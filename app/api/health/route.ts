@@ -10,3 +10,5 @@ export function GET() {
     { status: 200 },
   );
 }
+
+export const HEAD = GET;

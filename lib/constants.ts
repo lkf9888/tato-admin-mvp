@@ -49,7 +49,7 @@ export const csvFieldOptions = [
   { value: "status", label: "Trip status" },
 ] as const;
 
-export const demoCredentials = {
+export const bootstrapAdminCredentials = {
   email: process.env.ADMIN_EMAIL ?? "admin@local.test",
   password: process.env.ADMIN_PASSWORD ?? "admin123",
 };

@@ -5,7 +5,6 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { demoCredentials } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 
 const ADMIN_COOKIE = "turo-admin-session";
@@ -74,17 +73,6 @@ export async function validateAdminCredentials(email: string, password: string) 
     return {
       sessionValue: user.id,
       user,
-    };
-  }
-
-  if (normalizedEmail === normalizeEmail(demoCredentials.email) && password === demoCredentials.password) {
-    return {
-      sessionValue: "demo-admin",
-      user: {
-        id: "demo-admin",
-        name: "Demo Admin",
-        email: demoCredentials.email,
-      },
     };
   }
 

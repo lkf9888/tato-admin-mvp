@@ -62,16 +62,6 @@ export function AppShell({
             />
           </div>
 
-          <div className="mt-5 rounded-2xl bg-slate-950 p-3 text-[11px] text-white">
-            <p className="text-[10px] uppercase tracking-[0.22em] text-emerald-200">
-              {messages.shell.demoAccessKicker}
-            </p>
-            <p className="mt-1.5 leading-4 text-slate-200">{messages.shell.demoAccessCopy}</p>
-            <p className="mt-1.5 font-mono text-[10px] text-emerald-200">
-              demo-daniel-owner / owner123
-            </p>
-          </div>
-
           <form action={logoutAction} className="mt-5">
             <button className="w-full rounded-xl border border-slate-300 px-3 py-2 text-[13px] font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950">
               {messages.shell.signOut}

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { loginAction } from "@/app/actions";
-import { demoCredentials } from "@/lib/constants";
 import { isAdminAuthenticated } from "@/lib/auth";
 import { getMessages } from "@/lib/i18n";
 
@@ -55,19 +54,7 @@ export default async function LoginPage({
           <div className="mx-auto w-full max-w-md">
             <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{loginMessages.kicker}</p>
             <h2 className="mt-3 font-serif text-4xl text-slate-950">{loginMessages.title}</h2>
-            <p className="mt-3 text-sm text-slate-600">
-              {loginMessages.description}
-            </p>
-
-            <div className="mt-6 rounded-3xl bg-slate-100 p-5 text-sm text-slate-700">
-              <p className="font-semibold text-slate-900">{loginMessages.demoCredentials}</p>
-              <p className="mt-2">
-                {loginMessages.emailLabel}: {demoCredentials.email}
-              </p>
-              <p>
-                {loginMessages.passwordLabel}: {demoCredentials.password}
-              </p>
-            </div>
+            <p className="mt-3 text-sm text-slate-600">{loginMessages.description}</p>
 
             <form action={loginAction} className="mt-8 space-y-4">
               <label className="block">
@@ -76,7 +63,7 @@ export default async function LoginPage({
                 </span>
                 <input
                   name="email"
-                  defaultValue={demoCredentials.email}
+                  type="email"
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
                 />
               </label>
@@ -87,7 +74,6 @@ export default async function LoginPage({
                 <input
                   name="password"
                   type="password"
-                  defaultValue={demoCredentials.password}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
                 />
               </label>

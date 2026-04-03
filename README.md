@@ -33,15 +33,10 @@ npm run dev
 
 打开 [http://localhost:3000](http://localhost:3000)
 
-## 默认账号
+## 默认本地管理员
 
 - Admin email: `admin@local.test`
 - Admin password: `admin123`
-
-## 共享页示例
-
-- URL: `/share/demo-daniel-owner`
-- Password: `owner123`
 
 ## CSV 示例文件
 

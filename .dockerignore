@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.env.local
+.env.production
+.git
+.gitignore
+.next
+node_modules
+prisma/dev.db
+data
+npm-debug.log*
+Dockerfile*
+docker-compose*.yml

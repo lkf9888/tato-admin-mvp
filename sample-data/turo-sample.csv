@@ -1,0 +1,4 @@
+Reservation ID,Car,Guest Name,Phone,Trip Start,Trip End,Earnings,Status
+TURO-1001,Tesla Model 3 - White,Alice Zhang,7785550101,2026-03-30 09:00,2026-04-02 18:00,420.50,booked
+TURO-1002,Tesla Model Y - Black,Michael Chen,6045550112,2026-04-01 11:00,2026-04-05 10:00,590,ongoing
+TURO-1003,BMW X3 - Blue,Sarah Lee,2365550199,2026-04-04 15:00,2026-04-06 09:30,315.25,booked

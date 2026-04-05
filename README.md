@@ -20,6 +20,7 @@
 - Prisma
 - SQLite
 - FullCalendar
+- Stripe Checkout + Billing Portal
 
 ## 本地运行
 
@@ -37,6 +38,34 @@ npm run dev
 
 - Admin email: `admin@local.test`
 - Admin password: `admin123`
+
+## Stripe 订阅计费
+
+当前版本包含一个车辆名额订阅 MVP：
+
+- 前 5 台车辆免费
+- 从第 6 台开始，每多 1 台车辆名额收费 `$1 USD / 月`
+- 只有已购买名额覆盖车辆数量后，才允许导入 CSV
+- 如果 CSV 预估导入后的车辆数量超过已付费名额，系统会弹窗提示补交费用
+
+### Stripe 必填环境变量
+
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+STRIPE_SECRET_KEY=
+STRIPE_LISTING_PRICE_ID=
+STRIPE_WEBHOOK_SECRET=
+```
+
+说明：
+
+- `STRIPE_LISTING_PRICE_ID` 应该指向你在 Stripe 后台创建的 `$1 USD / month` recurring price
+- `STRIPE_WEBHOOK_SECRET` 用于校验 Stripe webhook
+- webhook 地址应指向：
+
+```text
+https://你的域名/api/stripe/webhook
+```
 
 ## CSV 示例文件
 
@@ -112,11 +141,32 @@ DATABASE_URL=file:/app/data/tato-prod.db
 SESSION_SECRET=replace-with-a-long-random-secret
 ADMIN_EMAIL=admin@local.test
 ADMIN_PASSWORD=admin123
+NEXT_PUBLIC_APP_URL=https://your-app.up.railway.app
+STRIPE_SECRET_KEY=
+STRIPE_LISTING_PRICE_ID=
+STRIPE_WEBHOOK_SECRET=
 ```
 
 如果需要，可以先参考：
 
 - `.env.railway.example`
+
+如果你要启用 Stripe 订阅计费，还需要：
+
+1. 在 Stripe 创建一个 `$1 USD / month` 的 recurring price
+2. 把这个 price 的 ID 填到 `STRIPE_LISTING_PRICE_ID`
+3. 在 Stripe 新建 webhook，监听这些事件：
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.paid`
+   - `invoice.payment_failed`
+4. 把 webhook 地址指向：
+
+```text
+https://你的 Railway 域名/api/stripe/webhook
+```
 
 #### 5. 触发部署
 

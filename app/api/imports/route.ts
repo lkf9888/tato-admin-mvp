@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { isAdminAuthenticated } from "@/lib/auth";
+import { assertImportWithinBillingLimit } from "@/lib/billing";
 import { importTuroOrders } from "@/lib/orders";
 
 const importSchema = z.object({
@@ -19,6 +20,12 @@ export async function POST(request: Request) {
 
   try {
     const parsed = importSchema.parse(await request.json());
+    await assertImportWithinBillingLimit({
+      rows: parsed.rows,
+      mapping: parsed.mapping,
+      createMissingVehicles: parsed.createMissingVehicles ?? false,
+    });
+
     const result = await importTuroOrders({
       fileName: parsed.fileName,
       rows: parsed.rows,
@@ -29,6 +36,20 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      (error as Error & { code?: string }).code === "BILLING_LIMIT_EXCEEDED"
+    ) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          details: (error as Error & { details?: unknown }).details,
+        },
+        { status: 402 },
+      );
+    }
+
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Import failed",

@@ -35,6 +35,24 @@ enum ShareVisibility {
   privacy
 }
 
+enum ListingStatus {
+  draft
+  published
+  archived
+}
+
+enum WorkspaceBillingStatus {
+  inactive
+  incomplete
+  incomplete_expired
+  trialing
+  active
+  past_due
+  canceled
+  unpaid
+  paused
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -132,6 +150,71 @@ model ShareLink {
   createdBy    String
   createdAt    DateTime        @default(now())
   owner        Owner           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+}
+
+model RentalListing {
+  id            String        @id @default(cuid())
+  publicId      String        @unique
+  status        ListingStatus @default(draft)
+  title         String
+  propertyType  String
+  neighborhood  String?
+  addressLine   String?
+  city          String
+  province      String
+  monthlyRent   Int
+  bedrooms      Float
+  bathrooms     Float
+  areaSqft      Int?
+  availableFrom DateTime?
+  summary       String
+  description   String
+  highlights    String?
+  amenities     String?
+  petPolicy     String?
+  parkingInfo   String?
+  furnishedInfo String?
+  contactName   String?
+  contactPhone  String?
+  contactEmail  String?
+  publishedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  photos        ListingPhoto[]
+
+  @@index([status, updatedAt])
+}
+
+model ListingPhoto {
+  id          String        @id @default(cuid())
+  listingId   String
+  storagePath String
+  mimeType    String
+  altText     String?
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  listing     RentalListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, sortOrder])
+}
+
+model WorkspaceBilling {
+  id                           String                 @id
+  freeVehicleSlots             Int                    @default(5)
+  purchasedVehicleSlots        Int                    @default(0)
+  stripeCustomerId             String?                @unique
+  stripeSubscriptionId         String?                @unique
+  stripeSubscriptionItemId     String?
+  stripePriceId                String?
+  stripePortalConfigurationId  String?
+  stripeLatestCheckoutSessionId String?
+  status                       WorkspaceBillingStatus @default(inactive)
+  currentPeriodStart           DateTime?
+  currentPeriodEnd             DateTime?
+  lastCheckoutAt               DateTime?
+  lastPaidAt                   DateTime?
+  createdAt                    DateTime               @default(now())
+  updatedAt                    DateTime               @updatedAt
 }
 
 model ActivityLog {

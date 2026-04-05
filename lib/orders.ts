@@ -293,6 +293,25 @@ function extractPlateNumber(vehicleLabel?: string, externalVehicleId?: string, v
   return null;
 }
 
+function buildProjectedVehicleKey(input: {
+  vehicleLabel?: string;
+  vehicleName?: string;
+  externalVehicleId?: string;
+  vin?: string;
+}) {
+  const plateNumber = extractPlateNumber(
+    input.vehicleLabel,
+    input.externalVehicleId,
+    input.vin,
+  );
+  if (plateNumber) return `plate:${plateNumber}`;
+  if (input.externalVehicleId) return `vehicle:${normalizeText(input.externalVehicleId)}`;
+  if (input.vin) return `vin:${normalizeText(input.vin)}`;
+  if (input.vehicleName) return `name:${normalizeText(input.vehicleName)}`;
+  if (input.vehicleLabel) return `label:${normalizeText(input.vehicleLabel)}`;
+  return null;
+}
+
 function parseVehicleBasics(vehicleName?: string) {
   const fallback = {
     brand: "Unknown",
@@ -463,6 +482,55 @@ export function normalizeCsvFieldMapping(input: Record<string, string>): CsvFiel
   }
 
   return normalized;
+}
+
+export async function estimateImportVehicleImpact(input: {
+  mapping: CsvFieldMapping;
+  rows: CsvImportRow[];
+  createMissingVehicles?: boolean;
+}) {
+  const mapping = normalizeCsvFieldMapping(input.mapping as Record<string, string>);
+  const vehicles = await prisma.vehicle.findMany();
+  const projectedNewVehicleKeys = new Set<string>();
+
+  for (const row of input.rows) {
+    const vehicleLabel = safeString(row[mapping.vehicleLabel ?? ""]);
+    const vehicleName = safeString(row[mapping.vehicleName ?? ""]);
+    const externalVehicleId = safeString(row[mapping.externalVehicleId ?? ""]);
+    const vin = safeString(row[mapping.vin ?? ""]);
+
+    if (!vehicleLabel && !vehicleName && !externalVehicleId && !vin) {
+      continue;
+    }
+
+    const existingVehicle = resolveVehicleFromCsv(vehicles, {
+      vehicleLabel,
+      vehicleName,
+      externalVehicleId,
+      vin,
+    });
+
+    if (existingVehicle || !input.createMissingVehicles) {
+      continue;
+    }
+
+    const projectedKey = buildProjectedVehicleKey({
+      vehicleLabel,
+      vehicleName,
+      externalVehicleId,
+      vin,
+    });
+
+    if (projectedKey) {
+      projectedNewVehicleKeys.add(projectedKey);
+    }
+  }
+
+  return {
+    currentVehicleCount: vehicles.length,
+    projectedNewVehicleCount: projectedNewVehicleKeys.size,
+    projectedVehicleCount: vehicles.length + projectedNewVehicleKeys.size,
+  };
 }
 
 export async function importTuroOrders(input: {

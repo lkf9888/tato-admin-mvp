@@ -32,6 +32,12 @@ function isSignedPayloadValid(payload?: string) {
   return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
 }
 
+function getSignedPayloadValue(payload?: string) {
+  if (!payload || !isSignedPayloadValid(payload)) return null;
+  const [value] = payload.split(".");
+  return value ?? null;
+}
+
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
@@ -56,11 +62,33 @@ export async function isAdminAuthenticated() {
   return isSignedPayloadValid(store.get(ADMIN_COOKIE)?.value);
 }
 
+export async function getAdminSessionValue() {
+  const store = await cookies();
+  return getSignedPayloadValue(store.get(ADMIN_COOKIE)?.value);
+}
+
+export async function getCurrentAdminUser() {
+  const sessionValue = await getAdminSessionValue();
+  if (!sessionValue) return null;
+
+  return prisma.user.findUnique({
+    where: { id: sessionValue },
+  });
+}
+
 export async function requireAdminAuth() {
   const authenticated = await isAdminAuthenticated();
   if (!authenticated) {
     redirect("/login");
   }
+}
+
+export async function requireCurrentAdminUser() {
+  const user = await getCurrentAdminUser();
+  if (!user) {
+    redirect("/login");
+  }
+  return user;
 }
 
 export async function validateAdminCredentials(email: string, password: string) {

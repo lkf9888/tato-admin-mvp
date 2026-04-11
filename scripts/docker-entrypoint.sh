@@ -11,7 +11,7 @@ if [ "$DB_PATH" != "$DATABASE_URL" ]; then
   mkdir -p "$(dirname "$DB_PATH")"
 fi
 
-npx prisma db push
+npx prisma db push --accept-data-loss
 
 PORT="${PORT:-3000}"
 

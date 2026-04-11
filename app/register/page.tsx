@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { registerAction } from "@/app/actions";
 import { isAdminAuthenticated } from "@/lib/auth";
 import { getMessages } from "@/lib/i18n";
+import { APP_VERSION_LABEL } from "@/lib/version";
 
 export default async function RegisterPage({
   searchParams,
@@ -113,6 +114,10 @@ export default async function RegisterPage({
                 {registerMessages.loginLink}
               </a>
             </div>
+
+            <p className="mt-4 text-xs uppercase tracking-[0.2em] text-slate-400">
+              {loginMessages.versionLabel} {APP_VERSION_LABEL}
+            </p>
           </div>
         </section>
       </div>

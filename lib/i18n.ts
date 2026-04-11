@@ -185,6 +185,7 @@ const messages = {
       languageLabel: "Language",
       languageHint: "Choose Auto to follow the browser language, or lock the interface to English or Chinese.",
       languageAutoLabel: "Auto",
+      versionLabel: "Version",
     },
     login: {
       brandName: "TATO",
@@ -207,6 +208,7 @@ const messages = {
       registerPrompt: "Need a new admin account?",
       registerLink: "Create account",
       submit: "Enter dashboard",
+      versionLabel: "Version",
     },
     register: {
       kicker: "Create admin account",
@@ -522,6 +524,7 @@ const messages = {
       languageLabel: "语言",
       languageHint: "选择“自动”时会跟随浏览器语言，也可以手动固定为英文或中文。",
       languageAutoLabel: "自动",
+      versionLabel: "版本号",
     },
     login: {
       brandName: "TATO",
@@ -544,6 +547,7 @@ const messages = {
       registerPrompt: "还没有后台账号？",
       registerLink: "创建新账号",
       submit: "进入后台",
+      versionLabel: "版本号",
     },
     register: {
       kicker: "创建后台账号",

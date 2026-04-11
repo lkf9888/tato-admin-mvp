@@ -3,6 +3,7 @@ import Link from "next/link";
 import { logoutAction } from "@/app/actions";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { getMessages, type Locale } from "@/lib/i18n";
+import { APP_VERSION_LABEL } from "@/lib/version";
 
 export function AppShell({
   locale,
@@ -64,6 +65,11 @@ export function AppShell({
               hint={messages.shell.languageHint}
               autoLabel={messages.shell.languageAutoLabel}
             />
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-[11px] text-slate-600">
+            <p className="font-medium text-slate-800">{messages.shell.versionLabel}</p>
+            <p className="mt-1">{APP_VERSION_LABEL}</p>
           </div>
 
           <form action={logoutAction} className="mt-5">

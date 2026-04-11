@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --page: #eef2e9;
-  --panel-strong: #e3eadb;
-  --accent-soft: #d8ead8;
+  --page: #f1ede4;
+  --panel-strong: #e9e2d5;
+  --accent-soft: #d9e3d4;
 }
 
 * {
@@ -11,16 +11,20 @@
 }
 
 html {
-  background: radial-gradient(circle at top left, #f8fbf4 0%, #eef2e9 60%, #e7ecdf 100%);
+  background:
+    radial-gradient(circle at top left, rgba(235, 207, 165, 0.32), transparent 28%),
+    radial-gradient(circle at 88% 12%, rgba(129, 158, 140, 0.22), transparent 24%),
+    linear-gradient(180deg, #f7f4ed 0%, #f1ede4 56%, #ece6da 100%);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 13px;
-  line-height: 1.35;
+  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
   color: #0f172a;
+  background: transparent;
 }
 
 a {
@@ -36,11 +40,62 @@ textarea {
 }
 
 .font-serif {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+textarea {
+  resize: vertical;
+}
+
+::selection {
+  background: rgba(202, 176, 129, 0.32);
+}
+
+.animate-rise {
+  animation: rise-in 720ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.animate-fade {
+  animation: fade-in 680ms ease both;
+}
+
+.animate-drift {
+  animation: drift 9s ease-in-out infinite;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
 }
 
 .fc .fc-toolbar-title {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   font-size: 1.25rem;
 }
 

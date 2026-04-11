@@ -198,7 +198,7 @@ async function ensurePortalConfigurationId(
 
   const configuration = await stripe.billingPortal.configurations.create({
     business_profile: {
-      headline: "Manage TATO listing subscription",
+      headline: "Manage TATO vehicle subscription",
     },
     default_return_url: `${getAppUrl()}/imports`,
     features: {

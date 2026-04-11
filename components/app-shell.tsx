@@ -6,11 +6,13 @@ import { getMessages, type Locale } from "@/lib/i18n";
 
 export function AppShell({
   locale,
+  localePreference,
   title,
   description,
   children,
 }: {
   locale: Locale;
+  localePreference: Locale | "auto";
   title: string;
   description: string;
   children: React.ReactNode;
@@ -57,8 +59,10 @@ export function AppShell({
           <div className="mt-5">
             <LanguageSwitcher
               locale={locale}
+              preference={localePreference}
               label={messages.shell.languageLabel}
               hint={messages.shell.languageHint}
+              autoLabel={messages.shell.languageAutoLabel}
             />
           </div>
 

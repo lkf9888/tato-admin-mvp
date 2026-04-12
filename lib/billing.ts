@@ -1,6 +1,10 @@
 import "server-only";
 
-import { WorkspaceBillingStatus, type WorkspaceBilling } from "@prisma/client";
+import {
+  Prisma,
+  WorkspaceBillingStatus,
+  type WorkspaceBilling,
+} from "@prisma/client";
 import type Stripe from "stripe";
 
 import { getCurrentAdminUser } from "@/lib/auth";
@@ -15,6 +19,27 @@ const ACTIVE_BILLING_STATUSES = new Set<WorkspaceBillingStatus>([
   WorkspaceBillingStatus.active,
   WorkspaceBillingStatus.trialing,
 ]);
+
+type FreeSlotCouponConfig = {
+  code: string;
+  bonusVehicleSlots: number;
+  description: string;
+};
+
+export type BillingCouponResolution =
+  | {
+      kind: "free_slots";
+      code: string;
+      bonusVehicleSlots: number;
+      description: string;
+      snapshot: Awaited<ReturnType<typeof getWorkspaceBillingSnapshot>>;
+    }
+  | {
+      kind: "promotion";
+      code: string;
+      promotionCodeId: string;
+      description: string;
+    };
 
 function mapStripeSubscriptionStatus(status?: Stripe.Subscription.Status | null) {
   switch (status) {
@@ -39,6 +64,105 @@ function mapStripeSubscriptionStatus(status?: Stripe.Subscription.Status | null)
   }
 }
 
+function normalizeCouponCode(code: string) {
+  return code.trim().toUpperCase();
+}
+
+function buildBillingReturnPath(input?: string, billingState?: string) {
+  const fallback = "/billing";
+  const normalized = input?.trim().startsWith("/") ? input.trim() : fallback;
+  const url = new URL(normalized, "https://tato.local");
+  if (billingState) {
+    url.searchParams.set("billing", billingState);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+function formatStripeCouponDescription(coupon: Stripe.Coupon) {
+  if (coupon.name?.trim()) {
+    return coupon.name.trim();
+  }
+
+  if (coupon.percent_off) {
+    return `${coupon.percent_off}% off`;
+  }
+
+  if (coupon.amount_off && coupon.currency) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: coupon.currency.toUpperCase(),
+    }).format(coupon.amount_off / 100);
+  }
+
+  return "Stripe discount";
+}
+
+function parseConfiguredFreeSlotCoupons() {
+  const rawCoupons = process.env.BILLING_FREE_SLOT_COUPONS?.trim();
+  if (!rawCoupons) {
+    return [];
+  }
+
+  return rawCoupons
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .flatMap<FreeSlotCouponConfig>((entry) => {
+      const [rawCode, rawSlots, ...descriptionParts] = entry.split(":");
+      const code = normalizeCouponCode(rawCode ?? "");
+      const bonusVehicleSlots = Number.parseInt((rawSlots ?? "").trim(), 10);
+
+      if (!code || !Number.isFinite(bonusVehicleSlots) || bonusVehicleSlots < 1) {
+        return [];
+      }
+
+      return [
+        {
+          code,
+          bonusVehicleSlots,
+          description:
+            descriptionParts.join(":").trim() || `${bonusVehicleSlots} free listing slot(s)`,
+        },
+      ];
+    });
+}
+
+function getConfiguredFreeSlotCoupon(code: string) {
+  const normalizedCode = normalizeCouponCode(code);
+  return parseConfiguredFreeSlotCoupons().find((coupon) => coupon.code === normalizedCode) ?? null;
+}
+
+async function findStripePromotionCode(code: string) {
+  if (!code || !isStripeBillingConfigured()) {
+    return null;
+  }
+
+  const stripe = getStripeClient();
+  const normalizedCode = normalizeCouponCode(code);
+  const response = await stripe.promotionCodes.list({
+    code: normalizedCode,
+    active: true,
+    limit: 1,
+  });
+
+  const promotionCode = response.data[0];
+  if (!promotionCode?.active) {
+    return null;
+  }
+
+  const coupon =
+    typeof promotionCode.promotion.coupon === "string"
+      ? await stripe.coupons.retrieve(promotionCode.promotion.coupon)
+      : promotionCode.promotion.coupon;
+
+  return {
+    kind: "promotion" as const,
+    code: promotionCode.code || normalizedCode,
+    promotionCodeId: promotionCode.id,
+    description: coupon ? formatStripeCouponDescription(coupon) : "Stripe discount",
+  };
+}
+
 export async function ensureWorkspaceBilling() {
   return prisma.workspaceBilling.upsert({
     where: { id: WORKSPACE_BILLING_ID },
@@ -55,14 +179,15 @@ export function getEffectivePurchasedVehicleSlots(billing: WorkspaceBilling) {
 }
 
 export function getAllowedVehicleCount(billing: WorkspaceBilling) {
-  return billing.freeVehicleSlots + getEffectivePurchasedVehicleSlots(billing);
+  return billing.freeVehicleSlots + billing.bonusVehicleSlots + getEffectivePurchasedVehicleSlots(billing);
 }
 
 export function getRequiredPaidSlotsForVehicleCount(
   vehicleCount: number,
   freeVehicleSlots = FREE_VEHICLE_SLOTS,
+  bonusVehicleSlots = 0,
 ) {
-  return Math.max(0, vehicleCount - freeVehicleSlots);
+  return Math.max(0, vehicleCount - freeVehicleSlots - bonusVehicleSlots);
 }
 
 export async function getWorkspaceBillingSnapshot() {
@@ -73,18 +198,25 @@ export async function getWorkspaceBillingSnapshot() {
 
   const effectivePurchasedVehicleSlots = getEffectivePurchasedVehicleSlots(billing);
   const allowedVehicleCount = getAllowedVehicleCount(billing);
-  const requiredPaidSlots = getRequiredPaidSlotsForVehicleCount(currentVehicleCount, billing.freeVehicleSlots);
+  const requiredPaidSlots = getRequiredPaidSlotsForVehicleCount(
+    currentVehicleCount,
+    billing.freeVehicleSlots,
+    billing.bonusVehicleSlots,
+  );
 
   return {
     billing,
     currentVehicleCount,
     freeVehicleSlots: billing.freeVehicleSlots,
+    bonusVehicleSlots: billing.bonusVehicleSlots,
     purchasedVehicleSlots: billing.purchasedVehicleSlots,
     effectivePurchasedVehicleSlots,
     allowedVehicleCount,
     requiredPaidSlots,
     isOverLimit: currentVehicleCount > allowedVehicleCount,
     stripeConfigured: isStripeBillingConfigured(),
+    status: billing.status,
+    currentPeriodEnd: billing.currentPeriodEnd,
   };
 }
 
@@ -106,6 +238,7 @@ export async function getImportBillingProjection(input: {
   const requiredPaidSlots = getRequiredPaidSlotsForVehicleCount(
     projectedVehicleCount,
     snapshot.freeVehicleSlots,
+    snapshot.bonusVehicleSlots,
   );
   const additionalPaidSlotsNeeded = Math.max(
     0,
@@ -198,9 +331,9 @@ async function ensurePortalConfigurationId(
 
   const configuration = await stripe.billingPortal.configurations.create({
     business_profile: {
-      headline: "Manage TATO vehicle subscription",
+      headline: "Manage TATO listing quota",
     },
-    default_return_url: `${getAppUrl()}/imports`,
+    default_return_url: `${getAppUrl()}/billing`,
     features: {
       invoice_history: {
         enabled: true,
@@ -237,9 +370,68 @@ async function ensurePortalConfigurationId(
   return configuration.id;
 }
 
+export async function resolveBillingCoupon(code: string): Promise<BillingCouponResolution> {
+  const normalizedCode = normalizeCouponCode(code);
+  if (!normalizedCode) {
+    throw new Error("Please enter a coupon code first.");
+  }
+
+  await ensureWorkspaceBilling();
+  const freeSlotCoupon = getConfiguredFreeSlotCoupon(normalizedCode);
+  if (freeSlotCoupon) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.billingCouponRedemption.create({
+          data: {
+            workspaceBillingId: WORKSPACE_BILLING_ID,
+            code: normalizedCode,
+            couponType: "free_slots",
+            bonusVehicleSlots: freeSlotCoupon.bonusVehicleSlots,
+            metadata: freeSlotCoupon.description,
+          },
+        });
+
+        await tx.workspaceBilling.update({
+          where: { id: WORKSPACE_BILLING_ID },
+          data: {
+            bonusVehicleSlots: {
+              increment: freeSlotCoupon.bonusVehicleSlots,
+            },
+          },
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new Error("This free quota coupon has already been redeemed.");
+      }
+      throw error;
+    }
+
+    return {
+      kind: "free_slots",
+      code: normalizedCode,
+      bonusVehicleSlots: freeSlotCoupon.bonusVehicleSlots,
+      description: freeSlotCoupon.description,
+      snapshot: await getWorkspaceBillingSnapshot(),
+    };
+  }
+
+  const promotionCode = await findStripePromotionCode(normalizedCode);
+  if (promotionCode) {
+    return promotionCode;
+  }
+
+  throw new Error("Coupon code is invalid or inactive.");
+}
+
 export async function createBillingCheckoutUrl(input: {
   desiredPaidVehicleSlots: number;
   origin?: string;
+  returnPath?: string;
+  couponCode?: string;
 }) {
   if (!isStripeBillingConfigured()) {
     throw new Error("Stripe billing is not configured yet.");
@@ -254,14 +446,44 @@ export async function createBillingCheckoutUrl(input: {
   const { billing, stripeCustomerId } = await ensureStripeCustomer();
   const appUrl = getAppUrl(input.origin);
   const priceId = getStripePriceId();
+  const returnPath = buildBillingReturnPath(input.returnPath, "updated");
+  const successPath = buildBillingReturnPath(input.returnPath, "success");
+  const cancelPath = buildBillingReturnPath(input.returnPath, "cancelled");
+  const couponCode = normalizeCouponCode(input.couponCode ?? "");
+
+  if (couponCode && getConfiguredFreeSlotCoupon(couponCode)) {
+    throw new Error("This coupon adds free quota. Apply it on the quota page before checkout.");
+  }
+
+  const promotionCode = couponCode ? await findStripePromotionCode(couponCode) : null;
 
   if (billing.stripeSubscriptionId && billing.stripeSubscriptionItemId) {
-    const configurationId = await ensurePortalConfigurationId(billing, stripe);
+    if (promotionCode) {
+      const updatedSubscription = await stripe.subscriptions.update(billing.stripeSubscriptionId, {
+        items: [
+          {
+            id: billing.stripeSubscriptionItemId,
+            price: priceId,
+            quantity: desiredPaidVehicleSlots,
+          },
+        ],
+        discounts: [
+          {
+            promotion_code: promotionCode.promotionCodeId,
+          },
+        ],
+        proration_behavior: "always_invoice",
+      });
 
+      await syncWorkspaceBillingFromStripeSubscription(updatedSubscription);
+      return `${appUrl}${returnPath}`;
+    }
+
+    const configurationId = await ensurePortalConfigurationId(billing, stripe);
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
       configuration: configurationId,
-      return_url: `${appUrl}/imports?billing=updated`,
+      return_url: `${appUrl}${returnPath}`,
       flow_data: {
         type: "subscription_update_confirm",
         subscription_update_confirm: {
@@ -283,8 +505,8 @@ export async function createBillingCheckoutUrl(input: {
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: stripeCustomerId,
-    success_url: `${appUrl}/imports?billing=success`,
-    cancel_url: `${appUrl}/imports?billing=cancelled`,
+    success_url: `${appUrl}${successPath}`,
+    cancel_url: `${appUrl}${cancelPath}`,
     line_items: [
       {
         price: priceId,
@@ -296,14 +518,23 @@ export async function createBillingCheckoutUrl(input: {
         },
       },
     ],
+    discounts: promotionCode
+      ? [
+          {
+            promotion_code: promotionCode.promotionCodeId,
+          },
+        ]
+      : undefined,
     metadata: {
       workspaceBillingId: WORKSPACE_BILLING_ID,
       desiredPaidVehicleSlots: String(desiredPaidVehicleSlots),
+      couponCode: promotionCode?.code ?? "",
     },
     subscription_data: {
       metadata: {
         workspaceBillingId: WORKSPACE_BILLING_ID,
         desiredPaidVehicleSlots: String(desiredPaidVehicleSlots),
+        couponCode: promotionCode?.code ?? "",
       },
     },
   });

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.0 - 2026-04-11
+
+- Added a dedicated `购买额度 / Buy Quota` page in the admin sidebar for managing listing capacity separately from CSV imports.
+- Added coupon support with two paths: Stripe promotion codes for discounts and internal free-quota codes that instantly add bonus vehicle slots.
+- Updated CSV import over-limit prompts so they send admins to the quota page instead of starting Stripe from inside the import modal.
+- Extended workspace billing to track bonus quota and coupon redemptions in Prisma.
+
 ## v0.2.0 - 2026-04-10
 
 - Restored the app back to the correct `TATO / Turo` branding after mixed `Harborline` content was removed.

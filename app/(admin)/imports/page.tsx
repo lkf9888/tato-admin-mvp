@@ -26,13 +26,14 @@ export default async function ImportsPage({
         billingSnapshot={{
           currentVehicleCount: billingSnapshot.currentVehicleCount,
           freeVehicleSlots: billingSnapshot.freeVehicleSlots,
+          bonusVehicleSlots: billingSnapshot.bonusVehicleSlots,
           purchasedVehicleSlots: billingSnapshot.purchasedVehicleSlots,
           effectivePurchasedVehicleSlots: billingSnapshot.effectivePurchasedVehicleSlots,
           allowedVehicleCount: billingSnapshot.allowedVehicleCount,
           requiredPaidSlots: billingSnapshot.requiredPaidSlots,
           isOverLimit: billingSnapshot.isOverLimit,
           stripeConfigured: billingSnapshot.stripeConfigured,
-          status: billingSnapshot.billing.status,
+          status: billingSnapshot.status,
         }}
         billingState={params.billing ?? null}
       />

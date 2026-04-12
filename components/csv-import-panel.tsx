@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Papa from "papaparse";
 
@@ -10,6 +11,7 @@ type PreviewRow = Record<string, string>;
 type BillingSnapshot = {
   currentVehicleCount: number;
   freeVehicleSlots: number;
+  bonusVehicleSlots: number;
   purchasedVehicleSlots: number;
   effectivePurchasedVehicleSlots: number;
   allowedVehicleCount: number;
@@ -51,14 +53,6 @@ const guessField = (header: string) => {
   return "";
 };
 
-function formatUsd(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
 export function CsvImportPanel({
   locale,
   billingSnapshot,
@@ -79,15 +73,10 @@ export function CsvImportPanel({
   const [createMissingVehicles, setCreateMissingVehicles] = useState(true);
   const [billingProjection, setBillingProjection] = useState<BillingProjection | null>(null);
   const [billingNotice, setBillingNotice] = useState("");
-  const [billingError, setBillingError] = useState("");
   const [billingCheckError, setBillingCheckError] = useState("");
   const [showBillingModal, setShowBillingModal] = useState(false);
-  const [desiredPaidVehicleSlots, setDesiredPaidVehicleSlots] = useState(
-    Math.max(1, billingSnapshot.requiredPaidSlots || billingSnapshot.purchasedVehicleSlots || 1),
-  );
   const [isPending, startTransition] = useTransition();
   const [isCheckingBilling, startBillingCheckTransition] = useTransition();
-  const [isCheckoutPending, startCheckoutTransition] = useTransition();
 
   const previewRows = useMemo(() => rows.slice(0, 5), [rows]);
 
@@ -146,9 +135,6 @@ export function CsvImportPanel({
       setBillingCheckError("");
 
       if (payload.exceedsPurchasedLimit) {
-        setDesiredPaidVehicleSlots((current) =>
-          Math.max(current, payload.requiredProjectedPaidSlots, billingSnapshot.purchasedVehicleSlots || 1),
-        );
         setShowBillingModal(true);
       }
     });
@@ -158,7 +144,6 @@ export function CsvImportPanel({
     createMissingVehicles,
     missingRequired.length,
     panelMessages.billing.genericError,
-    billingSnapshot.purchasedVehicleSlots,
   ]);
 
   const activeProjection = billingProjection ?? {
@@ -173,29 +158,7 @@ export function CsvImportPanel({
     exceedsPurchasedLimit: billingSnapshot.isOverLimit,
   };
 
-  async function startCheckout() {
-    setBillingError("");
-
-    startCheckoutTransition(async () => {
-      const response = await fetch("/api/billing/checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          desiredPaidVehicleSlots,
-        }),
-      });
-
-      const payload = (await response.json()) as { error?: string; url?: string };
-      if (!response.ok || !payload.url) {
-        setBillingError(payload.error ?? panelMessages.billing.genericError);
-        return;
-      }
-
-      window.location.href = payload.url;
-    });
-  }
+  const billingPageHref = `/billing?required=${activeProjection.requiredProjectedPaidSlots}&projected=${activeProjection.projectedVehicleCount}&needed=${activeProjection.additionalPaidSlotsNeeded}`;
 
   function handleImport() {
     if (activeProjection.exceedsPurchasedLimit || billingSnapshot.isOverLimit) {
@@ -229,9 +192,6 @@ export function CsvImportPanel({
 
       if (response.status === 402 && billingDetails) {
         setBillingProjection(billingDetails);
-        setDesiredPaidVehicleSlots((current) =>
-          Math.max(current, billingDetails.requiredProjectedPaidSlots, billingSnapshot.purchasedVehicleSlots || 1),
-        );
         setShowBillingModal(true);
         setResult(payload.error ?? panelMessages.billing.limitExceeded);
         return;
@@ -359,6 +319,10 @@ export function CsvImportPanel({
                 <span className="font-semibold text-slate-950">{billingSnapshot.freeVehicleSlots}</span>
               </div>
               <div className="flex items-center justify-between">
+                <span>{messages.billingPage.couponBonus}</span>
+                <span className="font-semibold text-slate-950">{billingSnapshot.bonusVehicleSlots}</span>
+              </div>
+              <div className="flex items-center justify-between">
                 <span>{panelMessages.billing.paidSlots}</span>
                 <span className="font-semibold text-slate-950">{billingSnapshot.effectivePurchasedVehicleSlots}</span>
               </div>
@@ -373,21 +337,8 @@ export function CsvImportPanel({
             </div>
 
             <div className="mt-5 space-y-3">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">
-                  {panelMessages.billing.desiredSlots}
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={500}
-                  value={desiredPaidVehicleSlots}
-                  onChange={(event) => setDesiredPaidVehicleSlots(Math.max(1, Number(event.target.value) || 1))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
-                />
-              </label>
-              <p className="text-sm text-slate-600">
-                {panelMessages.billing.priceHint(formatUsd(desiredPaidVehicleSlots))}
+              <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                {messages.billingPage.quantityCopy}
               </p>
               {!billingSnapshot.stripeConfigured ? (
                 <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -399,23 +350,12 @@ export function CsvImportPanel({
                   {billingNotice}
                 </p>
               ) : null}
-              {billingError ? (
-                <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {billingError}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                disabled={!billingSnapshot.stripeConfigured || isCheckoutPending}
-                onClick={startCheckout}
-                className="w-full rounded-2xl bg-slate-950 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+              <Link
+                href={billingPageHref}
+                className="block w-full rounded-2xl bg-slate-950 px-4 py-3 text-center font-medium text-white transition hover:bg-slate-800"
               >
-                {isCheckoutPending
-                  ? panelMessages.billing.redirecting
-                  : billingSnapshot.purchasedVehicleSlots > 0
-                    ? panelMessages.billing.manageAction
-                    : panelMessages.billing.payAction}
-              </button>
+                {panelMessages.billing.openBillingPage}
+              </Link>
             </div>
           </div>
 
@@ -549,29 +489,6 @@ export function CsvImportPanel({
               </div>
             </div>
 
-            <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">
-                {panelMessages.billing.desiredSlots}
-              </span>
-              <input
-                type="number"
-                min={1}
-                max={500}
-                value={desiredPaidVehicleSlots}
-                onChange={(event) => setDesiredPaidVehicleSlots(Math.max(1, Number(event.target.value) || 1))}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
-              />
-            </label>
-            <p className="mt-3 text-sm text-slate-600">
-              {panelMessages.billing.modalPriceHint(formatUsd(desiredPaidVehicleSlots))}
-            </p>
-
-            {billingError ? (
-              <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {billingError}
-              </p>
-            ) : null}
-
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
@@ -580,14 +497,12 @@ export function CsvImportPanel({
               >
                 {panelMessages.billing.closeModal}
               </button>
-              <button
-                type="button"
-                disabled={!billingSnapshot.stripeConfigured || isCheckoutPending}
-                onClick={startCheckout}
-                className="flex-1 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+              <Link
+                href={billingPageHref}
+                className="flex-1 rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-slate-800"
               >
-                {isCheckoutPending ? panelMessages.billing.redirecting : panelMessages.billing.payAction}
-              </button>
+                {panelMessages.billing.openBillingPage}
+              </Link>
             </div>
           </div>
         </div>

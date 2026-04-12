@@ -55,12 +55,14 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 STRIPE_SECRET_KEY=
 STRIPE_LISTING_PRICE_ID=
 STRIPE_WEBHOOK_SECRET=
+BILLING_FREE_SLOT_COUPONS=
 ```
 
 说明：
 
 - `STRIPE_LISTING_PRICE_ID` 应该指向你在 Stripe 后台创建的 `$1 USD / month` recurring price
 - `STRIPE_WEBHOOK_SECRET` 用于校验 Stripe webhook
+- `BILLING_FREE_SLOT_COUPONS` 可选，用于配置免费额度 coupon，格式示例：`WELCOME3:3,VIP10:10`
 - webhook 地址应指向：
 
 ```text
@@ -145,6 +147,7 @@ NEXT_PUBLIC_APP_URL=https://your-app.up.railway.app
 STRIPE_SECRET_KEY=
 STRIPE_LISTING_PRICE_ID=
 STRIPE_WEBHOOK_SECRET=
+BILLING_FREE_SLOT_COUPONS=
 ```
 
 如果需要，可以先参考：

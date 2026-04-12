@@ -6,6 +6,8 @@ import { createBillingCheckoutUrl } from "@/lib/billing";
 
 const checkoutSchema = z.object({
   desiredPaidVehicleSlots: z.coerce.number().int().min(1).max(500),
+  couponCode: z.string().trim().max(100).optional(),
+  returnPath: z.string().trim().startsWith("/").max(200).optional(),
 });
 
 export async function POST(request: Request) {
@@ -18,6 +20,8 @@ export async function POST(request: Request) {
     const parsed = checkoutSchema.parse(await request.json());
     const url = await createBillingCheckoutUrl({
       desiredPaidVehicleSlots: parsed.desiredPaidVehicleSlots,
+      couponCode: parsed.couponCode,
+      returnPath: parsed.returnPath,
       origin: new URL(request.url).origin,
     });
 

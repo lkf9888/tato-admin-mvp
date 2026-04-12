@@ -2,18 +2,18 @@ import { cn } from "@/lib/utils";
 import { getStatusLabel, type Locale } from "@/lib/i18n";
 
 const badgeStyles: Record<string, string> = {
-  turo: "bg-sky-100 text-sky-800",
-  offline: "bg-emerald-100 text-emerald-800",
-  cancelled: "bg-slate-200 text-slate-700",
-  booked: "bg-amber-100 text-amber-800",
-  ongoing: "bg-violet-100 text-violet-800",
-  completed: "bg-slate-100 text-slate-600",
-  available: "bg-emerald-100 text-emerald-800",
-  maintenance: "bg-orange-100 text-orange-800",
-  inactive: "bg-slate-200 text-slate-700",
-  conflict: "bg-rose-100 text-rose-800",
-  standard: "bg-sky-100 text-sky-700",
-  privacy: "bg-fuchsia-100 text-fuchsia-700",
+  turo: "border border-slate-900/10 bg-slate-900 text-white",
+  offline: "border border-emerald-900/10 bg-emerald-50 text-emerald-900",
+  cancelled: "border border-slate-900/8 bg-slate-200 text-slate-700",
+  booked: "border border-[rgba(255,107,87,0.18)] bg-[var(--accent-soft)] text-[var(--ink)]",
+  ongoing: "border border-emerald-900/10 bg-[#dceee5] text-[#184b39]",
+  completed: "border border-slate-900/8 bg-[#f3ede2] text-slate-700",
+  available: "border border-emerald-900/10 bg-emerald-50 text-emerald-900",
+  maintenance: "border border-amber-900/10 bg-amber-100 text-amber-900",
+  inactive: "border border-slate-900/8 bg-slate-200 text-slate-700",
+  conflict: "border border-rose-900/12 bg-rose-100 text-rose-800",
+  standard: "border border-slate-900/8 bg-white text-slate-800",
+  privacy: "border border-[rgba(255,107,87,0.18)] bg-[var(--accent-soft)] text-[var(--ink)]",
 };
 
 export function StatusBadge({
@@ -28,7 +28,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize tracking-wide",
+        "inline-flex rounded-full px-3 py-1 text-[11px] font-semibold capitalize tracking-[0.08em]",
         badgeStyles[value] ?? "bg-slate-100 text-slate-700",
         className,
       )}

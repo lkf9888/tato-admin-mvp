@@ -8,10 +8,10 @@ export function MetricCard({
   hint: string;
 }) {
   return (
-    <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-sm">
-      <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{label}</p>
-      <p className="mt-4 font-serif text-4xl text-slate-950">{value}</p>
-      <p className="mt-3 text-sm text-slate-600">{hint}</p>
+    <div className="rounded-[2rem] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_20px_50px_rgba(17,19,24,0.05)]">
+      <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--ink-soft)]">{label}</p>
+      <p className="mt-4 font-serif text-[2.7rem] leading-none text-[var(--ink)]">{value}</p>
+      <p className="mt-3 max-w-[16rem] text-[13px] leading-5 text-[var(--ink-soft)]">{hint}</p>
     </div>
   );
 }

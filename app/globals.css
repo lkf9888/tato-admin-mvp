@@ -1,9 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --page: #eef2e9;
-  --panel-strong: #e3eadb;
-  --accent-soft: #d8ead8;
+  --page: #f6f1e8;
+  --page-glow: #fbf7ef;
+  --panel-strong: #ede5d7;
+  --surface: rgba(255, 251, 245, 0.92);
+  --surface-muted: #f3ece0;
+  --accent: #ff6b57;
+  --accent-soft: #ffe2d9;
+  --accent-soft-strong: #ffd0c3;
+  --ink: #111318;
+  --ink-soft: #5c5f69;
+  --line: rgba(17, 19, 24, 0.08);
 }
 
 * {
@@ -11,7 +19,10 @@
 }
 
 html {
-  background: radial-gradient(circle at top left, #f8fbf4 0%, #eef2e9 60%, #e7ecdf 100%);
+  background:
+    radial-gradient(circle at top left, rgba(255, 153, 120, 0.14), transparent 22rem),
+    radial-gradient(circle at top right, rgba(33, 90, 70, 0.12), transparent 26rem),
+    linear-gradient(180deg, var(--page-glow) 0%, var(--page) 100%);
 }
 
 body {
@@ -19,8 +30,11 @@ body {
   min-height: 100vh;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 13px;
-  line-height: 1.35;
-  color: #0f172a;
+  line-height: 1.4;
+  color: var(--ink);
+  background: transparent;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -33,10 +47,34 @@ input,
 select,
 textarea {
   font: inherit;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+button {
+  cursor: pointer;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 107, 87, 0.18);
+}
+
+::selection {
+  background: rgba(255, 107, 87, 0.2);
 }
 
 .font-serif {
   font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: -0.03em;
 }
 
 .fc .fc-toolbar-title {
@@ -47,7 +85,7 @@ textarea {
 .fc .fc-button {
   border-radius: 999px;
   border: none;
-  background: #0f172a;
+  background: var(--ink);
   padding: 0.5rem 0.85rem;
   font-size: 0.875rem;
   text-transform: capitalize;
@@ -55,11 +93,11 @@ textarea {
 
 .fc .fc-button-primary:not(:disabled).fc-button-active,
 .fc .fc-button-primary:not(:disabled):active {
-  background: #2563eb;
+  background: var(--accent);
 }
 
 .fc-theme-standard td,
 .fc-theme-standard th,
 .fc-theme-standard .fc-scrollgrid {
-  border-color: #e2e8f0;
+  border-color: rgba(17, 19, 24, 0.08);
 }

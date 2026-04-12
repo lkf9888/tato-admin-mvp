@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.0 - 2026-04-12
+
+- Refreshed the TATO UI with a more Turo-inspired visual direction: warmer ivory surfaces, darker ink panels, softer coral accents, and more spacious rounded layouts.
+- Restyled the login and register pages to feel closer to Turo's brand rhythm with a stronger poster-style hero and cleaner auth panel.
+- Updated the admin shell, status badges, metric cards, and global surfaces so the dashboard feels more cohesive across pages.
+
 ## v0.4.0 - 2026-04-11
 
 - Added support for a billing-bypass admin account for testing, so one designated admin can import CSV files without quota enforcement.

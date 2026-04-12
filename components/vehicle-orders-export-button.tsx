@@ -123,39 +123,39 @@ export function VehicleOrdersExportButton({
         type="button"
         onClick={openDialog}
         disabled={vehicleOptions.length === 0}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_14px_32px_-24px_rgba(17,19,24,0.45)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
       >
         {calendarMessages.downloadOrders}
       </button>
 
       {isOpen ? (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/35 p-4">
-          <div className="w-full max-w-xl rounded-[1.75rem] border border-white/70 bg-white p-5 shadow-2xl">
+          <div className="w-full max-w-xl rounded-[1.85rem] border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,244,236,0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
                   {calendarMessages.exportDialogTitle}
                 </p>
-                <p className="mt-2 max-w-xl text-[13px] leading-5 text-slate-600">
+                <p className="mt-2 max-w-xl text-[13px] leading-5 text-[color:var(--ink-soft)]">
                   {calendarMessages.exportDialogCopy}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeDialog}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-500 transition hover:border-slate-900 hover:text-slate-950"
+                className="inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white"
               >
                 {calendarMessages.cancelAction}
               </button>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <label className="grid gap-1.5 text-[11px] text-slate-600 sm:col-span-3">
+              <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)] sm:col-span-3">
                 <span>{calendarMessages.vehicleField}</span>
                 <select
                   value={vehicleId}
                   onChange={(event) => setVehicleId(event.target.value)}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-900 outline-none"
+                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 py-3 text-[13px] text-[color:var(--ink)] outline-none"
                 >
                   {vehicleOptions.map((vehicle) => (
                     <option key={vehicle.id} value={vehicle.id}>
@@ -167,29 +167,29 @@ export function VehicleOrdersExportButton({
                 </select>
               </label>
 
-              <label className="grid gap-1.5 text-[11px] text-slate-600">
+              <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.startDateField}</span>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(event) => setStartDate(event.target.value)}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-900 outline-none"
+                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 py-3 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
-              <label className="grid gap-1.5 text-[11px] text-slate-600">
+              <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.endDateField}</span>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(event) => setEndDate(event.target.value)}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-900 outline-none"
+                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 py-3 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
             </div>
 
             {error ? (
-              <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-[12px] text-rose-700">
+              <p className="mt-4 rounded-[1rem] bg-rose-50 px-4 py-3 text-[12px] text-rose-700">
                 {error}
               </p>
             ) : null}
@@ -198,7 +198,7 @@ export function VehicleOrdersExportButton({
               <button
                 type="button"
                 onClick={closeDialog}
-                className="rounded-2xl border border-slate-200 px-4 py-3 text-[12px] font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
+                className="inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white"
               >
                 {calendarMessages.cancelAction}
               </button>
@@ -206,7 +206,7 @@ export function VehicleOrdersExportButton({
                 type="button"
                 onClick={handleDownload}
                 disabled={isDownloading}
-                className="rounded-2xl bg-slate-950 px-4 py-3 text-[12px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(255,107,87,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isDownloading ? calendarMessages.downloadingAction : calendarMessages.downloadAction}
               </button>

@@ -129,14 +129,14 @@ function orderIntersectsRange(order: CalendarOrder, rangeStart: Date, rangeEndEx
 
 function getTimelineBarClasses(order: CalendarOrder, clippedStart: boolean, clippedEnd: boolean) {
   return cn(
-    "absolute flex items-center overflow-hidden border px-3 text-left text-xs font-semibold text-white shadow-sm transition hover:brightness-105",
+    "absolute flex items-center overflow-hidden border px-3 text-left text-xs font-semibold text-white shadow-[0_16px_32px_-20px_rgba(17,19,24,0.7)] transition hover:-translate-y-0.5 hover:brightness-105",
     order.hasConflict
-      ? "border-rose-500 bg-rose-500"
+      ? "border-[#e5484d] bg-[#e5484d]"
       : order.status === "cancelled"
         ? "border-slate-400 bg-slate-400"
         : order.source === "turo"
-          ? "border-blue-600 bg-blue-600"
-          : "border-emerald-600 bg-emerald-600",
+          ? "border-[#3456df] bg-[#3456df]"
+          : "border-[#2f7f67] bg-[#2f7f67]",
     clippedStart ? "rounded-r-xl rounded-l-md" : "rounded-l-xl",
     clippedEnd ? "rounded-l-xl rounded-r-md" : "rounded-r-xl",
   );
@@ -465,6 +465,12 @@ export function CalendarView({
   );
   const timelineWidth = days.length * dayColumnWidth;
   const tableWidth = Math.max(vehicleColumnWidth + timelineWidth, timelineViewportWidth ?? 0);
+  const secondaryActionClass =
+    "inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_14px_32px_-24px_rgba(17,19,24,0.45)] backdrop-blur hover:border-[rgba(17,19,24,0.22)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-40";
+  const primaryActionClass =
+    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(255,107,87,0.75)] hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-40";
+  const filterSelectClass =
+    "h-11 rounded-full border border-[rgba(17,19,24,0.08)] bg-[rgba(255,255,255,0.72)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_12px_30px_-26px_rgba(17,19,24,0.5)] outline-none backdrop-blur";
 
   const openCreateOrderDialog = () => {
     const fallbackVehicleId =
@@ -631,76 +637,86 @@ export function CalendarView({
   };
 
   return (
-    <div className="space-y-3">
-      <section className="rounded-2xl border border-white/70 bg-white/90 p-3 shadow-sm">
-        <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-xl bg-slate-950 p-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setFocusDate((current) =>
-                    rangeMode === "month"
-                      ? addMonths(current, -1)
-                      : addDays(current, rangeMode === "week" ? -7 : -42),
-                  );
-                }}
-                className="rounded-lg px-2.5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/10"
-              >
-                &#8249;
+    <div className="space-y-4">
+      <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(255,244,236,0.96))] p-4 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="flex flex-col gap-3">
+            <div className="inline-flex flex-wrap items-center gap-2 rounded-full bg-[rgba(17,19,24,0.92)] px-2 py-2 shadow-[0_20px_44px_-28px_rgba(17,19,24,0.85)]">
+              <div className="inline-flex rounded-full bg-white/8 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFocusDate((current) =>
+                      rangeMode === "month"
+                        ? addMonths(current, -1)
+                        : addDays(current, rangeMode === "week" ? -7 : -42),
+                    );
+                  }}
+                  className="rounded-full px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  &#8249;
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFocusDate((current) =>
+                      rangeMode === "month"
+                        ? addMonths(current, 1)
+                        : addDays(current, rangeMode === "week" ? 7 : 42),
+                    );
+                  }}
+                  className="rounded-full px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  &#8250;
+                </button>
+              </div>
+              <button type="button" onClick={() => setFocusDate(new Date())} className={secondaryActionClass}>
+                {calendarMessages.today}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFocusDate((current) =>
-                    rangeMode === "month"
-                      ? addMonths(current, 1)
-                      : addDays(current, rangeMode === "week" ? 7 : 42),
-                  );
-                }}
-                className="rounded-lg px-2.5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/10"
-              >
-                &#8250;
-              </button>
+              {!readOnly ? (
+                <button
+                  type="button"
+                  onClick={openCreateOrderDialog}
+                  disabled={vehicleOptions.length === 0}
+                  className={primaryActionClass}
+                >
+                  {calendarMessages.manualCreate}
+                </button>
+              ) : null}
+              {!readOnly ? (
+                <VehicleOrdersExportButton
+                  locale={locale}
+                  vehicleOptions={vehicleOptions}
+                  preferredVehicleId={selectedVehicleId !== "all" ? selectedVehicleId : filteredVehicles[0]?.id}
+                  rangeStart={rangeStart.toISOString()}
+                  rangeEnd={rangeEndInclusive.toISOString()}
+                />
+              ) : null}
             </div>
-            <button
-              type="button"
-              onClick={() => setFocusDate(new Date())}
-              className="rounded-xl bg-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-300"
-            >
-              {calendarMessages.today}
-            </button>
-            {!readOnly ? (
-              <button
-                type="button"
-                onClick={openCreateOrderDialog}
-                disabled={vehicleOptions.length === 0}
-                className="rounded-xl bg-slate-950 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {calendarMessages.manualCreate}
-              </button>
-            ) : null}
-            {!readOnly ? (
-              <VehicleOrdersExportButton
-                locale={locale}
-                vehicleOptions={vehicleOptions}
-                preferredVehicleId={selectedVehicleId !== "all" ? selectedVehicleId : filteredVehicles[0]?.id}
-                rangeStart={rangeStart.toISOString()}
-                rangeEnd={rangeEndInclusive.toISOString()}
-              />
-            ) : null}
+
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--ink-soft)]">
+              <span className="rounded-full bg-white/72 px-3 py-1 font-semibold">
+                {calendarMessages.legend}
+              </span>
+              <span className="rounded-full bg-white/56 px-3 py-1">
+                {calendarMessages.scrollHint}
+              </span>
+            </div>
           </div>
 
-          <div className="text-center">
-            <h3 className="font-serif text-xl font-semibold text-slate-950">
+          <div className="text-center xl:flex-1">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-[color:var(--ink-soft)]">
+              {messages.shell.workspaceKicker}
+            </p>
+            <h3 className="mt-2 font-serif text-3xl font-semibold text-[color:var(--ink)] sm:text-[2.2rem]">
               {buildRangeTitle(rangeMode, rangeStart, rangeEndInclusive, locale)}
             </h3>
-            <p className="mt-0.5 text-[11px] text-slate-500">
+            <p className="mt-1.5 text-[12px] text-[color:var(--ink-soft)]">
               {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
             </p>
           </div>
 
-          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5">
+          <div className="inline-flex rounded-full bg-[rgba(17,19,24,0.92)] p-1 shadow-[0_18px_40px_-28px_rgba(17,19,24,0.8)]">
             {[
               { value: "week" as const, label: calendarMessages.week },
               { value: "month" as const, label: calendarMessages.month },
@@ -711,10 +727,10 @@ export function CalendarView({
                 type="button"
                 onClick={() => setRangeMode(option.value)}
                 className={cn(
-                  "rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition",
+                  "rounded-full px-4 py-2 text-[12px] font-semibold transition",
                   rangeMode === option.value
-                    ? "bg-slate-950 text-white"
-                    : "text-slate-600 hover:text-slate-950",
+                    ? "bg-[var(--accent)] text-[color:var(--ink)] shadow-[0_14px_28px_-20px_rgba(255,107,87,0.7)]"
+                    : "text-white/72 hover:text-white",
                 )}
               >
                 {option.label}
@@ -723,74 +739,75 @@ export function CalendarView({
           </div>
         </div>
 
-        <div className="mt-3 flex flex-col gap-2 xl:flex-row xl:items-center">
-          <select
-            value={selectedVehicleId}
-            onChange={(event) => setSelectedVehicleId(event.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] outline-none"
-          >
-            <option value="all">{calendarMessages.allVehicles}</option>
-            {vehicleOptions.map((vehicle) => (
-              <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.plateNumber ? `${vehicle.plateNumber} · ${vehicle.label}` : vehicle.label}
-              </option>
-            ))}
-          </select>
-
-          {!readOnly && (
+        <div className="mt-4 flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap">
             <select
-              value={selectedOwnerId}
-              onChange={(event) => setSelectedOwnerId(event.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] outline-none"
+              value={selectedVehicleId}
+              onChange={(event) => setSelectedVehicleId(event.target.value)}
+              className={filterSelectClass}
             >
-              <option value="all">{calendarMessages.allOwners}</option>
-              {ownerOptions.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.label}
+              <option value="all">{calendarMessages.allVehicles}</option>
+              {vehicleOptions.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {vehicle.plateNumber ? `${vehicle.plateNumber} · ${vehicle.label}` : vehicle.label}
                 </option>
               ))}
             </select>
-          )}
 
-          <select
-            value={selectedSource}
-            onChange={(event) => setSelectedSource(event.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] outline-none"
-          >
-            <option value="all">{calendarMessages.allSources}</option>
-            <option value="turo">{getStatusLabel("turo", locale)}</option>
-            <option value="offline">{getStatusLabel("offline", locale)}</option>
-          </select>
-        </div>
+            {!readOnly ? (
+              <select
+                value={selectedOwnerId}
+                onChange={(event) => setSelectedOwnerId(event.target.value)}
+                className={filterSelectClass}
+              >
+                <option value="all">{calendarMessages.allOwners}</option>
+                {ownerOptions.map((owner) => (
+                  <option key={owner.id} value={owner.id}>
+                    {owner.label}
+                  </option>
+                ))}
+              </select>
+            ) : null}
 
-        <div className="mt-2.5 flex flex-col gap-1 text-[11px] text-slate-500 lg:flex-row lg:items-center lg:justify-between">
-          <p>{calendarMessages.legend}</p>
-          <p>{calendarMessages.scrollHint}</p>
+            <select
+              value={selectedSource}
+              onChange={(event) => setSelectedSource(event.target.value)}
+              className={filterSelectClass}
+            >
+              <option value="all">{calendarMessages.allSources}</option>
+              <option value="turo">{getStatusLabel("turo", locale)}</option>
+              <option value="offline">{getStatusLabel("offline", locale)}</option>
+            </select>
+          </div>
+
+          <div className="hidden text-[11px] text-[color:var(--ink-soft)] xl:block">
+            {calendarMessages.scrollHint}
+          </div>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-white/70 bg-white/95 p-2.5 shadow-sm">
+      <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
         {filteredVehicles.length === 0 ? (
-          <div className="rounded-2xl bg-slate-50 px-4 py-8 text-sm text-slate-500">
+          <div className="rounded-[1.6rem] bg-[rgba(255,255,255,0.72)] px-4 py-10 text-sm text-[color:var(--ink-soft)]">
             {calendarMessages.noVehicles}
           </div>
         ) : (
           <div
             ref={timelineViewportRef}
-            className="max-h-[76vh] overflow-auto rounded-2xl border border-slate-200 bg-white"
+            className="max-h-[76vh] overflow-auto rounded-[1.65rem] border border-[color:var(--line)] bg-[rgba(255,252,247,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
           >
             <div style={{ width: tableWidth, minWidth: vehicleColumnWidth + timelineWidth }}>
               <div
-                className="sticky top-0 z-40 grid border-b border-slate-200 bg-white"
+                className="sticky top-0 z-40 grid border-b border-[color:var(--line)] bg-[rgba(255,251,246,0.92)] backdrop-blur"
                 style={{
                   gridTemplateColumns: `${vehicleColumnWidth}px repeat(${days.length}, ${dayColumnWidth}px)`,
                 }}
               >
-                <div className="sticky left-0 z-50 border-r border-slate-200 bg-white px-2.5 py-2.5">
-                  <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
+                <div className="sticky left-0 z-50 border-r border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,248,241,0.98),rgba(248,240,230,0.98))] px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
                     {messages.shell.nav.vehicles}
                   </p>
-                  <p className="mt-1 text-[11px] font-semibold text-slate-900">
+                  <p className="mt-1.5 text-[12px] font-semibold text-[color:var(--ink)]">
                     {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
                   </p>
                 </div>
@@ -803,18 +820,18 @@ export function CalendarView({
                     <div
                       key={date.toISOString()}
                       className={cn(
-                        "border-r border-slate-200 px-1.5 py-2 text-center",
-                        weekend ? "bg-slate-50" : "bg-white",
-                        todayColumn ? "bg-blue-50" : "",
+                        "border-r border-[color:var(--line)] px-1.5 py-2.5 text-center",
+                        weekend ? "bg-[#f3ede4]" : "bg-[rgba(255,251,246,0.9)]",
+                        todayColumn ? "bg-[rgba(255,107,87,0.14)]" : "",
                       )}
                     >
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
                         {formatWeekday(date, locale)}
                       </p>
-                      <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                      <p className="mt-0.5 text-[15px] font-semibold text-[color:var(--ink)]">
                         {formatDayNumber(date, locale)}
                       </p>
-                      <p className="mt-0.5 text-[10px] text-slate-400">
+                      <p className="mt-0.5 text-[10px] text-[color:var(--ink-soft)]/80">
                         {monthChanged ? formatMonthMarker(date, locale) : ""}
                       </p>
                     </div>
@@ -822,7 +839,7 @@ export function CalendarView({
                 })}
               </div>
 
-              {filteredVehicles.map((vehicle) => {
+              {filteredVehicles.map((vehicle, index) => {
                 const vehicleOrders = visibleOrders.filter((order) => order.vehicleId === vehicle.id);
                 const { bars, laneCount } = assignTimelineBars(
                   vehicleOrders,
@@ -831,32 +848,42 @@ export function CalendarView({
                   dayColumnWidth,
                 );
                 const rowHeight = Math.max(54, laneCount * LANE_HEIGHT + 16);
+                const alternateRow = index % 2 === 1;
 
                 return (
                   <div
                     key={vehicle.id}
-                    className="grid border-b border-slate-200 last:border-b-0"
+                    className="grid border-b border-[color:var(--line)] last:border-b-0"
                     style={{
                       gridTemplateColumns: `${vehicleColumnWidth}px ${timelineWidth}px`,
                     }}
                   >
                     <div
-                      className="sticky left-0 z-20 border-r border-slate-200 bg-white px-2.5 py-2.5"
+                      className={cn(
+                        "sticky left-0 z-20 border-r border-[color:var(--line)] px-3 py-3 backdrop-blur",
+                        alternateRow ? "bg-[#faf4eb]/95" : "bg-[rgba(255,252,247,0.95)]",
+                      )}
                       style={{ height: rowHeight }}
                     >
-                      <p className="text-[11px] font-semibold text-slate-950">
+                      <p className="text-[12px] font-semibold text-[color:var(--ink)]">
                         {vehicle.plateNumber || vehicle.label}
                       </p>
-                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-600">
+                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--ink-soft)]">
                         {vehicle.secondaryLabel || vehicle.label}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-slate-400">
+                      <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-[color:var(--ink-soft)]/80">
                         {vehicle.ownerName || calendarMessages.unassignedOwner}
                       </p>
                     </div>
 
-                    <div className="relative bg-white" style={{ height: rowHeight }}>
-                      {days.map((date, index) => {
+                    <div
+                      className={cn(
+                        "relative",
+                        alternateRow ? "bg-[#fcf7f1]" : "bg-[rgba(255,255,255,0.72)]",
+                      )}
+                      style={{ height: rowHeight }}
+                    >
+                      {days.map((date, dayIndex) => {
                         const weekend = [0, 6].includes(date.getDay());
                         const todayColumn = isSameDay(date, today);
 
@@ -864,12 +891,12 @@ export function CalendarView({
                           <div
                             key={date.toISOString()}
                             className={cn(
-                              "absolute inset-y-0 border-r border-slate-200",
-                              weekend ? "bg-slate-50/80" : "bg-white",
-                              todayColumn ? "bg-blue-50/60" : "",
+                              "absolute inset-y-0 border-r border-[color:var(--line)]",
+                              weekend ? "bg-[#f5eee5]/78" : "bg-transparent",
+                              todayColumn ? "bg-[rgba(255,107,87,0.08)]" : "",
                             )}
                             style={{
-                              left: index * dayColumnWidth,
+                              left: dayIndex * dayColumnWidth,
                               width: dayColumnWidth,
                             }}
                           />
@@ -877,7 +904,7 @@ export function CalendarView({
                       })}
 
                       {bars.length === 0 ? (
-                        <div className="absolute inset-y-0 left-2.5 flex items-center text-[10px] text-slate-400">
+                        <div className="absolute inset-y-0 left-3 flex items-center text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/70">
                           {calendarMessages.emptyRow}
                         </div>
                       ) : null}
@@ -938,7 +965,7 @@ export function CalendarView({
       {selectedOrder && orderPopover ? (
         <div
           ref={orderPopoverRef}
-          className="fixed z-[80] w-[min(22rem,calc(100vw-1.5rem))] rounded-[1.4rem] border border-slate-200/80 bg-white/98 p-4 shadow-2xl backdrop-blur"
+          className="fixed z-[80] w-[min(22rem,calc(100vw-1.5rem))] rounded-[1.5rem] border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,243,234,0.98))] p-4 shadow-[0_28px_60px_-30px_rgba(17,19,24,0.55)] backdrop-blur"
           style={{
             left: orderPopover.left,
             top: orderPopover.top,
@@ -950,22 +977,22 @@ export function CalendarView({
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
                 {calendarMessages.detailsKicker}
               </p>
-              <h3 className="mt-1 text-base font-semibold text-slate-950">
+              <h3 className="mt-1 text-base font-semibold text-[color:var(--ink)]">
                 {selectedOrder.vehiclePlateNumber
                   ? `${selectedOrder.vehiclePlateNumber} · ${selectedOrder.vehicleName}`
                   : selectedOrder.vehicleName}
               </h3>
-              <p className="mt-1 text-[12px] text-slate-500">
+              <p className="mt-1 text-[12px] text-[color:var(--ink-soft)]">
                 {selectedOrder.ownerName ?? calendarMessages.unassignedOwner}
               </p>
             </div>
             <button
               type="button"
               onClick={() => setOrderPopover(null)}
-              className="rounded-full border border-slate-200 px-2 py-1 text-[12px] font-semibold text-slate-500 transition hover:border-slate-900 hover:text-slate-950"
+              className="rounded-full border border-[rgba(17,19,24,0.08)] bg-white/80 px-2.5 py-1 text-[12px] font-semibold text-[color:var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.2)] hover:text-[color:var(--ink)]"
               aria-label={calendarMessages.cancelAction}
             >
               ×
@@ -980,18 +1007,14 @@ export function CalendarView({
 
           {!readOnly && selectedOrder.source === "offline" ? (
             <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => openEditOrderDialog(selectedOrder)}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
-              >
+              <button type="button" onClick={() => openEditOrderDialog(selectedOrder)} className={secondaryActionClass}>
                 {calendarMessages.manualEdit}
               </button>
               <button
                 type="button"
                 onClick={handleDeleteSelectedOrder}
                 disabled={isDeletingOrder}
-                className="rounded-xl border border-rose-200 px-3 py-2 text-[12px] font-semibold text-rose-600 transition hover:border-rose-500 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center justify-center rounded-full border border-rose-200 bg-white/76 px-4 text-[12px] font-semibold text-rose-600 backdrop-blur transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isDeletingOrder ? calendarMessages.deletingAction : calendarMessages.deleteAction}
               </button>
@@ -1006,46 +1029,46 @@ export function CalendarView({
                   setIsEditingNotes(true);
                   setNoteActionError(null);
                 }}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
+                className={secondaryActionClass}
               >
                 {calendarMessages.editNotes}
               </button>
             </div>
           ) : null}
 
-          <div className="mt-4 grid gap-3 text-[12px] text-slate-700 sm:grid-cols-2">
+          <div className="mt-4 grid gap-3 text-[12px] text-[color:var(--ink)] sm:grid-cols-2">
             <div>
-              <span className="text-[11px] text-slate-500">{calendarMessages.renter}</span>
-              <p className="mt-1 text-[14px] font-semibold text-slate-900">{selectedOrder.renterName}</p>
+              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.renter}</span>
+              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">{selectedOrder.renterName}</p>
             </div>
             <div>
-              <span className="text-[11px] text-slate-500">{calendarMessages.phone}</span>
-              <p className="mt-1 text-[14px] font-semibold text-slate-900">
+              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.phone}</span>
+              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
                 {maskSensitive ? maskPhone(selectedOrder.renterPhone) : selectedOrder.renterPhone || "—"}
               </p>
             </div>
             <div>
-              <span className="text-[11px] text-slate-500">{calendarMessages.pickup}</span>
-              <p className="mt-1 text-[14px] font-semibold text-slate-900">
+              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.pickup}</span>
+              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
                 {formatDateTime(selectedOrder.pickupDatetime, locale)}
               </p>
             </div>
             <div>
-              <span className="text-[11px] text-slate-500">{calendarMessages.return}</span>
-              <p className="mt-1 text-[14px] font-semibold text-slate-900">
+              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.return}</span>
+              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
                 {formatDateTime(selectedOrder.returnDatetime, locale)}
               </p>
             </div>
             <div>
-              <span className="text-[11px] text-slate-500">{calendarMessages.revenue}</span>
-              <p className="mt-1 text-[14px] font-semibold text-slate-900">
+              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.revenue}</span>
+              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
                 {selectedOrder.totalPrice != null
                   ? formatCurrency(selectedOrder.totalPrice, locale)
                   : "—"}
               </p>
             </div>
             <div className="sm:col-span-2">
-              <span className="text-[11px] text-slate-500">{calendarMessages.notes}</span>
+              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.notes}</span>
               {isEditingNotes && !readOnly ? (
                 <div className="mt-2 space-y-2">
                   <textarea
@@ -1053,18 +1076,11 @@ export function CalendarView({
                     onChange={(event) => setNotesDraft(event.target.value)}
                     placeholder={calendarMessages.notesPlaceholder}
                     rows={4}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-900 outline-none"
+                    className="w-full rounded-[1.2rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2 text-[13px] text-[color:var(--ink)] outline-none"
                   />
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveOrderNotes}
-                      disabled={isSavingNotes}
-                      className="rounded-xl bg-slate-950 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isSavingNotes
-                        ? calendarMessages.savingNotesAction
-                        : calendarMessages.saveNotesAction}
+                    <button type="button" onClick={handleSaveOrderNotes} disabled={isSavingNotes} className={primaryActionClass}>
+                      {isSavingNotes ? calendarMessages.savingNotesAction : calendarMessages.saveNotesAction}
                     </button>
                     <button
                       type="button"
@@ -1075,14 +1091,14 @@ export function CalendarView({
                           getDisplayOrderNote(selectedOrder.notes, selectedOrder.source) ?? "",
                         );
                       }}
-                      className="rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-600 transition hover:border-slate-900 hover:text-slate-950"
+                      className={secondaryActionClass}
                     >
                       {calendarMessages.cancelAction}
                     </button>
                   </div>
                 </div>
               ) : (
-                <p className="mt-1 text-[14px] font-semibold text-slate-900">
+                <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
                   {getDisplayOrderNote(selectedOrder.notes, selectedOrder.source) ??
                     calendarMessages.noExtraNotes}
                 </p>
@@ -1091,45 +1107,47 @@ export function CalendarView({
           </div>
 
           {noteActionError ? (
-            <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+            <p className="mt-3 rounded-[1rem] bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
               {noteActionError}
             </p>
           ) : null}
 
           {!readOnly && detailActionError ? (
-            <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+            <p className="mt-3 rounded-[1rem] bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
               {detailActionError}
             </p>
           ) : null}
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-white/70 bg-white/90 p-3 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
+      <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.88)] p-3 shadow-[0_20px_48px_-40px_rgba(17,19,24,0.4)]">
+        <p className="text-[11px] uppercase tracking-[0.26em] text-[color:var(--ink-soft)]">
           {calendarMessages.detailsKicker}
         </p>
         {selectedOrder ? (
-          <div className="mt-2.5 grid gap-3 lg:grid-cols-[1.05fr_0.95fr]">
-            <div>
-              <h3 className="font-serif text-2xl font-semibold text-slate-950">
+          <div className="mt-3 grid gap-px overflow-hidden rounded-[1.6rem] border border-[color:var(--line)] bg-[rgba(17,19,24,0.08)] lg:grid-cols-[0.92fr_1.08fr]">
+            <div className="bg-[linear-gradient(180deg,rgba(17,19,24,0.96),rgba(24,30,41,0.96))] px-5 py-5 text-white">
+              <h3 className="font-serif text-[2rem] font-semibold leading-tight text-white">
                 {selectedOrder.vehiclePlateNumber
                   ? `${selectedOrder.vehiclePlateNumber} · ${selectedOrder.vehicleName}`
                   : selectedOrder.vehicleName}
               </h3>
-              <p className="mt-1.5 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-white/62">
                 {selectedOrder.ownerName ?? calendarMessages.unassignedOwner}
               </p>
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
-                <StatusBadge value={selectedOrder.source} locale={locale} />
-                <StatusBadge value={selectedOrder.status} locale={locale} />
-                {selectedOrder.hasConflict ? <StatusBadge value="conflict" locale={locale} /> : null}
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                <StatusBadge value={selectedOrder.source} locale={locale} className="border-white/10" />
+                <StatusBadge value={selectedOrder.status} locale={locale} className="border-white/10" />
+                {selectedOrder.hasConflict ? (
+                  <StatusBadge value="conflict" locale={locale} className="border-white/10" />
+                ) : null}
               </div>
               {!readOnly && selectedOrder.source === "offline" ? (
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-5 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => openEditOrderDialog(selectedOrder)}
-                    className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
+                    className="inline-flex h-11 items-center justify-center rounded-full border border-white/12 bg-white/8 px-4 text-[12px] font-semibold text-white transition hover:bg-white/12"
                   >
                     {calendarMessages.manualEdit}
                   </button>
@@ -1137,7 +1155,7 @@ export function CalendarView({
                     type="button"
                     onClick={handleDeleteSelectedOrder}
                     disabled={isDeletingOrder}
-                    className="rounded-xl border border-rose-200 px-3 py-2 text-[13px] font-semibold text-rose-600 transition hover:border-rose-500 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-11 items-center justify-center rounded-full border border-rose-300/28 bg-rose-400/10 px-4 text-[12px] font-semibold text-rose-100 transition hover:bg-rose-400/18 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isDeletingOrder ? calendarMessages.deletingAction : calendarMessages.deleteAction}
                   </button>
@@ -1145,59 +1163,74 @@ export function CalendarView({
               ) : null}
             </div>
 
-            <div className="grid gap-3 text-[13px] text-slate-700 sm:grid-cols-2">
-              <div>
-                <span className="text-[12px] text-slate-500">{calendarMessages.renter}</span>
-                <p className="mt-0.5 text-base font-semibold text-slate-900">{selectedOrder.renterName}</p>
+            <div className="bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,245,237,0.98))] px-5 py-5">
+              <div className="grid gap-4 text-[13px] text-[color:var(--ink)] sm:grid-cols-2">
+                <div>
+                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
+                    {calendarMessages.renter}
+                  </span>
+                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">{selectedOrder.renterName}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
+                    {calendarMessages.phone}
+                  </span>
+                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">
+                    {maskSensitive ? maskPhone(selectedOrder.renterPhone) : selectedOrder.renterPhone || "—"}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
+                    {calendarMessages.pickup}
+                  </span>
+                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">
+                    {formatDateTime(selectedOrder.pickupDatetime, locale)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
+                    {calendarMessages.return}
+                  </span>
+                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">
+                    {formatDateTime(selectedOrder.returnDatetime, locale)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
+                    {calendarMessages.revenue}
+                  </span>
+                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">
+                    {selectedOrder.totalPrice != null
+                      ? formatCurrency(selectedOrder.totalPrice, locale)
+                      : "—"}
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
+                    {calendarMessages.notes}
+                  </span>
+                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">
+                    {getDisplayOrderNote(selectedOrder.notes, selectedOrder.source) ??
+                      calendarMessages.noExtraNotes}
+                  </p>
+                </div>
               </div>
-              <div>
-                <span className="text-[12px] text-slate-500">{calendarMessages.phone}</span>
-                <p className="mt-0.5 text-base font-semibold text-slate-900">
-                  {maskSensitive ? maskPhone(selectedOrder.renterPhone) : selectedOrder.renterPhone || "—"}
+
+              {!readOnly && detailActionError ? (
+                <p className="mt-4 rounded-[1rem] bg-rose-50 px-3 py-2.5 text-[12px] text-rose-700">
+                  {detailActionError}
                 </p>
-              </div>
-              <div>
-                <span className="text-[12px] text-slate-500">{calendarMessages.pickup}</span>
-                <p className="mt-0.5 text-base font-semibold text-slate-900">
-                  {formatDateTime(selectedOrder.pickupDatetime, locale)}
+              ) : null}
+
+              {readOnly ? (
+                <p className="mt-4 rounded-[1rem] bg-[var(--accent-soft)] px-3 py-2 text-[11px] text-[color:var(--ink-soft)]">
+                  {calendarMessages.sharedViewNotice}
                 </p>
-              </div>
-              <div>
-                <span className="text-[12px] text-slate-500">{calendarMessages.return}</span>
-                <p className="mt-0.5 text-base font-semibold text-slate-900">
-                  {formatDateTime(selectedOrder.returnDatetime, locale)}
-                </p>
-              </div>
-              <div>
-                <span className="text-[12px] text-slate-500">{calendarMessages.revenue}</span>
-                <p className="mt-0.5 text-base font-semibold text-slate-900">
-                  {selectedOrder.totalPrice != null
-                    ? formatCurrency(selectedOrder.totalPrice, locale)
-                    : "—"}
-                </p>
-              </div>
-              <div>
-                <span className="text-[12px] text-slate-500">{calendarMessages.notes}</span>
-                <p className="mt-0.5 text-base font-semibold text-slate-900">
-                  {selectedOrder.notes || calendarMessages.noExtraNotes}
-                </p>
-              </div>
+              ) : null}
             </div>
-
-            {!readOnly && detailActionError ? (
-              <p className="rounded-xl bg-rose-50 px-3 py-2.5 text-[12px] text-rose-700 lg:col-span-2">
-                {detailActionError}
-              </p>
-            ) : null}
-
-            {readOnly ? (
-              <p className="rounded-xl bg-slate-100 px-3 py-2 text-[11px] text-slate-500 lg:col-span-2">
-                {calendarMessages.sharedViewNotice}
-              </p>
-            ) : null}
           </div>
         ) : (
-          <div className="mt-2.5 rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-500">
+          <div className="mt-3 rounded-[1.6rem] bg-[rgba(255,255,255,0.72)] px-4 py-6 text-sm text-[color:var(--ink-soft)]">
             {calendarMessages.emptyState}
           </div>
         )}
@@ -1205,36 +1238,32 @@ export function CalendarView({
 
       {!readOnly && isOrderDialogOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 p-4">
-          <div className="w-full max-w-2xl rounded-[1.75rem] border border-white/70 bg-white p-5 shadow-2xl">
+          <div className="w-full max-w-2xl rounded-[1.85rem] border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,244,236,0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
                   {orderDialogMode === "create"
                     ? calendarMessages.createDialogTitle
                     : calendarMessages.editDialogTitle}
                 </p>
-                <p className="mt-2 max-w-xl text-[13px] leading-5 text-slate-600">
+                <p className="mt-2 max-w-xl text-[13px] leading-5 text-[color:var(--ink-soft)]">
                   {calendarMessages.dialogCopy}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={closeOrderDialog}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-500 transition hover:border-slate-900 hover:text-slate-950"
-              >
+              <button type="button" onClick={closeOrderDialog} className={secondaryActionClass}>
                 {calendarMessages.cancelAction}
               </button>
             </div>
 
             <form onSubmit={handleManualOrderSubmit} className="mt-5 grid gap-3 sm:grid-cols-2">
-              <label className="grid gap-1.5 text-[11px] text-slate-600">
+              <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.vehicleField}</span>
                 <select
                   value={orderDraft.vehicleId}
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, vehicleId: event.target.value }))
                   }
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-900 outline-none"
+                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 >
                   {vehicleOptions.map((vehicle) => (
                     <option key={vehicle.id} value={vehicle.id}>
@@ -1244,18 +1273,18 @@ export function CalendarView({
                 </select>
               </label>
 
-              <label className="grid gap-1.5 text-[11px] text-slate-600">
+              <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.renter}</span>
                 <input
                   value={orderDraft.renterName}
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, renterName: event.target.value }))
                   }
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-900 outline-none"
+                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
-              <label className="grid gap-1.5 text-[11px] text-slate-600">
+              <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.phone}</span>
                 <input
                   type="tel"
@@ -1263,11 +1292,11 @@ export function CalendarView({
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, renterPhone: event.target.value }))
                   }
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-900 outline-none"
+                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
-              <label className="grid gap-1.5 text-[11px] text-slate-600">
+              <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.totalPriceField}</span>
                 <input
                   type="number"
@@ -1277,11 +1306,11 @@ export function CalendarView({
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, totalPrice: event.target.value }))
                   }
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-900 outline-none"
+                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
-              <label className="grid gap-1.5 text-[11px] text-slate-600">
+              <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.pickup}</span>
                 <input
                   type="datetime-local"
@@ -1289,11 +1318,11 @@ export function CalendarView({
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, pickupDatetime: event.target.value }))
                   }
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-900 outline-none"
+                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
-              <label className="grid gap-1.5 text-[11px] text-slate-600">
+              <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.return}</span>
                 <input
                   type="datetime-local"
@@ -1301,33 +1330,25 @@ export function CalendarView({
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, returnDatetime: event.target.value }))
                   }
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-900 outline-none"
+                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
-              <div className="rounded-2xl bg-slate-50 px-3 py-3 text-[11px] leading-5 text-slate-500 sm:col-span-2">
+              <div className="rounded-[1.1rem] bg-[rgba(255,255,255,0.72)] px-3 py-3 text-[11px] leading-5 text-[color:var(--ink-soft)] sm:col-span-2">
                 {calendarMessages.conflictNotice}
               </div>
 
               {orderFormError ? (
-                <div className="rounded-2xl bg-rose-50 px-3 py-3 text-[11px] text-rose-700 sm:col-span-2">
+                <div className="rounded-[1.1rem] bg-rose-50 px-3 py-3 text-[11px] text-rose-700 sm:col-span-2">
                   {orderFormError}
                 </div>
               ) : null}
 
               <div className="flex justify-end gap-2 sm:col-span-2">
-                <button
-                  type="button"
-                  onClick={closeOrderDialog}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-[12px] font-semibold text-slate-600 transition hover:border-slate-900 hover:text-slate-950"
-                >
+                <button type="button" onClick={closeOrderDialog} className={secondaryActionClass}>
                   {calendarMessages.cancelAction}
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSavingOrder}
-                  className="rounded-xl bg-slate-950 px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
+                <button type="submit" disabled={isSavingOrder} className={primaryActionClass}>
                   {isSavingOrder
                     ? calendarMessages.savingAction
                     : orderDialogMode === "create"

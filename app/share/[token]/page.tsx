@@ -116,15 +116,15 @@ export default async function SharePage({
   return (
     <main className="min-h-screen bg-[var(--page)] px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-[1500px] space-y-6">
-        <section className="rounded-[2rem] border border-white/70 bg-white/90 px-6 py-8 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">
+        <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(255,244,236,0.96))] px-6 py-8 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+          <p className="text-xs uppercase tracking-[0.35em] text-[color:var(--ink-soft)]">
             {shareMessages.readOnlyKicker}
           </p>
-          <h1 className="mt-3 font-serif text-5xl text-slate-950">{shareLink.owner.name}</h1>
-          <p className="mt-3 max-w-3xl text-sm text-slate-600">{shareMessages.readOnlyCopy}</p>
-          <div className="mt-6 flex flex-wrap gap-3 text-sm text-slate-600">
+          <h1 className="mt-3 font-serif text-5xl text-[color:var(--ink)]">{shareLink.owner.name}</h1>
+          <p className="mt-3 max-w-3xl text-sm text-[color:var(--ink-soft)]">{shareMessages.readOnlyCopy}</p>
+          <div className="mt-6 flex flex-wrap gap-3 text-sm text-[color:var(--ink-soft)]">
             {vehicles.map((vehicle) => (
-              <span key={vehicle.id} className="rounded-full bg-slate-100 px-4 py-2">
+              <span key={vehicle.id} className="rounded-full bg-white/76 px-4 py-2 shadow-[0_12px_28px_-24px_rgba(17,19,24,0.45)]">
                 {vehicle.nickname}
               </span>
             ))}

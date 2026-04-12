@@ -68,6 +68,13 @@ export default async function VehiclesPage({
             placeholder={vehicleMessages.placeholders.vin}
             className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
           />
+          <input
+            name="purchasePrice"
+            type="number"
+            step="0.01"
+            placeholder={vehicleMessages.placeholders.purchasePrice}
+            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+          />
           <select name="ownerId" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
             <option value="">{vehicleMessages.placeholders.unassignedOwner}</option>
             {owners.map((owner) => (
@@ -121,6 +128,11 @@ export default async function VehiclesPage({
                   {vehicleMessages.ownerPrefix}:{" "}
                   {vehicle.owner?.name ?? vehicleMessages.placeholders.unassignedOwner}
                 </p>
+                {vehicle.purchasePrice != null ? (
+                  <p className="mt-1 text-sm text-slate-500">
+                    {vehicleMessages.placeholders.purchasePrice}: CA${vehicle.purchasePrice.toFixed(2)}
+                  </p>
+                ) : null}
               </div>
               <div className="flex gap-2">
                 <StatusBadge value={vehicle.status} locale={locale} />
@@ -165,6 +177,14 @@ export default async function VehiclesPage({
                 <input
                   name="vin"
                   defaultValue={vehicle.vin ?? ""}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                />
+                <input
+                  name="purchasePrice"
+                  type="number"
+                  step="0.01"
+                  defaultValue={vehicle.purchasePrice ?? ""}
+                  placeholder={vehicleMessages.placeholders.purchasePrice}
                   className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
                 />
                 <select

@@ -38,6 +38,7 @@ const vehicleSchema = z.object({
   status: z.nativeEnum(VehicleStatus),
   turoListingName: z.string().optional(),
   turoVehicleCode: z.string().optional(),
+  purchasePrice: z.coerce.number().nonnegative().optional(),
   notes: z.string().optional(),
 });
 
@@ -74,6 +75,7 @@ function revalidateAdminPages() {
   [
     "/dashboard",
     "/vehicles",
+    "/vehicle-roi",
     "/owners",
     "/orders",
     "/calendar",
@@ -216,6 +218,7 @@ export async function saveVehicleAction(formData: FormData) {
     status: formData.get("status"),
     turoListingName: cleanOptional(formData.get("turoListingName")),
     turoVehicleCode: cleanOptional(formData.get("turoVehicleCode")),
+    purchasePrice: cleanOptional(formData.get("purchasePrice")),
     notes: cleanOptional(formData.get("notes")),
   });
 
@@ -236,6 +239,33 @@ export async function saveVehicleAction(formData: FormData) {
     entityType: "Vehicle",
     entityId: vehicle.id,
     metadata: { plateNumber: vehicle.plateNumber },
+  });
+
+  revalidateAdminPages();
+}
+
+export async function saveVehiclePurchasePriceAction(formData: FormData) {
+  const id = formData.get("id")?.toString().trim();
+  if (!id) return;
+
+  const rawPurchasePrice = cleanOptional(formData.get("purchasePrice"));
+  const purchasePrice =
+    rawPurchasePrice == null ? null : z.coerce.number().nonnegative().parse(rawPurchasePrice);
+
+  const vehicle = await prisma.vehicle.update({
+    where: { id },
+    data: { purchasePrice },
+  });
+
+  await logActivity({
+    actor: "Admin",
+    action: "vehicle_purchase_price_updated",
+    entityType: "Vehicle",
+    entityId: vehicle.id,
+    metadata: {
+      plateNumber: vehicle.plateNumber,
+      purchasePrice,
+    },
   });
 
   revalidateAdminPages();

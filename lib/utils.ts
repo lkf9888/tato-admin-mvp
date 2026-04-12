@@ -60,6 +60,13 @@ export function parseNumberValue(value: unknown) {
 
 type ImportedOrderMetadata = {
   financials?: Record<string, string>;
+  rawRow?: Record<string, string>;
+  vehicle?: {
+    label?: string | null;
+    name?: string | null;
+    vehicleId?: string | null;
+    vin?: string | null;
+  };
 };
 
 const NET_EARNING_EXPENSE_KEYS = [
@@ -112,6 +119,52 @@ export function getNetEarningFromFinancials(
 export function getOrderNetEarning(sourceMetadata?: string | null, fallbackValue?: number | null) {
   const metadata = parseImportedOrderMetadata(sourceMetadata);
   return getNetEarningFromFinancials(metadata?.financials, fallbackValue);
+}
+
+export function getImportedOrderDistanceKilometers(sourceMetadata?: string | null) {
+  const metadata = parseImportedOrderMetadata(sourceMetadata);
+  const rawRow = metadata?.rawRow;
+
+  const directDistance = parseNumberValue(rawRow?.["Distance traveled"]);
+  if (directDistance != null && directDistance > 0) return directDistance;
+
+  const checkInOdometer = parseNumberValue(rawRow?.["Check-in odometer"]);
+  const checkOutOdometer = parseNumberValue(rawRow?.["Check-out odometer"]);
+
+  if (
+    checkInOdometer != null &&
+    checkOutOdometer != null &&
+    checkOutOdometer >= checkInOdometer
+  ) {
+    return checkOutOdometer - checkInOdometer;
+  }
+
+  return null;
+}
+
+export function formatNumber(
+  value?: number | null,
+  locale: Locale = "en",
+  maximumFractionDigits = 1,
+) {
+  if (value == null || Number.isNaN(value)) return "—";
+
+  return new Intl.NumberFormat(getLocaleTag(locale), {
+    maximumFractionDigits,
+  }).format(value);
+}
+
+export function formatPercentage(
+  value?: number | null,
+  locale: Locale = "en",
+  maximumFractionDigits = 1,
+) {
+  if (value == null || Number.isNaN(value)) return "—";
+
+  return new Intl.NumberFormat(getLocaleTag(locale), {
+    style: "percent",
+    maximumFractionDigits,
+  }).format(value / 100);
 }
 
 export function safeString(value: unknown) {

@@ -12,6 +12,7 @@ if [ "$DB_PATH" != "$DATABASE_URL" ]; then
 fi
 
 npx prisma db push --accept-data-loss
+npx tsx prisma/bootstrap-admins.ts
 
 PORT="${PORT:-3000}"
 

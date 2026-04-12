@@ -52,6 +52,7 @@ model User {
   name         String
   email        String   @unique
   passwordHash String
+  isBillingExempt Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

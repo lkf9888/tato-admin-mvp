@@ -17,6 +17,7 @@ type BillingSnapshot = {
   allowedVehicleCount: number;
   requiredPaidSlots: number;
   isOverLimit: boolean;
+  billingBypassActive: boolean;
   stripeConfigured: boolean;
   status: string;
 };
@@ -343,6 +344,11 @@ export function CsvImportPanel({
               {!billingSnapshot.stripeConfigured ? (
                 <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
                   {panelMessages.billing.notConfigured}
+                </p>
+              ) : null}
+              {billingSnapshot.billingBypassActive ? (
+                <p className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                  {messages.billingPage.debugBypassNotice}
                 </p>
               ) : null}
               {billingNotice ? (

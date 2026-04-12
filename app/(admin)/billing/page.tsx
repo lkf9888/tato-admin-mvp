@@ -41,6 +41,7 @@ export default async function BillingPage({
         allowedVehicleCount: billingSnapshot.allowedVehicleCount,
         requiredPaidSlots: billingSnapshot.requiredPaidSlots,
         isOverLimit: billingSnapshot.isOverLimit,
+        billingBypassActive: billingSnapshot.billingBypassActive,
         stripeConfigured: billingSnapshot.stripeConfigured,
         status: billingSnapshot.status,
         currentPeriodEnd: billingSnapshot.currentPeriodEnd?.toISOString() ?? null,

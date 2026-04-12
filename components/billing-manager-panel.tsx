@@ -14,6 +14,7 @@ type BillingSnapshot = {
   allowedVehicleCount: number;
   requiredPaidSlots: number;
   isOverLimit: boolean;
+  billingBypassActive: boolean;
   stripeConfigured: boolean;
   status: string;
   currentPeriodEnd: string | null;
@@ -182,6 +183,12 @@ export function BillingManagerPanel({
       {billingNotice ? (
         <section className="rounded-[1.75rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900 shadow-sm">
           {billingNotice}
+        </section>
+      ) : null}
+
+      {snapshot.billingBypassActive ? (
+        <section className="rounded-[1.75rem] border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-900 shadow-sm">
+          {billingMessages.debugBypassNotice}
         </section>
       ) : null}
 

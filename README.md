@@ -56,6 +56,9 @@ STRIPE_SECRET_KEY=
 STRIPE_LISTING_PRICE_ID=
 STRIPE_WEBHOOK_SECRET=
 BILLING_FREE_SLOT_COUPONS=
+BILLING_BYPASS_ADMIN_NAME=
+BILLING_BYPASS_ADMIN_EMAIL=
+BILLING_BYPASS_ADMIN_PASSWORD=
 ```
 
 说明：
@@ -63,6 +66,7 @@ BILLING_FREE_SLOT_COUPONS=
 - `STRIPE_LISTING_PRICE_ID` 应该指向你在 Stripe 后台创建的 `$1 USD / month` recurring price
 - `STRIPE_WEBHOOK_SECRET` 用于校验 Stripe webhook
 - `BILLING_FREE_SLOT_COUPONS` 可选，用于配置免费额度 coupon，格式示例：`WELCOME3:3,VIP10:10`
+- `BILLING_BYPASS_ADMIN_*` 可选，用于自动创建一个免额度限制的调试管理员账号
 - webhook 地址应指向：
 
 ```text
@@ -148,6 +152,9 @@ STRIPE_SECRET_KEY=
 STRIPE_LISTING_PRICE_ID=
 STRIPE_WEBHOOK_SECRET=
 BILLING_FREE_SLOT_COUPONS=
+BILLING_BYPASS_ADMIN_NAME=Debug Admin
+BILLING_BYPASS_ADMIN_EMAIL=debug-admin@tatocar.co
+BILLING_BYPASS_ADMIN_PASSWORD=replace-with-a-strong-password
 ```
 
 如果需要，可以先参考：
@@ -170,6 +177,14 @@ BILLING_FREE_SLOT_COUPONS=
 ```text
 https://你的 Railway 域名/api/stripe/webhook
 ```
+
+如果你要启用调试管理员免额度限制，还可以额外设置：
+
+- `BILLING_BYPASS_ADMIN_NAME`
+- `BILLING_BYPASS_ADMIN_EMAIL`
+- `BILLING_BYPASS_ADMIN_PASSWORD`
+
+容器启动时会自动创建或更新这个账号，并赋予“跳过购买额度限制”的调试权限。
 
 #### 5. 触发部署
 

@@ -432,6 +432,8 @@ const messages = {
         "Your quota has already been updated. If that covers your fleet, you can go back and import the CSV right away.",
       couponInvalid: "Coupon code is invalid, inactive, or already used.",
       stripeNotConfigured: "Stripe billing is not configured yet. Add the Stripe keys before using paid subscriptions.",
+      debugBypassNotice:
+        "This admin account has billing bypass enabled for testing. CSV imports will not be blocked by the paid listing limit while you are signed in.",
       checkoutAction: "Continue to Stripe",
       manageAction: "Update subscription",
       checkoutLoading: "Opening Stripe...",
@@ -818,6 +820,8 @@ const messages = {
       couponAppliedFreeSlotsDetail: "额度已经即时更新。如果现在已经覆盖你的车队数量，可以直接回去导入 CSV。",
       couponInvalid: "这个 coupon code 无效、已失效，或已经使用过。",
       stripeNotConfigured: "Stripe 计费尚未配置，暂时无法开启付费订阅。",
+      debugBypassNotice:
+        "当前这个管理员账号已开启调试免额度限制。只要你用这个账号登录，CSV 导入就不会被已购 listing 上限拦住。",
       checkoutAction: "前往 Stripe 支付",
       manageAction: "修改订阅数量",
       checkoutLoading: "正在跳转到 Stripe...",

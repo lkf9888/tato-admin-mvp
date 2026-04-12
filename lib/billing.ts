@@ -191,13 +191,15 @@ export function getRequiredPaidSlotsForVehicleCount(
 }
 
 export async function getWorkspaceBillingSnapshot() {
-  const [billing, currentVehicleCount] = await Promise.all([
+  const [billing, currentVehicleCount, currentUser] = await Promise.all([
     ensureWorkspaceBilling(),
     prisma.vehicle.count(),
+    getCurrentAdminUser(),
   ]);
 
   const effectivePurchasedVehicleSlots = getEffectivePurchasedVehicleSlots(billing);
   const allowedVehicleCount = getAllowedVehicleCount(billing);
+  const billingBypassActive = Boolean(currentUser?.isBillingExempt);
   const requiredPaidSlots = getRequiredPaidSlotsForVehicleCount(
     currentVehicleCount,
     billing.freeVehicleSlots,
@@ -213,7 +215,8 @@ export async function getWorkspaceBillingSnapshot() {
     effectivePurchasedVehicleSlots,
     allowedVehicleCount,
     requiredPaidSlots,
-    isOverLimit: currentVehicleCount > allowedVehicleCount,
+    isOverLimit: billingBypassActive ? false : currentVehicleCount > allowedVehicleCount,
+    billingBypassActive,
     stripeConfigured: isStripeBillingConfigured(),
     status: billing.status,
     currentPeriodEnd: billing.currentPeriodEnd,
@@ -251,7 +254,9 @@ export async function getImportBillingProjection(input: {
     projectedNewVehicleCount: impact.projectedNewVehicleCount,
     requiredProjectedPaidSlots: requiredPaidSlots,
     additionalPaidSlotsNeeded,
-    exceedsPurchasedLimit: projectedVehicleCount > snapshot.allowedVehicleCount,
+    exceedsPurchasedLimit: snapshot.billingBypassActive
+      ? false
+      : projectedVehicleCount > snapshot.allowedVehicleCount,
   };
 }
 

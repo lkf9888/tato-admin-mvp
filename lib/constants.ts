@@ -53,3 +53,9 @@ export const bootstrapAdminCredentials = {
   email: process.env.ADMIN_EMAIL ?? "admin@local.test",
   password: process.env.ADMIN_PASSWORD ?? "admin123",
 };
+
+export const billingBypassAdminCredentials = {
+  email: process.env.BILLING_BYPASS_ADMIN_EMAIL?.trim().toLowerCase() ?? "",
+  password: process.env.BILLING_BYPASS_ADMIN_PASSWORD ?? "",
+  name: process.env.BILLING_BYPASS_ADMIN_NAME?.trim() || "Debug Admin",
+};

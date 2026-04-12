@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.0 - 2026-04-11
+
+- Added support for a billing-bypass admin account for testing, so one designated admin can import CSV files without quota enforcement.
+- Added automatic startup provisioning for the billing-bypass admin account through environment variables on Railway or other production deployments.
+- Documented how to configure free-slot coupons and a debug admin account in production.
+
 ## v0.3.0 - 2026-04-11
 
 - Added a dedicated `购买额度 / Buy Quota` page in the admin sidebar for managing listing capacity separately from CSV imports.

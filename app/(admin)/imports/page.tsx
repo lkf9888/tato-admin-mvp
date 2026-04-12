@@ -32,6 +32,7 @@ export default async function ImportsPage({
           allowedVehicleCount: billingSnapshot.allowedVehicleCount,
           requiredPaidSlots: billingSnapshot.requiredPaidSlots,
           isOverLimit: billingSnapshot.isOverLimit,
+          billingBypassActive: billingSnapshot.billingBypassActive,
           stripeConfigured: billingSnapshot.stripeConfigured,
           status: billingSnapshot.status,
         }}

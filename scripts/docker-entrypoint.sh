@@ -11,7 +11,17 @@ if [ "$DB_PATH" != "$DATABASE_URL" ]; then
   mkdir -p "$(dirname "$DB_PATH")"
 fi
 
-npx prisma db push --accept-data-loss
+if [ "$DB_PATH" != "$DATABASE_URL" ] && [ -f "$DB_PATH" ]; then
+  mkdir -p /app/data/backups
+  cp "$DB_PATH" "/app/data/backups/$(basename "$DB_PATH" .db)-predeploy-$(date +%Y%m%d%H%M%S).db"
+fi
+
+if ! npx prisma db push; then
+  echo "Prisma schema sync failed without applying destructive changes."
+  echo "Existing data was left untouched. Review the schema diff and ship a safe migration before redeploying."
+  exit 1
+fi
+
 npx tsx prisma/bootstrap-admins.ts
 
 PORT="${PORT:-3000}"

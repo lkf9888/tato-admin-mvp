@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.11.1 - 2026-04-17
+
+- Hardened production startup so deploys no longer run Prisma with `--accept-data-loss`, preventing version updates from silently wiping live vehicle and order data.
+- Added an automatic SQLite backup step before production schema sync, making Railway redeploys safer when a persisted volume is attached.
+- Updated deployment guidance to clarify that production deploys now preserve data and will fail safely instead of applying destructive schema changes.
+
 ## v0.11.0 - 2026-04-17
 
 - Added a per-vehicle direct-booking deposit field so admins can charge a fixed security deposit together with rental price and insurance.

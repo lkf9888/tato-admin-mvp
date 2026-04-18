@@ -192,10 +192,16 @@ https://你的 Railway 域名/api/stripe/webhook
 
 启动时容器会自动执行：
 
-- `prisma db push`
+- `prisma db push`（不允许 destructive changes）
 - `next start`
 
 所以不需要你手动进容器初始化数据库。
+
+为了保护线上数据，当前生产启动流程还会：
+
+- 在 `/app/data/backups` 下自动备份现有 SQLite 文件
+- 只做非破坏性 schema 同步
+- 如果 Prisma 判断这次变更会造成数据丢失，部署会直接失败，并保留原有车辆、订单和车主数据不变
 
 #### 6. 打开公网地址
 

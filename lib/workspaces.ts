@@ -1,5 +1,3 @@
-import "server-only";
-
 import { prisma } from "@/lib/prisma";
 
 export const DEFAULT_WORKSPACE_SLUG = "default";

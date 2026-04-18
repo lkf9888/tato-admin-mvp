@@ -24,6 +24,7 @@ export function PublicBookingPanel({
   vehicleId,
   bookingDailyRate,
   bookingInsuranceFee,
+  bookingDepositAmount,
   stripeReady,
   defaultPickupDate,
   defaultReturnDate,
@@ -33,6 +34,7 @@ export function PublicBookingPanel({
   vehicleId: string;
   bookingDailyRate: number;
   bookingInsuranceFee: number;
+  bookingDepositAmount: number;
   stripeReady: boolean;
   defaultPickupDate: string;
   defaultReturnDate: string;
@@ -88,9 +90,17 @@ export function PublicBookingPanel({
         returnDate,
         bookingDailyRate,
         bookingInsuranceFee,
+        bookingDepositAmount,
         includeInsurance,
       }),
-    [bookingDailyRate, bookingInsuranceFee, includeInsurance, pickupDate, returnDate],
+    [
+      bookingDailyRate,
+      bookingDepositAmount,
+      bookingInsuranceFee,
+      includeInsurance,
+      pickupDate,
+      returnDate,
+    ],
   );
 
   async function startCheckout() {
@@ -237,6 +247,10 @@ export function PublicBookingPanel({
           <div className="flex items-center justify-between">
             <span>{reserveMessages.quoteInsurance}</span>
             <span>{includeInsurance ? formatCurrency(quote.insuranceAmount, locale) : "—"}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>{reserveMessages.quoteDeposit}</span>
+            <span>{formatCurrency(quote.depositAmount, locale)}</span>
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4">

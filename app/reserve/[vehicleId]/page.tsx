@@ -113,12 +113,21 @@ export default async function ReserveVehiclePage({
                 </div>
                 <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-white/52">
-                    {reserveMessages.ownerLabel}
+                    {reserveMessages.depositLabel}
                   </p>
-                  <p className="mt-3 text-lg font-semibold text-white">
-                    {vehicle.owner?.name ?? "TATO"}
+                  <p className="mt-3 text-[1.8rem] font-semibold text-white">
+                    {formatCurrency(vehicle.bookingDepositAmount, locale)}
                   </p>
                 </div>
+              </div>
+
+              <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:max-w-sm">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/52">
+                  {reserveMessages.ownerLabel}
+                </p>
+                <p className="mt-3 text-lg font-semibold text-white">
+                  {vehicle.owner?.name ?? "TATO"}
+                </p>
               </div>
 
               <div className="mt-10">
@@ -149,6 +158,7 @@ export default async function ReserveVehiclePage({
               vehicleId={vehicle.id}
               bookingDailyRate={vehicle.bookingDailyRate ?? 0}
               bookingInsuranceFee={vehicle.bookingInsuranceFee ?? 0}
+              bookingDepositAmount={vehicle.bookingDepositAmount ?? 0}
               stripeReady={stripeReady}
               defaultPickupDate={defaultPickupDate}
               defaultReturnDate={defaultReturnDate}

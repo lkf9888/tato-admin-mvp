@@ -59,6 +59,7 @@ export async function POST(request: Request) {
       returnDate: parsed.returnDate,
       bookingDailyRate: vehicle.bookingDailyRate ?? 0,
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
+      bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       includeInsurance: parsed.includeInsurance,
     });
 
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
         renterPhone: parsed.renterPhone ?? "",
         includeInsurance: parsed.includeInsurance ? "true" : "false",
         bookedDays: String(quote.days),
+        depositAmount: String(quote.depositAmount),
       },
       line_items: [
         {
@@ -110,6 +112,21 @@ export async function POST(request: Request) {
                   product_data: {
                     name: `${vehicle.nickname} insurance`,
                     description: "Daily protection fee",
+                  },
+                },
+              },
+            ]
+          : []),
+        ...(quote.depositAmount > 0
+          ? [
+              {
+                quantity: 1,
+                price_data: {
+                  currency: "cad",
+                  unit_amount: Math.round(quote.depositAmount * 100),
+                  product_data: {
+                    name: `${vehicle.nickname} deposit`,
+                    description: "Refundable security deposit",
                   },
                 },
               },

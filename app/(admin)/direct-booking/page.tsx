@@ -139,6 +139,7 @@ export default async function DirectBookingPage() {
                       {directMessages.pricingSummary(
                         formatCurrency(vehicle.bookingDailyRate, locale),
                         formatCurrency(vehicle.bookingInsuranceFee, locale),
+                        formatCurrency(vehicle.bookingDepositAmount, locale),
                       )}
                     </p>
                     <p className="mt-2 text-sm text-[color:var(--ink-soft)]">
@@ -218,7 +219,7 @@ export default async function DirectBookingPage() {
                     />
                   </label>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <label className="block">
                       <span className="mb-2 block text-sm font-medium text-[color:var(--ink)]">
                         {directMessages.rateLabel}
@@ -243,6 +244,20 @@ export default async function DirectBookingPage() {
                         min="0"
                         step="0.01"
                         defaultValue={vehicle.bookingInsuranceFee ?? ""}
+                        className="w-full rounded-[1.1rem] border border-[color:var(--line)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[color:var(--ink)]"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-[color:var(--ink)]">
+                        {directMessages.depositLabel}
+                      </span>
+                      <input
+                        name="bookingDepositAmount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        defaultValue={vehicle.bookingDepositAmount ?? ""}
                         className="w-full rounded-[1.1rem] border border-[color:var(--line)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[color:var(--ink)]"
                       />
                     </label>

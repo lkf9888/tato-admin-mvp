@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.11.0 - 2026-04-17
+
+- Added a per-vehicle direct-booking deposit field so admins can charge a fixed security deposit together with rental price and insurance.
+- Updated the public reservation quote and Stripe checkout flow so renters now pay `rental + insurance + deposit`.
+- Exposed the new deposit amount on both the admin booking setup page and the renter-facing booking page.
+
 ## v0.10.1 - 2026-04-17
 
 - Fixed direct-booking preview links to use the current live request domain instead of a stale or placeholder app URL, preventing `Open booking page` from landing on Railway's `Not Found` placeholder.

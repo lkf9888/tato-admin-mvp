@@ -87,6 +87,7 @@ model Vehicle {
   directBookingEnabled Boolean   @default(false)
   bookingDailyRate     Float?
   bookingInsuranceFee  Float?
+  bookingDepositAmount Float?
   bookingIntro         String?
   notes           String?
   createdAt       DateTime      @default(now())

@@ -280,12 +280,15 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
   const directBookingEnabled = formData.get("directBookingEnabled")?.toString() === "on";
   const rawDailyRate = cleanOptional(formData.get("bookingDailyRate"));
   const rawInsuranceFee = cleanOptional(formData.get("bookingInsuranceFee"));
+  const rawDepositAmount = cleanOptional(formData.get("bookingDepositAmount"));
   const bookingIntro = cleanOptional(formData.get("bookingIntro"));
 
   const bookingDailyRate =
     rawDailyRate == null ? null : z.coerce.number().nonnegative().parse(rawDailyRate);
   const bookingInsuranceFee =
     rawInsuranceFee == null ? null : z.coerce.number().nonnegative().parse(rawInsuranceFee);
+  const bookingDepositAmount =
+    rawDepositAmount == null ? null : z.coerce.number().nonnegative().parse(rawDepositAmount);
 
   const vehicle = await prisma.vehicle.update({
     where: { id },
@@ -293,6 +296,7 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
       directBookingEnabled,
       bookingDailyRate,
       bookingInsuranceFee,
+      bookingDepositAmount,
       bookingIntro,
     },
   });
@@ -307,6 +311,7 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
       directBookingEnabled,
       bookingDailyRate,
       bookingInsuranceFee,
+      bookingDepositAmount,
     },
   });
 

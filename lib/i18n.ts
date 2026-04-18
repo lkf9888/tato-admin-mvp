@@ -315,6 +315,7 @@ const messages = {
       noOwner: "Unassigned owner",
       rateLabel: "Open-date daily price",
       insuranceLabel: "Insurance fee / day",
+      depositLabel: "Deposit",
       introLabel: "Booking page intro",
       introPlaceholder: "Short description shown to renters on the public booking page.",
       enableLabel: "Enable public booking page",
@@ -328,7 +329,8 @@ const messages = {
       pricingMissing: "Add a daily rate to make this vehicle bookable.",
       blockedDates: "Upcoming occupied dates",
       blockedDatesEmpty: "No upcoming blocked dates from current orders.",
-      pricingSummary: (daily: string, insurance: string) => `${daily} daily · ${insurance} insurance`,
+      pricingSummary: (daily: string, insurance: string, deposit: string) =>
+        `${daily} daily · ${insurance} insurance · ${deposit} deposit`,
     },
     owners: {
       deleteError: "Owners with assigned vehicles need those vehicles reassigned first.",
@@ -645,6 +647,7 @@ const messages = {
       ownerLabel: "Managed by",
       rateLabel: "Daily rate",
       insuranceLabel: "Insurance / day",
+      depositLabel: "Deposit",
       bookingPanelTitle: "Build your quote",
       bookingPanelCopy:
         "Pick a date range, add renter details, and preview the Stripe payment total before checkout.",
@@ -661,6 +664,7 @@ const messages = {
       quoteDays: (count: number) => `${count} booked day(s)`,
       quoteBase: "Vehicle price",
       quoteInsurance: "Insurance",
+      quoteDeposit: "Deposit",
       quoteTotal: "Estimated total",
       stripeReady: "Stripe card checkout ready",
       stripeMissing: "Stripe has not been connected yet",
@@ -830,6 +834,7 @@ const messages = {
       noOwner: "未分配车主",
       rateLabel: "空白日期日租价格",
       insuranceLabel: "每日保险费用",
+      depositLabel: "押金",
       introLabel: "预定页简介",
       introPlaceholder: "这里可以写给租车人看的简短介绍，会显示在公开预定页上。",
       enableLabel: "开启公开预定页面",
@@ -843,7 +848,8 @@ const messages = {
       pricingMissing: "请先填写日租价格，这台车才能对外开放预定。",
       blockedDates: "接下来已占用日期",
       blockedDatesEmpty: "当前订单里还没有阻塞这台车的未来日期。",
-      pricingSummary: (daily: string, insurance: string) => `${daily} / 天 · 保险 ${insurance}`,
+      pricingSummary: (daily: string, insurance: string, deposit: string) =>
+        `${daily} / 天 · 保险 ${insurance} · 押金 ${deposit}`,
     },
     owners: {
       deleteError: "该车主名下还有车辆，请先重新分配车辆后再删除。",
@@ -1154,6 +1160,7 @@ const messages = {
       ownerLabel: "运营方",
       rateLabel: "日租价格",
       insuranceLabel: "每日保险费",
+      depositLabel: "押金",
       bookingPanelTitle: "生成预定报价",
       bookingPanelCopy: "选择日期、填写租客信息，然后预览 Stripe 支付金额。",
       pickupDate: "取车日期",
@@ -1169,6 +1176,7 @@ const messages = {
       quoteDays: (count: number) => `${count} 天`,
       quoteBase: "车辆价格",
       quoteInsurance: "保险费用",
+      quoteDeposit: "押金",
       quoteTotal: "预计总价",
       stripeReady: "已接入 Stripe 信用卡支付",
       stripeMissing: "Stripe 尚未接入",

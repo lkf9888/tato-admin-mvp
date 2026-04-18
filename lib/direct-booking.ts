@@ -34,18 +34,21 @@ export function getDirectBookingQuote(input: {
   returnDate: string;
   bookingDailyRate: number;
   bookingInsuranceFee?: number | null;
+  bookingDepositAmount?: number | null;
   includeInsurance?: boolean;
 }) {
   const days = getDirectBookingDays(input.pickupDate, input.returnDate);
   const baseAmount = days * input.bookingDailyRate;
   const insuranceFeePerDay = input.includeInsurance ? input.bookingInsuranceFee ?? 0 : 0;
   const insuranceAmount = days * insuranceFeePerDay;
+  const depositAmount = input.bookingDepositAmount ?? 0;
 
   return {
     days,
     baseAmount,
     insuranceAmount,
-    totalAmount: baseAmount + insuranceAmount,
+    depositAmount,
+    totalAmount: baseAmount + insuranceAmount + depositAmount,
   };
 }
 

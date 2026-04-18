@@ -138,6 +138,8 @@ Railway 会自动识别仓库里的 `Dockerfile` 并构建服务。
 
 这个路径是当前项目专门按 Railway Volume 规则配置的，SQLite 数据会持久化保存在这里。
 
+如果 Volume 没有挂上，或者挂载路径不是 `/app/data`，当前版本会直接拒绝启动，避免 Railway 在容器临时磁盘里创建一个新的空数据库并让你误以为“升级把数据清空了”。
+
 #### 4. 配置环境变量
 
 在 Railway 服务的 Variables 里添加：
@@ -156,6 +158,11 @@ BILLING_BYPASS_ADMIN_NAME=Debug Admin
 BILLING_BYPASS_ADMIN_EMAIL=debug-admin@tatocar.co
 BILLING_BYPASS_ADMIN_PASSWORD=replace-with-a-strong-password
 ```
+
+其中最关键的是：
+
+- `DATABASE_URL` 必须是 `file:/app/data/...`
+- Railway Volume 的挂载路径必须是 `/app/data`
 
 如果需要，可以先参考：
 

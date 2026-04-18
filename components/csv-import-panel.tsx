@@ -25,8 +25,16 @@ type BillingSnapshot = {
 type BillingProjection = BillingSnapshot & {
   projectedVehicleCount: number;
   projectedNewVehicleCount: number;
+  selectedProjectedNewVehicleCount: number;
   requiredProjectedPaidSlots: number;
   additionalPaidSlotsNeeded: number;
+  availableNewVehicleSlots: number;
+  selectableVehicleOptions: Array<{
+    key: string;
+    label: string;
+    secondaryLabel: string;
+    rowCount: number;
+  }>;
   exceedsPurchasedLimit: boolean;
 };
 
@@ -73,6 +81,7 @@ export function CsvImportPanel({
   const [result, setResult] = useState("");
   const [createMissingVehicles, setCreateMissingVehicles] = useState(true);
   const [billingProjection, setBillingProjection] = useState<BillingProjection | null>(null);
+  const [selectedVehicleKeys, setSelectedVehicleKeys] = useState<string[]>([]);
   const [billingNotice, setBillingNotice] = useState("");
   const [billingCheckError, setBillingCheckError] = useState("");
   const [showBillingModal, setShowBillingModal] = useState(false);
@@ -121,6 +130,7 @@ export function CsvImportPanel({
           rows,
           mapping,
           createMissingVehicles,
+          selectedVehicleKeys,
         }),
       });
 
@@ -145,7 +155,32 @@ export function CsvImportPanel({
     createMissingVehicles,
     missingRequired.length,
     panelMessages.billing.genericError,
+    selectedVehicleKeys,
   ]);
+
+  useEffect(() => {
+    if (
+      !billingProjection ||
+      billingProjection.selectableVehicleOptions.length === 0 ||
+      billingProjection.availableNewVehicleSlots < 1
+    ) {
+      return;
+    }
+
+    setSelectedVehicleKeys((current) => {
+      const validCurrent = current.filter((key) =>
+        billingProjection.selectableVehicleOptions.some((vehicle) => vehicle.key === key),
+      );
+
+      if (validCurrent.length > 0) {
+        return validCurrent.slice(0, billingProjection.availableNewVehicleSlots);
+      }
+
+      return billingProjection.selectableVehicleOptions
+        .slice(0, billingProjection.availableNewVehicleSlots)
+        .map((vehicle) => vehicle.key);
+    });
+  }, [billingProjection]);
 
   const activeProjection = billingProjection ?? {
     ...billingSnapshot,
@@ -156,6 +191,12 @@ export function CsvImportPanel({
       0,
       billingSnapshot.requiredPaidSlots - billingSnapshot.effectivePurchasedVehicleSlots,
     ),
+    selectedProjectedNewVehicleCount: 0,
+    availableNewVehicleSlots: Math.max(
+      0,
+      billingSnapshot.allowedVehicleCount - billingSnapshot.currentVehicleCount,
+    ),
+    selectableVehicleOptions: [],
     exceedsPurchasedLimit: billingSnapshot.isOverLimit,
   };
 
@@ -178,6 +219,7 @@ export function CsvImportPanel({
           mapping,
           rows,
           createMissingVehicles,
+          selectedVehicleKeys,
         }),
       });
 
@@ -185,6 +227,7 @@ export function CsvImportPanel({
         successRows?: number;
         failedRows?: number;
         createdVehicles?: number;
+        skippedRows?: number;
         error?: string;
         details?: BillingProjection;
       };
@@ -208,8 +251,24 @@ export function CsvImportPanel({
           payload.successRows ?? 0,
           payload.createdVehicles ?? 0,
           payload.failedRows ?? 0,
+          payload.skippedRows ?? 0,
         ),
       );
+    });
+  }
+
+  function toggleVehicleSelection(vehicleKey: string) {
+    setSelectedVehicleKeys((current) => {
+      const exists = current.includes(vehicleKey);
+      if (exists) {
+        return current.filter((key) => key !== vehicleKey);
+      }
+
+      if (current.length >= activeProjection.availableNewVehicleSlots) {
+        return current;
+      }
+
+      return [...current, vehicleKey];
     });
   }
 
@@ -249,15 +308,17 @@ export function CsvImportPanel({
                       complete: (results) => {
                         const nextHeaders = results.meta.fields ?? [];
                         setHeaders(nextHeaders);
-                        setRows(results.data);
-                        const guessedMapping = Object.fromEntries(
-                          nextHeaders.map((header) => [header, guessField(header)]),
-                        );
-                        setMapping(guessedMapping);
-                        setResult("");
-                        setBillingCheckError("");
-                      },
-                    });
+                    setRows(results.data);
+                    const guessedMapping = Object.fromEntries(
+                      nextHeaders.map((header) => [header, guessField(header)]),
+                    );
+                    setMapping(guessedMapping);
+                    setSelectedVehicleKeys([]);
+                    setBillingProjection(null);
+                    setResult("");
+                    setBillingCheckError("");
+                  },
+                });
                   }}
                 />
               </label>
@@ -411,7 +472,12 @@ export function CsvImportPanel({
                 <input
                   type="checkbox"
                   checked={createMissingVehicles}
-                  onChange={(event) => setCreateMissingVehicles(event.target.checked)}
+                  onChange={(event) => {
+                    setCreateMissingVehicles(event.target.checked);
+                    if (!event.target.checked) {
+                      setSelectedVehicleKeys([]);
+                    }
+                  }}
                   className="mt-1 h-4 w-4 rounded border-slate-300"
                 />
                 <span>
@@ -431,6 +497,19 @@ export function CsvImportPanel({
                 <p>
                   {panelMessages.billing.projectedPaidSlots(activeProjection.requiredProjectedPaidSlots)}
                 </p>
+                {activeProjection.selectableVehicleOptions.length > 0 ? (
+                  <>
+                    <p className="mt-2 text-slate-700">
+                      {panelMessages.selectedVehiclesSummary(
+                        selectedVehicleKeys.length,
+                        activeProjection.availableNewVehicleSlots,
+                      )}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {panelMessages.selectedVehiclesHint}
+                    </p>
+                  </>
+                ) : null}
               </div>
 
               {isCheckingBilling ? (
@@ -495,6 +574,62 @@ export function CsvImportPanel({
               </div>
             </div>
 
+            {activeProjection.selectableVehicleOptions.length > 0 ? (
+              <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                  {panelMessages.chooseVehiclesLabel}
+                </p>
+                <h4 className="mt-2 text-base font-semibold text-slate-950">
+                  {panelMessages.chooseVehiclesTitle}
+                </h4>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {panelMessages.chooseVehiclesCopy(activeProjection.availableNewVehicleSlots)}
+                </p>
+                <p className="mt-3 text-xs text-slate-500">
+                  {panelMessages.selectionLimitNotice(activeProjection.availableNewVehicleSlots)}
+                </p>
+
+                <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+                  {activeProjection.selectableVehicleOptions.map((vehicle) => {
+                    const checked = selectedVehicleKeys.includes(vehicle.key);
+                    const disableUnchecked =
+                      !checked && selectedVehicleKeys.length >= activeProjection.availableNewVehicleSlots;
+
+                    return (
+                      <label
+                        key={vehicle.key}
+                        className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition ${
+                          checked
+                            ? "border-slate-950 bg-white"
+                            : "border-slate-200 bg-white/75"
+                        } ${disableUnchecked ? "opacity-60" : ""}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disableUnchecked}
+                          onChange={() => toggleVehicleSelection(vehicle.key)}
+                          className="mt-1 h-4 w-4 rounded border-slate-300"
+                        />
+                        <span className="block min-w-0">
+                          <span className="block text-sm font-medium text-slate-950">{vehicle.label}</span>
+                          <span className="mt-1 block text-xs text-slate-500">
+                            {vehicle.secondaryLabel || "—"} · {vehicle.rowCount} row(s)
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {activeProjection.availableNewVehicleSlots < 1 ? (
+                  <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm text-slate-600">
+                    {panelMessages.selectionNoneAvailable}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
@@ -509,6 +644,18 @@ export function CsvImportPanel({
               >
                 {panelMessages.billing.openBillingPage}
               </Link>
+              {activeProjection.selectableVehicleOptions.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBillingModal(false);
+                    handleImport();
+                  }}
+                  className="flex-1 rounded-2xl bg-white px-4 py-3 text-center text-sm font-medium text-slate-950 ring-1 ring-slate-200 transition hover:bg-slate-50"
+                >
+                  {panelMessages.importSelectedAction}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

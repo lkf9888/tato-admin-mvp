@@ -23,6 +23,12 @@ export type CsvFieldMapping = {
 };
 
 type CsvImportRow = Record<string, string>;
+export type ProjectedImportVehicleOption = {
+  key: string;
+  label: string;
+  secondaryLabel: string;
+  rowCount: number;
+};
 const csvFieldKeys = new Set<string>([
   "vehicleLabel",
   "vehicleName",
@@ -312,6 +318,33 @@ function buildProjectedVehicleKey(input: {
   return null;
 }
 
+function buildProjectedVehicleLabels(input: {
+  vehicleLabel?: string;
+  vehicleName?: string;
+  externalVehicleId?: string;
+  vin?: string;
+}) {
+  const label =
+    input.vehicleName?.trim() ||
+    input.vehicleLabel?.trim() ||
+    input.externalVehicleId?.trim() ||
+    input.vin?.trim() ||
+    "Imported vehicle";
+
+  const secondaryLabel = [
+    input.vehicleLabel?.trim(),
+    input.externalVehicleId?.trim(),
+    input.vin?.trim(),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return {
+    label,
+    secondaryLabel,
+  };
+}
+
 function parseVehicleBasics(vehicleName?: string) {
   const fallback = {
     brand: "Unknown",
@@ -491,7 +524,7 @@ export async function estimateImportVehicleImpact(input: {
 }) {
   const mapping = normalizeCsvFieldMapping(input.mapping as Record<string, string>);
   const vehicles = await prisma.vehicle.findMany();
-  const projectedNewVehicleKeys = new Set<string>();
+  const projectedVehicleMap = new Map<string, ProjectedImportVehicleOption>();
 
   for (const row of input.rows) {
     const vehicleLabel = safeString(row[mapping.vehicleLabel ?? ""]);
@@ -522,14 +555,28 @@ export async function estimateImportVehicleImpact(input: {
     });
 
     if (projectedKey) {
-      projectedNewVehicleKeys.add(projectedKey);
+      const existingProjectedVehicle = projectedVehicleMap.get(projectedKey);
+      const labels = buildProjectedVehicleLabels({
+        vehicleLabel,
+        vehicleName,
+        externalVehicleId,
+        vin,
+      });
+
+      projectedVehicleMap.set(projectedKey, {
+        key: projectedKey,
+        label: labels.label,
+        secondaryLabel: labels.secondaryLabel,
+        rowCount: (existingProjectedVehicle?.rowCount ?? 0) + 1,
+      });
     }
   }
 
   return {
     currentVehicleCount: vehicles.length,
-    projectedNewVehicleCount: projectedNewVehicleKeys.size,
-    projectedVehicleCount: vehicles.length + projectedNewVehicleKeys.size,
+    projectedNewVehicleCount: projectedVehicleMap.size,
+    projectedVehicleCount: vehicles.length + projectedVehicleMap.size,
+    projectedVehicleOptions: Array.from(projectedVehicleMap.values()),
   };
 }
 
@@ -539,9 +586,11 @@ export async function importTuroOrders(input: {
   mapping: CsvFieldMapping;
   rows: CsvImportRow[];
   createMissingVehicles?: boolean;
+  selectedVehicleKeys?: string[];
 }) {
   const mapping = normalizeCsvFieldMapping(input.mapping as Record<string, string>);
   const failures: Array<{ rowNumber: number; reason: string; row: CsvImportRow }> = [];
+  const selectedVehicleKeys = new Set((input.selectedVehicleKeys ?? []).filter(Boolean));
 
   const batch = await prisma.importBatch.create({
     data: {
@@ -563,6 +612,7 @@ export async function importTuroOrders(input: {
   let updatedVehicles = 0;
   let deletedCancelledRows = 0;
   let deletedStaleOrders = 0;
+  let skippedRows = 0;
 
   for (const [index, row] of input.rows.entries()) {
     const vehicleLabel = safeString(row[mapping.vehicleLabel ?? ""]);
@@ -572,6 +622,12 @@ export async function importTuroOrders(input: {
     const renterName = safeString(row[mapping.renterName ?? ""]);
     const pickupValue = safeString(row[mapping.pickupDatetime ?? ""]);
     const returnValue = safeString(row[mapping.returnDatetime ?? ""]);
+    const projectedVehicleKey = buildProjectedVehicleKey({
+      vehicleLabel,
+      vehicleName,
+      externalVehicleId,
+      vin,
+    });
 
     if ((!vehicleLabel && !vehicleName && !externalVehicleId && !vin) || !renterName || !pickupValue || !returnValue) {
       failures.push({
@@ -590,6 +646,15 @@ export async function importTuroOrders(input: {
     });
 
     if (!vehicle && input.createMissingVehicles) {
+      if (
+        selectedVehicleKeys.size > 0 &&
+        projectedVehicleKey &&
+        !selectedVehicleKeys.has(projectedVehicleKey)
+      ) {
+        skippedRows += 1;
+        continue;
+      }
+
       const createdVehicle = await createVehicleFromCsvRow({
         row,
         mapping,
@@ -702,17 +767,25 @@ export async function importTuroOrders(input: {
 
   if (failures.length === 0) {
     const staleTuroOrders = await prisma.order.findMany({
-      where:
-        syncedOrderIds.size > 0
+      where: {
+        source: OrderSource.turo,
+        ...(syncedVehicleIds.size > 0
           ? {
-              source: OrderSource.turo,
+              vehicleId: {
+                in: Array.from(syncedVehicleIds),
+              },
+            }
+          : {
+              id: "__no_stale_orders__",
+            }),
+        ...(syncedOrderIds.size > 0
+          ? {
               id: {
                 notIn: Array.from(syncedOrderIds),
               },
             }
-          : {
-              source: OrderSource.turo,
-            },
+          : {}),
+      },
       select: {
         id: true,
         vehicleId: true,
@@ -747,8 +820,8 @@ export async function importTuroOrders(input: {
       failures: JSON.stringify(failures),
       notes:
         failures.length > 0
-          ? `${failures.length} row(s) need manual review${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) removed` : ""} · previous Turo orders kept until the file imports cleanly`
-          : `Import completed without row-level issues${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) removed` : ""}${deletedStaleOrders > 0 ? ` · ${deletedStaleOrders} stale Turo order(s) replaced` : ""}`,
+          ? `${failures.length} row(s) need manual review${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) removed` : ""} · previous Turo orders kept until the file imports cleanly`
+          : `Import completed without row-level issues${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) removed` : ""}${deletedStaleOrders > 0 ? ` · ${deletedStaleOrders} stale Turo order(s) replaced` : ""}`,
     },
   });
 
@@ -763,6 +836,7 @@ export async function importTuroOrders(input: {
       failedRows: failures.length,
       createdVehicles,
       updatedVehicles,
+      skippedRows,
       deletedCancelledRows,
       deletedStaleOrders,
     },
@@ -774,6 +848,7 @@ export async function importTuroOrders(input: {
     failedRows: failures.length,
     createdVehicles,
     updatedVehicles,
+    skippedRows,
     deletedCancelledRows,
     deletedStaleOrders,
     failures,

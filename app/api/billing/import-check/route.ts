@@ -8,6 +8,7 @@ const importCheckSchema = z.object({
   rows: z.array(z.record(z.string(), z.string())),
   mapping: z.record(z.string(), z.string()),
   createMissingVehicles: z.boolean().optional(),
+  selectedVehicleKeys: z.array(z.string()).optional(),
 });
 
 export async function POST(request: Request) {
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
       rows: parsed.rows,
       mapping: parsed.mapping,
       createMissingVehicles: parsed.createMissingVehicles ?? false,
+      selectedVehicleKeys: parsed.selectedVehicleKeys ?? [],
     });
 
     return NextResponse.json(projection);

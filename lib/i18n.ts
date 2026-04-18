@@ -463,8 +463,25 @@ const messages = {
           checkoutCancelled: "Stripe checkout was cancelled. No billing changes were made.",
           checkoutUpdated: "Stripe billing was updated. You can retry the CSV import now.",
         },
-        importResult: (successRows: number, createdVehicles: number, failedRows: number) =>
-          `Imported ${successRows} row(s), auto-created ${createdVehicles} vehicle(s), ${failedRows} row(s) need review. Refresh logs below to inspect the new batch.`,
+        importResult: (
+          successRows: number,
+          createdVehicles: number,
+          failedRows: number,
+          skippedRows = 0,
+        ) =>
+          `Imported ${successRows} row(s), auto-created ${createdVehicles} vehicle(s), skipped ${skippedRows} row(s), ${failedRows} row(s) need review. Refresh logs below to inspect the new batch.`,
+        selectedVehiclesSummary: (selected: number, max: number) =>
+          `Selected ${selected} / ${max} new vehicle(s) to fit within the current quota.`,
+        selectedVehiclesHint:
+          "Existing vehicles in this CSV will still sync normally. Only new vehicles count toward the remaining quota.",
+        chooseVehiclesTitle: "Choose which new vehicles to import",
+        chooseVehiclesCopy: (max: number) =>
+          `This file contains more new vehicles than your remaining quota allows. Pick up to ${max} new vehicle(s) to import now, or buy more quota.`,
+        chooseVehiclesLabel: "New vehicles found in this CSV",
+        importSelectedAction: "Import selected vehicles",
+        selectionLimitNotice: (max: number) => `You can select up to ${max} new vehicle(s).`,
+        selectionNoneAvailable:
+          "No new-vehicle quota is left right now. You can still import existing vehicles from this file, or buy more quota first.",
       },
     },
     billingPage: {
@@ -958,8 +975,25 @@ const messages = {
           checkoutCancelled: "Stripe 支付已取消，本次未变更任何计费信息。",
           checkoutUpdated: "Stripe 订阅已更新，现在可以重新尝试导入 CSV。",
         },
-        importResult: (successRows: number, createdVehicles: number, failedRows: number) =>
-          `已导入 ${successRows} 行，自动创建 ${createdVehicles} 台车辆，另有 ${failedRows} 行待人工检查。可刷新下方日志查看新批次。`,
+        importResult: (
+          successRows: number,
+          createdVehicles: number,
+          failedRows: number,
+          skippedRows = 0,
+        ) =>
+          `已导入 ${successRows} 行，自动创建 ${createdVehicles} 台车辆，跳过 ${skippedRows} 行，另有 ${failedRows} 行待人工检查。可刷新下方日志查看新批次。`,
+        selectedVehiclesSummary: (selected: number, max: number) =>
+          `已选择 ${selected} / ${max} 台新车辆，符合当前额度上限。`,
+        selectedVehiclesHint:
+          "这份 CSV 里已存在于系统中的车辆仍会正常同步，只有新车辆会占用剩余额度。",
+        chooseVehiclesTitle: "选择本次要导入的新车辆",
+        chooseVehiclesCopy: (max: number) =>
+          `这份文件里的新车辆数量超过了当前剩余额度。你现在可以先勾选最多 ${max} 台新车辆导入，或者先补购更多额度。`,
+        chooseVehiclesLabel: "这份 CSV 识别到的新车辆",
+        importSelectedAction: "导入已选车辆",
+        selectionLimitNotice: (max: number) => `当前最多可选择 ${max} 台新车辆。`,
+        selectionNoneAvailable:
+          "当前没有可用的新车辆额度。你仍然可以导入这份文件里已存在于系统中的车辆，或者先去补购额度。",
       },
     },
     billingPage: {

@@ -8,7 +8,10 @@ import {
 import type Stripe from "stripe";
 
 import { getCurrentAdminUser } from "@/lib/auth";
-import { estimateImportVehicleImpact, type CsvFieldMapping } from "@/lib/orders";
+import {
+  estimateImportVehicleImpact,
+  type CsvFieldMapping,
+} from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { getAppUrl, getStripeClient, getStripePriceId, isStripeBillingConfigured } from "@/lib/stripe";
 
@@ -227,6 +230,7 @@ export async function getImportBillingProjection(input: {
   mapping: CsvFieldMapping;
   rows: Record<string, string>[];
   createMissingVehicles?: boolean;
+  selectedVehicleKeys?: string[];
 }) {
   const [snapshot, impact] = await Promise.all([
     getWorkspaceBillingSnapshot(),
@@ -237,7 +241,20 @@ export async function getImportBillingProjection(input: {
     }),
   ]);
 
-  const projectedVehicleCount = Math.max(snapshot.currentVehicleCount, impact.projectedVehicleCount);
+  const availableNewVehicleSlots = Math.max(0, snapshot.allowedVehicleCount - snapshot.currentVehicleCount);
+  const validSelectedVehicleKeys = new Set(
+    (input.selectedVehicleKeys ?? []).filter((key) =>
+      impact.projectedVehicleOptions.some((vehicle) => vehicle.key === key),
+    ),
+  );
+  const selectedProjectedNewVehicleCount =
+    input.createMissingVehicles && validSelectedVehicleKeys.size > 0
+      ? validSelectedVehicleKeys.size
+      : impact.projectedNewVehicleCount;
+  const projectedVehicleCount = Math.max(
+    snapshot.currentVehicleCount,
+    snapshot.currentVehicleCount + selectedProjectedNewVehicleCount,
+  );
   const requiredPaidSlots = getRequiredPaidSlotsForVehicleCount(
     projectedVehicleCount,
     snapshot.freeVehicleSlots,
@@ -252,8 +269,11 @@ export async function getImportBillingProjection(input: {
     ...snapshot,
     projectedVehicleCount,
     projectedNewVehicleCount: impact.projectedNewVehicleCount,
+    selectedProjectedNewVehicleCount,
     requiredProjectedPaidSlots: requiredPaidSlots,
     additionalPaidSlotsNeeded,
+    availableNewVehicleSlots,
+    selectableVehicleOptions: impact.projectedVehicleOptions,
     exceedsPurchasedLimit: snapshot.billingBypassActive
       ? false
       : projectedVehicleCount > snapshot.allowedVehicleCount,
@@ -264,6 +284,7 @@ export async function assertImportWithinBillingLimit(input: {
   mapping: CsvFieldMapping;
   rows: Record<string, string>[];
   createMissingVehicles?: boolean;
+  selectedVehicleKeys?: string[];
 }) {
   const projection = await getImportBillingProjection(input);
   if (!projection.exceedsPurchasedLimit) {

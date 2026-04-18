@@ -6,6 +6,7 @@ import {
   syncWorkspaceBillingFromStripeSubscription,
   syncWorkspaceBillingFromSubscriptionId,
 } from "@/lib/billing";
+import { persistDirectBookingFromCheckoutSession } from "@/lib/direct-booking-server";
 import { getStripeClient, getStripeWebhookSecret } from "@/lib/stripe";
 
 export async function POST(request: Request) {
@@ -34,6 +35,15 @@ export async function POST(request: Request) {
               ? session.subscription
               : session.subscription.id;
           await syncWorkspaceBillingFromSubscriptionId(subscriptionId);
+        } else if (session.mode === "payment") {
+          await persistDirectBookingFromCheckoutSession(session);
+        }
+        break;
+      }
+      case "checkout.session.async_payment_succeeded": {
+        const session = event.data.object;
+        if (session.mode === "payment") {
+          await persistDirectBookingFromCheckoutSession(session);
         }
         break;
       }

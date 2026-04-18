@@ -11,7 +11,16 @@ const ADMIN_COOKIE = "turo-admin-session";
 const SHARE_COOKIE_PREFIX = "turo-share-access-";
 
 function getSecret() {
-  return process.env.SESSION_SECRET ?? "local-dev-secret";
+  const secret = process.env.SESSION_SECRET;
+  if (secret && secret.length > 0) return secret;
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SESSION_SECRET must be set in production. Refusing to sign sessions with a development fallback.",
+    );
+  }
+
+  return "local-dev-secret";
 }
 
 function signValue(value: string) {
@@ -107,9 +116,17 @@ export async function validateAdminCredentials(email: string, password: string) 
   return null;
 }
 
-export async function grantShareAccess(token: string) {
+function sharePasswordFingerprint(passwordHash: string) {
+  return createHmac("sha256", getSecret())
+    .update(`share-password:${passwordHash}`)
+    .digest("hex")
+    .slice(0, 32);
+}
+
+export async function grantShareAccess(token: string, passwordHash: string) {
   const store = await cookies();
-  store.set(`${SHARE_COOKIE_PREFIX}${token}`, createSignedPayload(token), {
+  const fingerprint = sharePasswordFingerprint(passwordHash);
+  store.set(`${SHARE_COOKIE_PREFIX}${token}`, createSignedPayload(fingerprint), {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
@@ -117,7 +134,13 @@ export async function grantShareAccess(token: string) {
   });
 }
 
-export async function hasShareAccess(token: string) {
+export async function hasShareAccess(token: string, passwordHash: string) {
   const store = await cookies();
-  return isSignedPayloadValid(store.get(`${SHARE_COOKIE_PREFIX}${token}`)?.value);
+  const signed = store.get(`${SHARE_COOKIE_PREFIX}${token}`)?.value;
+  const value = getSignedPayloadValue(signed);
+  if (!value) return false;
+
+  const expected = sharePasswordFingerprint(passwordHash);
+  if (value.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(value), Buffer.from(expected));
 }

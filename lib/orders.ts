@@ -220,11 +220,75 @@ function parseCsvOrderStatus(value?: string) {
   return OrderStatus.booked;
 }
 
-function parseCsvDate(value: string) {
-  const parsedValue = parse(value, "yyyy-MM-dd hh:mm a", new Date());
-  if (!Number.isNaN(parsedValue.getTime())) return parsedValue;
+const CSV_DATE_FORMATS = [
+  "yyyy-MM-dd hh:mm a",
+  "yyyy-MM-dd h:mm a",
+  "yyyy-MM-dd HH:mm",
+  "yyyy-MM-dd HH:mm:ss",
+  "MM/dd/yyyy hh:mm a",
+  "MM/dd/yyyy HH:mm",
+];
 
-  const fallback = new Date(value);
+function getCsvImportTimeZone() {
+  return process.env.CSV_IMPORT_TIMEZONE?.trim() || "America/Vancouver";
+}
+
+function zonedWallClockToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  timeZone: string,
+) {
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second);
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(new Date(utcGuess));
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type !== "literal") map[part.type] = part.value;
+  }
+  const tzYear = Number(map.year);
+  const tzMonth = Number(map.month);
+  const tzDay = Number(map.day);
+  const tzHour = Number(map.hour === "24" ? "00" : map.hour);
+  const tzMinute = Number(map.minute);
+  const tzSecond = Number(map.second);
+  const tzAsUtc = Date.UTC(tzYear, tzMonth - 1, tzDay, tzHour, tzMinute, tzSecond);
+  const offset = tzAsUtc - utcGuess;
+  return new Date(utcGuess - offset);
+}
+
+function parseCsvDate(value: string) {
+  const timeZone = getCsvImportTimeZone();
+  const trimmed = value.trim();
+
+  for (const format of CSV_DATE_FORMATS) {
+    const parsed = parse(trimmed, format, new Date());
+    if (Number.isNaN(parsed.getTime())) continue;
+
+    return zonedWallClockToUtc(
+      parsed.getFullYear(),
+      parsed.getMonth() + 1,
+      parsed.getDate(),
+      parsed.getHours(),
+      parsed.getMinutes(),
+      parsed.getSeconds(),
+      timeZone,
+    );
+  }
+
+  const fallback = new Date(trimmed);
   return fallback;
 }
 

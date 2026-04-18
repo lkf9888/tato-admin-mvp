@@ -545,6 +545,6 @@ export async function unlockShareLinkAction(formData: FormData) {
     redirect(`/share/${token}?error=password`);
   }
 
-  await grantShareAccess(token);
+  await grantShareAccess(token, shareLink.passwordHash);
   redirect(`/share/${token}`);
 }

@@ -4,11 +4,14 @@ import type { NextRequest } from "next/server";
 const protectedPrefixes = [
   "/dashboard",
   "/vehicles",
+  "/vehicle-roi",
   "/owners",
   "/orders",
   "/calendar",
   "/imports",
   "/share-links",
+  "/billing",
+  "/direct-booking",
 ];
 
 export function middleware(request: NextRequest) {

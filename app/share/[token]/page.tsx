@@ -53,7 +53,9 @@ export default async function SharePage({
     );
   }
 
-  const unlocked = shareLink.passwordHash ? await hasShareAccess(token) : true;
+  const unlocked = shareLink.passwordHash
+    ? await hasShareAccess(token, shareLink.passwordHash)
+    : true;
 
   if (shareLink.passwordHash && !unlocked) {
     return (

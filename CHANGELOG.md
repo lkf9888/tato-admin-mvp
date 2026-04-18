@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.0 - 2026-04-17
+
+- Added a new `在线预定 / Direct Booking` admin workspace for configuring vehicle-level public booking pages, share links, daily pricing, and insurance fees.
+- Added a renter-facing public reservation page per vehicle at `/reserve/[vehicleId]` with a first-pass quote builder, blocked-date visibility, and a Stripe-ready checkout entry.
+- Added persisted direct-booking vehicle settings in Prisma so each imported vehicle can be toggled on for public booking independently.
+
 ## v0.8.0 - 2026-04-12
 
 - Added a new `车辆投资回报分析 / Vehicle ROI` workspace in the left navigation so admins can review return metrics per vehicle.

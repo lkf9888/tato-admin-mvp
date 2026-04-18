@@ -23,6 +23,7 @@ export function AppShell({
     { href: "/dashboard", label: messages.shell.nav.dashboard },
     { href: "/vehicles", label: messages.shell.nav.vehicles },
     { href: "/vehicle-roi", label: messages.shell.nav.vehicleRoi },
+    { href: "/direct-booking", label: messages.shell.nav.directBooking },
     { href: "/owners", label: messages.shell.nav.owners },
     { href: "/orders", label: messages.shell.nav.orders },
     { href: "/calendar", label: messages.shell.nav.calendar },

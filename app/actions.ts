@@ -76,10 +76,12 @@ function revalidateAdminPages() {
     "/dashboard",
     "/vehicles",
     "/vehicle-roi",
+    "/direct-booking",
     "/owners",
     "/orders",
     "/calendar",
     "/imports",
+    "/billing",
     "/share-links",
   ].forEach((path) => revalidatePath(path));
 }
@@ -269,6 +271,47 @@ export async function saveVehiclePurchasePriceAction(formData: FormData) {
   });
 
   revalidateAdminPages();
+}
+
+export async function saveVehicleDirectBookingAction(formData: FormData) {
+  const id = formData.get("id")?.toString().trim();
+  if (!id) return;
+
+  const directBookingEnabled = formData.get("directBookingEnabled")?.toString() === "on";
+  const rawDailyRate = cleanOptional(formData.get("bookingDailyRate"));
+  const rawInsuranceFee = cleanOptional(formData.get("bookingInsuranceFee"));
+  const bookingIntro = cleanOptional(formData.get("bookingIntro"));
+
+  const bookingDailyRate =
+    rawDailyRate == null ? null : z.coerce.number().nonnegative().parse(rawDailyRate);
+  const bookingInsuranceFee =
+    rawInsuranceFee == null ? null : z.coerce.number().nonnegative().parse(rawInsuranceFee);
+
+  const vehicle = await prisma.vehicle.update({
+    where: { id },
+    data: {
+      directBookingEnabled,
+      bookingDailyRate,
+      bookingInsuranceFee,
+      bookingIntro,
+    },
+  });
+
+  await logActivity({
+    actor: "Admin",
+    action: "vehicle_direct_booking_updated",
+    entityType: "Vehicle",
+    entityId: vehicle.id,
+    metadata: {
+      plateNumber: vehicle.plateNumber,
+      directBookingEnabled,
+      bookingDailyRate,
+      bookingInsuranceFee,
+    },
+  });
+
+  revalidateAdminPages();
+  revalidatePath(`/reserve/${vehicle.id}`);
 }
 
 export async function deleteVehicleAction(formData: FormData) {

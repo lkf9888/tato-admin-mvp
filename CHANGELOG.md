@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.12.0 - 2026-04-17
+
+- Replaced the renter-facing direct-booking date inputs with a custom calendar picker that disables occupied dates before the renter can choose them.
+- Added client-side range blocking so pickup and return dates can no longer be selected if they would overlap an existing booking window.
+- Kept the server-side checkout conflict guard in place, so both the UI and Stripe checkout now protect against overlapping reservations.
+
 ## v0.11.1 - 2026-04-17
 
 - Hardened production startup so deploys no longer run Prisma with `--accept-data-loss`, preventing version updates from silently wiping live vehicle and order data.

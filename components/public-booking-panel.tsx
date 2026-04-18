@@ -1,10 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
-import { getDirectBookingQuote } from "@/lib/direct-booking";
-import { getMessages, type Locale } from "@/lib/i18n";
-import { formatCurrency } from "@/lib/utils";
+import {
+  expandBlockedBookingDates,
+  getDirectBookingQuote,
+  hasDateOnlyBookingConflict,
+  type DateOnlyBookingWindow,
+} from "@/lib/direct-booking";
+import { getLocaleTag, getMessages, type Locale } from "@/lib/i18n";
+import { cn, formatCurrency } from "@/lib/utils";
 
 type CheckoutState = "idle" | "success" | "cancelled" | "error";
 
@@ -17,7 +30,203 @@ type StoredBookingState = {
   includeInsurance: boolean;
 };
 
+type BookingDatePickerProps = {
+  locale: Locale;
+  label: string;
+  hint: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+  isDateDisabled: (value: string) => boolean;
+  minDate?: string;
+  disabled?: boolean;
+};
+
 const STORAGE_PREFIX = "tato-direct-booking:";
+const DAY_MS = 86_400_000;
+const WEEKDAY_LABELS = {
+  en: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+  zh: ["一", "二", "三", "四", "五", "六", "日"],
+} as const;
+
+function parseDateOnly(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  return new Date(Date.UTC(year, month - 1, day, 12));
+}
+
+function formatDateOnlyValue(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function addUtcDays(value: Date, amount: number) {
+  return new Date(value.getTime() + amount * DAY_MS);
+}
+
+function startOfUtcMonth(value: Date) {
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1, 12));
+}
+
+function buildCalendarDays(monthValue: Date) {
+  const monthStart = startOfUtcMonth(monthValue);
+  const mondayOffset = (monthStart.getUTCDay() + 6) % 7;
+  const gridStart = addUtcDays(monthStart, -mondayOffset);
+
+  return Array.from({ length: 42 }, (_, index) => addUtcDays(gridStart, index));
+}
+
+function formatDisplayDate(value: string, locale: Locale) {
+  const parsed = parseDateOnly(value);
+  if (!parsed) return value;
+
+  return new Intl.DateTimeFormat(getLocaleTag(locale), {
+    month: locale === "zh" ? "numeric" : "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(parsed);
+}
+
+function formatMonthLabel(value: Date, locale: Locale) {
+  return new Intl.DateTimeFormat(getLocaleTag(locale), {
+    month: locale === "zh" ? "long" : "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(value);
+}
+
+function BookingDatePicker({
+  locale,
+  label,
+  hint,
+  value,
+  placeholder,
+  onChange,
+  isDateDisabled,
+  minDate,
+  disabled = false,
+}: BookingDatePickerProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const initialMonth = useMemo(() => {
+    const seededValue = value || minDate || formatDateOnlyValue(new Date());
+    return startOfUtcMonth(parseDateOnly(seededValue) ?? new Date());
+  }, [minDate, value]);
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(initialMonth);
+
+  useEffect(() => {
+    if (!value) return;
+
+    const parsed = parseDateOnly(value);
+    if (parsed) {
+      setVisibleMonth(startOfUtcMonth(parsed));
+    }
+  }, [value]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isOpen]);
+
+  const days = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
+  const weekdayLabels = WEEKDAY_LABELS[locale];
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <span className="mb-2 block text-sm font-medium text-white">{label}</span>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setIsOpen((current) => !current)}
+        className={cn(
+          "flex w-full items-center justify-between rounded-[1.2rem] border border-white/10 bg-white/6 px-4 py-3 text-left text-sm text-white transition",
+          disabled ? "cursor-not-allowed opacity-50" : "hover:border-white/20",
+        )}
+      >
+        <span className={cn(value ? "text-white" : "text-white/46")}>
+          {value ? formatDisplayDate(value, locale) : placeholder}
+        </span>
+        <CalendarDays className="h-4 w-4 text-white/54" />
+      </button>
+      <p className="mt-2 text-xs leading-5 text-white/48">{hint}</p>
+
+      {isOpen ? (
+        <div className="absolute left-0 z-30 mt-3 w-[19rem] rounded-[1.4rem] border border-white/10 bg-[#0f131b] p-4 shadow-[0_30px_70px_-30px_rgba(0,0,0,0.85)]">
+          <div className="mb-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setVisibleMonth((current) => addUtcDays(startOfUtcMonth(current), -1))}
+              className="rounded-full border border-white/10 p-2 text-white/70 transition hover:border-white/20 hover:text-white"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <p className="text-sm font-medium text-white">{formatMonthLabel(visibleMonth, locale)}</p>
+            <button
+              type="button"
+              onClick={() => setVisibleMonth((current) => addUtcDays(startOfUtcMonth(current), 35))}
+              className="rounded-full border border-white/10 p-2 text-white/70 transition hover:border-white/20 hover:text-white"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-[0.18em] text-white/38">
+            {weekdayLabels.map((weekday) => (
+              <span key={weekday} className="py-1">
+                {weekday}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-2 grid grid-cols-7 gap-1">
+            {days.map((day) => {
+              const dayValue = formatDateOnlyValue(day);
+              const isDisabled = disabled || isDateDisabled(dayValue);
+              const isSelected = value === dayValue;
+              const isOutsideMonth = day.getUTCMonth() !== visibleMonth.getUTCMonth();
+
+              return (
+                <button
+                  key={dayValue}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => {
+                    onChange(dayValue);
+                    setIsOpen(false);
+                  }}
+                  className={cn(
+                    "h-10 rounded-xl text-sm transition",
+                    isSelected
+                      ? "bg-[#ff6b57] text-white shadow-[0_16px_30px_-18px_rgba(255,107,87,0.95)]"
+                      : "text-white/88",
+                    isOutsideMonth && !isSelected ? "text-white/28" : "",
+                    !isDisabled && !isSelected ? "hover:bg-white/8" : "",
+                    isDisabled ? "cursor-not-allowed text-white/18 line-through opacity-60" : "",
+                  )}
+                >
+                  {day.getUTCDate()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function PublicBookingPanel({
   locale,
@@ -25,6 +234,7 @@ export function PublicBookingPanel({
   bookingDailyRate,
   bookingInsuranceFee,
   bookingDepositAmount,
+  blockedDateWindows,
   stripeReady,
   defaultPickupDate,
   defaultReturnDate,
@@ -35,6 +245,7 @@ export function PublicBookingPanel({
   bookingDailyRate: number;
   bookingInsuranceFee: number;
   bookingDepositAmount: number;
+  blockedDateWindows: DateOnlyBookingWindow[];
   stripeReady: boolean;
   defaultPickupDate: string;
   defaultReturnDate: string;
@@ -43,6 +254,11 @@ export function PublicBookingPanel({
   const messages = getMessages(locale);
   const reserveMessages = messages.reservePage;
   const storageKey = `${STORAGE_PREFIX}${vehicleId}`;
+  const todayDate = useMemo(() => formatDateOnlyValue(new Date()), []);
+  const blockedDateSet = useMemo(
+    () => expandBlockedBookingDates(blockedDateWindows),
+    [blockedDateWindows],
+  );
 
   const [pickupDate, setPickupDate] = useState(defaultPickupDate);
   const [returnDate, setReturnDate] = useState(defaultReturnDate);
@@ -52,6 +268,30 @@ export function PublicBookingPanel({
   const [includeInsurance, setIncludeInsurance] = useState(bookingInsuranceFee > 0);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  const isPickupDateDisabled = useCallback(
+    (candidate: string) => {
+      if (candidate < todayDate) return true;
+      if (blockedDateSet.has(candidate)) return true;
+      if (returnDate && candidate >= returnDate) return true;
+      if (returnDate && hasDateOnlyBookingConflict(blockedDateWindows, candidate, returnDate)) {
+        return true;
+      }
+
+      return false;
+    },
+    [blockedDateSet, blockedDateWindows, returnDate, todayDate],
+  );
+
+  const isReturnDateDisabled = useCallback(
+    (candidate: string) => {
+      if (!pickupDate) return true;
+      if (candidate <= pickupDate) return true;
+
+      return hasDateOnlyBookingConflict(blockedDateWindows, pickupDate, candidate);
+    },
+    [blockedDateWindows, pickupDate],
+  );
 
   useEffect(() => {
     const stored = window.sessionStorage.getItem(storageKey);
@@ -69,6 +309,26 @@ export function PublicBookingPanel({
       window.sessionStorage.removeItem(storageKey);
     }
   }, [defaultPickupDate, defaultReturnDate, storageKey]);
+
+  useEffect(() => {
+    if (pickupDate && isPickupDateDisabled(pickupDate)) {
+      setPickupDate("");
+      setReturnDate("");
+      setError(reserveMessages.conflictError);
+      return;
+    }
+
+    if (returnDate && isReturnDateDisabled(returnDate)) {
+      setReturnDate("");
+      setError(reserveMessages.conflictError);
+    }
+  }, [
+    isPickupDateDisabled,
+    isReturnDateDisabled,
+    pickupDate,
+    reserveMessages.conflictError,
+    returnDate,
+  ]);
 
   useEffect(() => {
     const payload: StoredBookingState = {
@@ -103,11 +363,30 @@ export function PublicBookingPanel({
     ],
   );
 
+  function handlePickupDateChange(nextValue: string) {
+    setError("");
+    setPickupDate(nextValue);
+
+    if (returnDate && hasDateOnlyBookingConflict(blockedDateWindows, nextValue, returnDate)) {
+      setReturnDate("");
+    }
+  }
+
+  function handleReturnDateChange(nextValue: string) {
+    setError("");
+    setReturnDate(nextValue);
+  }
+
   async function startCheckout() {
     setError("");
 
     if (!pickupDate || !returnDate || quote.days < 1) {
       setError(reserveMessages.invalidRange);
+      return;
+    }
+
+    if (hasDateOnlyBookingConflict(blockedDateWindows, pickupDate, returnDate)) {
+      setError(reserveMessages.conflictError);
       return;
     }
 
@@ -169,25 +448,31 @@ export function PublicBookingPanel({
       ) : null}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-2 block text-sm font-medium text-white">{reserveMessages.pickupDate}</span>
-          <input
-            type="date"
-            value={pickupDate}
-            onChange={(event) => setPickupDate(event.target.value)}
-            className="w-full rounded-[1.2rem] border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-2 block text-sm font-medium text-white">{reserveMessages.returnDate}</span>
-          <input
-            type="date"
-            value={returnDate}
-            min={pickupDate || undefined}
-            onChange={(event) => setReturnDate(event.target.value)}
-            className="w-full rounded-[1.2rem] border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
-          />
-        </label>
+        <BookingDatePicker
+          locale={locale}
+          label={reserveMessages.pickupDate}
+          hint={reserveMessages.pickupDateHint}
+          value={pickupDate}
+          placeholder={reserveMessages.selectDatePlaceholder}
+          onChange={handlePickupDateChange}
+          isDateDisabled={isPickupDateDisabled}
+          minDate={todayDate}
+        />
+        <BookingDatePicker
+          locale={locale}
+          label={reserveMessages.returnDate}
+          hint={reserveMessages.returnDateHint}
+          value={returnDate}
+          placeholder={reserveMessages.selectDatePlaceholder}
+          onChange={handleReturnDateChange}
+          isDateDisabled={isReturnDateDisabled}
+          minDate={pickupDate}
+          disabled={!pickupDate}
+        />
+      </div>
+
+      <div className="mt-3 rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-4 py-3 text-xs leading-5 text-white/54">
+        {reserveMessages.calendarHint}
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">

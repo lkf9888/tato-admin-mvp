@@ -1,5 +1,5 @@
 import { PublicBookingPanel } from "@/components/public-booking-panel";
-import { getBlockedBookingWindows } from "@/lib/direct-booking";
+import { getBlockedBookingWindows, getDateOnlyBookingWindows } from "@/lib/direct-booking";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getStripeSecretKey } from "@/lib/stripe";
@@ -65,6 +65,7 @@ export default async function ReserveVehiclePage({
   }
 
   const blockedWindows = getBlockedBookingWindows(vehicle.orders, 6);
+  const blockedDateWindows = getDateOnlyBookingWindows(vehicle.orders);
   const stripeReady = Boolean(getStripeSecretKey());
   const today = new Date();
   const defaultPickupDate = toDateInputValue(addDays(today, 1));
@@ -159,6 +160,7 @@ export default async function ReserveVehiclePage({
               bookingDailyRate={vehicle.bookingDailyRate ?? 0}
               bookingInsuranceFee={vehicle.bookingInsuranceFee ?? 0}
               bookingDepositAmount={vehicle.bookingDepositAmount ?? 0}
+              blockedDateWindows={blockedDateWindows}
               stripeReady={stripeReady}
               defaultPickupDate={defaultPickupDate}
               defaultReturnDate={defaultReturnDate}

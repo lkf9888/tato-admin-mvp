@@ -266,6 +266,7 @@ export function PublicBookingPanel({
         onClick={startCheckout}
         disabled={!stripeReady || isPending}
         className="mt-5 w-full rounded-full bg-[#ff6b57] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(255,107,87,0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
+        style={{ backgroundColor: "#ff6b57", color: "#ffffff" }}
       >
         {isPending ? reserveMessages.checkoutLoading : reserveMessages.checkoutAction}
       </button>

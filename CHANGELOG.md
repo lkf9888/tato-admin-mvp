@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.9.1 - 2026-04-17
+
+- Fixed direct-booking action buttons rendering as dark pills without visible labels by correcting the global CSS layer ordering and explicitly setting button text color on the new booking surfaces.
+
 ## v0.9.0 - 2026-04-17
 
 - Added a new `在线预定 / Direct Booking` admin workspace for configuring vehicle-level public booking pages, share links, daily pricing, and insurance fees.

@@ -276,7 +276,7 @@ export function CsvImportPanel({
   return (
     <>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+        <section className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
@@ -289,11 +289,11 @@ export function CsvImportPanel({
                 href="https://turo.com/business/earnings"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
+                className="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
               >
                 {panelMessages.openTuroPage}
               </a>
-              <label className="inline-flex cursor-pointer items-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white">
+              <label className="inline-flex cursor-pointer items-center rounded-md bg-slate-950 px-4 py-3 text-sm font-medium text-white">
                 {panelMessages.chooseFile}
                 <input
                   type="file"
@@ -327,7 +327,7 @@ export function CsvImportPanel({
             </div>
           </div>
 
-          <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200">
+          <div className="mt-6 overflow-hidden rounded-lg border border-slate-200">
             <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
               <thead className="bg-slate-50">
                 <tr>
@@ -362,7 +362,7 @@ export function CsvImportPanel({
         </section>
 
         <section className="space-y-5">
-          <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+          <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
             <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
               {panelMessages.billing.kicker}
             </p>
@@ -373,7 +373,7 @@ export function CsvImportPanel({
               {panelMessages.billing.copy}
             </p>
 
-            <div className="mt-5 grid gap-3 rounded-3xl bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="mt-5 grid gap-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
               <div className="flex items-center justify-between">
                 <span>{panelMessages.billing.currentVehicles}</span>
                 <span className="font-semibold text-slate-950">{billingSnapshot.currentVehicleCount}</span>
@@ -401,34 +401,34 @@ export function CsvImportPanel({
             </div>
 
             <div className="mt-5 space-y-3">
-              <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <p className="rounded-md bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 {messages.billingPage.quantityCopy}
               </p>
               {!billingSnapshot.stripeConfigured ? (
-                <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                <p className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700">
                   {panelMessages.billing.notConfigured}
                 </p>
               ) : null}
               {billingSnapshot.billingBypassActive ? (
-                <p className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                <p className="rounded-md bg-sky-50 px-4 py-3 text-sm text-sky-800">
                   {messages.billingPage.debugBypassNotice}
                 </p>
               ) : null}
               {billingNotice ? (
-                <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                <p className="rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                   {billingNotice}
                 </p>
               ) : null}
               <Link
                 href={billingPageHref}
-                className="block w-full rounded-2xl bg-slate-950 px-4 py-3 text-center font-medium text-white transition hover:bg-slate-800"
+                className="block w-full rounded-md bg-slate-950 px-4 py-3 text-center font-medium text-white transition hover:bg-slate-800"
               >
                 {panelMessages.billing.openBillingPage}
               </Link>
             </div>
           </div>
 
-          <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+          <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
             <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
               {panelMessages.mappingKicker}
             </p>
@@ -444,7 +444,7 @@ export function CsvImportPanel({
                         [header]: event.target.value,
                       }))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+                    className="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
                   >
                     <option value="">{panelMessages.ignoreColumn}</option>
                     {csvFieldOptions.map((option) => (
@@ -458,7 +458,7 @@ export function CsvImportPanel({
             </div>
           </div>
 
-          <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+          <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
             <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
               {panelMessages.importKicker}
             </p>
@@ -470,7 +470,7 @@ export function CsvImportPanel({
                 {panelMessages.requiredMappingLeft}:{" "}
                 {missingRequired.length > 0 ? missingRequired.join(", ") : panelMessages.none}
               </p>
-              <label className="flex items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <label className="flex items-start gap-3 rounded-md bg-slate-50 px-4 py-3 text-sm text-slate-700">
                 <input
                   type="checkbox"
                   checked={createMissingVehicles}
@@ -488,7 +488,7 @@ export function CsvImportPanel({
                 </span>
               </label>
 
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+              <div className="rounded-md bg-slate-50 px-4 py-3">
                 <p className="font-medium text-slate-900">{panelMessages.billing.projectionTitle}</p>
                 <p className="mt-2">
                   {panelMessages.billing.projectedVehicles(activeProjection.projectedVehicleCount)}
@@ -518,12 +518,12 @@ export function CsvImportPanel({
                 <p className="text-slate-500">{panelMessages.billing.checkingImport}</p>
               ) : null}
               {billingCheckError ? (
-                <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-700">
                   {billingCheckError}
                 </p>
               ) : null}
               {activeProjection.exceedsPurchasedLimit ? (
-                <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                <p className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700">
                   {panelMessages.billing.limitExceededDetail(
                     activeProjection.projectedVehicleCount,
                     activeProjection.allowedVehicleCount,
@@ -535,11 +535,11 @@ export function CsvImportPanel({
               <button
                 disabled={rows.length === 0 || missingRequired.length > 0 || isPending}
                 onClick={() => submitImport()}
-                className="w-full rounded-2xl bg-slate-950 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="w-full rounded-md bg-slate-950 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {isPending ? panelMessages.importing : panelMessages.runImport}
               </button>
-              {result ? <p className="rounded-2xl bg-slate-100 px-4 py-3 text-slate-700">{result}</p> : null}
+              {result ? <p className="rounded-md bg-slate-100 px-4 py-3 text-slate-700">{result}</p> : null}
             </div>
           </div>
         </section>
@@ -547,7 +547,7 @@ export function CsvImportPanel({
 
       {showBillingModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
-          <div className="w-full max-w-xl rounded-[1.75rem] border border-white/70 bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-xl rounded-lg border border-white/70 bg-white p-6 shadow-2xl">
             <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
               {panelMessages.billing.modalKicker}
             </p>
@@ -561,7 +561,7 @@ export function CsvImportPanel({
               )}
             </p>
 
-            <div className="mt-5 grid gap-3 rounded-3xl bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="mt-5 grid gap-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
               <div className="flex items-center justify-between">
                 <span>{panelMessages.billing.currentVehicles}</span>
                 <span className="font-semibold text-slate-950">{billingSnapshot.currentVehicleCount}</span>
@@ -577,7 +577,7 @@ export function CsvImportPanel({
             </div>
 
             {activeProjection.selectableVehicleOptions.length > 0 ? (
-              <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+              <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
                   {panelMessages.chooseVehiclesLabel}
                 </p>
@@ -600,7 +600,7 @@ export function CsvImportPanel({
                     return (
                       <label
                         key={vehicle.key}
-                        className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition ${
+                        className={`flex cursor-pointer items-start gap-3 rounded-md border px-4 py-3 transition ${
                           checked
                             ? "border-slate-950 bg-white"
                             : "border-slate-200 bg-white/75"
@@ -625,7 +625,7 @@ export function CsvImportPanel({
                 </div>
 
                 {activeProjection.availableNewVehicleSlots < 1 ? (
-                  <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm text-slate-600">
+                  <p className="mt-4 rounded-md bg-white px-4 py-3 text-sm text-slate-600">
                     {panelMessages.selectionNoneAvailable}
                   </p>
                 ) : null}
@@ -636,13 +636,13 @@ export function CsvImportPanel({
               <button
                 type="button"
                 onClick={() => setShowBillingModal(false)}
-                className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
+                className="rounded-md border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
               >
                 {panelMessages.billing.closeModal}
               </button>
               <Link
                 href={billingPageHref}
-                className="flex-1 rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-slate-800"
+                className="flex-1 rounded-md bg-slate-950 px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-slate-800"
               >
                 {panelMessages.billing.openBillingPage}
               </Link>
@@ -651,7 +651,7 @@ export function CsvImportPanel({
                   type="button"
                   disabled={isPending || isCheckingBilling || selectedVehicleKeys.length === 0}
                   onClick={() => submitImport({ skipLimitGuard: true })}
-                  className="flex-1 rounded-2xl bg-white px-4 py-3 text-center text-sm font-medium text-slate-950 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  className="flex-1 rounded-md bg-white px-4 py-3 text-center text-sm font-medium text-slate-950 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                 >
                   {panelMessages.importSelectedAction}
                 </button>

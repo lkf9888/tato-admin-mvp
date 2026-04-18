@@ -70,7 +70,7 @@ export function AppShell({
             />
           </div>
 
-          <div className="mt-5 rounded-[1.4rem] border border-[var(--line)] bg-white/80 px-4 py-3 text-[11px] text-[var(--ink-soft)] shadow-[0_14px_35px_rgba(17,19,24,0.05)]">
+          <div className="mt-5 rounded-lg border border-[var(--line)] bg-white/80 px-4 py-3 text-[11px] text-[var(--ink-soft)] shadow-[0_14px_35px_rgba(17,19,24,0.05)]">
             <p className="font-medium text-[var(--ink)]">{messages.shell.versionLabel}</p>
             <p className="mt-1">{APP_VERSION_LABEL}</p>
           </div>
@@ -83,7 +83,7 @@ export function AppShell({
         </aside>
 
         <main className="flex-1 px-3 py-4 sm:px-4 lg:px-6">
-          <header className="mb-5 flex flex-col gap-4 rounded-[2rem] border border-[var(--line)] bg-[var(--surface)] px-5 py-5 shadow-[0_24px_70px_rgba(17,19,24,0.06)] backdrop-blur md:flex-row md:items-end md:justify-between">
+          <header className="mb-5 flex flex-col gap-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-5 py-5 shadow-[0_24px_70px_rgba(17,19,24,0.06)] backdrop-blur md:flex-row md:items-end md:justify-between">
             <div>
               <p className="text-[11px] uppercase tracking-[0.34em] text-[var(--ink-soft)]">
                 {messages.shell.workspaceKicker}
@@ -93,7 +93,7 @@ export function AppShell({
               </h2>
               <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[var(--ink-soft)]">{description}</p>
             </div>
-            <div className="rounded-full border border-[rgba(255,107,87,0.12)] bg-[var(--accent-soft)] px-3.5 py-2 text-[11px] text-[var(--ink)] shadow-[0_10px_20px_rgba(255,107,87,0.08)]">
+            <div className="rounded-full border border-[rgba(89, 60, 251, 0.12)] bg-[var(--accent-soft)] px-3.5 py-2 text-[11px] text-[var(--ink)] shadow-[0_10px_20px_rgba(89, 60, 251, 0.08)]">
               {messages.shell.workspaceBadge}
             </div>
           </header>

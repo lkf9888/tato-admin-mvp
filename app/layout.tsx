@@ -24,7 +24,7 @@ export default async function RootLayout({
     <html lang={locale === "zh" ? "zh-CN" : "en"}>
       <body>
         {children}
-        <div className="pointer-events-none fixed bottom-3 left-3 z-50 rounded-full border border-[var(--line)] bg-[rgba(255,251,245,0.92)] px-3 py-1.5 text-[11px] font-medium tracking-[0.08em] text-[var(--ink-soft)] shadow-[0_16px_32px_rgba(17,19,24,0.08)] backdrop-blur">
+        <div className="pointer-events-none fixed bottom-3 left-3 z-50 rounded-full border border-[var(--line)] bg-[rgba(255, 255, 255, 0.92)] px-3 py-1.5 text-[11px] font-medium tracking-[0.08em] text-[var(--ink-soft)] shadow-[0_16px_32px_rgba(17,19,24,0.08)] backdrop-blur">
           {APP_VERSION_LABEL}
         </div>
       </body>

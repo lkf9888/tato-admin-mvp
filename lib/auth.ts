@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
+import { ensureUserWorkspace } from "@/lib/workspaces";
 
 const ADMIN_COOKIE = "turo-admin-session";
 const SHARE_COOKIE_PREFIX = "turo-share-access-";
@@ -80,8 +81,21 @@ export async function getCurrentAdminUser() {
   const sessionValue = await getAdminSessionValue();
   if (!sessionValue) return null;
 
+  const user = await prisma.user.findUnique({
+    where: { id: sessionValue },
+    include: { workspace: true },
+  });
+
+  if (!user) return null;
+
+  if (user.workspaceId && user.workspace) {
+    return user;
+  }
+
+  const workspace = await ensureUserWorkspace(user.id);
   return prisma.user.findUnique({
     where: { id: sessionValue },
+    include: { workspace: true },
   });
 }
 
@@ -98,6 +112,27 @@ export async function requireCurrentAdminUser() {
     redirect("/login");
   }
   return user;
+}
+
+export async function requireCurrentWorkspace() {
+  const user = await requireCurrentAdminUser();
+  if (!user.workspaceId || !user.workspace) {
+    redirect("/login");
+  }
+
+  return user.workspace;
+}
+
+export async function requireCurrentAdminContext() {
+  const user = await requireCurrentAdminUser();
+  if (!user.workspaceId || !user.workspace) {
+    redirect("/login");
+  }
+
+  return {
+    user,
+    workspace: user.workspace,
+  };
 }
 
 export async function validateAdminCredentials(email: string, password: string) {

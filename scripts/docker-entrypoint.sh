@@ -46,6 +46,7 @@ if ! npx prisma db push; then
 fi
 
 npx tsx prisma/bootstrap-admins.ts
+npx tsx prisma/bootstrap-workspaces.ts
 
 PORT="${PORT:-3000}"
 

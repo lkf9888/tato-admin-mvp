@@ -11,11 +11,13 @@ import {
   clearAdminSession,
   normalizeEmail,
   grantShareAccess,
+  requireCurrentAdminContext,
   setAdminSession,
   validateAdminCredentials,
 } from "@/lib/auth";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { createWorkspaceForRegistration } from "@/lib/workspaces";
 
 const ownerSchema = z.object({
   id: z.string().optional(),
@@ -125,15 +127,25 @@ export async function registerAction(formData: FormData) {
     redirect("/register?error=exists");
   }
 
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      passwordHash: await bcrypt.hash(parsed.data.password, 10),
-    },
-  });
+  const workspace = await createWorkspaceForRegistration({ name, email });
+  const [user] = await prisma.$transaction([
+    prisma.user.create({
+      data: {
+        workspaceId: workspace.id,
+        name,
+        email,
+        passwordHash: await bcrypt.hash(parsed.data.password, 10),
+      },
+    }),
+    prisma.workspaceBilling.create({
+      data: {
+        workspaceId: workspace.id,
+      },
+    }),
+  ]);
 
   await logActivity({
+    workspaceId: workspace.id,
     actor: user.name,
     action: "user_registered",
     entityType: "User",
@@ -146,6 +158,7 @@ export async function registerAction(formData: FormData) {
 }
 
 export async function saveOwnerAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const parsed = ownerSchema.parse({
     id: cleanOptional(formData.get("id")),
     name: formData.get("name"),
@@ -157,17 +170,27 @@ export async function saveOwnerAction(formData: FormData) {
 
   const { id, ...ownerData } = parsed;
 
-  const owner = id
+  const existingOwner = id
+    ? await prisma.owner.findFirst({
+        where: { id, workspaceId: workspace.id },
+      })
+    : null;
+
+  const owner = existingOwner
     ? await prisma.owner.update({
-        where: { id },
+        where: { id: existingOwner.id },
         data: ownerData,
       })
     : await prisma.owner.create({
-        data: ownerData,
+        data: {
+          ...ownerData,
+          workspaceId: workspace.id,
+        },
       });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: id ? "owner_updated" : "owner_created",
     entityType: "Owner",
     entityId: owner.id,
@@ -178,11 +201,12 @@ export async function saveOwnerAction(formData: FormData) {
 }
 
 export async function deleteOwnerAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const id = formData.get("id")?.toString();
   if (!id) return;
 
   const vehicleCount = await prisma.vehicle.count({
-    where: { ownerId: id },
+    where: { ownerId: id, workspaceId: workspace.id },
   });
 
   if (vehicleCount > 0) {
@@ -190,24 +214,31 @@ export async function deleteOwnerAction(formData: FormData) {
   }
 
   await prisma.shareLink.deleteMany({
-    where: { ownerId: id },
+    where: { ownerId: id, workspaceId: workspace.id },
   });
 
+  const owner = await prisma.owner.findFirst({
+    where: { id, workspaceId: workspace.id },
+  });
+  if (!owner) return;
+
   await prisma.owner.delete({
-    where: { id },
+    where: { id: owner.id },
   });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "owner_deleted",
     entityType: "Owner",
-    entityId: id,
+    entityId: owner.id,
   });
 
   revalidateAdminPages();
 }
 
 export async function saveVehicleAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const parsed = vehicleSchema.parse({
     id: cleanOptional(formData.get("id")),
     ownerId: cleanOptional(formData.get("ownerId")),
@@ -226,17 +257,27 @@ export async function saveVehicleAction(formData: FormData) {
 
   const { id, ...vehicleData } = parsed;
 
-  const vehicle = id
+  const existingVehicle = id
+    ? await prisma.vehicle.findFirst({
+        where: { id, workspaceId: workspace.id },
+      })
+    : null;
+
+  const vehicle = existingVehicle
     ? await prisma.vehicle.update({
-        where: { id },
+        where: { id: existingVehicle.id },
         data: vehicleData,
       })
     : await prisma.vehicle.create({
-        data: vehicleData,
+        data: {
+          ...vehicleData,
+          workspaceId: workspace.id,
+        },
       });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: id ? "vehicle_updated" : "vehicle_created",
     entityType: "Vehicle",
     entityId: vehicle.id,
@@ -247,6 +288,7 @@ export async function saveVehicleAction(formData: FormData) {
 }
 
 export async function saveVehiclePurchasePriceAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const id = formData.get("id")?.toString().trim();
   if (!id) return;
 
@@ -254,13 +296,19 @@ export async function saveVehiclePurchasePriceAction(formData: FormData) {
   const purchasePrice =
     rawPurchasePrice == null ? null : z.coerce.number().nonnegative().parse(rawPurchasePrice);
 
+  const existingVehicle = await prisma.vehicle.findFirst({
+    where: { id, workspaceId: workspace.id },
+  });
+  if (!existingVehicle) return;
+
   const vehicle = await prisma.vehicle.update({
-    where: { id },
+    where: { id: existingVehicle.id },
     data: { purchasePrice },
   });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "vehicle_purchase_price_updated",
     entityType: "Vehicle",
     entityId: vehicle.id,
@@ -274,6 +322,7 @@ export async function saveVehiclePurchasePriceAction(formData: FormData) {
 }
 
 export async function saveVehicleDirectBookingAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const id = formData.get("id")?.toString().trim();
   if (!id) return;
 
@@ -290,8 +339,13 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
   const bookingDepositAmount =
     rawDepositAmount == null ? null : z.coerce.number().nonnegative().parse(rawDepositAmount);
 
+  const existingVehicle = await prisma.vehicle.findFirst({
+    where: { id, workspaceId: workspace.id },
+  });
+  if (!existingVehicle) return;
+
   const vehicle = await prisma.vehicle.update({
-    where: { id },
+    where: { id: existingVehicle.id },
     data: {
       directBookingEnabled,
       bookingDailyRate,
@@ -302,7 +356,8 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
   });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "vehicle_direct_booking_updated",
     entityType: "Vehicle",
     entityId: vehicle.id,
@@ -320,32 +375,40 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
 }
 
 export async function deleteVehicleAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const id = formData.get("id")?.toString();
   if (!id) return;
 
   const orderCount = await prisma.order.count({
-    where: { vehicleId: id },
+    where: { vehicleId: id, workspaceId: workspace.id },
   });
 
   if (orderCount > 0) {
     redirect("/vehicles?error=vehicle-has-orders");
   }
 
+  const vehicle = await prisma.vehicle.findFirst({
+    where: { id, workspaceId: workspace.id },
+  });
+  if (!vehicle) return;
+
   await prisma.vehicle.delete({
-    where: { id },
+    where: { id: vehicle.id },
   });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "vehicle_deleted",
     entityType: "Vehicle",
-    entityId: id,
+    entityId: vehicle.id,
   });
 
   revalidateAdminPages();
 }
 
 export async function saveOfflineOrderAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const parsed = orderSchema.parse({
     id: cleanOptional(formData.get("id")),
     vehicleId: formData.get("vehicleId"),
@@ -363,7 +426,18 @@ export async function saveOfflineOrderAction(formData: FormData) {
     notes: cleanOptional(formData.get("notes")),
   });
 
+  const vehicle = await prisma.vehicle.findFirst({
+    where: {
+      id: parsed.vehicleId,
+      workspaceId: workspace.id,
+    },
+  });
+  if (!vehicle) {
+    redirect("/orders?error=vehicle-not-found");
+  }
+
   const payload = {
+    workspaceId: workspace.id,
     vehicleId: parsed.vehicleId,
     renterName: parsed.renterName,
     renterPhone: parsed.renterPhone,
@@ -378,12 +452,18 @@ export async function saveOfflineOrderAction(formData: FormData) {
     contractNumber: parsed.contractNumber,
     notes: parsed.notes,
     source: OrderSource.offline,
-    createdBy: "Admin",
+    createdBy: user.name,
   };
 
-  const order = parsed.id
+  const existingOrder = parsed.id
+    ? await prisma.order.findFirst({
+        where: { id: parsed.id, workspaceId: workspace.id },
+      })
+    : null;
+
+  const order = existingOrder
     ? await prisma.order.update({
-        where: { id: parsed.id },
+        where: { id: existingOrder.id },
         data: payload,
       })
     : await prisma.order.create({
@@ -393,7 +473,8 @@ export async function saveOfflineOrderAction(formData: FormData) {
   await reconcileVehicleConflicts(parsed.vehicleId);
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: parsed.id ? "offline_order_updated" : "offline_order_created",
     entityType: "Order",
     entityId: order.id,
@@ -408,19 +489,26 @@ export async function saveOfflineOrderAction(formData: FormData) {
 }
 
 export async function updateOrderStatusAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const id = formData.get("id")?.toString();
   const status = formData.get("status")?.toString() as OrderStatus | undefined;
 
   if (!id || !status) return;
 
+  const existingOrder = await prisma.order.findFirst({
+    where: { id, workspaceId: workspace.id },
+  });
+  if (!existingOrder) return;
+
   const order = await prisma.order.update({
-    where: { id },
+    where: { id: existingOrder.id },
     data: { status },
   });
 
   await reconcileVehicleConflicts(order.vehicleId);
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "order_status_updated",
     entityType: "Order",
     entityId: id,
@@ -431,11 +519,12 @@ export async function updateOrderStatusAction(formData: FormData) {
 }
 
 export async function deleteOrderAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const id = formData.get("id")?.toString();
   if (!id) return;
 
-  const existing = await prisma.order.findUnique({
-    where: { id },
+  const existing = await prisma.order.findFirst({
+    where: { id, workspaceId: workspace.id },
   });
   if (!existing) return;
 
@@ -444,21 +533,23 @@ export async function deleteOrderAction(formData: FormData) {
   }
 
   await prisma.order.delete({
-    where: { id },
+    where: { id: existing.id },
   });
   await reconcileVehicleConflicts(existing.vehicleId);
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "offline_order_deleted",
     entityType: "Order",
-    entityId: id,
+    entityId: existing.id,
   });
 
   revalidateAdminPages();
 }
 
 export async function createShareLinkAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const ownerId = formData.get("ownerId")?.toString();
   if (!ownerId) return;
 
@@ -468,19 +559,27 @@ export async function createShareLinkAction(formData: FormData) {
     (formData.get("visibility")?.toString() as ShareVisibility | undefined) ??
     ShareVisibility.standard;
 
+  const owner = await prisma.owner.findFirst({
+    where: { id: ownerId, workspaceId: workspace.id },
+    select: { id: true },
+  });
+  if (!owner) return;
+
   const shareLink = await prisma.shareLink.create({
     data: {
-      ownerId,
+      workspaceId: workspace.id,
+      ownerId: owner.id,
       token: randomBytes(18).toString("hex"),
       passwordHash: password ? await bcrypt.hash(password, 10) : undefined,
       expiresAt: expiresAtValue ? new Date(expiresAtValue) : undefined,
       visibility,
-      createdBy: "Admin",
+      createdBy: user.name,
     },
   });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "share_link_created",
     entityType: "ShareLink",
     entityId: shareLink.id,
@@ -491,37 +590,51 @@ export async function createShareLinkAction(formData: FormData) {
 }
 
 export async function revokeShareLinkAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const id = formData.get("id")?.toString();
   if (!id) return;
 
+  const existingShareLink = await prisma.shareLink.findFirst({
+    where: { id, workspaceId: workspace.id },
+  });
+  if (!existingShareLink) return;
+
   await prisma.shareLink.update({
-    where: { id },
+    where: { id: existingShareLink.id },
     data: { isActive: false },
   });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "share_link_revoked",
     entityType: "ShareLink",
-    entityId: id,
+    entityId: existingShareLink.id,
   });
 
   revalidateAdminPages();
 }
 
 export async function deleteShareLinkAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
   const id = formData.get("id")?.toString();
   if (!id) return;
 
+  const existingShareLink = await prisma.shareLink.findFirst({
+    where: { id, workspaceId: workspace.id },
+  });
+  if (!existingShareLink) return;
+
   await prisma.shareLink.delete({
-    where: { id },
+    where: { id: existingShareLink.id },
   });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "share_link_deleted",
     entityType: "ShareLink",
-    entityId: id,
+    entityId: existingShareLink.id,
   });
 
   revalidateAdminPages();

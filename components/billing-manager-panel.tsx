@@ -175,32 +175,32 @@ export function BillingManagerPanel({
   return (
     <div className="space-y-6">
       {projectedVehicleCount && additionalPaidSlotsNeeded ? (
-        <section className="rounded-[1.75rem] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 shadow-sm">
+        <section className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 shadow-sm">
           {billingMessages.projectedNotice(projectedVehicleCount, additionalPaidSlotsNeeded)}
         </section>
       ) : null}
 
       {billingNotice ? (
-        <section className="rounded-[1.75rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900 shadow-sm">
+        <section className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900 shadow-sm">
           {billingNotice}
         </section>
       ) : null}
 
       {snapshot.billingBypassActive ? (
-        <section className="rounded-[1.75rem] border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-900 shadow-sm">
+        <section className="rounded-lg border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-900 shadow-sm">
           {billingMessages.debugBypassNotice}
         </section>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-        <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+        <section className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
           <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
             {billingMessages.kicker}
           </p>
           <h3 className="mt-2 font-serif text-3xl text-slate-950">{billingMessages.title}</h3>
           <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">{billingMessages.copy}</p>
 
-          <div className="mt-6 rounded-3xl bg-slate-50 p-4">
+          <div className="mt-6 rounded-lg bg-slate-50 p-4">
             <div className="space-y-3 text-sm text-slate-700">
               <div className="flex items-center justify-between">
                 <span>{billingMessages.currentVehicles}</span>
@@ -242,14 +242,14 @@ export function BillingManagerPanel({
 
           <Link
             href="/imports"
-            className="mt-5 inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
+            className="mt-5 inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
           >
             {billingMessages.backToImports}
           </Link>
         </section>
 
         <section className="space-y-6">
-          <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+          <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
             <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
               {billingMessages.quantityKicker}
             </p>
@@ -274,10 +274,10 @@ export function BillingManagerPanel({
                       Math.max(1, Number.parseInt(event.target.value || "1", 10) || 1),
                     )
                   }
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-slate-900"
+                  className="mt-2 w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-slate-900"
                 />
               </label>
-              <div className="rounded-3xl bg-slate-50 px-4 py-4 text-sm text-slate-700">
+              <div className="rounded-lg bg-slate-50 px-4 py-4 text-sm text-slate-700">
                 <p className="font-medium text-slate-900">{billingMessages.quantityHint(desiredMonthlyPrice)}</p>
                 {appliedPromotion ? (
                   <p className="mt-2 text-xs text-sky-700">
@@ -293,13 +293,13 @@ export function BillingManagerPanel({
             </div>
 
             {!snapshot.stripeConfigured ? (
-              <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 {billingMessages.stripeNotConfigured}
               </p>
             ) : null}
 
             {checkoutError ? (
-              <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 {checkoutError}
               </p>
             ) : null}
@@ -308,7 +308,7 @@ export function BillingManagerPanel({
               type="button"
               onClick={startCheckout}
               disabled={!snapshot.stripeConfigured || isCheckoutPending}
-              className="mt-5 inline-flex items-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="mt-5 inline-flex items-center rounded-md bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {isCheckoutPending
                 ? billingMessages.checkoutLoading
@@ -318,7 +318,7 @@ export function BillingManagerPanel({
             </button>
           </div>
 
-          <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+          <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
             <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
               {billingMessages.couponKicker}
             </p>
@@ -336,12 +336,12 @@ export function BillingManagerPanel({
                   setAppliedPromotion(null);
                 }}
                 placeholder={billingMessages.couponPlaceholder}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-slate-900"
+                className="mt-2 w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-slate-900"
               />
             </label>
 
             {couponNotice ? (
-              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+              <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                 <p>{couponNotice}</p>
                 {appliedFreeCoupon ? (
                   <p className="mt-1 text-xs text-emerald-800">
@@ -352,7 +352,7 @@ export function BillingManagerPanel({
             ) : null}
 
             {couponError ? (
-              <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 {couponError}
               </p>
             ) : null}
@@ -361,7 +361,7 @@ export function BillingManagerPanel({
               type="button"
               onClick={applyCoupon}
               disabled={isCouponPending}
-              className="mt-5 inline-flex items-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+              className="mt-5 inline-flex items-center rounded-md border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
             >
               {isCouponPending ? billingMessages.applyingCoupon : billingMessages.applyCoupon}
             </button>

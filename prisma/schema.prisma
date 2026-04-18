@@ -47,17 +47,38 @@ enum WorkspaceBillingStatus {
   paused
 }
 
+model Workspace {
+  id            String            @id @default(cuid())
+  name          String
+  slug          String            @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  users         User[]
+  owners        Owner[]
+  vehicles      Vehicle[]
+  orders        Order[]
+  importBatches ImportBatch[]
+  shareLinks    ShareLink[]
+  activityLogs  ActivityLog[]
+  billing       WorkspaceBilling?
+}
+
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
+  id              String    @id @default(cuid())
+  workspaceId     String?
+  name            String
+  email           String    @unique
+  passwordHash    String
   isBillingExempt Boolean @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
 }
 
 model Owner {
+  workspaceId  String?
   id          String          @id @default(cuid())
   name        String
   phone       String?
@@ -67,11 +88,15 @@ model Owner {
   notes       String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+  workspace   Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   vehicles    Vehicle[]
   shareLinks  ShareLink[]
+
+  @@index([workspaceId])
 }
 
 model Vehicle {
+  workspaceId      String?
   id              String        @id @default(cuid())
   ownerId         String?
   plateNumber     String        @unique
@@ -92,11 +117,15 @@ model Vehicle {
   notes           String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  workspace       Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   owner           Owner?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   orders          Order[]
+
+  @@index([workspaceId])
 }
 
 model Order {
+  workspaceId      String?
   id              String       @id @default(cuid())
   vehicleId       String
   importBatchId   String?
@@ -119,14 +148,17 @@ model Order {
   hasConflict     Boolean      @default(false)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+  workspace       Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   importBatch     ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   vehicle         Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
+  @@index([workspaceId])
   @@index([vehicleId, pickupDatetime, returnDatetime])
   @@index([source, externalOrderId])
 }
 
 model ImportBatch {
+  workspaceId String?
   id          String   @id @default(cuid())
   fileName    String
   importedBy  String
@@ -137,10 +169,14 @@ model ImportBatch {
   notes       String?
   mapping     String?
   failures    String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   orders      Order[]
+
+  @@index([workspaceId])
 }
 
 model ShareLink {
+  workspaceId   String?
   id           String          @id @default(cuid())
   ownerId      String
   token        String          @unique
@@ -150,11 +186,15 @@ model ShareLink {
   visibility   ShareVisibility @default(standard)
   createdBy    String
   createdAt    DateTime        @default(now())
+  workspace    Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   owner        Owner           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
 
 model WorkspaceBilling {
-  id                           String                 @id
+  id                           String                 @id @default(cuid())
+  workspaceId                  String                 @unique
   freeVehicleSlots             Int                    @default(5)
   bonusVehicleSlots            Int                    @default(0)
   purchasedVehicleSlots        Int                    @default(0)
@@ -171,6 +211,7 @@ model WorkspaceBilling {
   lastPaidAt                   DateTime?
   createdAt                    DateTime               @default(now())
   updatedAt                    DateTime               @updatedAt
+  workspace                    Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   couponRedemptions            BillingCouponRedemption[]
 }
 
@@ -188,6 +229,7 @@ model BillingCouponRedemption {
 }
 
 model ActivityLog {
+  workspaceId String?
   id         String   @id @default(cuid())
   actor      String
   action     String
@@ -195,4 +237,7 @@ model ActivityLog {
   entityId   String
   metadata   String?
   createdAt  DateTime @default(now())
+  workspace  Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
 }

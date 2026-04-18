@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { isAdminAuthenticated } from "@/lib/auth";
+import { requireCurrentAdminContext } from "@/lib/auth";
 import { assertImportWithinBillingLimit } from "@/lib/billing";
 import { importTuroOrders } from "@/lib/orders";
 
@@ -14,14 +14,17 @@ const importSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const authenticated = await isAdminAuthenticated();
-  if (!authenticated) {
+  let context;
+  try {
+    context = await requireCurrentAdminContext();
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const parsed = importSchema.parse(await request.json());
     await assertImportWithinBillingLimit({
+      workspaceId: context.workspace.id,
       rows: parsed.rows,
       mapping: parsed.mapping,
       createMissingVehicles: parsed.createMissingVehicles ?? false,
@@ -29,10 +32,11 @@ export async function POST(request: Request) {
     });
 
     const result = await importTuroOrders({
+      workspaceId: context.workspace.id,
       fileName: parsed.fileName,
       rows: parsed.rows,
       mapping: parsed.mapping,
-      actor: "Admin",
+      actor: context.user.name,
       createMissingVehicles: parsed.createMissingVehicles ?? false,
       selectedVehicleKeys: parsed.selectedVehicleKeys ?? [],
     });

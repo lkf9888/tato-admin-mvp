@@ -130,7 +130,7 @@ export function VehicleOrdersExportButton({
 
       {isOpen ? (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/35 p-4">
-          <div className="w-full max-w-xl rounded-[1.85rem] border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,244,236,0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
+          <div className="w-full max-w-xl rounded-lg border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
@@ -155,7 +155,7 @@ export function VehicleOrdersExportButton({
                 <select
                   value={vehicleId}
                   onChange={(event) => setVehicleId(event.target.value)}
-                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 py-3 text-[13px] text-[color:var(--ink)] outline-none"
+                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 py-3 text-[13px] text-[color:var(--ink)] outline-none"
                 >
                   {vehicleOptions.map((vehicle) => (
                     <option key={vehicle.id} value={vehicle.id}>
@@ -173,7 +173,7 @@ export function VehicleOrdersExportButton({
                   type="date"
                   value={startDate}
                   onChange={(event) => setStartDate(event.target.value)}
-                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 py-3 text-[13px] text-[color:var(--ink)] outline-none"
+                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 py-3 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
@@ -183,13 +183,13 @@ export function VehicleOrdersExportButton({
                   type="date"
                   value={endDate}
                   onChange={(event) => setEndDate(event.target.value)}
-                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 py-3 text-[13px] text-[color:var(--ink)] outline-none"
+                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 py-3 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
             </div>
 
             {error ? (
-              <p className="mt-4 rounded-[1rem] bg-rose-50 px-4 py-3 text-[12px] text-rose-700">
+              <p className="mt-4 rounded-md bg-rose-50 px-4 py-3 text-[12px] text-rose-700">
                 {error}
               </p>
             ) : null}
@@ -206,7 +206,7 @@ export function VehicleOrdersExportButton({
                 type="button"
                 onClick={handleDownload}
                 disabled={isDownloading}
-                className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(255,107,87,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89, 60, 251, 0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isDownloading ? calendarMessages.downloadingAction : calendarMessages.downloadAction}
               </button>

@@ -3,11 +3,12 @@ import "server-only";
 import {
   Prisma,
   WorkspaceBillingStatus,
+  type Workspace,
   type WorkspaceBilling,
 } from "@prisma/client";
 import type Stripe from "stripe";
 
-import { getCurrentAdminUser } from "@/lib/auth";
+import { requireCurrentAdminContext } from "@/lib/auth";
 import {
   estimateImportVehicleImpact,
   type CsvFieldMapping,
@@ -15,7 +16,6 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getAppUrl, getStripeClient, getStripePriceId, isStripeBillingConfigured } from "@/lib/stripe";
 
-const WORKSPACE_BILLING_ID = "default";
 export const FREE_VEHICLE_SLOTS = 5;
 
 const ACTIVE_BILLING_STATUSES = new Set<WorkspaceBillingStatus>([
@@ -167,11 +167,23 @@ async function findStripePromotionCode(code: string) {
 }
 
 export async function ensureWorkspaceBilling() {
+  const { workspace } = await requireCurrentAdminContext();
   return prisma.workspaceBilling.upsert({
-    where: { id: WORKSPACE_BILLING_ID },
+    where: { workspaceId: workspace.id },
     update: {},
     create: {
-      id: WORKSPACE_BILLING_ID,
+      workspaceId: workspace.id,
+      freeVehicleSlots: FREE_VEHICLE_SLOTS,
+    },
+  });
+}
+
+async function ensureWorkspaceBillingForWorkspace(workspaceId: string) {
+  return prisma.workspaceBilling.upsert({
+    where: { workspaceId },
+    update: {},
+    create: {
+      workspaceId,
       freeVehicleSlots: FREE_VEHICLE_SLOTS,
     },
   });
@@ -194,15 +206,17 @@ export function getRequiredPaidSlotsForVehicleCount(
 }
 
 export async function getWorkspaceBillingSnapshot() {
-  const [billing, currentVehicleCount, currentUser] = await Promise.all([
-    ensureWorkspaceBilling(),
-    prisma.vehicle.count(),
-    getCurrentAdminUser(),
+  const { user, workspace } = await requireCurrentAdminContext();
+  const [billing, currentVehicleCount] = await Promise.all([
+    ensureWorkspaceBillingForWorkspace(workspace.id),
+    prisma.vehicle.count({
+      where: { workspaceId: workspace.id },
+    }),
   ]);
 
   const effectivePurchasedVehicleSlots = getEffectivePurchasedVehicleSlots(billing);
   const allowedVehicleCount = getAllowedVehicleCount(billing);
-  const billingBypassActive = Boolean(currentUser?.isBillingExempt);
+  const billingBypassActive = Boolean(user.isBillingExempt);
   const requiredPaidSlots = getRequiredPaidSlotsForVehicleCount(
     currentVehicleCount,
     billing.freeVehicleSlots,
@@ -227,6 +241,7 @@ export async function getWorkspaceBillingSnapshot() {
 }
 
 export async function getImportBillingProjection(input: {
+  workspaceId: string;
   mapping: CsvFieldMapping;
   rows: Record<string, string>[];
   createMissingVehicles?: boolean;
@@ -235,6 +250,7 @@ export async function getImportBillingProjection(input: {
   const [snapshot, impact] = await Promise.all([
     getWorkspaceBillingSnapshot(),
     estimateImportVehicleImpact({
+      workspaceId: input.workspaceId,
       mapping: input.mapping,
       rows: input.rows,
       createMissingVehicles: input.createMissingVehicles,
@@ -281,6 +297,7 @@ export async function getImportBillingProjection(input: {
 }
 
 export async function assertImportWithinBillingLimit(input: {
+  workspaceId: string;
   mapping: CsvFieldMapping;
   rows: Record<string, string>[];
   createMissingVehicles?: boolean;
@@ -298,19 +315,14 @@ export async function assertImportWithinBillingLimit(input: {
 }
 
 async function ensureStripeCustomer() {
-  const [billing, currentUser] = await Promise.all([
-    ensureWorkspaceBilling(),
-    getCurrentAdminUser(),
-  ]);
-
-  if (!currentUser) {
-    throw new Error("Please sign in again before starting checkout.");
-  }
+  const { user: currentUser, workspace } = await requireCurrentAdminContext();
+  const billing = await ensureWorkspaceBillingForWorkspace(workspace.id);
 
   if (billing.stripeCustomerId) {
     return {
       billing,
       currentUser,
+      workspace,
       stripeCustomerId: billing.stripeCustomerId,
     };
   }
@@ -320,7 +332,8 @@ async function ensureStripeCustomer() {
     email: currentUser.email,
     name: currentUser.name,
     metadata: {
-      workspaceBillingId: WORKSPACE_BILLING_ID,
+      workspaceId: workspace.id,
+      workspaceBillingId: billing.id,
     },
   });
 
@@ -334,6 +347,7 @@ async function ensureStripeCustomer() {
   return {
     billing: nextBilling,
     currentUser,
+    workspace,
     stripeCustomerId: customer.id,
   };
 }
@@ -402,14 +416,15 @@ export async function resolveBillingCoupon(code: string): Promise<BillingCouponR
     throw new Error("Please enter a coupon code first.");
   }
 
-  await ensureWorkspaceBilling();
+  const { workspace } = await requireCurrentAdminContext();
+  const billing = await ensureWorkspaceBillingForWorkspace(workspace.id);
   const freeSlotCoupon = getConfiguredFreeSlotCoupon(normalizedCode);
   if (freeSlotCoupon) {
     try {
       await prisma.$transaction(async (tx) => {
         await tx.billingCouponRedemption.create({
           data: {
-            workspaceBillingId: WORKSPACE_BILLING_ID,
+            workspaceBillingId: billing.id,
             code: normalizedCode,
             couponType: "free_slots",
             bonusVehicleSlots: freeSlotCoupon.bonusVehicleSlots,
@@ -418,7 +433,7 @@ export async function resolveBillingCoupon(code: string): Promise<BillingCouponR
         });
 
         await tx.workspaceBilling.update({
-          where: { id: WORKSPACE_BILLING_ID },
+          where: { id: billing.id },
           data: {
             bonusVehicleSlots: {
               increment: freeSlotCoupon.bonusVehicleSlots,
@@ -469,7 +484,7 @@ export async function createBillingCheckoutUrl(input: {
   }
 
   const stripe = getStripeClient();
-  const { billing, stripeCustomerId } = await ensureStripeCustomer();
+  const { billing, stripeCustomerId, workspace } = await ensureStripeCustomer();
   const appUrl = getAppUrl(input.origin);
   const priceId = getStripePriceId();
   const returnPath = buildBillingReturnPath(input.returnPath, "updated");
@@ -552,13 +567,15 @@ export async function createBillingCheckoutUrl(input: {
         ]
       : undefined,
     metadata: {
-      workspaceBillingId: WORKSPACE_BILLING_ID,
+      workspaceId: workspace.id,
+      workspaceBillingId: billing.id,
       desiredPaidVehicleSlots: String(desiredPaidVehicleSlots),
       couponCode: promotionCode?.code ?? "",
     },
     subscription_data: {
       metadata: {
-        workspaceBillingId: WORKSPACE_BILLING_ID,
+        workspaceId: workspace.id,
+        workspaceBillingId: billing.id,
         desiredPaidVehicleSlots: String(desiredPaidVehicleSlots),
         couponCode: promotionCode?.code ?? "",
       },
@@ -584,7 +601,26 @@ export async function createBillingCheckoutUrl(input: {
 export async function syncWorkspaceBillingFromStripeSubscription(
   subscription: Stripe.Subscription,
 ) {
-  const billing = await ensureWorkspaceBilling();
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer?.id ?? null;
+  const billing =
+    (subscription.id
+      ? await prisma.workspaceBilling.findUnique({
+          where: { stripeSubscriptionId: subscription.id },
+        })
+      : null) ??
+    (customerId
+      ? await prisma.workspaceBilling.findUnique({
+          where: { stripeCustomerId: customerId },
+        })
+      : null);
+
+  if (!billing) {
+    throw new Error("Workspace billing record not found for Stripe subscription.");
+  }
+
   const primaryItem = subscription.items.data[0];
   const purchasedVehicleSlots = primaryItem?.quantity ?? 0;
 
@@ -592,9 +628,7 @@ export async function syncWorkspaceBillingFromStripeSubscription(
     where: { id: billing.id },
     data: {
       stripeCustomerId:
-        typeof subscription.customer === "string"
-          ? subscription.customer
-          : subscription.customer?.id ?? billing.stripeCustomerId,
+        customerId ?? billing.stripeCustomerId,
       stripeSubscriptionId: subscription.id,
       stripeSubscriptionItemId: primaryItem?.id ?? null,
       stripePriceId:
@@ -620,10 +654,11 @@ export async function syncWorkspaceBillingFromSubscriptionId(subscriptionId: str
 }
 
 export async function markWorkspaceBillingInvoicePaid(customerId?: string | null) {
-  const billing = await ensureWorkspaceBilling();
-  if (customerId && billing.stripeCustomerId && customerId !== billing.stripeCustomerId) {
-    return billing;
-  }
+  if (!customerId) return null;
+  const billing = await prisma.workspaceBilling.findUnique({
+    where: { stripeCustomerId: customerId },
+  });
+  if (!billing) return null;
 
   return prisma.workspaceBilling.update({
     where: { id: billing.id },
@@ -638,10 +673,11 @@ export async function markWorkspaceBillingInvoicePaid(customerId?: string | null
 }
 
 export async function markWorkspaceBillingInvoiceFailed(customerId?: string | null) {
-  const billing = await ensureWorkspaceBilling();
-  if (customerId && billing.stripeCustomerId && customerId !== billing.stripeCustomerId) {
-    return billing;
-  }
+  if (!customerId) return null;
+  const billing = await prisma.workspaceBilling.findUnique({
+    where: { stripeCustomerId: customerId },
+  });
+  if (!billing) return null;
 
   return prisma.workspaceBilling.update({
     where: { id: billing.id },

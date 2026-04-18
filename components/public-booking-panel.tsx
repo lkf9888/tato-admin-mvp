@@ -152,7 +152,7 @@ function BookingDatePicker({
         disabled={disabled}
         onClick={() => setIsOpen((current) => !current)}
         className={cn(
-          "flex w-full items-center justify-between rounded-[1.2rem] border border-white/10 bg-white/6 px-4 py-3 text-left text-sm text-white transition",
+          "flex w-full items-center justify-between rounded-md border border-white/10 bg-white/6 px-4 py-3 text-left text-sm text-white transition",
           disabled ? "cursor-not-allowed opacity-50" : "hover:border-white/20",
         )}
       >
@@ -164,7 +164,7 @@ function BookingDatePicker({
       <p className="mt-2 text-xs leading-5 text-white/48">{hint}</p>
 
       {isOpen ? (
-        <div className="absolute left-0 z-30 mt-3 w-[19rem] rounded-[1.4rem] border border-white/10 bg-[#0f131b] p-4 shadow-[0_30px_70px_-30px_rgba(0,0,0,0.85)]">
+        <div className="absolute left-0 z-30 mt-3 w-[19rem] rounded-lg border border-white/10 bg-[#0f131b] p-4 shadow-[0_30px_70px_-30px_rgba(0,0,0,0.85)]">
           <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
@@ -210,7 +210,7 @@ function BookingDatePicker({
                   className={cn(
                     "h-10 rounded-xl text-sm transition",
                     isSelected
-                      ? "bg-[#ff6b57] text-white shadow-[0_16px_30px_-18px_rgba(255,107,87,0.95)]"
+                      ? "bg-[#593cfb] text-white shadow-[0_16px_30px_-18px_rgba(89, 60, 251, 0.95)]"
                       : "text-white/88",
                     isOutsideMonth && !isSelected ? "text-white/28" : "",
                     !isDisabled && !isSelected ? "hover:bg-white/8" : "",
@@ -423,26 +423,26 @@ export function PublicBookingPanel({
   }
 
   return (
-    <div className="rounded-[2rem] border border-white/10 bg-[#10141d] p-5 text-white shadow-[0_35px_80px_-50px_rgba(5,8,14,0.95)] sm:p-6">
+    <div className="rounded-lg border border-white/10 bg-[#10141d] p-5 text-white shadow-[0_35px_80px_-50px_rgba(5,8,14,0.95)] sm:p-6">
       <p className="text-[11px] uppercase tracking-[0.32em] text-white/48">
         {reserveMessages.bookingPanelTitle}
       </p>
       <p className="mt-3 max-w-lg text-sm leading-6 text-white/68">{reserveMessages.bookingPanelCopy}</p>
 
       {checkoutState === "success" ? (
-        <div className="mt-5 rounded-[1.5rem] border border-emerald-300/18 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+        <div className="mt-5 rounded-lg border border-emerald-300/18 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
           {reserveMessages.successNotice}
         </div>
       ) : null}
 
       {checkoutState === "cancelled" ? (
-        <div className="mt-5 rounded-[1.5rem] border border-amber-300/18 bg-amber-400/10 px-4 py-3 text-sm text-amber-50">
+        <div className="mt-5 rounded-lg border border-amber-300/18 bg-amber-400/10 px-4 py-3 text-sm text-amber-50">
           {reserveMessages.cancelledNotice}
         </div>
       ) : null}
 
       {checkoutState === "error" ? (
-        <div className="mt-5 rounded-[1.5rem] border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+        <div className="mt-5 rounded-lg border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
           {reserveMessages.errorNotice}
         </div>
       ) : null}
@@ -471,7 +471,7 @@ export function PublicBookingPanel({
         />
       </div>
 
-      <div className="mt-3 rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-4 py-3 text-xs leading-5 text-white/54">
+      <div className="mt-3 rounded-md border border-white/8 bg-white/[0.03] px-4 py-3 text-xs leading-5 text-white/54">
         {reserveMessages.calendarHint}
       </div>
 
@@ -481,7 +481,7 @@ export function PublicBookingPanel({
           <input
             value={renterName}
             onChange={(event) => setRenterName(event.target.value)}
-            className="w-full rounded-[1.2rem] border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
+            className="w-full rounded-md border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
           />
         </label>
         <label className="block">
@@ -490,7 +490,7 @@ export function PublicBookingPanel({
             type="email"
             value={renterEmail}
             onChange={(event) => setRenterEmail(event.target.value)}
-            className="w-full rounded-[1.2rem] border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
+            className="w-full rounded-md border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
           />
         </label>
       </div>
@@ -500,11 +500,11 @@ export function PublicBookingPanel({
         <input
           value={renterPhone}
           onChange={(event) => setRenterPhone(event.target.value)}
-          className="w-full rounded-[1.2rem] border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
+          className="w-full rounded-md border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
         />
       </label>
 
-      <label className="mt-5 flex items-start gap-3 rounded-[1.3rem] border border-white/8 bg-white/[0.04] px-4 py-4">
+      <label className="mt-5 flex items-start gap-3 rounded-md border border-white/8 bg-white/[0.04] px-4 py-4">
         <input
           type="checkbox"
           checked={includeInsurance}
@@ -519,7 +519,7 @@ export function PublicBookingPanel({
         </span>
       </label>
 
-      <div className="mt-5 rounded-[1.5rem] border border-white/8 bg-white/[0.04] p-4">
+      <div className="mt-5 rounded-lg border border-white/8 bg-white/[0.04] p-4">
         <div className="flex items-center justify-between text-sm text-white/62">
           <span>{reserveMessages.quoteDays(quote.days)}</span>
           <span>{formatCurrency(bookingDailyRate, locale)}</span>
@@ -546,7 +546,7 @@ export function PublicBookingPanel({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between rounded-[1.3rem] border border-white/8 bg-white/[0.04] px-4 py-3">
+      <div className="mt-4 flex items-center justify-between rounded-md border border-white/8 bg-white/[0.04] px-4 py-3">
         <div>
           <p className="text-sm font-medium text-white">
             {stripeReady ? reserveMessages.stripeReady : reserveMessages.stripeMissing}
@@ -556,7 +556,7 @@ export function PublicBookingPanel({
       </div>
 
       {error ? (
-        <div className="mt-4 rounded-[1.4rem] border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+        <div className="mt-4 rounded-lg border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
           {error}
         </div>
       ) : null}
@@ -564,8 +564,8 @@ export function PublicBookingPanel({
       <button
         onClick={startCheckout}
         disabled={!stripeReady || isPending}
-        className="mt-5 w-full rounded-full bg-[#ff6b57] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(255,107,87,0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
-        style={{ backgroundColor: "#ff6b57", color: "#ffffff" }}
+        className="mt-5 w-full rounded-full bg-[#593cfb] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(89, 60, 251, 0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
+        style={{ backgroundColor: "#593cfb", color: "#ffffff" }}
       >
         {isPending ? reserveMessages.checkoutLoading : reserveMessages.checkoutAction}
       </button>

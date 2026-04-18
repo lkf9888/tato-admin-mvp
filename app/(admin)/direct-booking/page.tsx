@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 
 import { saveVehicleDirectBookingAction } from "@/app/actions";
+import { requireCurrentWorkspace } from "@/lib/auth";
 import { getBlockedBookingWindows } from "@/lib/direct-booking";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
@@ -9,10 +10,12 @@ import { getAppUrl, getStripeSecretKey } from "@/lib/stripe";
 import { formatDate } from "@/lib/utils";
 
 export default async function DirectBookingPage() {
+  const workspace = await requireCurrentWorkspace();
   const [headerStore, { locale, messages }, vehicles] = await Promise.all([
     headers(),
     getI18n(),
     prisma.vehicle.findMany({
+      where: { workspaceId: workspace.id },
       include: {
         owner: true,
         orders: {
@@ -48,7 +51,7 @@ export default async function DirectBookingPage() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.94),rgba(255,240,231,0.97))] p-6 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.94),rgba(255,240,231,0.97))] p-6 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
         <p className="text-xs uppercase tracking-[0.32em] text-[color:var(--ink-soft)]">
           {directMessages.kicker}
         </p>
@@ -67,19 +70,19 @@ export default async function DirectBookingPage() {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-[1.6rem] border border-[rgba(17,19,24,0.06)] bg-white/80 px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
+          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-white/80 px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
             <p className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
               {directMessages.enabledCount}
             </p>
             <p className="mt-3 text-[2rem] font-semibold text-[color:var(--ink)]">{enabledCount}</p>
           </div>
-          <div className="rounded-[1.6rem] border border-[rgba(17,19,24,0.06)] bg-white/80 px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
+          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-white/80 px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
             <p className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
               {directMessages.readyCount}
             </p>
             <p className="mt-3 text-[2rem] font-semibold text-[color:var(--ink)]">{readyCount}</p>
           </div>
-          <div className="rounded-[1.6rem] border border-[rgba(17,19,24,0.06)] bg-white/80 px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
+          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-white/80 px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
             <p className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
               {directMessages.stripeStatus}
             </p>
@@ -91,7 +94,7 @@ export default async function DirectBookingPage() {
       </section>
 
       {vehicles.length === 0 ? (
-        <section className="rounded-[2rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+        <section className="rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
           {directMessages.emptyState}
         </section>
       ) : null}
@@ -106,9 +109,9 @@ export default async function DirectBookingPage() {
           return (
             <article
               key={vehicle.id}
-              className="overflow-hidden rounded-[1.75rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
+              className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
             >
-              <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,244,236,0.96))] px-5 py-4">
+              <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.96))] px-5 py-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-serif text-[1.5rem] leading-tight text-[color:var(--ink)]">
@@ -117,7 +120,7 @@ export default async function DirectBookingPage() {
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-[0.08em] ${
                         isLive
-                          ? "border border-[rgba(255,107,87,0.18)] bg-[var(--accent-soft)] text-[var(--ink)]"
+                          ? "border border-[rgba(89, 60, 251, 0.18)] bg-[var(--accent-soft)] text-[var(--ink)]"
                           : "border border-slate-900/8 bg-slate-200 text-slate-700"
                       }`}
                     >
@@ -153,7 +156,7 @@ export default async function DirectBookingPage() {
               <form action={saveVehicleDirectBookingAction} className="space-y-4 px-5 py-4">
                 <input type="hidden" name="id" value={vehicle.id} />
 
-                <label className="flex items-center justify-between gap-4 rounded-[1rem] border border-[color:var(--line)] bg-[var(--surface-muted)] px-4 py-2.5">
+                <label className="flex items-center justify-between gap-4 rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-4 py-2.5">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-[color:var(--ink)]">
                       {directMessages.enableLabel}
@@ -185,7 +188,7 @@ export default async function DirectBookingPage() {
                       inputMode="decimal"
                       defaultValue={vehicle.bookingDailyRate ?? ""}
                       placeholder="0.00"
-                      className="w-full rounded-[0.9rem] border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-3 text-base font-medium tabular-nums text-[color:var(--ink)]"
+                      className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-3 text-base font-medium tabular-nums text-[color:var(--ink)]"
                     />
                   </label>
 
@@ -201,7 +204,7 @@ export default async function DirectBookingPage() {
                       inputMode="decimal"
                       defaultValue={vehicle.bookingInsuranceFee ?? ""}
                       placeholder="0.00"
-                      className="w-full rounded-[0.9rem] border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-3 text-base font-medium tabular-nums text-[color:var(--ink)]"
+                      className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-3 text-base font-medium tabular-nums text-[color:var(--ink)]"
                     />
                   </label>
 
@@ -217,7 +220,7 @@ export default async function DirectBookingPage() {
                       inputMode="decimal"
                       defaultValue={vehicle.bookingDepositAmount ?? ""}
                       placeholder="0.00"
-                      className="w-full rounded-[0.9rem] border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-3 text-base font-medium tabular-nums text-[color:var(--ink)]"
+                      className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-3 text-base font-medium tabular-nums text-[color:var(--ink)]"
                     />
                   </label>
                 </div>
@@ -231,7 +234,7 @@ export default async function DirectBookingPage() {
                     rows={2}
                     defaultValue={vehicle.bookingIntro ?? ""}
                     placeholder={directMessages.introPlaceholder}
-                    className="w-full rounded-[1rem] border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm leading-6 text-[color:var(--ink)]"
+                    className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm leading-6 text-[color:var(--ink)]"
                   />
                 </label>
 

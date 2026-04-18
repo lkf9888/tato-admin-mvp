@@ -19,7 +19,7 @@ export default async function RegisterPage({
 
   return (
     <main className="min-h-screen bg-[var(--page)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-[86rem] overflow-hidden rounded-[2.5rem] border border-[var(--line)] bg-[rgba(255,250,244,0.9)] shadow-[0_30px_90px_rgba(17,19,24,0.08)] lg:grid-cols-[1.18fr_0.82fr]">
+      <div className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-[86rem] overflow-hidden rounded-xl border border-[var(--line)] bg-[rgba(255, 255, 255, 0.9)] shadow-[0_30px_90px_rgba(17,19,24,0.08)] lg:grid-cols-[1.18fr_0.82fr]">
         <section className="relative hidden overflow-hidden bg-[#111318] px-12 py-12 text-white lg:block">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(255,127,102,0.22),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(53,110,88,0.28),transparent_30%),linear-gradient(180deg,#171a20_0%,#12141a_58%,#090b12_100%)]" />
           <div className="absolute inset-y-0 right-0 w-px bg-white/8" />
@@ -44,7 +44,7 @@ export default async function RegisterPage({
 
             <div className="grid gap-4 sm:grid-cols-3">
               {loginMessages.features.map(([label, copy]) => (
-                <div key={label} className="rounded-[1.6rem] border border-white/10 bg-white/[0.04] p-5 backdrop-blur">
+                <div key={label} className="rounded-lg border border-white/10 bg-white/[0.04] p-5 backdrop-blur">
                   <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/94">{label}</p>
                   <p className="mt-3 text-[13px] leading-6 text-white/60">{copy}</p>
                 </div>
@@ -53,9 +53,9 @@ export default async function RegisterPage({
           </div>
         </section>
 
-        <section className="flex items-center bg-[rgba(255,252,247,0.68)] px-6 py-10 sm:px-10 lg:px-14">
+        <section className="flex items-center bg-[rgba(255, 255, 255, 0.68)] px-6 py-10 sm:px-10 lg:px-14">
           <div className="mx-auto w-full max-w-md">
-            <div className="rounded-[2rem] border border-[var(--line)] bg-white/78 px-7 py-7 shadow-[0_26px_65px_rgba(17,19,24,0.06)] backdrop-blur">
+            <div className="rounded-lg border border-[var(--line)] bg-white/78 px-7 py-7 shadow-[0_26px_65px_rgba(17,19,24,0.06)] backdrop-blur">
               <p className="text-[11px] uppercase tracking-[0.35em] text-[var(--ink-soft)]">{registerMessages.kicker}</p>
               <h2 className="mt-3 font-serif text-[2.85rem] leading-none text-[var(--ink)]">{registerMessages.title}</h2>
               <p className="mt-3 text-[13px] leading-6 text-[var(--ink-soft)]">{registerMessages.description}</p>
@@ -94,13 +94,13 @@ export default async function RegisterPage({
                 </label>
 
                 {params.error === "invalid" ? (
-                  <p className="rounded-[1.25rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  <p className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                     {registerMessages.invalidInput}
                   </p>
                 ) : null}
 
                 {params.error === "exists" ? (
-                  <p className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                  <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
                     {registerMessages.emailExists}
                   </p>
                 ) : null}
@@ -110,7 +110,7 @@ export default async function RegisterPage({
                 </button>
               </form>
 
-              <div className="mt-6 rounded-[1.6rem] border border-[var(--line)] bg-[var(--surface-muted)] px-5 py-4 text-sm text-[var(--ink-soft)]">
+              <div className="mt-6 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-5 py-4 text-sm text-[var(--ink-soft)]">
                 <p className="font-medium text-[var(--ink)]">{registerMessages.loginPrompt}</p>
                 <a href="/login" className="mt-2 inline-flex text-sm font-medium text-[var(--ink)] underline underline-offset-4 decoration-[var(--accent)]">
                   {registerMessages.loginLink}

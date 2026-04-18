@@ -1,4 +1,5 @@
 import { deleteOrderAction, saveOfflineOrderAction, updateOrderStatusAction } from "@/app/actions";
+import { requireCurrentWorkspace } from "@/lib/auth";
 import { StatusBadge } from "@/components/status-badge";
 import { getOrderStatusOptions } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
@@ -12,8 +13,9 @@ import {
   normalizeText,
 } from "@/lib/utils";
 
-async function fetchOrders() {
+async function fetchOrders(workspaceId: string) {
   return prisma.order.findMany({
+    where: { workspaceId },
     include: { vehicle: { include: { owner: true } } },
     orderBy: { pickupDatetime: "desc" },
   });
@@ -68,10 +70,12 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<{ error?: string; q?: string }>;
 }) {
+  const workspace = await requireCurrentWorkspace();
   const [{ locale, messages }, orders, vehicles, params] = await Promise.all([
     getI18n(),
-    fetchOrders(),
+    fetchOrders(workspace.id),
     prisma.vehicle.findMany({
+      where: { workspaceId: workspace.id },
       orderBy: { nickname: "asc" },
     }),
     searchParams,
@@ -83,21 +87,21 @@ export default async function OrdersPage({
   const filteredOrders = orders.filter((order) => matchesOrderSearch(order, searchQuery, locale));
 
   const inputClass =
-    "h-12 rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 text-[13px] text-[color:var(--ink)] outline-none";
+    "h-12 rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 text-[13px] text-[color:var(--ink)] outline-none";
   const subtleButtonClass =
     "inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white";
   const primaryButtonClass =
-    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(255,107,87,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]";
+    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89, 60, 251, 0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]";
 
   return (
     <div className="space-y-5">
       {params.error ? (
-        <div className="rounded-[1.4rem] border border-amber-200/70 bg-[rgba(255,248,230,0.92)] px-5 py-4 text-sm text-amber-700 shadow-[0_16px_40px_-36px_rgba(17,19,24,0.45)]">
+        <div className="rounded-lg border border-amber-200/70 bg-[rgba(247, 247, 247, 0.92)] px-5 py-4 text-sm text-amber-700 shadow-[0_16px_40px_-36px_rgba(17,19,24,0.45)]">
           {orderMessages.importedReadOnly}
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(255,244,236,0.96))] p-6 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247, 247, 247, 0.96))] p-6 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-[color:var(--ink-soft)]">
@@ -179,7 +183,7 @@ export default async function OrdersPage({
         </form>
       </section>
 
-      <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.88)] p-6 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] p-6 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-[color:var(--ink-soft)]">
@@ -212,7 +216,7 @@ export default async function OrdersPage({
 
       <section className="grid gap-4 lg:grid-cols-2">
         {filteredOrders.length === 0 ? (
-          <div className="rounded-[2rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] lg:col-span-2">
+          <div className="rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] lg:col-span-2">
             {orderMessages.emptySearch}
           </div>
         ) : null}
@@ -224,9 +228,9 @@ export default async function OrdersPage({
           return (
             <article
               key={order.id}
-              className="h-fit overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
+              className="h-fit overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
             >
-              <div className="bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,244,236,0.98))] px-5 py-5">
+              <div className="bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.98))] px-5 py-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h3 className="font-serif text-[2rem] leading-tight text-[color:var(--ink)]">
@@ -292,11 +296,11 @@ export default async function OrdersPage({
                 </div>
 
                 {hasNetEarning ? (
-                  <div className="mt-4 overflow-hidden rounded-[1.6rem] border border-[rgba(17,19,24,0.06)] bg-[linear-gradient(180deg,rgba(17,19,24,0.96),rgba(24,30,41,0.96))] px-4 py-4 text-white">
+                  <div className="mt-4 overflow-hidden rounded-lg border border-[rgba(17,19,24,0.06)] bg-[linear-gradient(180deg,rgba(17,19,24,0.96),rgba(24,30,41,0.96))] px-4 py-4 text-white">
                     <p className="text-[11px] uppercase tracking-[0.22em] text-white/60">
                       {orderMessages.importedBreakdown}
                     </p>
-                    <div className="mt-3 rounded-[1.25rem] bg-white/8 px-4 py-3">
+                    <div className="mt-3 rounded-md bg-white/8 px-4 py-3">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">
                         {orderMessages.revenuePrefix}
                       </p>

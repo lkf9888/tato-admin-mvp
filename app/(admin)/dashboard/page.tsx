@@ -2,10 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { MetricCard } from "@/components/metric-card";
 import { formatDateTime } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
+import { requireCurrentWorkspace } from "@/lib/auth";
 import { getActivityActionLabel } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 
 export default async function DashboardPage() {
+  const workspace = await requireCurrentWorkspace();
   const now = new Date();
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
@@ -17,6 +19,7 @@ export default async function DashboardPage() {
       getI18n(),
       prisma.order.findMany({
         where: {
+          workspaceId: workspace.id,
           pickupDatetime: { lte: endOfDay },
           returnDatetime: { gte: startOfDay },
           status: { not: "cancelled" },
@@ -26,6 +29,7 @@ export default async function DashboardPage() {
       }),
       prisma.order.findMany({
         where: {
+          workspaceId: workspace.id,
           pickupDatetime: { gte: now },
         },
         include: { vehicle: true },
@@ -33,14 +37,16 @@ export default async function DashboardPage() {
         take: 5,
       }),
       prisma.order.findMany({
-        where: { hasConflict: true },
+        where: { workspaceId: workspace.id, hasConflict: true },
         include: { vehicle: true },
         orderBy: { pickupDatetime: "asc" },
       }),
       prisma.importBatch.findFirst({
+        where: { workspaceId: workspace.id },
         orderBy: { importedAt: "desc" },
       }),
       prisma.activityLog.findMany({
+        where: { workspaceId: workspace.id },
         orderBy: { createdAt: "desc" },
         take: 6,
       }),
@@ -86,7 +92,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+        <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
@@ -105,7 +111,7 @@ export default async function DashboardPage() {
             {upcomingOrders.map((order) => (
               <div
                 key={order.id}
-                className="flex flex-col gap-3 rounded-3xl border border-slate-200 px-5 py-4 md:flex-row md:items-center md:justify-between"
+                className="flex flex-col gap-3 rounded-lg border border-slate-200 px-5 py-4 md:flex-row md:items-center md:justify-between"
               >
                 <div>
                   <p className="font-semibold text-slate-900">
@@ -126,7 +132,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+        <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
           <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
             {dashboardMessages.activityKicker}
           </p>
@@ -135,7 +141,7 @@ export default async function DashboardPage() {
           </h3>
           <div className="mt-6 space-y-4">
             {latestLogs.map((log) => (
-              <div key={log.id} className="rounded-3xl bg-slate-50 px-4 py-4">
+              <div key={log.id} className="rounded-lg bg-slate-50 px-4 py-4">
                 <p className="font-medium text-slate-900">
                   {getActivityActionLabel(log.action, locale)}
                 </p>

@@ -34,7 +34,7 @@ export default async function SharePage({
   if (!shareLink || !shareLink.isActive) {
     return (
       <main className="min-h-screen bg-[var(--page)] px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-[2rem] bg-white p-8 shadow-sm">
+        <div className="mx-auto max-w-xl rounded-lg bg-white p-8 shadow-sm">
           <h1 className="font-serif text-4xl text-slate-950">{shareMessages.unavailableTitle}</h1>
           <p className="mt-4 text-sm text-slate-600">{shareMessages.unavailableCopy}</p>
         </div>
@@ -45,7 +45,7 @@ export default async function SharePage({
   if (shareLink.expiresAt && shareLink.expiresAt < new Date()) {
     return (
       <main className="min-h-screen bg-[var(--page)] px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-[2rem] bg-white p-8 shadow-sm">
+        <div className="mx-auto max-w-xl rounded-lg bg-white p-8 shadow-sm">
           <h1 className="font-serif text-4xl text-slate-950">{shareMessages.expiredTitle}</h1>
           <p className="mt-4 text-sm text-slate-600">{shareMessages.expiredCopy}</p>
         </div>
@@ -60,7 +60,7 @@ export default async function SharePage({
   if (shareLink.passwordHash && !unlocked) {
     return (
       <main className="min-h-screen bg-[var(--page)] px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-[2rem] bg-white p-8 shadow-sm">
+        <div className="mx-auto max-w-xl rounded-lg bg-white p-8 shadow-sm">
           <p className="text-xs uppercase tracking-[0.35em] text-slate-500">
             {shareMessages.ownerCalendarKicker}
           </p>
@@ -73,14 +73,14 @@ export default async function SharePage({
               name="password"
               type="password"
               placeholder={shareMessages.sharePassword}
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+              className="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
             />
             {query.error ? (
-              <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 {shareMessages.incorrectPassword}
               </p>
             ) : null}
-            <button className="w-full rounded-2xl bg-slate-950 px-4 py-3 font-medium text-white">
+            <button className="w-full rounded-md bg-slate-950 px-4 py-3 font-medium text-white">
               {shareMessages.unlockCalendar}
             </button>
           </form>
@@ -118,7 +118,7 @@ export default async function SharePage({
   return (
     <main className="min-h-screen bg-[var(--page)] px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-[1500px] space-y-6">
-        <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(255,244,236,0.96))] px-6 py-8 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+        <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247, 247, 247, 0.96))] px-6 py-8 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
           <p className="text-xs uppercase tracking-[0.35em] text-[color:var(--ink-soft)]">
             {shareMessages.readOnlyKicker}
           </p>

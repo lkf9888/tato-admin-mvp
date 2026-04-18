@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { isAdminAuthenticated } from "@/lib/auth";
+import { requireCurrentAdminContext } from "@/lib/auth";
 import { getImportBillingProjection } from "@/lib/billing";
 
 const importCheckSchema = z.object({
@@ -12,14 +12,17 @@ const importCheckSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const authenticated = await isAdminAuthenticated();
-  if (!authenticated) {
+  let context;
+  try {
+    context = await requireCurrentAdminContext();
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const parsed = importCheckSchema.parse(await request.json());
     const projection = await getImportBillingProjection({
+      workspaceId: context.workspace.id,
       rows: parsed.rows,
       mapping: parsed.mapping,
       createMissingVehicles: parsed.createMissingVehicles ?? false,

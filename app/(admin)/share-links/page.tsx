@@ -1,17 +1,21 @@
 import { DeleteShareLinkButton } from "@/components/delete-share-link-button";
 import { StatusBadge } from "@/components/status-badge";
+import { requireCurrentWorkspace } from "@/lib/auth";
 import { getShareVisibilityOptions } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 
 export default async function ShareLinksPage() {
+  const workspace = await requireCurrentWorkspace();
   const [{ locale, messages }, owners, shareLinks] = await Promise.all([
     getI18n(),
     prisma.owner.findMany({
+      where: { workspaceId: workspace.id },
       orderBy: { name: "asc" },
     }),
     prisma.shareLink.findMany({
+      where: { workspaceId: workspace.id },
       include: { owner: true },
       orderBy: { createdAt: "desc" },
     }),
@@ -22,12 +26,12 @@ export default async function ShareLinksPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+      <section className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
         <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
           {shareLinkMessages.createKicker}
         </p>
         <form action="/api/share-links/create" method="post" className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <select name="ownerId" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <select name="ownerId" className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
             {owners.map((owner) => (
               <option key={owner.id} value={owner.id}>
                 {owner.name}
@@ -37,7 +41,7 @@ export default async function ShareLinksPage() {
           <select
             name="visibility"
             defaultValue="standard"
-            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
           >
             {shareVisibilityOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -48,14 +52,14 @@ export default async function ShareLinksPage() {
           <input
             name="password"
             placeholder={shareLinkMessages.optionalPassword}
-            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
           />
           <input
             name="expiresAt"
             type="datetime-local"
-            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
           />
-          <button className="rounded-2xl bg-slate-950 px-4 py-3 font-medium text-white xl:col-span-1">
+          <button className="rounded-md bg-slate-950 px-4 py-3 font-medium text-white xl:col-span-1">
             {shareLinkMessages.generateLink}
           </button>
         </form>
@@ -63,7 +67,7 @@ export default async function ShareLinksPage() {
 
       <section className="space-y-4">
         {shareLinks.map((shareLink) => (
-          <article key={shareLink.id} className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+          <article key={shareLink.id} className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
                 <h3 className="font-serif text-3xl text-slate-950">{shareLink.owner.name}</h3>
@@ -93,14 +97,14 @@ export default async function ShareLinksPage() {
             <div className="mt-4 flex flex-col gap-3 md:flex-row">
               <a
                 href={`/share/${shareLink.token}`}
-                className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
+                className="rounded-md border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
               >
                 {shareLinkMessages.openSharePage}
               </a>
               {shareLink.isActive ? (
                 <form action="/api/share-links/revoke" method="post">
                   <input type="hidden" name="id" value={shareLink.id} />
-                  <button className="rounded-2xl border border-rose-200 px-4 py-3 text-sm font-medium text-rose-600">
+                  <button className="rounded-md border border-rose-200 px-4 py-3 text-sm font-medium text-rose-600">
                     {shareLinkMessages.revokeLink}
                   </button>
                 </form>

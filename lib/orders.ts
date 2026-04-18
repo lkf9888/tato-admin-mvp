@@ -100,6 +100,7 @@ export async function reconcileVehicleConflicts(vehicleId: string) {
 }
 
 export async function logActivity(input: {
+  workspaceId?: string | null;
   actor: string;
   action: string;
   entityType: string;
@@ -108,6 +109,7 @@ export async function logActivity(input: {
 }) {
   await prisma.activityLog.create({
     data: {
+      workspaceId: input.workspaceId ?? undefined,
       actor: input.actor,
       action: input.action,
       entityType: input.entityType,
@@ -448,6 +450,7 @@ function parseVehicleBasics(vehicleName?: string) {
 }
 
 async function createVehicleFromCsvRow(input: {
+  workspaceId: string;
   row: CsvImportRow;
   mapping: CsvFieldMapping;
   actor: string;
@@ -462,34 +465,45 @@ async function createVehicleFromCsvRow(input: {
 
   const basics = parseVehicleBasics(vehicleName || vehicleLabel);
 
-  const vehicle = await prisma.vehicle.upsert({
-    where: {
-      plateNumber,
-    },
-    update: {
-      nickname: vehicleName || vehicleLabel || plateNumber,
-      brand: basics.brand,
-      model: basics.model,
-      year: basics.year,
-      vin: vin || undefined,
-      turoListingName: vehicleName || vehicleLabel || undefined,
-      turoVehicleCode: externalVehicleId || undefined,
-      notes: "Auto-created from Turo CSV import.",
-    },
-    create: {
-      plateNumber,
-      nickname: vehicleName || vehicleLabel || plateNumber,
-      brand: basics.brand,
-      model: basics.model,
-      year: basics.year,
-      vin: vin || undefined,
-      turoListingName: vehicleName || vehicleLabel || undefined,
-      turoVehicleCode: externalVehicleId || undefined,
-      notes: "Auto-created from Turo CSV import.",
-    },
+  const existingGlobalVehicle = await prisma.vehicle.findUnique({
+    where: { plateNumber },
   });
 
+  if (existingGlobalVehicle && existingGlobalVehicle.workspaceId !== input.workspaceId) {
+    return null;
+  }
+
+  const vehicle = existingGlobalVehicle
+    ? await prisma.vehicle.update({
+        where: { id: existingGlobalVehicle.id },
+        data: {
+          nickname: vehicleName || vehicleLabel || plateNumber,
+          brand: basics.brand,
+          model: basics.model,
+          year: basics.year,
+          vin: vin || undefined,
+          turoListingName: vehicleName || vehicleLabel || undefined,
+          turoVehicleCode: externalVehicleId || undefined,
+          notes: "Auto-created from Turo CSV import.",
+        },
+      })
+    : await prisma.vehicle.create({
+        data: {
+          workspaceId: input.workspaceId,
+          plateNumber,
+          nickname: vehicleName || vehicleLabel || plateNumber,
+          brand: basics.brand,
+          model: basics.model,
+          year: basics.year,
+          vin: vin || undefined,
+          turoListingName: vehicleName || vehicleLabel || undefined,
+          turoVehicleCode: externalVehicleId || undefined,
+          notes: "Auto-created from Turo CSV import.",
+        },
+      });
+
   await logActivity({
+    workspaceId: input.workspaceId,
     actor: input.actor,
     action: "vehicle_auto_created_from_csv",
     entityType: "Vehicle",
@@ -582,12 +596,15 @@ export function normalizeCsvFieldMapping(input: Record<string, string>): CsvFiel
 }
 
 export async function estimateImportVehicleImpact(input: {
+  workspaceId: string;
   mapping: CsvFieldMapping;
   rows: CsvImportRow[];
   createMissingVehicles?: boolean;
 }) {
   const mapping = normalizeCsvFieldMapping(input.mapping as Record<string, string>);
-  const vehicles = await prisma.vehicle.findMany();
+  const vehicles = await prisma.vehicle.findMany({
+    where: { workspaceId: input.workspaceId },
+  });
   const projectedVehicleMap = new Map<string, ProjectedImportVehicleOption>();
 
   for (const row of input.rows) {
@@ -645,6 +662,7 @@ export async function estimateImportVehicleImpact(input: {
 }
 
 export async function importTuroOrders(input: {
+  workspaceId: string;
   fileName: string;
   actor: string;
   mapping: CsvFieldMapping;
@@ -658,6 +676,7 @@ export async function importTuroOrders(input: {
 
   const batch = await prisma.importBatch.create({
     data: {
+      workspaceId: input.workspaceId,
       fileName: input.fileName,
       importedBy: input.actor,
       totalRows: input.rows.length,
@@ -669,7 +688,9 @@ export async function importTuroOrders(input: {
 
   let successRows = 0;
   const touchedVehicleIds = new Set<string>();
-  const vehicles = await prisma.vehicle.findMany();
+  const vehicles = await prisma.vehicle.findMany({
+    where: { workspaceId: input.workspaceId },
+  });
   const syncedVehicleIds = new Set<string>();
   const syncedOrderIds = new Set<string>();
   let createdVehicles = 0;
@@ -720,6 +741,7 @@ export async function importTuroOrders(input: {
       }
 
       const createdVehicle = await createVehicleFromCsvRow({
+        workspaceId: input.workspaceId,
         row,
         mapping,
         actor: input.actor,
@@ -794,6 +816,7 @@ export async function importTuroOrders(input: {
 
     const payload = {
       vehicleId: vehicle.id,
+      workspaceId: input.workspaceId,
       importBatchId: batch.id,
       source: OrderSource.turo,
       externalOrderId,
@@ -832,6 +855,7 @@ export async function importTuroOrders(input: {
   if (failures.length === 0) {
     const staleTuroOrders = await prisma.order.findMany({
       where: {
+        workspaceId: input.workspaceId,
         source: OrderSource.turo,
         ...(syncedVehicleIds.size > 0
           ? {
@@ -890,6 +914,7 @@ export async function importTuroOrders(input: {
   });
 
   await logActivity({
+    workspaceId: input.workspaceId,
     actor: input.actor,
     action: "import_csv",
     entityType: "ImportBatch",

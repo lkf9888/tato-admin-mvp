@@ -31,7 +31,7 @@ export function LanguageSwitcher({
   ];
 
   return (
-    <div className={cn("rounded-2xl border border-slate-200 bg-white/70 p-3", className)}>
+    <div className={cn("rounded-md border border-slate-200 bg-white/70 p-3", className)}>
       <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{label}</p>
       <div className="mt-2 grid grid-cols-3 gap-2">
         {options.map((option) => {

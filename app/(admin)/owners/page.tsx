@@ -1,4 +1,5 @@
 import { deleteOwnerAction, saveOwnerAction } from "@/app/actions";
+import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 
@@ -7,9 +8,11 @@ export default async function OwnersPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  const workspace = await requireCurrentWorkspace();
   const [{ messages }, owners, params] = await Promise.all([
     getI18n(),
     prisma.owner.findMany({
+      where: { workspaceId: workspace.id },
       include: { vehicles: true, shareLinks: true },
       orderBy: { createdAt: "desc" },
     }),
@@ -21,12 +24,12 @@ export default async function OwnersPage({
   return (
     <div className="space-y-6">
       {params.error ? (
-        <div className="rounded-3xl bg-amber-50 px-5 py-4 text-sm text-amber-700">
+        <div className="rounded-lg bg-amber-50 px-5 py-4 text-sm text-amber-700">
           {ownerMessages.deleteError}
         </div>
       ) : null}
 
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+      <section className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
         <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
           {ownerMessages.createKicker}
         </p>
@@ -34,29 +37,29 @@ export default async function OwnersPage({
           <input
             name="name"
             placeholder={ownerMessages.placeholders.name}
-            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
           />
           <input
             name="phone"
             placeholder={ownerMessages.placeholders.phone}
-            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
           />
           <input
             name="email"
             placeholder={ownerMessages.placeholders.email}
-            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
           />
           <input
             name="companyName"
             placeholder={ownerMessages.placeholders.company}
-            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
           />
           <input
             name="notes"
             placeholder={ownerMessages.placeholders.notes}
-            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 xl:col-span-4"
+            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 xl:col-span-4"
           />
-          <button className="rounded-2xl bg-slate-950 px-4 py-3 font-medium text-white xl:col-span-1">
+          <button className="rounded-md bg-slate-950 px-4 py-3 font-medium text-white xl:col-span-1">
             {ownerMessages.addOwner}
           </button>
         </form>
@@ -64,7 +67,7 @@ export default async function OwnersPage({
 
       <section className="grid gap-5 xl:grid-cols-2">
         {owners.map((owner) => (
-          <article key={owner.id} className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+          <article key={owner.id} className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <h3 className="font-serif text-3xl text-slate-950">{owner.name}</h3>
@@ -83,7 +86,7 @@ export default async function OwnersPage({
               </div>
             </div>
 
-            <details className="mt-5 rounded-3xl bg-slate-50 px-5 py-4">
+            <details className="mt-5 rounded-lg bg-slate-50 px-5 py-4">
               <summary className="cursor-pointer text-sm font-medium text-slate-700">
                 {ownerMessages.editOwner}
               </summary>
@@ -92,29 +95,29 @@ export default async function OwnersPage({
                 <input
                   name="name"
                   defaultValue={owner.name}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                  className="rounded-md border border-slate-200 bg-white px-4 py-3"
                 />
                 <input
                   name="phone"
                   defaultValue={owner.phone ?? ""}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                  className="rounded-md border border-slate-200 bg-white px-4 py-3"
                 />
                 <input
                   name="email"
                   defaultValue={owner.email ?? ""}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                  className="rounded-md border border-slate-200 bg-white px-4 py-3"
                 />
                 <input
                   name="companyName"
                   defaultValue={owner.companyName ?? ""}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                  className="rounded-md border border-slate-200 bg-white px-4 py-3"
                 />
                 <input
                   name="notes"
                   defaultValue={owner.notes ?? ""}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 md:col-span-2"
+                  className="rounded-md border border-slate-200 bg-white px-4 py-3 md:col-span-2"
                 />
-                <button className="rounded-2xl bg-slate-950 px-4 py-3 font-medium text-white md:col-span-2">
+                <button className="rounded-md bg-slate-950 px-4 py-3 font-medium text-white md:col-span-2">
                   {ownerMessages.saveChanges}
                 </button>
               </form>

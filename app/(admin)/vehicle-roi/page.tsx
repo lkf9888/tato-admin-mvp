@@ -1,4 +1,5 @@
 import { saveVehiclePurchasePriceAction } from "@/app/actions";
+import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import {
@@ -29,9 +30,11 @@ function buildMonthLabel(value: Date, locale: "en" | "zh") {
 }
 
 export default async function VehicleRoiPage() {
+  const workspace = await requireCurrentWorkspace();
   const [{ locale, messages }, vehicles] = await Promise.all([
     getI18n(),
     prisma.vehicle.findMany({
+      where: { workspaceId: workspace.id },
       include: {
         owner: true,
         orders: {
@@ -117,7 +120,7 @@ export default async function VehicleRoiPage() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(255,244,236,0.96))] p-6 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247, 247, 247, 0.96))] p-6 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
         <p className="text-xs uppercase tracking-[0.28em] text-[color:var(--ink-soft)]">
           {roiMessages.kicker}
         </p>
@@ -129,7 +132,7 @@ export default async function VehicleRoiPage() {
         </p>
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-[1.6rem] border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.72)] px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
+          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.72)] px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
             <p className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
               {roiMessages.fleetMonthRevenue}
             </p>
@@ -137,7 +140,7 @@ export default async function VehicleRoiPage() {
               {formatCurrency(fleetMonthRevenue, locale)}
             </p>
           </div>
-          <div className="rounded-[1.6rem] border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.72)] px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
+          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.72)] px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
             <p className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
               {roiMessages.fleetRevenuePerKm}
             </p>
@@ -150,7 +153,7 @@ export default async function VehicleRoiPage() {
                 : roiMessages.missingDistance}
             </p>
           </div>
-          <div className="rounded-[1.6rem] border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.72)] px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
+          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.72)] px-5 py-4 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
             <p className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
               {roiMessages.pricedVehicles}
             </p>
@@ -163,7 +166,7 @@ export default async function VehicleRoiPage() {
 
       <section className="grid gap-4 xl:grid-cols-2">
         {vehicleMetrics.length === 0 ? (
-          <div className="rounded-[2rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] xl:col-span-2">
+          <div className="rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] xl:col-span-2">
             {roiMessages.emptyState}
           </div>
         ) : null}
@@ -171,9 +174,9 @@ export default async function VehicleRoiPage() {
         {vehicleMetrics.map((item) => (
           <article
             key={item.vehicle.id}
-            className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
+            className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
           >
-            <div className="bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,244,236,0.98))] px-5 py-5">
+            <div className="bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.98))] px-5 py-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h3 className="font-serif text-[2rem] leading-tight text-[color:var(--ink)]">
@@ -192,14 +195,14 @@ export default async function VehicleRoiPage() {
               </div>
 
               <div className="mt-5 grid gap-4 xl:grid-cols-3">
-                <section className="rounded-[1.6rem] border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.72)] px-4 py-4">
+                <section className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.72)] px-4 py-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
                     {roiMessages.monthlyRevenueTitle}
                   </p>
                   <p className="mt-2 text-[12px] text-[color:var(--ink-soft)]">
                     {roiMessages.monthlyRevenueHint}
                   </p>
-                  <div className="mt-4 rounded-[1.2rem] bg-white/78 px-4 py-3">
+                  <div className="mt-4 rounded-md bg-white/78 px-4 py-3">
                     <p className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                       {roiMessages.currentMonth}
                     </p>
@@ -209,7 +212,7 @@ export default async function VehicleRoiPage() {
                   </div>
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">
                     {item.monthlyRevenue.map((month) => (
-                      <div key={month.key} className="rounded-[1rem] bg-white/64 px-3 py-2">
+                      <div key={month.key} className="rounded-md bg-white/64 px-3 py-2">
                         <p className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--ink-soft)]">
                           {month.label}
                         </p>
@@ -221,14 +224,14 @@ export default async function VehicleRoiPage() {
                   </div>
                 </section>
 
-                <section className="rounded-[1.6rem] border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.72)] px-4 py-4">
+                <section className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.72)] px-4 py-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
                     {roiMessages.perKmTitle}
                   </p>
                   <p className="mt-2 text-[12px] text-[color:var(--ink-soft)]">
                     {roiMessages.perKmHint}
                   </p>
-                  <div className="mt-4 rounded-[1.2rem] bg-white/78 px-4 py-3">
+                  <div className="mt-4 rounded-md bg-white/78 px-4 py-3">
                     <p className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                       {roiMessages.perKmTitle}
                     </p>
@@ -248,14 +251,14 @@ export default async function VehicleRoiPage() {
                   </div>
                 </section>
 
-                <section className="rounded-[1.6rem] border border-[rgba(17,19,24,0.06)] bg-[linear-gradient(180deg,rgba(17,19,24,0.96),rgba(24,30,41,0.96))] px-4 py-4 text-white">
+                <section className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[linear-gradient(180deg,rgba(17,19,24,0.96),rgba(24,30,41,0.96))] px-4 py-4 text-white">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-white/60">
                     {roiMessages.annualizedTitle}
                   </p>
                   <p className="mt-2 text-[12px] text-white/60">
                     {roiMessages.annualizedHint}
                   </p>
-                  <div className="mt-4 rounded-[1.2rem] bg-white/8 px-4 py-3">
+                  <div className="mt-4 rounded-md bg-white/8 px-4 py-3">
                     <p className="text-[11px] uppercase tracking-[0.16em] text-white/50">
                       {roiMessages.annualizedLabel}
                     </p>
@@ -292,7 +295,7 @@ export default async function VehicleRoiPage() {
                       placeholder={roiMessages.purchasePriceLabel}
                       className="h-11 rounded-full border border-white/12 bg-white/8 px-4 text-sm text-white outline-none placeholder:text-white/35"
                     />
-                    <button className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(255,107,87,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]">
+                    <button className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89, 60, 251, 0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]">
                       {roiMessages.savePurchasePrice}
                     </button>
                   </form>

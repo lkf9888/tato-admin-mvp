@@ -1,19 +1,24 @@
 import { CalendarView } from "@/components/calendar-view";
+import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getDisplayOrderNote, getOrderNetEarning } from "@/lib/utils";
 
 export default async function CalendarPage() {
+  const workspace = await requireCurrentWorkspace();
   const [{ locale }, vehicles, owners, orders] = await Promise.all([
     getI18n(),
     prisma.vehicle.findMany({
+      where: { workspaceId: workspace.id },
       include: { owner: true },
       orderBy: { plateNumber: "asc" },
     }),
     prisma.owner.findMany({
+      where: { workspaceId: workspace.id },
       orderBy: { name: "asc" },
     }),
     prisma.order.findMany({
+      where: { workspaceId: workspace.id },
       include: { vehicle: { include: { owner: true } } },
       orderBy: { pickupDatetime: "asc" },
     }),

@@ -49,7 +49,7 @@ export default async function ReserveVehiclePage({
   if (!vehicle || !vehicle.directBookingEnabled || (vehicle.bookingDailyRate ?? 0) <= 0) {
     return (
       <main className="min-h-screen bg-[var(--page)] px-4 py-8 sm:px-6">
-        <div className="mx-auto max-w-4xl rounded-[2.6rem] border border-[var(--line)] bg-[rgba(255,250,244,0.92)] p-10 shadow-[0_30px_90px_rgba(17,19,24,0.08)]">
+        <div className="mx-auto max-w-4xl rounded-xl border border-[var(--line)] bg-[rgba(255, 255, 255, 0.92)] p-10 shadow-[0_30px_90px_rgba(17,19,24,0.08)]">
           <p className="text-[11px] uppercase tracking-[0.34em] text-[var(--ink-soft)]">
             {reserveMessages.heroKicker}
           </p>
@@ -78,7 +78,7 @@ export default async function ReserveVehiclePage({
   return (
     <main className="min-h-screen bg-[var(--page)] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[90rem] space-y-6">
-        <section className="overflow-hidden rounded-[2.5rem] border border-[var(--line)] bg-[rgba(255,250,244,0.92)] shadow-[0_30px_90px_rgba(17,19,24,0.08)] lg:grid lg:grid-cols-[1.08fr_0.92fr]">
+        <section className="overflow-hidden rounded-xl border border-[var(--line)] bg-[rgba(255, 255, 255, 0.92)] shadow-[0_30px_90px_rgba(17,19,24,0.08)] lg:grid lg:grid-cols-[1.08fr_0.92fr]">
           <div className="relative overflow-hidden bg-[#111318] px-7 py-8 text-white sm:px-10 sm:py-10">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(255,127,102,0.22),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(53,110,88,0.28),transparent_30%),linear-gradient(180deg,#171a20_0%,#12141a_58%,#090b12_100%)]" />
             <div className="relative">
@@ -96,7 +96,7 @@ export default async function ReserveVehiclePage({
               </p>
 
               <div className="mt-10 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+                <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-white/52">
                     {reserveMessages.rateLabel}
                   </p>
@@ -104,7 +104,7 @@ export default async function ReserveVehiclePage({
                     {formatCurrency(vehicle.bookingDailyRate, locale)}
                   </p>
                 </div>
-                <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+                <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-white/52">
                     {reserveMessages.insuranceLabel}
                   </p>
@@ -112,7 +112,7 @@ export default async function ReserveVehiclePage({
                     {formatCurrency(vehicle.bookingInsuranceFee, locale)}
                   </p>
                 </div>
-                <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+                <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-white/52">
                     {reserveMessages.depositLabel}
                   </p>
@@ -122,7 +122,7 @@ export default async function ReserveVehiclePage({
                 </div>
               </div>
 
-              <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:max-w-sm">
+              <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:max-w-sm">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-white/52">
                   {reserveMessages.ownerLabel}
                 </p>
@@ -153,7 +153,7 @@ export default async function ReserveVehiclePage({
             </div>
           </div>
 
-          <div className="bg-[rgba(255,252,247,0.68)] p-5 sm:p-7 lg:p-8">
+          <div className="bg-[rgba(255, 255, 255, 0.68)] p-5 sm:p-7 lg:p-8">
             <PublicBookingPanel
               locale={locale}
               vehicleId={vehicle.id}

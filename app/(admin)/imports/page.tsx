@@ -1,4 +1,5 @@
 import { CsvImportPanel } from "@/components/csv-import-panel";
+import { requireCurrentWorkspace } from "@/lib/auth";
 import { getWorkspaceBillingSnapshot } from "@/lib/billing";
 import { getI18n } from "@/lib/i18n-server";
 import { formatDateTime } from "@/lib/utils";
@@ -9,9 +10,11 @@ export default async function ImportsPage({
 }: {
   searchParams: Promise<{ billing?: string }>;
 }) {
+  const workspace = await requireCurrentWorkspace();
   const [{ locale, messages }, batches, billingSnapshot, params] = await Promise.all([
     getI18n(),
     prisma.importBatch.findMany({
+      where: { workspaceId: workspace.id },
       orderBy: { importedAt: "desc" },
     }),
     getWorkspaceBillingSnapshot(),
@@ -39,7 +42,7 @@ export default async function ImportsPage({
         billingState={params.billing ?? null}
       />
 
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-sm">
+      <section className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
@@ -50,7 +53,7 @@ export default async function ImportsPage({
           <p className="text-sm text-slate-500">{importMessages.sampleFile}</p>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200">
+        <div className="mt-6 overflow-hidden rounded-lg border border-slate-200">
           <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
             <thead className="bg-slate-50">
               <tr>

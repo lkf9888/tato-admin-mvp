@@ -468,7 +468,7 @@ export function CalendarView({
   const secondaryActionClass =
     "inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_14px_32px_-24px_rgba(17,19,24,0.45)] backdrop-blur hover:border-[rgba(17,19,24,0.22)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-40";
   const primaryActionClass =
-    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(255,107,87,0.75)] hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-40";
+    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89, 60, 251, 0.75)] hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-40";
   const filterSelectClass =
     "h-11 rounded-full border border-[rgba(17,19,24,0.08)] bg-[rgba(255,255,255,0.72)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_12px_30px_-26px_rgba(17,19,24,0.5)] outline-none backdrop-blur";
 
@@ -638,7 +638,7 @@ export function CalendarView({
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(255,244,236,0.96))] p-4 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247, 247, 247, 0.96))] p-4 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="flex flex-col gap-3">
             <div className="inline-flex flex-wrap items-center gap-2 rounded-full bg-[rgba(17,19,24,0.92)] px-2 py-2 shadow-[0_20px_44px_-28px_rgba(17,19,24,0.85)]">
@@ -729,7 +729,7 @@ export function CalendarView({
                 className={cn(
                   "rounded-full px-4 py-2 text-[12px] font-semibold transition",
                   rangeMode === option.value
-                    ? "bg-[var(--accent)] text-[color:var(--ink)] shadow-[0_14px_28px_-20px_rgba(255,107,87,0.7)]"
+                    ? "bg-[var(--accent)] text-[color:var(--ink)] shadow-[0_14px_28px_-20px_rgba(89, 60, 251, 0.7)]"
                     : "text-white/72 hover:text-white",
                 )}
               >
@@ -786,15 +786,15 @@ export function CalendarView({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
         {filteredVehicles.length === 0 ? (
-          <div className="rounded-[1.6rem] bg-[rgba(255,255,255,0.72)] px-4 py-10 text-sm text-[color:var(--ink-soft)]">
+          <div className="rounded-lg bg-[rgba(255,255,255,0.72)] px-4 py-10 text-sm text-[color:var(--ink-soft)]">
             {calendarMessages.noVehicles}
           </div>
         ) : (
           <div
             ref={timelineViewportRef}
-            className="max-h-[76vh] overflow-auto rounded-[1.65rem] border border-[color:var(--line)] bg-[rgba(255,252,247,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+            className="max-h-[76vh] overflow-auto rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
           >
             <div style={{ width: tableWidth, minWidth: vehicleColumnWidth + timelineWidth }}>
               <div
@@ -803,7 +803,7 @@ export function CalendarView({
                   gridTemplateColumns: `${vehicleColumnWidth}px repeat(${days.length}, ${dayColumnWidth}px)`,
                 }}
               >
-                <div className="sticky left-0 z-50 border-r border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,248,241,0.98),rgba(248,240,230,0.98))] px-3 py-3">
+                <div className="sticky left-0 z-50 border-r border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.98))] px-3 py-3">
                   <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
                     {messages.shell.nav.vehicles}
                   </p>
@@ -822,7 +822,7 @@ export function CalendarView({
                       className={cn(
                         "border-r border-[color:var(--line)] px-1.5 py-2.5 text-center",
                         weekend ? "bg-[#f3ede4]" : "bg-[rgba(255,251,246,0.9)]",
-                        todayColumn ? "bg-[rgba(255,107,87,0.14)]" : "",
+                        todayColumn ? "bg-[rgba(89, 60, 251, 0.14)]" : "",
                       )}
                     >
                       <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
@@ -861,7 +861,7 @@ export function CalendarView({
                     <div
                       className={cn(
                         "sticky left-0 z-20 border-r border-[color:var(--line)] px-3 py-3 backdrop-blur",
-                        alternateRow ? "bg-[#faf4eb]/95" : "bg-[rgba(255,252,247,0.95)]",
+                        alternateRow ? "bg-[#faf4eb]/95" : "bg-[rgba(255, 255, 255, 0.95)]",
                       )}
                       style={{ height: rowHeight }}
                     >
@@ -893,7 +893,7 @@ export function CalendarView({
                             className={cn(
                               "absolute inset-y-0 border-r border-[color:var(--line)]",
                               weekend ? "bg-[#f5eee5]/78" : "bg-transparent",
-                              todayColumn ? "bg-[rgba(255,107,87,0.08)]" : "",
+                              todayColumn ? "bg-[rgba(89, 60, 251, 0.08)]" : "",
                             )}
                             style={{
                               left: dayIndex * dayColumnWidth,
@@ -965,7 +965,7 @@ export function CalendarView({
       {selectedOrder && orderPopover ? (
         <div
           ref={orderPopoverRef}
-          className="fixed z-[80] w-[min(22rem,calc(100vw-1.5rem))] rounded-[1.5rem] border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,243,234,0.98))] p-4 shadow-[0_28px_60px_-30px_rgba(17,19,24,0.55)] backdrop-blur"
+          className="fixed z-[80] w-[min(22rem,calc(100vw-1.5rem))] rounded-lg border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(255,243,234,0.98))] p-4 shadow-[0_28px_60px_-30px_rgba(17,19,24,0.55)] backdrop-blur"
           style={{
             left: orderPopover.left,
             top: orderPopover.top,
@@ -1076,7 +1076,7 @@ export function CalendarView({
                     onChange={(event) => setNotesDraft(event.target.value)}
                     placeholder={calendarMessages.notesPlaceholder}
                     rows={4}
-                    className="w-full rounded-[1.2rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2 text-[13px] text-[color:var(--ink)] outline-none"
+                    className="w-full rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2 text-[13px] text-[color:var(--ink)] outline-none"
                   />
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={handleSaveOrderNotes} disabled={isSavingNotes} className={primaryActionClass}>
@@ -1107,25 +1107,25 @@ export function CalendarView({
           </div>
 
           {noteActionError ? (
-            <p className="mt-3 rounded-[1rem] bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+            <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
               {noteActionError}
             </p>
           ) : null}
 
           {!readOnly && detailActionError ? (
-            <p className="mt-3 rounded-[1rem] bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+            <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
               {detailActionError}
             </p>
           ) : null}
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-[2rem] border border-[color:var(--line)] bg-[rgba(255,251,245,0.88)] p-3 shadow-[0_20px_48px_-40px_rgba(17,19,24,0.4)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] p-3 shadow-[0_20px_48px_-40px_rgba(17,19,24,0.4)]">
         <p className="text-[11px] uppercase tracking-[0.26em] text-[color:var(--ink-soft)]">
           {calendarMessages.detailsKicker}
         </p>
         {selectedOrder ? (
-          <div className="mt-3 grid gap-px overflow-hidden rounded-[1.6rem] border border-[color:var(--line)] bg-[rgba(17,19,24,0.08)] lg:grid-cols-[0.92fr_1.08fr]">
+          <div className="mt-3 grid gap-px overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(17,19,24,0.08)] lg:grid-cols-[0.92fr_1.08fr]">
             <div className="bg-[linear-gradient(180deg,rgba(17,19,24,0.96),rgba(24,30,41,0.96))] px-5 py-5 text-white">
               <h3 className="font-serif text-[2rem] font-semibold leading-tight text-white">
                 {selectedOrder.vehiclePlateNumber
@@ -1163,7 +1163,7 @@ export function CalendarView({
               ) : null}
             </div>
 
-            <div className="bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,245,237,0.98))] px-5 py-5">
+            <div className="bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(255,245,237,0.98))] px-5 py-5">
               <div className="grid gap-4 text-[13px] text-[color:var(--ink)] sm:grid-cols-2">
                 <div>
                   <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
@@ -1217,20 +1217,20 @@ export function CalendarView({
               </div>
 
               {!readOnly && detailActionError ? (
-                <p className="mt-4 rounded-[1rem] bg-rose-50 px-3 py-2.5 text-[12px] text-rose-700">
+                <p className="mt-4 rounded-md bg-rose-50 px-3 py-2.5 text-[12px] text-rose-700">
                   {detailActionError}
                 </p>
               ) : null}
 
               {readOnly ? (
-                <p className="mt-4 rounded-[1rem] bg-[var(--accent-soft)] px-3 py-2 text-[11px] text-[color:var(--ink-soft)]">
+                <p className="mt-4 rounded-md bg-[var(--accent-soft)] px-3 py-2 text-[11px] text-[color:var(--ink-soft)]">
                   {calendarMessages.sharedViewNotice}
                 </p>
               ) : null}
             </div>
           </div>
         ) : (
-          <div className="mt-3 rounded-[1.6rem] bg-[rgba(255,255,255,0.72)] px-4 py-6 text-sm text-[color:var(--ink-soft)]">
+          <div className="mt-3 rounded-lg bg-[rgba(255,255,255,0.72)] px-4 py-6 text-sm text-[color:var(--ink-soft)]">
             {calendarMessages.emptyState}
           </div>
         )}
@@ -1238,7 +1238,7 @@ export function CalendarView({
 
       {!readOnly && isOrderDialogOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 p-4">
-          <div className="w-full max-w-2xl rounded-[1.85rem] border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,244,236,0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
+          <div className="w-full max-w-2xl rounded-lg border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
@@ -1263,7 +1263,7 @@ export function CalendarView({
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, vehicleId: event.target.value }))
                   }
-                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
+                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 >
                   {vehicleOptions.map((vehicle) => (
                     <option key={vehicle.id} value={vehicle.id}>
@@ -1280,7 +1280,7 @@ export function CalendarView({
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, renterName: event.target.value }))
                   }
-                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
+                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
@@ -1292,7 +1292,7 @@ export function CalendarView({
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, renterPhone: event.target.value }))
                   }
-                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
+                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
@@ -1306,7 +1306,7 @@ export function CalendarView({
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, totalPrice: event.target.value }))
                   }
-                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
+                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
@@ -1318,7 +1318,7 @@ export function CalendarView({
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, pickupDatetime: event.target.value }))
                   }
-                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
+                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
@@ -1330,16 +1330,16 @@ export function CalendarView({
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, returnDatetime: event.target.value }))
                   }
-                  className="rounded-[1rem] border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
+                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />
               </label>
 
-              <div className="rounded-[1.1rem] bg-[rgba(255,255,255,0.72)] px-3 py-3 text-[11px] leading-5 text-[color:var(--ink-soft)] sm:col-span-2">
+              <div className="rounded-md bg-[rgba(255,255,255,0.72)] px-3 py-3 text-[11px] leading-5 text-[color:var(--ink-soft)] sm:col-span-2">
                 {calendarMessages.conflictNotice}
               </div>
 
               {orderFormError ? (
-                <div className="rounded-[1.1rem] bg-rose-50 px-3 py-3 text-[11px] text-rose-700 sm:col-span-2">
+                <div className="rounded-md bg-rose-50 px-3 py-3 text-[11px] text-rose-700 sm:col-span-2">
                   {orderFormError}
                 </div>
               ) : null}

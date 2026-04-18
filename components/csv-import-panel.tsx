@@ -273,204 +273,212 @@ export function CsvImportPanel({
     });
   }
 
+  const importMessages = messages.imports;
+  const hasFile = rows.length > 0;
+  const readyToImport = hasFile && missingRequired.length === 0;
+
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-                {panelMessages.uploadKicker}
-              </p>
-              <h3 className="mt-2 font-serif text-3xl text-slate-950">{panelMessages.uploadTitle}</h3>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <a
-                href="https://turo.com/business/earnings"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
-              >
-                {panelMessages.openTuroPage}
-              </a>
-              <label className="inline-flex cursor-pointer items-center rounded-md bg-slate-950 px-4 py-3 text-sm font-medium text-white">
-                {panelMessages.chooseFile}
-                <input
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (!file) return;
-                    setFileName(file.name);
-                    Papa.parse<PreviewRow>(file, {
-                      header: true,
-                      skipEmptyLines: true,
-                      complete: (results) => {
-                        const nextHeaders = results.meta.fields ?? [];
-                        setHeaders(nextHeaders);
-                    setRows(results.data);
-                    const guessedMapping = Object.fromEntries(
-                      nextHeaders.map((header) => [header, guessField(header)]),
-                    );
-                    setMapping(guessedMapping);
-                    setSelectedVehicleKeys([]);
-                    setBillingProjection(null);
-                    setShowBillingModal(false);
-                    setResult("");
-                    setBillingCheckError("");
-                  },
-                });
-                  }}
-                />
-              </label>
-            </div>
-          </div>
+      <section className="rounded-lg border border-[color:var(--line)] bg-white px-6 py-5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+        <div className="flex flex-col gap-1">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
+            {importMessages.pageKicker}
+          </p>
+          <h2 className="font-serif text-[1.8rem] leading-tight text-[color:var(--ink)]">
+            {importMessages.pageTitle}
+          </h2>
+          <p className="text-sm text-[color:var(--ink-soft)]">{importMessages.pageSubtitle}</p>
+        </div>
 
-          <div className="mt-6 overflow-hidden rounded-lg border border-slate-200">
-            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  {headers.map((header) => (
-                    <th key={header} className="px-4 py-3 font-semibold text-slate-700">
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {previewRows.length > 0 ? (
-                  previewRows.map((row, index) => (
-                    <tr key={`${index}-${row[headers[0] ?? ""]}`}>
+        <div className="mt-5 border-t border-[color:var(--line)] pt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
+            {importMessages.guideTitle}
+          </p>
+          <ol className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {importMessages.guideSteps.map((step, index) => (
+              <li
+                key={step.title}
+                className="flex gap-3 rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-3"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-semibold text-white tabular-nums">
+                  {index + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-[color:var(--ink)]">{step.title}</p>
+                  <p className="mt-1 text-[12px] leading-5 text-[color:var(--ink-soft)]">{step.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-4">
+          <section className="rounded-lg border border-[color:var(--line)] bg-white px-5 py-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-semibold text-white">
+                  1
+                </span>
+                <div>
+                  <h3 className="text-[15px] font-semibold text-[color:var(--ink)]">
+                    {panelMessages.uploadTitle}
+                  </h3>
+                  <p className="text-[12px] text-[color:var(--ink-soft)]">
+                    {fileName ? fileName : panelMessages.emptyState}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href="https://turo.com/business/earnings"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center rounded-md border border-[color:var(--line)] bg-white px-3 py-2 text-[13px] font-medium text-[color:var(--ink)] transition hover:border-[var(--ink)]"
+                >
+                  {panelMessages.openTuroPage}
+                </a>
+                <label className="inline-flex cursor-pointer items-center rounded-md bg-[var(--ink)] px-3 py-2 text-[13px] font-medium text-white transition hover:bg-[color:rgba(18,18,20,0.85)]">
+                  {panelMessages.chooseFile}
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      setFileName(file.name);
+                      Papa.parse<PreviewRow>(file, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                          const nextHeaders = results.meta.fields ?? [];
+                          setHeaders(nextHeaders);
+                          setRows(results.data);
+                          const guessedMapping = Object.fromEntries(
+                            nextHeaders.map((header) => [header, guessField(header)]),
+                          );
+                          setMapping(guessedMapping);
+                          setSelectedVehicleKeys([]);
+                          setBillingProjection(null);
+                          setShowBillingModal(false);
+                          setResult("");
+                          setBillingCheckError("");
+                        },
+                      });
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {hasFile ? (
+              <div className="mt-4 overflow-x-auto rounded-md border border-[color:var(--line)]">
+                <table className="min-w-full divide-y divide-[color:var(--line)] text-left text-[12px]">
+                  <thead className="bg-[var(--surface-muted)]">
+                    <tr>
                       {headers.map((header) => (
-                        <td key={header} className="px-4 py-3 text-slate-600">
-                          {row[header] || "—"}
-                        </td>
+                        <th
+                          key={header}
+                          className="whitespace-nowrap px-3 py-2 font-semibold text-[color:var(--ink)]"
+                        >
+                          {header}
+                        </th>
                       ))}
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="px-4 py-10 text-slate-500" colSpan={Math.max(headers.length, 1)}>
-                      {panelMessages.emptyState}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="space-y-5">
-          <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-              {panelMessages.billing.kicker}
-            </p>
-            <h3 className="mt-2 font-serif text-3xl text-slate-950">
-              {panelMessages.billing.title}
-            </h3>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              {panelMessages.billing.copy}
-            </p>
-
-            <div className="mt-5 grid gap-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
-              <div className="flex items-center justify-between">
-                <span>{panelMessages.billing.currentVehicles}</span>
-                <span className="font-semibold text-slate-950">{billingSnapshot.currentVehicleCount}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>{panelMessages.billing.freeIncluded}</span>
-                <span className="font-semibold text-slate-950">{billingSnapshot.freeVehicleSlots}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>{messages.billingPage.couponBonus}</span>
-                <span className="font-semibold text-slate-950">{billingSnapshot.bonusVehicleSlots}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>{panelMessages.billing.paidSlots}</span>
-                <span className="font-semibold text-slate-950">{billingSnapshot.effectivePurchasedVehicleSlots}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>{panelMessages.billing.allowedTotal}</span>
-                <span className="font-semibold text-slate-950">{billingSnapshot.allowedVehicleCount}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>{panelMessages.billing.subscriptionStatus}</span>
-                <span className="font-semibold capitalize text-slate-950">{billingSnapshot.status}</span>
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              <p className="rounded-md bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                {messages.billingPage.quantityCopy}
-              </p>
-              {!billingSnapshot.stripeConfigured ? (
-                <p className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                  {panelMessages.billing.notConfigured}
-                </p>
-              ) : null}
-              {billingSnapshot.billingBypassActive ? (
-                <p className="rounded-md bg-sky-50 px-4 py-3 text-sm text-sky-800">
-                  {messages.billingPage.debugBypassNotice}
-                </p>
-              ) : null}
-              {billingNotice ? (
-                <p className="rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  {billingNotice}
-                </p>
-              ) : null}
-              <Link
-                href={billingPageHref}
-                className="block w-full rounded-md bg-slate-950 px-4 py-3 text-center font-medium text-white transition hover:bg-slate-800"
-              >
-                {panelMessages.billing.openBillingPage}
-              </Link>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-              {panelMessages.mappingKicker}
-            </p>
-            <div className="mt-5 space-y-4">
-              {headers.map((header) => (
-                <label key={header} className="block space-y-2">
-                  <span className="text-sm font-medium text-slate-700">{header}</span>
-                  <select
-                    value={mapping[header] ?? ""}
-                    onChange={(event) =>
-                      setMapping((current) => ({
-                        ...current,
-                        [header]: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
-                  >
-                    <option value="">{panelMessages.ignoreColumn}</option>
-                    {csvFieldOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
+                  </thead>
+                  <tbody className="divide-y divide-[color:var(--line)] bg-white">
+                    {previewRows.map((row, index) => (
+                      <tr key={`${index}-${row[headers[0] ?? ""]}`}>
+                        {headers.map((header) => (
+                          <td
+                            key={header}
+                            className="whitespace-nowrap px-3 py-2 text-[color:var(--ink-soft)]"
+                          >
+                            {row[header] || "—"}
+                          </td>
+                        ))}
+                      </tr>
                     ))}
-                  </select>
-                </label>
-              ))}
-            </div>
-          </div>
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </section>
 
-          <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-              {panelMessages.importKicker}
-            </p>
-            <div className="mt-4 space-y-4 text-sm text-slate-600">
-              <p>
-                {panelMessages.rowsDetected}: {rows.length}
-              </p>
-              <p>
-                {panelMessages.requiredMappingLeft}:{" "}
-                {missingRequired.length > 0 ? missingRequired.join(", ") : panelMessages.none}
-              </p>
-              <label className="flex items-start gap-3 rounded-md bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <section
+            className={`rounded-lg border border-[color:var(--line)] bg-white px-5 py-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] transition ${
+              hasFile ? "" : "opacity-60"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-semibold text-white">
+                2
+              </span>
+              <div className="flex-1">
+                <h3 className="text-[15px] font-semibold text-[color:var(--ink)]">
+                  {panelMessages.mappingKicker}
+                </h3>
+                <p className="text-[12px] text-[color:var(--ink-soft)]">
+                  {hasFile
+                    ? missingRequired.length > 0
+                      ? `${panelMessages.requiredMappingLeft}: ${missingRequired.join(", ")}`
+                      : `${panelMessages.requiredMappingLeft}: ${panelMessages.none}`
+                    : panelMessages.emptyState}
+                </p>
+              </div>
+            </div>
+
+            {hasFile ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {headers.map((header) => (
+                  <label key={header} className="block space-y-1">
+                    <span className="text-[12px] font-medium text-[color:var(--ink)]">{header}</span>
+                    <select
+                      value={mapping[header] ?? ""}
+                      onChange={(event) =>
+                        setMapping((current) => ({
+                          ...current,
+                          [header]: event.target.value,
+                        }))
+                      }
+                      className="h-9 w-full rounded-md border border-[color:var(--line)] bg-white px-2 text-[13px] text-[color:var(--ink)] outline-none focus:border-[var(--ink)]"
+                    >
+                      <option value="">{panelMessages.ignoreColumn}</option>
+                      {csvFieldOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+          </section>
+
+          <section
+            className={`rounded-lg border border-[color:var(--line)] bg-white px-5 py-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] transition ${
+              readyToImport ? "" : "opacity-60"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-semibold text-white">
+                3
+              </span>
+              <div className="flex-1">
+                <h3 className="text-[15px] font-semibold text-[color:var(--ink)]">
+                  {panelMessages.importKicker}
+                </h3>
+                <p className="text-[12px] text-[color:var(--ink-soft)]">
+                  {panelMessages.rowsDetected}: {rows.length}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3 text-[13px] text-[color:var(--ink)]">
+              <label className="flex items-start gap-3 rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px]">
                 <input
                   type="checkbox"
                   checked={createMissingVehicles}
@@ -480,50 +488,61 @@ export function CsvImportPanel({
                       setSelectedVehicleKeys([]);
                     }
                   }}
-                  className="mt-1 h-4 w-4 rounded border-slate-300"
+                  className="mt-0.5 h-4 w-4 rounded border-[color:var(--line)]"
                 />
                 <span>
-                  {panelMessages.autoCreateTitle}
-                  <span className="block text-xs text-slate-500">{panelMessages.autoCreateHint}</span>
+                  <span className="font-medium text-[color:var(--ink)]">
+                    {panelMessages.autoCreateTitle}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-[color:var(--ink-soft)]">
+                    {panelMessages.autoCreateHint}
+                  </span>
                 </span>
               </label>
 
-              <div className="rounded-md bg-slate-50 px-4 py-3">
-                <p className="font-medium text-slate-900">{panelMessages.billing.projectionTitle}</p>
-                <p className="mt-2">
-                  {panelMessages.billing.projectedVehicles(activeProjection.projectedVehicleCount)}
-                </p>
-                <p>
-                  {panelMessages.billing.projectedNewVehicles(activeProjection.projectedNewVehicleCount)}
-                </p>
-                <p>
-                  {panelMessages.billing.projectedPaidSlots(activeProjection.requiredProjectedPaidSlots)}
-                </p>
-                {activeProjection.selectableVehicleOptions.length > 0 ? (
-                  <>
-                    <p className="mt-2 text-slate-700">
+              {hasFile ? (
+                <div className="rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[12px] text-[color:var(--ink-soft)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--ink)]">
+                    {panelMessages.billing.projectionTitle}
+                  </p>
+                  <div className="mt-1 grid gap-0.5 sm:grid-cols-3">
+                    <p>
+                      {panelMessages.billing.projectedVehicles(activeProjection.projectedVehicleCount)}
+                    </p>
+                    <p>
+                      {panelMessages.billing.projectedNewVehicles(
+                        activeProjection.projectedNewVehicleCount,
+                      )}
+                    </p>
+                    <p>
+                      {panelMessages.billing.projectedPaidSlots(
+                        activeProjection.requiredProjectedPaidSlots,
+                      )}
+                    </p>
+                  </div>
+                  {activeProjection.selectableVehicleOptions.length > 0 ? (
+                    <p className="mt-1 text-[color:var(--ink)]">
                       {panelMessages.selectedVehiclesSummary(
                         selectedVehicleKeys.length,
                         activeProjection.availableNewVehicleSlots,
                       )}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {panelMessages.selectedVehiclesHint}
-                    </p>
-                  </>
-                ) : null}
-              </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               {isCheckingBilling ? (
-                <p className="text-slate-500">{panelMessages.billing.checkingImport}</p>
+                <p className="text-[12px] text-[color:var(--ink-soft)]">
+                  {panelMessages.billing.checkingImport}
+                </p>
               ) : null}
               {billingCheckError ? (
-                <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <p className="rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
                   {billingCheckError}
                 </p>
               ) : null}
               {activeProjection.exceedsPurchasedLimit ? (
-                <p className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                <p className="rounded-md bg-amber-50 px-3 py-2 text-[12px] text-amber-700">
                   {panelMessages.billing.limitExceededDetail(
                     activeProjection.projectedVehicleCount,
                     activeProjection.allowedVehicleCount,
@@ -533,16 +552,86 @@ export function CsvImportPanel({
               ) : null}
 
               <button
-                disabled={rows.length === 0 || missingRequired.length > 0 || isPending}
+                disabled={!readyToImport || isPending}
                 onClick={() => submitImport()}
-                className="w-full rounded-md bg-slate-950 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="w-full rounded-md bg-[var(--accent)] px-4 py-2.5 text-[14px] font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-[color:var(--line)] disabled:text-[color:var(--ink-soft)]"
               >
                 {isPending ? panelMessages.importing : panelMessages.runImport}
               </button>
-              {result ? <p className="rounded-md bg-slate-100 px-4 py-3 text-slate-700">{result}</p> : null}
+              {result ? (
+                <p className="rounded-md bg-[var(--surface-muted)] px-3 py-2 text-[12px] text-[color:var(--ink)]">
+                  {result}
+                </p>
+              ) : null}
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
+
+        <aside className="space-y-4">
+          <section className="rounded-lg border border-[color:var(--line)] bg-white px-5 py-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[11px] font-semibold text-[var(--accent)]">
+                0
+              </span>
+              <h3 className="text-[14px] font-semibold text-[color:var(--ink)]">
+                {panelMessages.billing.title}
+              </h3>
+            </div>
+            <p className="mt-2 text-[12px] leading-5 text-[color:var(--ink-soft)]">
+              {panelMessages.billing.copy}
+            </p>
+
+            <dl className="mt-3 space-y-1.5 text-[12px]">
+              {[
+                [panelMessages.billing.currentVehicles, billingSnapshot.currentVehicleCount],
+                [panelMessages.billing.freeIncluded, billingSnapshot.freeVehicleSlots],
+                [messages.billingPage.couponBonus, billingSnapshot.bonusVehicleSlots],
+                [panelMessages.billing.paidSlots, billingSnapshot.effectivePurchasedVehicleSlots],
+                [panelMessages.billing.allowedTotal, billingSnapshot.allowedVehicleCount],
+              ].map(([label, value]) => (
+                <div
+                  key={label as string}
+                  className="flex items-center justify-between gap-2 border-b border-[color:var(--line)] pb-1.5 last:border-0 last:pb-0"
+                >
+                  <dt className="text-[color:var(--ink-soft)]">{label}</dt>
+                  <dd className="font-semibold tabular-nums text-[color:var(--ink)]">{value}</dd>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-[color:var(--ink-soft)]">
+                  {panelMessages.billing.subscriptionStatus}
+                </dt>
+                <dd className="font-semibold capitalize text-[color:var(--ink)]">
+                  {billingSnapshot.status}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="mt-3 space-y-2">
+              {!billingSnapshot.stripeConfigured ? (
+                <p className="rounded-md bg-amber-50 px-3 py-2 text-[12px] text-amber-700">
+                  {panelMessages.billing.notConfigured}
+                </p>
+              ) : null}
+              {billingSnapshot.billingBypassActive ? (
+                <p className="rounded-md bg-sky-50 px-3 py-2 text-[12px] text-sky-800">
+                  {messages.billingPage.debugBypassNotice}
+                </p>
+              ) : null}
+              {billingNotice ? (
+                <p className="rounded-md bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">
+                  {billingNotice}
+                </p>
+              ) : null}
+              <Link
+                href={billingPageHref}
+                className="block w-full rounded-md bg-[var(--ink)] px-3 py-2 text-center text-[13px] font-medium text-white transition hover:bg-[color:rgba(18,18,20,0.85)]"
+              >
+                {panelMessages.billing.openBillingPage}
+              </Link>
+            </div>
+          </section>
+        </aside>
       </div>
 
       {showBillingModal ? (

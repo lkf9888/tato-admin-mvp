@@ -397,6 +397,28 @@ const messages = {
       saveOfflineOrder: "Save offline order",
     },
     imports: {
+      pageKicker: "CSV import",
+      pageTitle: "Import Turo trips",
+      pageSubtitle: "Sync your Turo earnings export into this workspace in four short steps.",
+      guideTitle: "How to import",
+      guideSteps: [
+        {
+          title: "Download your Turo CSV",
+          body: "Open the Turo earnings page, pick the date range you want, and click Export to download the CSV to your computer.",
+        },
+        {
+          title: "Check your quota",
+          body: "Make sure your allowed vehicle total on the right covers your fleet. If it's not enough, buy more slots or apply a coupon first.",
+        },
+        {
+          title: "Upload and map",
+          body: "Click Choose file to upload the CSV. We auto-map common columns — review the dropdowns if any required fields are still missing.",
+        },
+        {
+          title: "Run the import",
+          body: "Click Run import. New vehicles will be auto-created (unless you opt out) and offline conflicts will be flagged for you to review.",
+        },
+      ],
       logKicker: "Import log",
       logTitle: "Recent CSV batches",
       sampleFile: "Sample file lives in `/sample-data/turo-sample.csv`",
@@ -918,6 +940,28 @@ const messages = {
       saveOfflineOrder: "保存线下订单",
     },
     imports: {
+      pageKicker: "CSV 导入",
+      pageTitle: "导入 Turo 行程",
+      pageSubtitle: "按四个步骤，把 Turo 收益导出文件同步进这个工作台。",
+      guideTitle: "导入步骤",
+      guideSteps: [
+        {
+          title: "从 Turo 下载 CSV",
+          body: "打开 Turo 的 Earnings 页面，选择你想导入的时间范围，点击 Export 把 CSV 下载到电脑。",
+        },
+        {
+          title: "确认名额够用",
+          body: "先看右侧「当前可用总名额」是否覆盖车队数量。不够的话，先去购买更多名额或输入 coupon 解锁。",
+        },
+        {
+          title: "上传并映射字段",
+          body: "点击「选择文件」上传 CSV，系统会自动匹配常见列名。若提示仍有必填字段，请在字段映射里手动选择。",
+        },
+        {
+          title: "执行导入",
+          body: "点击「执行导入」。新车辆会自动建档（除非关闭该选项），与线下订单冲突的记录会被标记等你处理。",
+        },
+      ],
       logKicker: "导入日志",
       logTitle: "最近 CSV 批次",
       sampleFile: "示例文件位于 `/sample-data/turo-sample.csv`",

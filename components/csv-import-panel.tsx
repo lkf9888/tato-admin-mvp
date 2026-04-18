@@ -202,8 +202,8 @@ export function CsvImportPanel({
 
   const billingPageHref = `/billing?required=${activeProjection.requiredProjectedPaidSlots}&projected=${activeProjection.projectedVehicleCount}&needed=${activeProjection.additionalPaidSlotsNeeded}`;
 
-  function handleImport() {
-    if (activeProjection.exceedsPurchasedLimit || billingSnapshot.isOverLimit) {
+  function submitImport(options?: { skipLimitGuard?: boolean }) {
+    if (!options?.skipLimitGuard && (activeProjection.exceedsPurchasedLimit || billingSnapshot.isOverLimit)) {
       setShowBillingModal(true);
       return;
     }
@@ -246,6 +246,7 @@ export function CsvImportPanel({
         return;
       }
 
+      setShowBillingModal(false);
       setResult(
         panelMessages.importResult(
           payload.successRows ?? 0,
@@ -315,6 +316,7 @@ export function CsvImportPanel({
                     setMapping(guessedMapping);
                     setSelectedVehicleKeys([]);
                     setBillingProjection(null);
+                    setShowBillingModal(false);
                     setResult("");
                     setBillingCheckError("");
                   },
@@ -532,7 +534,7 @@ export function CsvImportPanel({
 
               <button
                 disabled={rows.length === 0 || missingRequired.length > 0 || isPending}
-                onClick={handleImport}
+                onClick={() => submitImport()}
                 className="w-full rounded-2xl bg-slate-950 px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {isPending ? panelMessages.importing : panelMessages.runImport}
@@ -647,11 +649,9 @@ export function CsvImportPanel({
               {activeProjection.selectableVehicleOptions.length > 0 ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowBillingModal(false);
-                    handleImport();
-                  }}
-                  className="flex-1 rounded-2xl bg-white px-4 py-3 text-center text-sm font-medium text-slate-950 ring-1 ring-slate-200 transition hover:bg-slate-50"
+                  disabled={isPending || isCheckingBilling || selectedVehicleKeys.length === 0}
+                  onClick={() => submitImport({ skipLimitGuard: true })}
+                  className="flex-1 rounded-2xl bg-white px-4 py-3 text-center text-sm font-medium text-slate-950 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                 >
                   {panelMessages.importSelectedAction}
                 </button>

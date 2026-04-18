@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.13.1 - 2026-04-18
+
+- Fixed the quota-selection import flow so `Import selected vehicles` no longer immediately reopens the quota modal after a valid subset has been chosen.
+- Disabled the modal import action while the billing re-check is still running, preventing stale quota state from retriggering the popup.
+- Closed the quota modal automatically after a successful CSV import and reset it when a new CSV file is chosen.
+
 ## v0.13.0 - 2026-04-18
 
 - Fixed a critical gap where Stripe direct-booking payments completed but were never written to the Order table; the webhook now persists paid bookings idempotently and auto-refunds late-detected conflicts.

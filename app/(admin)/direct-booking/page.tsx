@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 
 import { saveVehicleDirectBookingAction } from "@/app/actions";
 import { getBlockedBookingWindows } from "@/lib/direct-booking";
@@ -8,7 +9,8 @@ import { getAppUrl, getStripeSecretKey } from "@/lib/stripe";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export default async function DirectBookingPage() {
-  const [{ locale, messages }, vehicles] = await Promise.all([
+  const [headerStore, { locale, messages }, vehicles] = await Promise.all([
+    headers(),
     getI18n(),
     prisma.vehicle.findMany({
       include: {
@@ -29,7 +31,15 @@ export default async function DirectBookingPage() {
   ]);
 
   const directMessages = messages.directBookingPage;
-  const appUrl = getAppUrl();
+  const forwardedHost = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
+  const forwardedProto = headerStore.get("x-forwarded-proto");
+  const protocol =
+    forwardedProto ??
+    (forwardedHost?.includes("localhost") || forwardedHost?.startsWith("127.0.0.1")
+      ? "http"
+      : "https");
+  const requestOrigin = forwardedHost ? `${protocol}://${forwardedHost}` : undefined;
+  const appUrl = requestOrigin?.replace(/\/$/, "") ?? getAppUrl();
   const enabledCount = vehicles.filter((vehicle) => vehicle.directBookingEnabled).length;
   const readyCount = vehicles.filter(
     (vehicle) => vehicle.directBookingEnabled && (vehicle.bookingDailyRate ?? 0) > 0,

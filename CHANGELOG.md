@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.10.1 - 2026-04-17
+
+- Fixed direct-booking preview links to use the current live request domain instead of a stale or placeholder app URL, preventing `Open booking page` from landing on Railway's `Not Found` placeholder.
+
 ## v0.10.0 - 2026-04-17
 
 - Added a quota-aware CSV import selection flow so admins can choose which new vehicles from an over-limit CSV should be imported within the currently available quota.

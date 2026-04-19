@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.14.5 - 2026-04-18
+
+- Fixed the quota modal so `导入已选车辆 / Import selected vehicles` stays clickable after choosing vehicles, instead of being disabled by the background billing re-check that runs after each checkbox change.
+- Kept the real quota validation on the server, so the smoother modal interaction does not reduce billing-limit safety.
+
 ## v0.14.4 - 2026-04-18
 
 - Added Stripe billing config validation so `STRIPE_LISTING_PRICE_ID` must be a real Stripe Price ID (`price_...`) instead of a Product ID (`prod_...`).

@@ -738,7 +738,7 @@ export function CsvImportPanel({
               {activeProjection.selectableVehicleOptions.length > 0 ? (
                 <button
                   type="button"
-                  disabled={isPending || isCheckingBilling || selectedVehicleKeys.length === 0}
+                  disabled={isPending || selectedVehicleKeys.length === 0}
                   onClick={() => submitImport({ skipLimitGuard: true })}
                   className="flex-1 rounded-md bg-white px-4 py-3 text-center text-sm font-medium text-slate-950 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                 >

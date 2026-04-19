@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.14.7 - 2026-04-18
+
+- Stopped re-running the server-side billing projection every time the selected-vehicle checkboxes change in the CSV quota modal.
+- Moved the selected-vehicle projection math to the client, so large CSV files no longer sit on `正在检查这份 CSV...` while you are only choosing which vehicles to import within quota.
+
 ## v0.14.6 - 2026-04-18
 
 - Replaced the CSV import page loading states with explicit client flags instead of `useTransition`, fixing the bug where imports could finish and show a result while the button stayed stuck on `导入中 / Importing`.

@@ -134,7 +134,6 @@ export function CsvImportPanel({
             rows,
             mapping,
             createMissingVehicles,
-            selectedVehicleKeys,
           }),
         });
 
@@ -170,7 +169,6 @@ export function CsvImportPanel({
     createMissingVehicles,
     missingRequired.length,
     panelMessages.billing.genericError,
-    selectedVehicleKeys,
   ]);
 
   useEffect(() => {
@@ -197,23 +195,60 @@ export function CsvImportPanel({
     });
   }, [billingProjection]);
 
-  const activeProjection = billingProjection ?? {
-    ...billingSnapshot,
-    projectedVehicleCount: billingSnapshot.currentVehicleCount,
-    projectedNewVehicleCount: 0,
-    requiredProjectedPaidSlots: billingSnapshot.requiredPaidSlots,
-    additionalPaidSlotsNeeded: Math.max(
+  const activeProjection = useMemo(() => {
+    if (!billingProjection) {
+      return {
+        ...billingSnapshot,
+        projectedVehicleCount: billingSnapshot.currentVehicleCount,
+        projectedNewVehicleCount: 0,
+        requiredProjectedPaidSlots: billingSnapshot.requiredPaidSlots,
+        additionalPaidSlotsNeeded: Math.max(
+          0,
+          billingSnapshot.requiredPaidSlots - billingSnapshot.effectivePurchasedVehicleSlots,
+        ),
+        selectedProjectedNewVehicleCount: 0,
+        availableNewVehicleSlots: Math.max(
+          0,
+          billingSnapshot.allowedVehicleCount - billingSnapshot.currentVehicleCount,
+        ),
+        selectableVehicleOptions: [],
+        exceedsPurchasedLimit: billingSnapshot.isOverLimit,
+      };
+    }
+
+    if (billingProjection.selectableVehicleOptions.length === 0) {
+      return billingProjection;
+    }
+
+    const validSelectedVehicleCount = selectedVehicleKeys.filter((key) =>
+      billingProjection.selectableVehicleOptions.some((vehicle) => vehicle.key === key),
+    ).length;
+    const selectedProjectedNewVehicleCount =
+      validSelectedVehicleCount > 0
+        ? Math.min(validSelectedVehicleCount, billingProjection.availableNewVehicleSlots)
+        : 0;
+    const projectedVehicleCount =
+      billingSnapshot.currentVehicleCount + selectedProjectedNewVehicleCount;
+    const requiredProjectedPaidSlots = Math.max(
       0,
-      billingSnapshot.requiredPaidSlots - billingSnapshot.effectivePurchasedVehicleSlots,
-    ),
-    selectedProjectedNewVehicleCount: 0,
-    availableNewVehicleSlots: Math.max(
+      projectedVehicleCount - billingSnapshot.freeVehicleSlots - billingSnapshot.bonusVehicleSlots,
+    );
+    const additionalPaidSlotsNeeded = Math.max(
       0,
-      billingSnapshot.allowedVehicleCount - billingSnapshot.currentVehicleCount,
-    ),
-    selectableVehicleOptions: [],
-    exceedsPurchasedLimit: billingSnapshot.isOverLimit,
-  };
+      requiredProjectedPaidSlots - billingSnapshot.effectivePurchasedVehicleSlots,
+    );
+
+    return {
+      ...billingProjection,
+      projectedVehicleCount,
+      selectedProjectedNewVehicleCount,
+      requiredProjectedPaidSlots,
+      additionalPaidSlotsNeeded,
+      exceedsPurchasedLimit: billingSnapshot.billingBypassActive
+        ? false
+        : projectedVehicleCount > billingSnapshot.allowedVehicleCount,
+    };
+  }, [billingProjection, billingSnapshot, selectedVehicleKeys]);
 
   const billingPageHref = `/billing?required=${activeProjection.requiredProjectedPaidSlots}&projected=${activeProjection.projectedVehicleCount}&needed=${activeProjection.additionalPaidSlotsNeeded}`;
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
 
 import { getCsvFieldOptions, getMessages, type Locale } from "@/lib/i18n";
@@ -85,8 +85,8 @@ export function CsvImportPanel({
   const [billingNotice, setBillingNotice] = useState("");
   const [billingCheckError, setBillingCheckError] = useState("");
   const [showBillingModal, setShowBillingModal] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [isCheckingBilling, startBillingCheckTransition] = useTransition();
+  const [isImporting, setIsImporting] = useState(false);
+  const [isCheckingBilling, setIsCheckingBilling] = useState(false);
 
   const previewRows = useMemo(() => rows.slice(0, 5), [rows]);
 
@@ -120,35 +120,50 @@ export function CsvImportPanel({
       return;
     }
 
-    startBillingCheckTransition(async () => {
-      const response = await fetch("/api/billing/import-check", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          rows,
-          mapping,
-          createMissingVehicles,
-          selectedVehicleKeys,
-        }),
-      });
+    let cancelled = false;
+    setIsCheckingBilling(true);
 
-      const payload = (await response.json()) as BillingProjection & { error?: string };
+    void (async () => {
+      try {
+        const response = await fetch("/api/billing/import-check", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            rows,
+            mapping,
+            createMissingVehicles,
+            selectedVehicleKeys,
+          }),
+        });
 
-      if (!response.ok) {
-        setBillingProjection(null);
-        setBillingCheckError(payload.error ?? panelMessages.billing.genericError);
-        return;
+        const payload = (await response.json()) as BillingProjection & { error?: string };
+
+        if (cancelled) return;
+
+        if (!response.ok) {
+          setBillingProjection(null);
+          setBillingCheckError(payload.error ?? panelMessages.billing.genericError);
+          return;
+        }
+
+        setBillingProjection(payload);
+        setBillingCheckError("");
+
+        if (payload.exceedsPurchasedLimit) {
+          setShowBillingModal(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsCheckingBilling(false);
+        }
       }
+    })();
 
-      setBillingProjection(payload);
-      setBillingCheckError("");
-
-      if (payload.exceedsPurchasedLimit) {
-        setShowBillingModal(true);
-      }
-    });
+    return () => {
+      cancelled = true;
+    };
   }, [
     rows,
     mapping,
@@ -208,54 +223,59 @@ export function CsvImportPanel({
       return;
     }
 
-    startTransition(async () => {
-      const response = await fetch("/api/imports", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fileName,
-          mapping,
-          rows,
-          createMissingVehicles,
-          selectedVehicleKeys,
-        }),
-      });
+    setIsImporting(true);
+    void (async () => {
+      try {
+        const response = await fetch("/api/imports", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileName,
+            mapping,
+            rows,
+            createMissingVehicles,
+            selectedVehicleKeys,
+          }),
+        });
 
-      const payload = (await response.json()) as {
-        successRows?: number;
-        failedRows?: number;
-        createdVehicles?: number;
-        skippedRows?: number;
-        error?: string;
-        details?: BillingProjection;
-      };
+        const payload = (await response.json()) as {
+          successRows?: number;
+          failedRows?: number;
+          createdVehicles?: number;
+          skippedRows?: number;
+          error?: string;
+          details?: BillingProjection;
+        };
 
-      const billingDetails = payload.details;
+        const billingDetails = payload.details;
 
-      if (response.status === 402 && billingDetails) {
-        setBillingProjection(billingDetails);
-        setShowBillingModal(true);
-        setResult(payload.error ?? panelMessages.billing.limitExceeded);
-        return;
+        if (response.status === 402 && billingDetails) {
+          setBillingProjection(billingDetails);
+          setShowBillingModal(true);
+          setResult(payload.error ?? panelMessages.billing.limitExceeded);
+          return;
+        }
+
+        if (!response.ok) {
+          setResult(payload.error ?? panelMessages.genericFailure);
+          return;
+        }
+
+        setShowBillingModal(false);
+        setResult(
+          panelMessages.importResult(
+            payload.successRows ?? 0,
+            payload.createdVehicles ?? 0,
+            payload.failedRows ?? 0,
+            payload.skippedRows ?? 0,
+          ),
+        );
+      } finally {
+        setIsImporting(false);
       }
-
-      if (!response.ok) {
-        setResult(payload.error ?? panelMessages.genericFailure);
-        return;
-      }
-
-      setShowBillingModal(false);
-      setResult(
-        panelMessages.importResult(
-          payload.successRows ?? 0,
-          payload.createdVehicles ?? 0,
-          payload.failedRows ?? 0,
-          payload.skippedRows ?? 0,
-        ),
-      );
-    });
+    })();
   }
 
   function toggleVehicleSelection(vehicleKey: string) {
@@ -552,11 +572,11 @@ export function CsvImportPanel({
               ) : null}
 
               <button
-                disabled={!readyToImport || isPending}
+                disabled={!readyToImport || isImporting}
                 onClick={() => submitImport()}
                 className="w-full rounded-md bg-[var(--accent)] px-4 py-2.5 text-[14px] font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-[color:var(--line)] disabled:text-[color:var(--ink-soft)]"
               >
-                {isPending ? panelMessages.importing : panelMessages.runImport}
+                {isImporting ? panelMessages.importing : panelMessages.runImport}
               </button>
               {result ? (
                 <p className="rounded-md bg-[var(--surface-muted)] px-3 py-2 text-[12px] text-[color:var(--ink)]">
@@ -738,7 +758,7 @@ export function CsvImportPanel({
               {activeProjection.selectableVehicleOptions.length > 0 ? (
                 <button
                   type="button"
-                  disabled={isPending || selectedVehicleKeys.length === 0}
+                  disabled={isImporting || selectedVehicleKeys.length === 0}
                   onClick={() => submitImport({ skipLimitGuard: true })}
                   className="flex-1 rounded-md bg-white px-4 py-3 text-center text-sm font-medium text-slate-950 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                 >

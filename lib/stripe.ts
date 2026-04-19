@@ -9,7 +9,18 @@ export function getStripeSecretKey() {
 }
 
 export function getStripePriceId() {
-  return process.env.STRIPE_LISTING_PRICE_ID ?? "";
+  const priceId = process.env.STRIPE_LISTING_PRICE_ID?.trim() ?? "";
+  if (!priceId) {
+    return "";
+  }
+
+  if (!priceId.startsWith("price_")) {
+    throw new Error(
+      "Stripe listing price is misconfigured. STRIPE_LISTING_PRICE_ID must use a Stripe Price ID like price_xxx, not a Product ID like prod_xxx.",
+    );
+  }
+
+  return priceId;
 }
 
 export function getStripeWebhookSecret() {
@@ -17,7 +28,11 @@ export function getStripeWebhookSecret() {
 }
 
 export function isStripeBillingConfigured() {
-  return Boolean(getStripeSecretKey() && getStripePriceId());
+  try {
+    return Boolean(getStripeSecretKey() && getStripePriceId());
+  } catch {
+    return false;
+  }
 }
 
 export function getStripeClient() {

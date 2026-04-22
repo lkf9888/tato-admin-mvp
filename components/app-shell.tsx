@@ -29,6 +29,7 @@ export function AppShell({
     { href: "/calendar", label: messages.shell.nav.calendar },
     { href: "/imports", label: messages.shell.nav.imports },
     { href: "/billing", label: messages.shell.nav.billing },
+    { href: "/payouts", label: messages.shell.nav.payouts },
     { href: "/share-links", label: messages.shell.nav.shareLinks },
   ];
 

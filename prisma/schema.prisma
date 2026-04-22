@@ -209,6 +209,16 @@ model WorkspaceBilling {
   currentPeriodEnd             DateTime?
   lastCheckoutAt               DateTime?
   lastPaidAt                   DateTime?
+  // Stripe Connect fields — per-workspace payout account for direct-booking
+  // revenue. The platform (site owner) collects a flat application fee and the
+  // rest is settled on-behalf-of the host's Connect account, so renters see
+  // the host's business name on their statement.
+  stripeConnectAccountId       String?                @unique
+  stripeConnectCountry         String?
+  stripeConnectChargesEnabled  Boolean                @default(false)
+  stripeConnectPayoutsEnabled  Boolean                @default(false)
+  stripeConnectDetailsSubmitted Boolean               @default(false)
+  stripeConnectOnboardedAt     DateTime?
   createdAt                    DateTime               @default(now())
   updatedAt                    DateTime               @updatedAt
   workspace                    Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

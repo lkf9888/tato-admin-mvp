@@ -522,11 +522,7 @@ async function createVehicleFromCsvRow(input: {
 
   const basics = parseVehicleBasics(vehicleName || vehicleLabel);
 
-  // Workspace-scoped plate lookup. Previously this used `findUnique` against a
-  // globally-unique plate column, which meant a plate taken by another
-  // workspace caused a silent null return here (= "Vehicle not found" failure
-  // downstream). Plate uniqueness is now per-workspace so each workspace gets
-  // its own plate namespace.
+  // 1. Workspace-scoped plate lookup — cheap primary path.
   const existingVehicle = await prisma.vehicle.findFirst({
     where: {
       workspaceId: input.workspaceId,
@@ -534,34 +530,61 @@ async function createVehicleFromCsvRow(input: {
     },
   });
 
+  // 2. If not found in this workspace, check globally. A plate in another
+  // workspace here almost always means leftover data from the "default"
+  // workspace that was created before the user registered into their own
+  // workspace. Adopt those vehicles into the current workspace instead of
+  // failing the whole row with a global unique-constraint error. Without
+  // this, a CSV import can never succeed once the default workspace owns
+  // any plates that the user later re-imports.
+  const foreignVehicle = existingVehicle
+    ? null
+    : await prisma.vehicle.findFirst({
+        where: { plateNumber },
+      });
+
+  const sharedUpdateData = {
+    nickname: vehicleName || vehicleLabel || plateNumber,
+    brand: basics.brand,
+    model: basics.model,
+    year: basics.year,
+    vin: vin || undefined,
+    turoListingName: vehicleName || vehicleLabel || undefined,
+    turoVehicleCode: externalVehicleId || undefined,
+    notes: "Auto-created from Turo CSV import.",
+  };
+
   const vehicle = existingVehicle
     ? await prisma.vehicle.update({
         where: { id: existingVehicle.id },
-        data: {
-          nickname: vehicleName || vehicleLabel || plateNumber,
-          brand: basics.brand,
-          model: basics.model,
-          year: basics.year,
-          vin: vin || undefined,
-          turoListingName: vehicleName || vehicleLabel || undefined,
-          turoVehicleCode: externalVehicleId || undefined,
-          notes: "Auto-created from Turo CSV import.",
-        },
+        data: sharedUpdateData,
       })
-    : await prisma.vehicle.create({
-        data: {
-          workspaceId: input.workspaceId,
-          plateNumber,
-          nickname: vehicleName || vehicleLabel || plateNumber,
-          brand: basics.brand,
-          model: basics.model,
-          year: basics.year,
-          vin: vin || undefined,
-          turoListingName: vehicleName || vehicleLabel || undefined,
-          turoVehicleCode: externalVehicleId || undefined,
-          notes: "Auto-created from Turo CSV import.",
-        },
-      });
+    : foreignVehicle
+      ? await prisma.vehicle.update({
+          where: { id: foreignVehicle.id },
+          data: {
+            ...sharedUpdateData,
+            workspaceId: input.workspaceId,
+            notes: "Adopted from another workspace during Turo CSV import.",
+          },
+        })
+      : await prisma.vehicle.create({
+          data: {
+            workspaceId: input.workspaceId,
+            plateNumber,
+            ...sharedUpdateData,
+          },
+        });
+
+  // When we adopt a vehicle from another workspace, move its historical orders
+  // with it so findExistingImportedOrder keeps finding them in this workspace
+  // and we don't end up with duplicate rows.
+  if (foreignVehicle) {
+    await prisma.order.updateMany({
+      where: { vehicleId: vehicle.id, workspaceId: { not: input.workspaceId } },
+      data: { workspaceId: input.workspaceId },
+    });
+  }
 
   await logActivity({
     workspaceId: input.workspaceId,

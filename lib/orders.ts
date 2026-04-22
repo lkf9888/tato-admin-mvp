@@ -488,6 +488,24 @@ function parseVehicleBasics(vehicleName?: string) {
   };
 }
 
+function summarizeImportError(error: unknown): string {
+  if (!error) return "Unknown import error";
+  const message = error instanceof Error ? error.message : String(error);
+  // Prisma unique-constraint shape: "Unique constraint failed on the fields: (`plateNumber`)"
+  const uniqueMatch = message.match(/Unique constraint failed on the fields?:\s*\(`?([^`)]+)`?\)/i);
+  if (uniqueMatch) {
+    return `Duplicate ${uniqueMatch[1]} value (unique constraint)`;
+  }
+  // Foreign-key shape: "Foreign key constraint failed on the field: `vehicleId`"
+  const fkMatch = message.match(/Foreign key constraint failed on the field:\s*`?([^`]+)`?/i);
+  if (fkMatch) {
+    return `Foreign key violation on ${fkMatch[1]}`;
+  }
+  // Truncate verbose Prisma error envelopes so the breakdown panel stays readable.
+  const firstLine = message.split("\n").find((line) => line.trim().length > 0) ?? message;
+  return firstLine.length > 160 ? `${firstLine.slice(0, 157)}…` : firstLine;
+}
+
 async function createVehicleFromCsvRow(input: {
   workspaceId: string;
   row: CsvImportRow;
@@ -572,20 +590,16 @@ async function syncVehicleFromCsvRow(input: {
   const vehicleName = safeString(input.row[input.mapping.vehicleName ?? ""]);
   const externalVehicleId = safeString(input.row[input.mapping.externalVehicleId ?? ""]);
   const vin = safeString(input.row[input.mapping.vin ?? ""]);
-  const parsedPlateNumber = extractPlateNumber(vehicleLabel, externalVehicleId, vin);
   const basics = parseVehicleBasics(vehicleName || vehicleLabel);
 
-  const nextPlateNumber =
-    parsedPlateNumber &&
-    !input.vehicles.some(
-      (candidate) => candidate.id !== input.vehicle.id && candidate.plateNumber === parsedPlateNumber,
-    )
-      ? parsedPlateNumber
-      : input.vehicle.plateNumber;
-
+  // Intentionally do NOT touch `plateNumber` here. Plates are stable
+  // identifiers, re-writing them during per-row CSV sync can collide with the
+  // global unique constraint (two rows parse the same plate, a cross-workspace
+  // vehicle already owns it, etc.) and takes down the whole batch. Users can
+  // edit the plate directly from the vehicle management UI when they truly
+  // need to change it.
   const nextData = {
-    plateNumber: nextPlateNumber,
-    nickname: vehicleName || vehicleLabel || nextPlateNumber,
+    nickname: vehicleName || vehicleLabel || input.vehicle.plateNumber,
     brand: basics.brand,
     model: basics.model,
     year: basics.year,
@@ -595,7 +609,6 @@ async function syncVehicleFromCsvRow(input: {
   };
 
   const hasChanges =
-    input.vehicle.plateNumber !== nextData.plateNumber ||
     input.vehicle.nickname !== nextData.nickname ||
     input.vehicle.brand !== nextData.brand ||
     input.vehicle.model !== nextData.model ||
@@ -757,142 +770,153 @@ export async function importTuroOrders(input: {
       vin,
     });
 
-    if ((!vehicleLabel && !vehicleName && !externalVehicleId && !vin) || !renterName || !pickupValue || !returnValue) {
-      failures.push({
-        rowNumber: index + 1,
-        reason: "Missing required mapped fields",
-        row,
-      });
-      continue;
-    }
-
-    let vehicle = resolveVehicleFromCsv(vehicles, {
-      vehicleLabel,
-      vehicleName,
-      externalVehicleId,
-      vin,
-    });
-
-    if (!vehicle && input.createMissingVehicles) {
-      if (
-        selectedVehicleKeys.size > 0 &&
-        projectedVehicleKey &&
-        !selectedVehicleKeys.has(projectedVehicleKey)
-      ) {
-        skippedRows += 1;
+    try {
+      if ((!vehicleLabel && !vehicleName && !externalVehicleId && !vin) || !renterName || !pickupValue || !returnValue) {
+        failures.push({
+          rowNumber: index + 1,
+          reason: "Missing required mapped fields",
+          row,
+        });
         continue;
       }
 
-      const createdVehicle = await createVehicleFromCsvRow({
+      let vehicle = resolveVehicleFromCsv(vehicles, {
+        vehicleLabel,
+        vehicleName,
+        externalVehicleId,
+        vin,
+      });
+
+      if (!vehicle && input.createMissingVehicles) {
+        if (
+          selectedVehicleKeys.size > 0 &&
+          projectedVehicleKey &&
+          !selectedVehicleKeys.has(projectedVehicleKey)
+        ) {
+          skippedRows += 1;
+          continue;
+        }
+
+        const createdVehicle = await createVehicleFromCsvRow({
+          workspaceId: input.workspaceId,
+          row,
+          mapping,
+          actor: input.actor,
+        });
+
+        if (createdVehicle) {
+          vehicles.push(createdVehicle);
+          vehicle = createdVehicle;
+          createdVehicles += 1;
+        }
+      }
+
+      if (!vehicle) {
+        failures.push({
+          rowNumber: index + 1,
+          reason: `Vehicle not found for "${vehicleLabel || vehicleName || externalVehicleId || vin}"`,
+          row,
+        });
+        continue;
+      }
+
+      if (!syncedVehicleIds.has(vehicle.id)) {
+        const syncedVehicle = await syncVehicleFromCsvRow({
+          vehicle,
+          vehicles,
+          row,
+          mapping,
+        });
+
+        if (syncedVehicle !== vehicle) {
+          vehicle = syncedVehicle;
+          updatedVehicles += 1;
+        }
+
+        syncedVehicleIds.add(vehicle.id);
+      }
+
+      const pickupDatetime = parseCsvDate(pickupValue);
+      const returnDatetime = parseCsvDate(returnValue);
+
+      if (Number.isNaN(pickupDatetime.getTime()) || Number.isNaN(returnDatetime.getTime())) {
+        failures.push({
+          rowNumber: index + 1,
+          reason: "Invalid pickup or return date",
+          row,
+        });
+        continue;
+      }
+
+      const externalOrderId = safeString(row[mapping.externalOrderId ?? ""]) || null;
+      const existing = await findExistingImportedOrder({
+        externalOrderId,
+        vehicleId: vehicle.id,
+        renterName,
+        pickupDatetime,
+        returnDatetime,
+      });
+      const status = parseCsvOrderStatus(row[mapping.status ?? ""]);
+
+      if (status === OrderStatus.cancelled) {
+        if (existing) {
+          await prisma.order.delete({
+            where: { id: existing.id },
+          });
+          touchedVehicleIds.add(vehicle.id);
+          deletedCancelledRows += 1;
+        }
+
+        successRows += 1;
+        continue;
+      }
+
+      const payload = {
+        vehicleId: vehicle.id,
         workspaceId: input.workspaceId,
-        row,
-        mapping,
-        actor: input.actor,
-      });
+        importBatchId: batch.id,
+        source: OrderSource.turo,
+        externalOrderId,
+        renterName,
+        renterPhone: safeString(row[mapping.renterPhone ?? ""]) || null,
+        pickupDatetime,
+        returnDatetime,
+        totalPrice: getNetEarningFromFinancials(
+          extractFinancialsFromRow(row),
+          parseNumberValue(row[mapping.totalEarnings ?? ""]) ??
+            parseNumberValue(row[mapping.tripPrice ?? ""]) ??
+            parseNumberValue(row[mapping.totalPrice ?? ""]),
+        ),
+        status,
+        createdBy: input.actor,
+        pickupLocation: safeString(row[mapping.pickupLocation ?? ""]) || null,
+        returnLocation: safeString(row[mapping.returnLocation ?? ""]) || null,
+        notes: existing?.notes ?? null,
+        sourceMetadata: buildSourceMetadata(row),
+      };
 
-      if (createdVehicle) {
-        vehicles.push(createdVehicle);
-        vehicle = createdVehicle;
-        createdVehicles += 1;
-      }
-    }
+      const savedOrder = existing
+        ? await prisma.order.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await prisma.order.create({
+            data: payload,
+          });
+      syncedOrderIds.add(savedOrder.id);
 
-    if (!vehicle) {
-      failures.push({
-        rowNumber: index + 1,
-        reason: `Vehicle not found for "${vehicleLabel || vehicleName || externalVehicleId || vin}"`,
-        row,
-      });
-      continue;
-    }
-
-    if (!syncedVehicleIds.has(vehicle.id)) {
-      const syncedVehicle = await syncVehicleFromCsvRow({
-        vehicle,
-        vehicles,
-        row,
-        mapping,
-      });
-
-      if (syncedVehicle !== vehicle) {
-        vehicle = syncedVehicle;
-        updatedVehicles += 1;
-      }
-
-      syncedVehicleIds.add(vehicle.id);
-    }
-
-    const pickupDatetime = parseCsvDate(pickupValue);
-    const returnDatetime = parseCsvDate(returnValue);
-
-    if (Number.isNaN(pickupDatetime.getTime()) || Number.isNaN(returnDatetime.getTime())) {
-      failures.push({
-        rowNumber: index + 1,
-        reason: "Invalid pickup or return date",
-        row,
-      });
-      continue;
-    }
-
-    const externalOrderId = safeString(row[mapping.externalOrderId ?? ""]) || null;
-    const existing = await findExistingImportedOrder({
-      externalOrderId,
-      vehicleId: vehicle.id,
-      renterName,
-      pickupDatetime,
-      returnDatetime,
-    });
-    const status = parseCsvOrderStatus(row[mapping.status ?? ""]);
-
-    if (status === OrderStatus.cancelled) {
-      if (existing) {
-        await prisma.order.delete({
-          where: { id: existing.id },
-        });
-        touchedVehicleIds.add(vehicle.id);
-        deletedCancelledRows += 1;
-      }
-
+      touchedVehicleIds.add(vehicle.id);
       successRows += 1;
-      continue;
+    } catch (error) {
+      // Any unexpected DB/Prisma error (unique constraint, FK violation, etc.)
+      // gets reported as a per-row failure instead of taking down the whole
+      // batch. The surfaced reason feeds into the aggregated breakdown panel.
+      failures.push({
+        rowNumber: index + 1,
+        reason: summarizeImportError(error),
+        row,
+      });
     }
-
-    const payload = {
-      vehicleId: vehicle.id,
-      workspaceId: input.workspaceId,
-      importBatchId: batch.id,
-      source: OrderSource.turo,
-      externalOrderId,
-      renterName,
-      renterPhone: safeString(row[mapping.renterPhone ?? ""]) || null,
-      pickupDatetime,
-      returnDatetime,
-      totalPrice: getNetEarningFromFinancials(
-        extractFinancialsFromRow(row),
-        parseNumberValue(row[mapping.totalEarnings ?? ""]) ??
-          parseNumberValue(row[mapping.tripPrice ?? ""]) ??
-          parseNumberValue(row[mapping.totalPrice ?? ""]),
-      ),
-      status,
-      createdBy: input.actor,
-      pickupLocation: safeString(row[mapping.pickupLocation ?? ""]) || null,
-      returnLocation: safeString(row[mapping.returnLocation ?? ""]) || null,
-      notes: existing?.notes ?? null,
-      sourceMetadata: buildSourceMetadata(row),
-    };
-
-    const savedOrder = existing
-      ? await prisma.order.update({
-          where: { id: existing.id },
-          data: payload,
-        })
-      : await prisma.order.create({
-          data: payload,
-        });
-    syncedOrderIds.add(savedOrder.id);
-
-    touchedVehicleIds.add(vehicle.id);
-    successRows += 1;
   }
 
   if (failures.length === 0) {

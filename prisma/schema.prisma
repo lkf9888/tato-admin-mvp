@@ -99,7 +99,7 @@ model Vehicle {
   workspaceId      String?
   id              String        @id @default(cuid())
   ownerId         String?
-  plateNumber     String
+  plateNumber     String        @unique
   nickname        String
   brand           String
   model           String
@@ -121,7 +121,6 @@ model Vehicle {
   owner           Owner?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   orders          Order[]
 
-  @@unique([workspaceId, plateNumber])
   @@index([workspaceId])
 }
 

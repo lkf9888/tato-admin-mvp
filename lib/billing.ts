@@ -27,6 +27,7 @@ type FreeSlotCouponConfig = {
   code: string;
   bonusVehicleSlots: number;
   description: string;
+  reusable: boolean;
 };
 
 export type BillingCouponResolution =
@@ -111,7 +112,7 @@ function parseConfiguredFreeSlotCoupons() {
     .map((entry) => entry.trim())
     .filter(Boolean)
     .flatMap<FreeSlotCouponConfig>((entry) => {
-      const [rawCode, rawSlots, ...descriptionParts] = entry.split(":");
+      const [rawCode, rawSlots, ...rest] = entry.split(":");
       const code = normalizeCouponCode(rawCode ?? "");
       const bonusVehicleSlots = Number.parseInt((rawSlots ?? "").trim(), 10);
 
@@ -119,12 +120,28 @@ function parseConfiguredFreeSlotCoupons() {
         return [];
       }
 
+      // Accept a trailing `reusable` / `reuse` / `unlimited` marker on any segment
+      // so codes like `LKF9888:999999:Unlimited listings:reusable` can be redeemed
+      // by every workspace without touching the redemption table.
+      const reusableMarkers = new Set(["reusable", "reuse", "unlimited"]);
+      const descriptionSegments: string[] = [];
+      let reusable = false;
+      for (const segment of rest) {
+        const trimmed = segment.trim();
+        if (reusableMarkers.has(trimmed.toLowerCase())) {
+          reusable = true;
+        } else {
+          descriptionSegments.push(segment);
+        }
+      }
+
       return [
         {
           code,
           bonusVehicleSlots,
           description:
-            descriptionParts.join(":").trim() || `${bonusVehicleSlots} free listing slot(s)`,
+            descriptionSegments.join(":").trim() || `${bonusVehicleSlots} free listing slot(s)`,
+          reusable,
         },
       ];
     });
@@ -420,35 +437,49 @@ export async function resolveBillingCoupon(code: string): Promise<BillingCouponR
   const billing = await ensureWorkspaceBillingForWorkspace(workspace.id);
   const freeSlotCoupon = getConfiguredFreeSlotCoupon(normalizedCode);
   if (freeSlotCoupon) {
-    try {
-      await prisma.$transaction(async (tx) => {
-        await tx.billingCouponRedemption.create({
-          data: {
-            workspaceBillingId: billing.id,
-            code: normalizedCode,
-            couponType: "free_slots",
-            bonusVehicleSlots: freeSlotCoupon.bonusVehicleSlots,
-            metadata: freeSlotCoupon.description,
-          },
-        });
-
-        await tx.workspaceBilling.update({
+    if (freeSlotCoupon.reusable) {
+      // Reusable coupons skip the redemption table entirely so every workspace
+      // (and every repeated apply within a workspace) always succeeds. We just
+      // lift bonusVehicleSlots to at least the coupon's value instead of
+      // stacking on each apply, so the quota cannot be inflated by spamming.
+      const target = freeSlotCoupon.bonusVehicleSlots;
+      if (billing.bonusVehicleSlots < target) {
+        await prisma.workspaceBilling.update({
           where: { id: billing.id },
-          data: {
-            bonusVehicleSlots: {
-              increment: freeSlotCoupon.bonusVehicleSlots,
-            },
-          },
+          data: { bonusVehicleSlots: target },
         });
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        throw new Error("This free quota coupon has already been redeemed.");
       }
-      throw error;
+    } else {
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.billingCouponRedemption.create({
+            data: {
+              workspaceBillingId: billing.id,
+              code: normalizedCode,
+              couponType: "free_slots",
+              bonusVehicleSlots: freeSlotCoupon.bonusVehicleSlots,
+              metadata: freeSlotCoupon.description,
+            },
+          });
+
+          await tx.workspaceBilling.update({
+            where: { id: billing.id },
+            data: {
+              bonusVehicleSlots: {
+                increment: freeSlotCoupon.bonusVehicleSlots,
+              },
+            },
+          });
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          throw new Error("This free quota coupon has already been redeemed.");
+        }
+        throw error;
+      }
     }
 
     return {

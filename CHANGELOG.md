@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.14.8 - 2026-04-21
+
+- Added a `reusable` marker to the `BILLING_FREE_SLOT_COUPONS` env var so free-quota coupon codes can be redeemed by every workspace (and re-applied within the same workspace) without tripping the one-shot global uniqueness guard.
+- Updated coupon redemption for reusable codes to lift the workspace bonus to the coupon's minimum instead of stacking on each apply, preventing quota inflation from spamming the apply button.
+- To turn `LKF9888` into an unlimited-use unlock, set `BILLING_FREE_SLOT_COUPONS=LKF9888:999999:Unlimited listings:reusable` on Railway and redeploy.
+
 ## v0.14.7 - 2026-04-18
 
 - Stopped re-running the server-side billing projection every time the selected-vehicle checkboxes change in the CSV quota modal.

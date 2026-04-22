@@ -223,12 +223,33 @@ function parseCsvOrderStatus(value?: string) {
 }
 
 const CSV_DATE_FORMATS = [
+  // ISO-ish formats
+  "yyyy-MM-dd HH:mm:ss",
+  "yyyy-MM-dd HH:mm",
   "yyyy-MM-dd hh:mm a",
   "yyyy-MM-dd h:mm a",
-  "yyyy-MM-dd HH:mm",
-  "yyyy-MM-dd HH:mm:ss",
+  "yyyy-MM-dd'T'HH:mm:ss",
+  "yyyy-MM-dd'T'HH:mm",
+  // US-style formats Turo earnings export commonly uses
   "MM/dd/yyyy hh:mm a",
+  "MM/dd/yyyy h:mm a",
   "MM/dd/yyyy HH:mm",
+  "M/d/yyyy h:mm a",
+  "M/d/yyyy hh:mm a",
+  "M/d/yyyy HH:mm",
+  "M/d/yyyy H:mm",
+  "M/d/yy h:mm a",
+  "M/d/yy H:mm",
+  // Month-name formats, e.g. "Apr 22, 2026 9:00 AM"
+  "MMM d, yyyy h:mm a",
+  "MMM d, yyyy hh:mm a",
+  "MMM dd, yyyy h:mm a",
+  "MMMM d, yyyy h:mm a",
+  "MMMM d, yyyy hh:mm a",
+  // Date-only fallbacks
+  "yyyy-MM-dd",
+  "MM/dd/yyyy",
+  "M/d/yyyy",
 ];
 
 function getCsvImportTimeZone() {
@@ -351,15 +372,33 @@ function buildSourceMetadata(row: CsvImportRow) {
 }
 
 function extractPlateNumber(vehicleLabel?: string, externalVehicleId?: string, vin?: string) {
+  // 1. Explicit BC-style plate marker, e.g. "Tesla Model Y #A603JM".
   const bcPlateMatch = (vehicleLabel ?? "").match(/#([A-Za-z0-9]+)/);
   if (bcPlateMatch?.[1]) return bcPlateMatch[1].toUpperCase();
 
-  const leadingToken = (vehicleLabel ?? "")
-    .split(" ")[0]
-    ?.replace(/[^A-Za-z0-9]/g, "")
-    .trim();
-  if (leadingToken) return leadingToken.toUpperCase();
+  // 2. Parenthesised plate, e.g. "2022 Tesla Model Y (A603JM)".
+  const parenPlateMatch = (vehicleLabel ?? "").match(/\(([A-Za-z0-9]{5,10})\)/);
+  if (parenPlateMatch?.[1] && !/^\d+$/.test(parenPlateMatch[1])) {
+    return parenPlateMatch[1].toUpperCase();
+  }
 
+  // 3. A plate-shaped token (letters+digits) inside the label. Skip pure-digit
+  // tokens because a leading year (e.g. "2022 Tesla Model Y") must NOT be
+  // treated as the plate — that collapses every 2022-year car into one row.
+  const plateLikeToken = (vehicleLabel ?? "")
+    .split(/[\s,()\[\]]+/)
+    .map((token) => token.replace(/[^A-Za-z0-9]/g, "").trim())
+    .find(
+      (token) =>
+        token.length >= 5 &&
+        token.length <= 10 &&
+        /[A-Za-z]/.test(token) &&
+        /[0-9]/.test(token),
+    );
+  if (plateLikeToken) return plateLikeToken.toUpperCase();
+
+  // 4. Deterministic fallbacks — these guarantee each Turo vehicle gets its
+  // own plate bucket even when the label has no plate.
   if (externalVehicleId) return `TURO-${externalVehicleId}`;
   if (vin) return `VIN-${vin.slice(-8).toUpperCase()}`;
   return null;
@@ -465,17 +504,21 @@ async function createVehicleFromCsvRow(input: {
 
   const basics = parseVehicleBasics(vehicleName || vehicleLabel);
 
-  const existingGlobalVehicle = await prisma.vehicle.findUnique({
-    where: { plateNumber },
+  // Workspace-scoped plate lookup. Previously this used `findUnique` against a
+  // globally-unique plate column, which meant a plate taken by another
+  // workspace caused a silent null return here (= "Vehicle not found" failure
+  // downstream). Plate uniqueness is now per-workspace so each workspace gets
+  // its own plate namespace.
+  const existingVehicle = await prisma.vehicle.findFirst({
+    where: {
+      workspaceId: input.workspaceId,
+      plateNumber,
+    },
   });
 
-  if (existingGlobalVehicle && existingGlobalVehicle.workspaceId !== input.workspaceId) {
-    return null;
-  }
-
-  const vehicle = existingGlobalVehicle
+  const vehicle = existingVehicle
     ? await prisma.vehicle.update({
-        where: { id: existingGlobalVehicle.id },
+        where: { id: existingVehicle.id },
         data: {
           nickname: vehicleName || vehicleLabel || plateNumber,
           brand: basics.brand,

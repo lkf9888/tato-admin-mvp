@@ -40,25 +40,72 @@ type BillingProjection = BillingSnapshot & {
 
 const guessField = (header: string) => {
   const normalized = header.trim().toLowerCase();
-  if (normalized.includes("reservation") || normalized.includes("trip id")) return "externalOrderId";
-  if (normalized === "vehicle") return "vehicleLabel";
-  if (normalized === "vehicle name" || normalized === "car") return "vehicleName";
-  if (normalized === "vehicle id") return "externalVehicleId";
+  if (
+    normalized === "reservation" ||
+    normalized === "reservation id" ||
+    normalized === "trip" ||
+    normalized === "trip id" ||
+    normalized === "booking id" ||
+    normalized === "confirmation code"
+  ) {
+    return "externalOrderId";
+  }
+  if (normalized === "vehicle" || normalized === "listing") return "vehicleLabel";
+  if (normalized === "vehicle name" || normalized === "nickname" || normalized === "car") {
+    return "vehicleName";
+  }
+  if (normalized === "vehicle id" || normalized === "listing id" || normalized === "car id") {
+    return "externalVehicleId";
+  }
   if (normalized === "vin") return "vin";
-  if (normalized.includes("guest") || normalized.includes("renter")) return "renterName";
+  if (
+    normalized === "guest" ||
+    normalized === "guest name" ||
+    normalized === "renter" ||
+    normalized === "renter name" ||
+    normalized === "driver" ||
+    normalized === "driver name"
+  ) {
+    return "renterName";
+  }
   if (normalized.includes("phone")) return "renterPhone";
-  if (normalized === "pickup location") return "pickupLocation";
-  if (normalized === "return location") return "returnLocation";
-  if (normalized.includes("trip start") || normalized === "pickup datetime" || normalized === "pickup time") {
+  if (normalized.includes("pickup location") || normalized.includes("pick-up location")) {
+    return "pickupLocation";
+  }
+  if (normalized.includes("return location") || normalized.includes("drop-off location")) {
+    return "returnLocation";
+  }
+  if (
+    normalized.includes("trip start") ||
+    normalized === "start" ||
+    normalized === "start date" ||
+    normalized === "start datetime" ||
+    normalized === "pickup datetime" ||
+    normalized === "pickup time" ||
+    normalized === "pickup" ||
+    normalized.includes("pick-up time")
+  ) {
     return "pickupDatetime";
   }
-  if (normalized.includes("trip end") || normalized === "return datetime" || normalized === "return time") {
+  if (
+    normalized.includes("trip end") ||
+    normalized === "end" ||
+    normalized === "end date" ||
+    normalized === "end datetime" ||
+    normalized === "return datetime" ||
+    normalized === "return time" ||
+    normalized === "return" ||
+    normalized.includes("drop-off time")
+  ) {
     return "returnDatetime";
   }
   if (normalized === "trip price") return "tripPrice";
   if (normalized === "total earnings") return "totalEarnings";
-  if (normalized.includes("earning") || normalized.includes("price")) return "totalPrice";
-  if (normalized.includes("trip status") || normalized.includes("status")) return "status";
+  if (normalized.includes("earning") || normalized.includes("payout")) return "totalPrice";
+  if (normalized === "price" || normalized === "total price" || normalized === "total") {
+    return "totalPrice";
+  }
+  if (normalized.includes("trip status") || normalized === "status") return "status";
   return "";
 };
 
@@ -79,6 +126,9 @@ export function CsvImportPanel({
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [result, setResult] = useState("");
+  const [failureBreakdown, setFailureBreakdown] = useState<
+    Array<{ reason: string; count: number; sampleRows: number[] }>
+  >([]);
   const [createMissingVehicles, setCreateMissingVehicles] = useState(true);
   const [billingProjection, setBillingProjection] = useState<BillingProjection | null>(null);
   const [selectedVehicleKeys, setSelectedVehicleKeys] = useState<string[]>([]);
@@ -282,6 +332,7 @@ export function CsvImportPanel({
           skippedRows?: number;
           error?: string;
           details?: BillingProjection;
+          failures?: Array<{ rowNumber: number; reason: string }>;
         };
 
         const billingDetails = payload.details;
@@ -306,6 +357,24 @@ export function CsvImportPanel({
             payload.failedRows ?? 0,
             payload.skippedRows ?? 0,
           ),
+        );
+
+        // Aggregate per-reason breakdown so the user can see at a glance why
+        // rows were rejected (missing fields, bad date format, unresolved
+        // vehicle, etc.) instead of just a `N 失败` headline.
+        const reasonMap = new Map<string, { count: number; sampleRows: number[] }>();
+        for (const failure of payload.failures ?? []) {
+          const entry = reasonMap.get(failure.reason) ?? { count: 0, sampleRows: [] };
+          entry.count += 1;
+          if (entry.sampleRows.length < 5) {
+            entry.sampleRows.push(failure.rowNumber);
+          }
+          reasonMap.set(failure.reason, entry);
+        }
+        setFailureBreakdown(
+          Array.from(reasonMap.entries())
+            .map(([reason, entry]) => ({ reason, ...entry }))
+            .sort((a, b) => b.count - a.count),
         );
       } finally {
         setIsImporting(false);
@@ -419,6 +488,7 @@ export function CsvImportPanel({
                           setBillingProjection(null);
                           setShowBillingModal(false);
                           setResult("");
+                          setFailureBreakdown([]);
                           setBillingCheckError("");
                         },
                       });
@@ -617,6 +687,33 @@ export function CsvImportPanel({
                 <p className="rounded-md bg-[var(--surface-muted)] px-3 py-2 text-[12px] text-[color:var(--ink)]">
                   {result}
                 </p>
+              ) : null}
+              {failureBreakdown.length > 0 ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                  <p className="font-semibold">
+                    {locale === "zh" ? "失败原因分类" : "Failure breakdown"}
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {failureBreakdown.slice(0, 8).map((entry) => (
+                      <li key={entry.reason}>
+                        <span className="font-medium">{entry.reason}</span>
+                        <span className="mx-1">·</span>
+                        <span className="tabular-nums">
+                          {locale === "zh"
+                            ? `${entry.count} 行`
+                            : `${entry.count} row${entry.count === 1 ? "" : "s"}`}
+                        </span>
+                        {entry.sampleRows.length > 0 ? (
+                          <span className="ml-1 text-amber-800">
+                            ({locale === "zh" ? "示例行号" : "sample rows"}:{" "}
+                            {entry.sampleRows.join(", ")}
+                            {entry.count > entry.sampleRows.length ? "…" : ""})
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
             </div>
           </section>

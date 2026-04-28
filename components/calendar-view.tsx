@@ -71,7 +71,7 @@ const MIN_DAY_COLUMN_WIDTHS = {
   month: 34,
   sixWeeks: 28,
 } as const;
-const LANE_HEIGHT = 36;
+const LANE_HEIGHT = 32;
 const BAR_HEIGHT = 28;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const SCRUBBER_DAY_RANGE = 365;
@@ -884,7 +884,7 @@ export function CalendarView({
                   rangeEndExclusive,
                   dayColumnWidth,
                 );
-                const rowHeight = Math.max(64, laneCount * LANE_HEIGHT + 18);
+                const rowHeight = Math.max(44, laneCount * LANE_HEIGHT + 8);
                 const alternateRow = index % 2 === 1;
 
                 return (
@@ -897,18 +897,17 @@ export function CalendarView({
                   >
                     <div
                       className={cn(
-                        "sticky left-0 z-20 border-r border-[color:var(--line)] px-3 py-3 backdrop-blur",
+                        "sticky left-0 z-20 flex flex-col justify-center overflow-hidden border-r border-[color:var(--line)] px-3 py-1.5 backdrop-blur",
                         alternateRow ? "bg-[#faf4eb]/95" : "bg-[rgba(255, 255, 255, 0.95)]",
                       )}
                       style={{ height: rowHeight }}
                     >
-                      <p className="text-[12px] font-semibold text-[color:var(--ink)]">
+                      <p className="truncate text-[12px] font-semibold leading-tight text-[color:var(--ink)]">
                         {vehicle.plateNumber || vehicle.label}
                       </p>
-                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--ink-soft)]">
+                      <p className="mt-0.5 truncate text-[10.5px] leading-tight text-[color:var(--ink-soft)]">
                         {vehicle.secondaryLabel || vehicle.label}
-                      </p>
-                      <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-[color:var(--ink-soft)]/80">
+                        {" · "}
                         {vehicle.ownerName || calendarMessages.unassignedOwner}
                       </p>
                     </div>
@@ -981,7 +980,7 @@ export function CalendarView({
                             )}
                             style={{
                               left: bar.left,
-                              top: 9 + bar.lane * LANE_HEIGHT,
+                              top: 6 + bar.lane * LANE_HEIGHT,
                               width: bar.width,
                               height: BAR_HEIGHT,
                             }}

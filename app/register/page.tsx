@@ -1,19 +1,15 @@
 import { redirect } from "next/navigation";
 
-import { registerAction } from "@/app/actions";
+import { RegisterForm } from "@/components/register-form";
 import { isAdminAuthenticated } from "@/lib/auth";
-import { getMessages } from "@/lib/i18n";
+import { getI18n } from "@/lib/i18n-server";
 import { APP_VERSION_LABEL } from "@/lib/version";
 
-export default async function RegisterPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
+export default async function RegisterPage() {
   const authenticated = await isAdminAuthenticated();
   if (authenticated) redirect("/dashboard");
 
-  const [params, messages] = await Promise.all([searchParams, Promise.resolve(getMessages("en"))]);
+  const { locale, messages } = await getI18n();
   const registerMessages = messages.register;
   const loginMessages = messages.login;
 
@@ -56,59 +52,7 @@ export default async function RegisterPage({
         <section className="flex items-center bg-[rgba(255, 255, 255, 0.68)] px-6 py-10 sm:px-10 lg:px-14">
           <div className="mx-auto w-full max-w-md">
             <div className="rounded-lg border border-[var(--line)] bg-white/78 px-7 py-7 shadow-[0_26px_65px_rgba(17,19,24,0.06)] backdrop-blur">
-              <p className="text-[11px] uppercase tracking-[0.35em] text-[var(--ink-soft)]">{registerMessages.kicker}</p>
-              <h2 className="mt-3 font-serif text-[2.85rem] leading-none text-[var(--ink)]">{registerMessages.title}</h2>
-              <p className="mt-3 text-[13px] leading-6 text-[var(--ink-soft)]">{registerMessages.description}</p>
-
-              <form action={registerAction} className="mt-8 space-y-4">
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[var(--ink)]">
-                    {registerMessages.nameLabel}
-                  </span>
-                  <input
-                    name="name"
-                    className="w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3.5 text-[14px] outline-none"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[var(--ink)]">
-                    {registerMessages.emailLabel}
-                  </span>
-                  <input
-                    name="email"
-                    type="email"
-                    className="w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3.5 text-[14px] outline-none"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[var(--ink)]">
-                    {registerMessages.passwordLabel}
-                  </span>
-                  <input
-                    name="password"
-                    type="password"
-                    className="w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3.5 text-[14px] outline-none"
-                  />
-                </label>
-
-                {params.error === "invalid" ? (
-                  <p className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                    {registerMessages.invalidInput}
-                  </p>
-                ) : null}
-
-                {params.error === "exists" ? (
-                  <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                    {registerMessages.emailExists}
-                  </p>
-                ) : null}
-
-                <button className="w-full rounded-full bg-[var(--ink)] px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24]">
-                  {registerMessages.submit}
-                </button>
-              </form>
+              <RegisterForm locale={locale} />
 
               <div className="mt-6 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-5 py-4 text-sm text-[var(--ink-soft)]">
                 <p className="font-medium text-[var(--ink)]">{registerMessages.loginPrompt}</p>

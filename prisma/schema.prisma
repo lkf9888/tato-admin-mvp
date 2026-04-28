@@ -240,6 +240,20 @@ model BillingCouponRedemption {
   @@index([workspaceBillingId])
 }
 
+model EmailVerification {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  purpose    String    @default("registration")
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, purpose])
+  @@index([expiresAt])
+}
+
 model ActivityLog {
   workspaceId String?
   id         String   @id @default(cuid())

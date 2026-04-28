@@ -15,6 +15,8 @@ import {
   setAdminSession,
   validateAdminCredentials,
 } from "@/lib/auth";
+import { issueRegistrationCode, verifyRegistrationCode } from "@/lib/email-verification";
+import { getLocale } from "@/lib/i18n-server";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { createWorkspaceForRegistration } from "@/lib/workspaces";
@@ -106,25 +108,91 @@ export async function logoutAction() {
   redirect("/login");
 }
 
-export async function registerAction(formData: FormData) {
-  const parsed = registrationSchema.safeParse({
-    name: formData.get("name"),
-    email: formData.get("email"),
-    password: formData.get("password"),
-  });
+type RegistrationActionResult =
+  | { ok: true; sent?: boolean }
+  | {
+      ok: false;
+      error:
+        | "invalid"
+        | "exists"
+        | "throttled"
+        | "no_pending_code"
+        | "expired"
+        | "invalid_code"
+        | "too_many_attempts";
+    };
 
+/**
+ * Step 1 of the new sign-up flow. Validates the form, ensures the email is
+ * not already taken, then issues a single-use 6-digit verification code that
+ * is emailed to the user. The user account is NOT created yet — only an
+ * EmailVerification row exists at this point. Step 2 (verifyAndRegisterAction)
+ * actually persists the user once the code matches.
+ */
+export async function requestRegistrationCodeAction(input: {
+  name: string;
+  email: string;
+  password: string;
+}): Promise<RegistrationActionResult> {
+  const parsed = registrationSchema.safeParse(input);
   if (!parsed.success) {
-    redirect("/register?error=invalid");
+    return { ok: false, error: "invalid" };
+  }
+
+  const email = normalizeEmail(parsed.data.email);
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    return { ok: false, error: "exists" };
+  }
+
+  const locale = await getLocale();
+  const result = await issueRegistrationCode({ email, locale });
+  if (!result.ok) {
+    if (result.reason === "throttled") {
+      return { ok: false, error: "throttled" };
+    }
+    return { ok: false, error: "invalid" };
+  }
+
+  return { ok: true, sent: result.sent };
+}
+
+/**
+ * Step 2 of the new sign-up flow. Re-validates name/email/password against
+ * the form (so a tampered client can't slip in a different email after
+ * verification), looks up the latest unconsumed EmailVerification record,
+ * compares the entered code, and on success creates the User + Workspace +
+ * WorkspaceBilling in a single transaction and signs the user in.
+ */
+export async function verifyAndRegisterAction(input: {
+  name: string;
+  email: string;
+  password: string;
+  code: string;
+}): Promise<RegistrationActionResult> {
+  const parsed = registrationSchema.safeParse({
+    name: input.name,
+    email: input.email,
+    password: input.password,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: "invalid" };
   }
 
   const name = parsed.data.name.trim();
   const email = normalizeEmail(parsed.data.email);
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-  });
 
+  const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
-    redirect("/register?error=exists");
+    return { ok: false, error: "exists" };
+  }
+
+  const verifyResult = await verifyRegistrationCode({
+    email,
+    code: input.code,
+  });
+  if (!verifyResult.ok) {
+    return { ok: false, error: verifyResult.reason };
   }
 
   const workspace = await createWorkspaceForRegistration({ name, email });
@@ -150,11 +218,11 @@ export async function registerAction(formData: FormData) {
     action: "user_registered",
     entityType: "User",
     entityId: user.id,
-    metadata: { email: user.email },
+    metadata: { email: user.email, emailVerified: true },
   });
 
   await setAdminSession(user.id);
-  redirect("/dashboard");
+  return { ok: true };
 }
 
 export async function saveOwnerAction(formData: FormData) {

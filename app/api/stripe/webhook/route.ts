@@ -8,6 +8,7 @@ import {
 } from "@/lib/billing";
 import { persistDirectBookingFromCheckoutSession } from "@/lib/direct-booking-server";
 import { getStripeClient, getStripeWebhookSecret } from "@/lib/stripe";
+import { syncWorkspaceConnectFromAccount } from "@/lib/stripe-connect";
 
 export async function POST(request: Request) {
   const webhookSecret = getStripeWebhookSecret();
@@ -65,6 +66,14 @@ export async function POST(request: Request) {
         const customerId =
           typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
         await markWorkspaceBillingInvoiceFailed(customerId);
+        break;
+      }
+      case "account.updated": {
+        // Stripe Connect: a host finished (or progressed through) Express
+        // onboarding. Mirror the latest enable flags into our DB so the
+        // admin /payouts page and the public booking gate stay in sync
+        // without the host clicking "refresh status".
+        await syncWorkspaceConnectFromAccount(event.data.object);
         break;
       }
       default:

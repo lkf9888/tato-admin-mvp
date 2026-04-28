@@ -3,6 +3,7 @@ import { getBlockedBookingWindows, getDateOnlyBookingWindows } from "@/lib/direc
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getStripeSecretKey } from "@/lib/stripe";
+import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 function addDays(value: Date, amount: number) {
@@ -67,6 +68,12 @@ export default async function ReserveVehiclePage({
   const blockedWindows = getBlockedBookingWindows(vehicle.orders, 6);
   const blockedDateWindows = getDateOnlyBookingWindows(vehicle.orders);
   const stripeReady = Boolean(getStripeSecretKey());
+  const connectSnapshot = vehicle.workspaceId
+    ? await getWorkspaceConnectSnapshot(vehicle.workspaceId)
+    : null;
+  const hostPayoutsReady = Boolean(
+    connectSnapshot?.accountId && connectSnapshot.chargesEnabled,
+  );
   const today = new Date();
   const defaultPickupDate = toDateInputValue(addDays(today, 1));
   const defaultReturnDate = toDateInputValue(addDays(today, 4));
@@ -162,6 +169,7 @@ export default async function ReserveVehiclePage({
               bookingDepositAmount={vehicle.bookingDepositAmount ?? 0}
               blockedDateWindows={blockedDateWindows}
               stripeReady={stripeReady}
+              hostPayoutsReady={hostPayoutsReady}
               defaultPickupDate={defaultPickupDate}
               defaultReturnDate={defaultReturnDate}
               checkoutState={checkoutState}

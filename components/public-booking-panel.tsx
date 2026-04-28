@@ -236,6 +236,7 @@ export function PublicBookingPanel({
   bookingDepositAmount,
   blockedDateWindows,
   stripeReady,
+  hostPayoutsReady,
   defaultPickupDate,
   defaultReturnDate,
   checkoutState,
@@ -247,6 +248,7 @@ export function PublicBookingPanel({
   bookingDepositAmount: number;
   blockedDateWindows: DateOnlyBookingWindow[];
   stripeReady: boolean;
+  hostPayoutsReady: boolean;
   defaultPickupDate: string;
   defaultReturnDate: string;
   checkoutState: CheckoutState;
@@ -549,9 +551,17 @@ export function PublicBookingPanel({
       <div className="mt-4 flex items-center justify-between rounded-md border border-white/8 bg-white/[0.04] px-4 py-3">
         <div>
           <p className="text-sm font-medium text-white">
-            {stripeReady ? reserveMessages.stripeReady : reserveMessages.stripeMissing}
+            {!stripeReady
+              ? reserveMessages.stripeMissing
+              : !hostPayoutsReady
+                ? reserveMessages.hostPayoutsMissing
+                : reserveMessages.stripeReady}
           </p>
-          <p className="mt-1 text-xs text-white/56">{reserveMessages.checkoutHelp}</p>
+          <p className="mt-1 text-xs text-white/56">
+            {!hostPayoutsReady && stripeReady
+              ? reserveMessages.hostPayoutsHint
+              : reserveMessages.checkoutHelp}
+          </p>
         </div>
       </div>
 
@@ -563,7 +573,7 @@ export function PublicBookingPanel({
 
       <button
         onClick={startCheckout}
-        disabled={!stripeReady || isPending}
+        disabled={!stripeReady || !hostPayoutsReady || isPending}
         className="mt-5 w-full rounded-full bg-[#593cfb] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(89, 60, 251, 0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
         style={{ backgroundColor: "#593cfb", color: "#ffffff" }}
       >

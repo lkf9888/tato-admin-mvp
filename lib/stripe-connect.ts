@@ -1,5 +1,7 @@
 import "server-only";
 
+import type Stripe from "stripe";
+
 import { prisma } from "@/lib/prisma";
 import { getAppUrl, getStripeClient, getStripeSecretKey } from "@/lib/stripe";
 
@@ -193,4 +195,73 @@ export async function getWorkspaceConnectSnapshot(
     detailsSubmitted: billing.stripeConnectDetailsSubmitted,
     onboardedAt: billing.stripeConnectOnboardedAt,
   };
+}
+
+/**
+ * Webhook entry point: when Stripe sends an `account.updated` event for one of
+ * our connected hosts, mirror the latest charges/payouts/details_submitted
+ * flags into the host's WorkspaceBilling row so the admin UI and the public
+ * booking page reflect the new state without the host having to click
+ * "refresh status".
+ */
+export async function syncWorkspaceConnectFromAccount(account: Stripe.Account) {
+  if (!account?.id) return null;
+
+  const billing = await prisma.workspaceBilling.findFirst({
+    where: { stripeConnectAccountId: account.id },
+  });
+  if (!billing) return null;
+
+  const chargesEnabled = Boolean(account.charges_enabled);
+  const payoutsEnabled = Boolean(account.payouts_enabled);
+  const detailsSubmitted = Boolean(account.details_submitted);
+  const becameActive =
+    chargesEnabled && payoutsEnabled && !billing.stripeConnectOnboardedAt;
+  const accountCountry =
+    typeof account.country === "string" && isConnectCountry(account.country)
+      ? account.country
+      : null;
+
+  return prisma.workspaceBilling.update({
+    where: { id: billing.id },
+    data: {
+      stripeConnectChargesEnabled: chargesEnabled,
+      stripeConnectPayoutsEnabled: payoutsEnabled,
+      stripeConnectDetailsSubmitted: detailsSubmitted,
+      stripeConnectOnboardedAt: becameActive
+        ? new Date()
+        : billing.stripeConnectOnboardedAt,
+      stripeConnectCountry: accountCountry ?? billing.stripeConnectCountry,
+    },
+  });
+}
+
+/**
+ * Used by the public direct-booking flow: given a vehicle id, return the
+ * Connect snapshot for the host that owns it. Falls back to a "not connected"
+ * snapshot when the vehicle is workspace-less or the workspace billing row
+ * does not exist yet, which the booking UI gates on.
+ */
+export async function getWorkspaceConnectSnapshotByVehicleId(
+  vehicleId: string,
+): Promise<WorkspaceConnectSnapshot & { workspaceId: string | null }> {
+  const vehicle = await prisma.vehicle.findUnique({
+    where: { id: vehicleId },
+    select: { workspaceId: true },
+  });
+
+  if (!vehicle?.workspaceId) {
+    return {
+      workspaceId: null,
+      accountId: null,
+      country: null,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      detailsSubmitted: false,
+      onboardedAt: null,
+    };
+  }
+
+  const snapshot = await getWorkspaceConnectSnapshot(vehicle.workspaceId);
+  return { workspaceId: vehicle.workspaceId, ...snapshot };
 }

@@ -738,6 +738,9 @@ const messages = {
       quoteTotal: "Estimated total",
       stripeReady: "Stripe card checkout ready",
       stripeMissing: "Stripe has not been connected yet",
+      hostPayoutsMissing: "The host hasn't set up payouts yet",
+      hostPayoutsHint:
+        "This vehicle's host needs to connect a Stripe payout account before card payments can be accepted.",
       checkoutAction: "Continue to Stripe",
       checkoutLoading: "Opening Stripe...",
       checkoutHelp:
@@ -1320,6 +1323,8 @@ const messages = {
       quoteTotal: "预计总价",
       stripeReady: "已接入 Stripe 信用卡支付",
       stripeMissing: "Stripe 尚未接入",
+      hostPayoutsMissing: "车主尚未开通收款账户",
+      hostPayoutsHint: "请联系车主先在管理后台『收款账户』里完成 Stripe 开通，再来预订这台车。",
       checkoutAction: "前往 Stripe 支付",
       checkoutLoading: "正在打开 Stripe...",
       checkoutHelp: "这版初稿会先校验日期和价格，然后创建一个安全的 Stripe Checkout 支付页。",

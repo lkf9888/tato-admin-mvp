@@ -71,9 +71,10 @@ const MIN_DAY_COLUMN_WIDTHS = {
   month: 34,
   sixWeeks: 28,
 } as const;
-const LANE_HEIGHT = 28;
-const BAR_HEIGHT = 20;
+const LANE_HEIGHT = 36;
+const BAR_HEIGHT = 28;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const SCRUBBER_DAY_RANGE = 365;
 
 function startOfDay(value: Date | string) {
   const date = new Date(value);
@@ -129,14 +130,14 @@ function orderIntersectsRange(order: CalendarOrder, rangeStart: Date, rangeEndEx
 
 function getTimelineBarClasses(order: CalendarOrder, clippedStart: boolean, clippedEnd: boolean) {
   return cn(
-    "absolute flex items-center overflow-hidden border px-3 text-left text-xs font-semibold text-white shadow-[0_16px_32px_-20px_rgba(17,19,24,0.7)] transition hover:-translate-y-0.5 hover:brightness-105",
+    "absolute flex items-center overflow-hidden border-[1.5px] px-3.5 text-left text-[13px] font-semibold leading-tight text-white shadow-[0_18px_36px_-18px_rgba(17,19,24,0.7)] transition hover:-translate-y-0.5 hover:brightness-110 cursor-pointer",
     order.hasConflict
-      ? "border-[#e5484d] bg-[#e5484d]"
+      ? "border-[#c61e22] bg-[#e5484d]"
       : order.status === "cancelled"
-        ? "border-slate-400 bg-slate-400"
+        ? "border-slate-500 bg-slate-400"
         : order.source === "turo"
-          ? "border-[#3456df] bg-[#3456df]"
-          : "border-[#2f7f67] bg-[#2f7f67]",
+          ? "border-[#1f3aa8] bg-[#3456df]"
+          : "border-[#1f5b48] bg-[#2f7f67]",
     clippedStart ? "rounded-r-xl rounded-l-md" : "rounded-l-xl",
     clippedEnd ? "rounded-l-xl rounded-r-md" : "rounded-r-xl",
   );
@@ -784,6 +785,42 @@ export function CalendarView({
             {calendarMessages.scrollHint}
           </div>
         </div>
+
+        <div className="mt-4 rounded-2xl border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.78)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+          <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
+            <span>{calendarMessages.scrubberLabel}</span>
+            <span className="rounded-full bg-[rgba(17,19,24,0.06)] px-3 py-1 text-[11px] tracking-[0.18em] text-[color:var(--ink)]">
+              {formatDate(normalizedFocusDate, locale)}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={-SCRUBBER_DAY_RANGE}
+            max={SCRUBBER_DAY_RANGE}
+            step={1}
+            value={Math.max(
+              -SCRUBBER_DAY_RANGE,
+              Math.min(
+                SCRUBBER_DAY_RANGE,
+                Math.round((normalizedFocusDate.getTime() - today.getTime()) / DAY_IN_MS),
+              ),
+            )}
+            onChange={(event) => {
+              setFocusDate(addDays(today, Number(event.target.value)));
+            }}
+            aria-label={calendarMessages.scrubberLabel}
+            className="mt-3 w-full cursor-pointer appearance-none bg-transparent accent-[var(--accent)] [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-[linear-gradient(90deg,rgba(17,19,24,0.08),rgba(89,60,251,0.18),rgba(17,19,24,0.08))] [&::-webkit-slider-thumb]:-mt-2 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[var(--accent)] [&::-webkit-slider-thumb]:shadow-[0_8px_20px_-10px_rgba(89,60,251,0.9)] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-[rgba(17,19,24,0.12)] [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[var(--accent)]"
+          />
+          <div className="mt-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
+            <span>{formatDate(addDays(today, -SCRUBBER_DAY_RANGE), locale)}</span>
+            <span>{formatDate(addDays(today, -Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}</span>
+            <span className="rounded-full bg-[rgba(89,60,251,0.12)] px-2 py-0.5 text-[color:var(--ink)]">
+              {calendarMessages.today}
+            </span>
+            <span>{formatDate(addDays(today, Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}</span>
+            <span>{formatDate(addDays(today, SCRUBBER_DAY_RANGE), locale)}</span>
+          </div>
+        </div>
       </section>
 
       <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
@@ -847,7 +884,7 @@ export function CalendarView({
                   rangeEndExclusive,
                   dayColumnWidth,
                 );
-                const rowHeight = Math.max(54, laneCount * LANE_HEIGHT + 16);
+                const rowHeight = Math.max(64, laneCount * LANE_HEIGHT + 18);
                 const alternateRow = index % 2 === 1;
 
                 return (
@@ -944,7 +981,7 @@ export function CalendarView({
                             )}
                             style={{
                               left: bar.left,
-                              top: 8 + bar.lane * LANE_HEIGHT,
+                              top: 9 + bar.lane * LANE_HEIGHT,
                               width: bar.width,
                               height: BAR_HEIGHT,
                             }}

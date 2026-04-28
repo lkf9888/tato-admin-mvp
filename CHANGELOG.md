@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.15.4 - 2026-04-28
+
+- Reorganized the sidebar navigation into four labelled groups instead of a flat 11-item list, since the menu got noticeably crowded after Stripe Connect / Payouts landed:
+  - **Operations / 运营**: Dashboard, Calendar, Orders, CSV Imports
+  - **Fleet / 车队**: Vehicles, Vehicle ROI, Owners
+  - **Customer Booking / 客户接入**: Direct Booking, Share Links
+  - **Billing / 账务**: Buy Quota, Payouts
+- Group headings render as small uppercase tracker labels above each cluster; item rows kept their pill style but with slightly tighter vertical padding so the grouped sidebar fits in roughly the same vertical space.
+- Bilingual i18n keys added for the four group labels (`groupOperations`, `groupFleet`, `groupBookings`, `groupBilling`).
+
 ## v0.15.3 - 2026-04-28
 
 - Wired Stripe Connect onboarding all the way through to renter payments. The direct-booking checkout route now creates a Destination Charge with `transfer_data.destination` set to the host's Connect account, `on_behalf_of` set to the same account so the renter's card statement shows the host's business name, and a 5% `application_fee_amount` carved out of the rental + insurance subtotal (deposit excluded — it's a refundable hold, not earned revenue).

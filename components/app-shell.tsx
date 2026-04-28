@@ -19,18 +19,38 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const messages = getMessages(locale);
-  const navItems = [
-    { href: "/dashboard", label: messages.shell.nav.dashboard },
-    { href: "/vehicles", label: messages.shell.nav.vehicles },
-    { href: "/vehicle-roi", label: messages.shell.nav.vehicleRoi },
-    { href: "/direct-booking", label: messages.shell.nav.directBooking },
-    { href: "/owners", label: messages.shell.nav.owners },
-    { href: "/orders", label: messages.shell.nav.orders },
-    { href: "/calendar", label: messages.shell.nav.calendar },
-    { href: "/imports", label: messages.shell.nav.imports },
-    { href: "/billing", label: messages.shell.nav.billing },
-    { href: "/payouts", label: messages.shell.nav.payouts },
-    { href: "/share-links", label: messages.shell.nav.shareLinks },
+  const navGroups = [
+    {
+      label: messages.shell.nav.groupOperations,
+      items: [
+        { href: "/dashboard", label: messages.shell.nav.dashboard },
+        { href: "/calendar", label: messages.shell.nav.calendar },
+        { href: "/orders", label: messages.shell.nav.orders },
+        { href: "/imports", label: messages.shell.nav.imports },
+      ],
+    },
+    {
+      label: messages.shell.nav.groupFleet,
+      items: [
+        { href: "/vehicles", label: messages.shell.nav.vehicles },
+        { href: "/vehicle-roi", label: messages.shell.nav.vehicleRoi },
+        { href: "/owners", label: messages.shell.nav.owners },
+      ],
+    },
+    {
+      label: messages.shell.nav.groupBookings,
+      items: [
+        { href: "/direct-booking", label: messages.shell.nav.directBooking },
+        { href: "/share-links", label: messages.shell.nav.shareLinks },
+      ],
+    },
+    {
+      label: messages.shell.nav.groupBilling,
+      items: [
+        { href: "/billing", label: messages.shell.nav.billing },
+        { href: "/payouts", label: messages.shell.nav.payouts },
+      ],
+    },
   ];
 
   return (
@@ -49,15 +69,24 @@ export function AppShell({
             </p>
           </div>
 
-          <nav className="mt-8 space-y-1.5">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="block rounded-full px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink-soft)] transition hover:bg-white/85 hover:text-[var(--ink)] hover:shadow-[0_10px_30px_rgba(17,19,24,0.06)]"
-              >
-                {item.label}
-              </Link>
+          <nav className="mt-7 space-y-4">
+            {navGroups.map((group) => (
+              <div key={group.label} className="space-y-1">
+                <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--ink-soft)]/70">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {group.items.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="block rounded-full px-3.5 py-2 text-[13px] font-medium text-[var(--ink-soft)] transition hover:bg-white/85 hover:text-[var(--ink)] hover:shadow-[0_10px_30px_rgba(17,19,24,0.06)]"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
 

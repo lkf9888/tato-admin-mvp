@@ -325,6 +325,17 @@ export function BillingManagerPanel({
             <h3 className="mt-2 font-serif text-3xl text-slate-950">{billingMessages.couponTitle}</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">{billingMessages.couponCopy}</p>
 
+            <div className="mt-4 rounded-md border border-[var(--accent)]/20 bg-[var(--accent-soft)]/60 px-4 py-3 text-sm text-slate-700">
+              <p className="font-medium text-slate-900">{billingMessages.welcomeCouponHintTitle}</p>
+              <p className="mt-1 leading-5">
+                {billingMessages.welcomeCouponHintBefore}
+                <code className="mx-1 rounded bg-white px-1.5 py-0.5 font-mono text-xs text-slate-900">
+                  3MONTHFREE
+                </code>
+                {billingMessages.welcomeCouponHintAfter}
+              </p>
+            </div>
+
             <label className="mt-5 block text-sm font-medium text-slate-700">
               {billingMessages.couponLabel}
               <input

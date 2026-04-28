@@ -20,6 +20,7 @@ export default async function DirectBookingPage() {
         owner: true,
         orders: {
           where: {
+            isArchived: false,
             status: {
               not: "cancelled",
             },

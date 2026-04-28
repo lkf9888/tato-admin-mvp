@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { OrderStatus } from "@prisma/client";
 
-import { isAdminAuthenticated } from "@/lib/auth";
+import { requireCurrentWorkspace } from "@/lib/auth";
 import { getMessages, type Locale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDateTime, getOrderNetEarning } from "@/lib/utils";
@@ -68,10 +68,7 @@ function buildWorkbookXml(sheetName: string, headers: string[], rows: string[][]
 }
 
 export async function GET(request: Request) {
-  const authenticated = await isAdminAuthenticated();
-  if (!authenticated) {
-    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  }
+  const workspace = await requireCurrentWorkspace();
 
   const { searchParams } = new URL(request.url);
   const vehicleId = searchParams.get("vehicleId");
@@ -83,8 +80,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "INVALID_RANGE" }, { status: 400 });
   }
 
-  const vehicle = await prisma.vehicle.findUnique({
-    where: { id: vehicleId },
+  const vehicle = await prisma.vehicle.findFirst({
+    where: { id: vehicleId, workspaceId: workspace.id },
   });
 
   if (!vehicle) {
@@ -96,6 +93,8 @@ export async function GET(request: Request) {
   const orders = await prisma.order.findMany({
     where: {
       vehicleId,
+      workspaceId: workspace.id,
+      isArchived: false,
       status: {
         not: OrderStatus.cancelled,
       },

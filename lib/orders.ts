@@ -60,6 +60,7 @@ export async function reconcileVehicleConflicts(vehicleId: string) {
   const orders = await prisma.order.findMany({
     where: {
       vehicleId,
+      isArchived: false,
       status: {
         not: OrderStatus.cancelled,
       },
@@ -881,19 +882,6 @@ export async function importTuroOrders(input: {
       });
       const status = parseCsvOrderStatus(row[mapping.status ?? ""]);
 
-      if (status === OrderStatus.cancelled) {
-        if (existing) {
-          await prisma.order.delete({
-            where: { id: existing.id },
-          });
-          touchedVehicleIds.add(vehicle.id);
-          deletedCancelledRows += 1;
-        }
-
-        successRows += 1;
-        continue;
-      }
-
       const payload = {
         vehicleId: vehicle.id,
         workspaceId: input.workspaceId,
@@ -916,7 +904,25 @@ export async function importTuroOrders(input: {
         returnLocation: safeString(row[mapping.returnLocation ?? ""]) || null,
         notes: existing?.notes ?? null,
         sourceMetadata: buildSourceMetadata(row),
+        isArchived: status === OrderStatus.cancelled,
       };
+
+      if (status === OrderStatus.cancelled) {
+        const savedCancelledOrder = existing
+          ? await prisma.order.update({
+              where: { id: existing.id },
+              data: payload,
+            })
+          : await prisma.order.create({
+              data: payload,
+            });
+
+        syncedOrderIds.add(savedCancelledOrder.id);
+        touchedVehicleIds.add(vehicle.id);
+        deletedCancelledRows += 1;
+        successRows += 1;
+        continue;
+      }
 
       const savedOrder = existing
         ? await prisma.order.update({
@@ -947,6 +953,7 @@ export async function importTuroOrders(input: {
       where: {
         workspaceId: input.workspaceId,
         source: OrderSource.turo,
+        isArchived: false,
         ...(syncedVehicleIds.size > 0
           ? {
               vehicleId: {
@@ -971,11 +978,14 @@ export async function importTuroOrders(input: {
     });
 
     if (staleTuroOrders.length > 0) {
-      await prisma.order.deleteMany({
+      await prisma.order.updateMany({
         where: {
           id: {
             in: staleTuroOrders.map((order) => order.id),
           },
+        },
+        data: {
+          isArchived: true,
         },
       });
 
@@ -998,8 +1008,8 @@ export async function importTuroOrders(input: {
       failures: JSON.stringify(failures),
       notes:
         failures.length > 0
-          ? `${failures.length} row(s) need manual review${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) removed` : ""} · previous Turo orders kept until the file imports cleanly`
-          : `Import completed without row-level issues${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) removed` : ""}${deletedStaleOrders > 0 ? ` · ${deletedStaleOrders} stale Turo order(s) replaced` : ""}`,
+          ? `${failures.length} row(s) need manual review${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""} · previous Turo orders kept until the file imports cleanly`
+          : `Import completed without row-level issues${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""}${deletedStaleOrders > 0 ? ` · ${deletedStaleOrders} stale Turo order(s) archived` : ""}`,
     },
   });
 

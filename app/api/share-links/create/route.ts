@@ -4,7 +4,7 @@ import { ShareVisibility } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
-import { isAdminAuthenticated } from "@/lib/auth";
+import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 
@@ -24,10 +24,7 @@ function revalidateSharePages() {
 }
 
 export async function POST(request: Request) {
-  const authenticated = await isAdminAuthenticated();
-  if (!authenticated) {
-    return redirectTo(request, "/login");
-  }
+  const { workspace, user } = await requireCurrentAdminContext();
 
   const formData = await request.formData();
   const ownerId = formData.get("ownerId")?.toString();
@@ -42,19 +39,30 @@ export async function POST(request: Request) {
     ? (requestedVisibility as ShareVisibility)
     : ShareVisibility.standard;
 
+  const owner = await prisma.owner.findFirst({
+    where: { id: ownerId, workspaceId: workspace.id },
+    select: { id: true },
+  });
+
+  if (!owner) {
+    return redirectTo(request, "/share-links");
+  }
+
   const shareLink = await prisma.shareLink.create({
     data: {
-      ownerId,
+      workspaceId: workspace.id,
+      ownerId: owner.id,
       token: randomBytes(18).toString("hex"),
       passwordHash: password ? await bcrypt.hash(password, 10) : undefined,
       expiresAt: expiresAtValue ? new Date(expiresAtValue) : undefined,
       visibility,
-      createdBy: "Admin",
+      createdBy: user.name,
     },
   });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "share_link_created",
     entityType: "ShareLink",
     entityId: shareLink.id,

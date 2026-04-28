@@ -18,7 +18,13 @@ export default async function CalendarPage() {
       orderBy: { name: "asc" },
     }),
     prisma.order.findMany({
-      where: { workspaceId: workspace.id },
+      where: {
+        workspaceId: workspace.id,
+        isArchived: false,
+        status: {
+          not: "cancelled",
+        },
+      },
       include: { vehicle: { include: { owner: true } } },
       orderBy: { pickupDatetime: "asc" },
     }),

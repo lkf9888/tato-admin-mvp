@@ -145,6 +145,7 @@ model Order {
   notes           String?
   sourceMetadata  String?
   createdBy       String
+  isArchived      Boolean      @default(false)
   hasConflict     Boolean      @default(false)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -153,6 +154,7 @@ model Order {
   vehicle         Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
+  @@index([workspaceId, isArchived])
   @@index([vehicleId, pickupDatetime, returnDatetime])
   @@index([source, externalOrderId])
 }

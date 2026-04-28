@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireAdminAuth } from "@/lib/auth";
+import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 
@@ -32,8 +32,9 @@ function revalidateOrderSurfaces() {
 }
 
 async function fetchOrderForResponse(id: string) {
-  return prisma.order.findUniqueOrThrow({
-    where: { id },
+  const { workspace } = await requireCurrentAdminContext();
+  return prisma.order.findFirstOrThrow({
+    where: { id, workspaceId: workspace.id, isArchived: false },
     include: { vehicle: { include: { owner: true } } },
   });
 }
@@ -61,7 +62,7 @@ function buildResponseOrder(order: OrderForResponse) {
 }
 
 export async function POST(request: Request) {
-  await requireAdminAuth();
+  const { workspace, user } = await requireCurrentAdminContext();
 
   try {
     const parsed = manualOrderSchema.parse(await request.json());
@@ -76,8 +77,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "INVALID_DATES" }, { status: 400 });
     }
 
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: parsed.vehicleId, workspaceId: workspace.id },
+      select: { id: true },
+    });
+
+    if (!vehicle) {
+      return NextResponse.json({ error: "VEHICLE_NOT_FOUND" }, { status: 404 });
+    }
+
     const order = await prisma.order.create({
       data: {
+        workspaceId: workspace.id,
         source: OrderSource.offline,
         status: OrderStatus.booked,
         vehicleId: parsed.vehicleId,
@@ -86,13 +97,14 @@ export async function POST(request: Request) {
         pickupDatetime,
         returnDatetime,
         totalPrice: parsed.totalPrice,
-        createdBy: "Admin",
+        createdBy: user.name,
       },
     });
 
     await reconcileVehicleConflicts(order.vehicleId);
     await logActivity({
-      actor: "Admin",
+      workspaceId: workspace.id,
+      actor: user.name,
       action: "offline_order_created",
       entityType: "Order",
       entityId: order.id,
@@ -115,7 +127,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  await requireAdminAuth();
+  const { workspace, user } = await requireCurrentAdminContext();
 
   try {
     const payload = (await request.json()) as Record<string, unknown>;
@@ -125,8 +137,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "MISSING_ID" }, { status: 400 });
     }
 
-    const existing = await prisma.order.findUnique({
-      where: { id },
+    const existing = await prisma.order.findFirst({
+      where: { id, workspaceId: workspace.id, isArchived: false },
     });
 
     if (!existing) {
@@ -149,8 +161,17 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "INVALID_DATES" }, { status: 400 });
     }
 
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: parsed.vehicleId, workspaceId: workspace.id },
+      select: { id: true },
+    });
+
+    if (!vehicle) {
+      return NextResponse.json({ error: "VEHICLE_NOT_FOUND" }, { status: 404 });
+    }
+
     const order = await prisma.order.update({
-      where: { id },
+      where: { id: existing.id },
       data: {
         vehicleId: parsed.vehicleId,
         renterName: parsed.renterName,
@@ -167,7 +188,8 @@ export async function PATCH(request: Request) {
     }
 
     await logActivity({
-      actor: "Admin",
+      workspaceId: workspace.id,
+      actor: user.name,
       action: "offline_order_updated",
       entityType: "Order",
       entityId: order.id,
@@ -190,7 +212,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  await requireAdminAuth();
+  const { workspace, user } = await requireCurrentAdminContext();
 
   try {
     const payload = (await request.json()) as Record<string, unknown>;
@@ -200,8 +222,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "MISSING_ID" }, { status: 400 });
     }
 
-    const existing = await prisma.order.findUnique({
-      where: { id },
+    const existing = await prisma.order.findFirst({
+      where: { id, workspaceId: workspace.id, isArchived: false },
     });
 
     if (!existing) {
@@ -213,12 +235,13 @@ export async function DELETE(request: Request) {
     }
 
     await prisma.order.delete({
-      where: { id },
+      where: { id: existing.id },
     });
 
     await reconcileVehicleConflicts(existing.vehicleId);
     await logActivity({
-      actor: "Admin",
+      workspaceId: workspace.id,
+      actor: user.name,
       action: "offline_order_deleted",
       entityType: "Order",
       entityId: id,

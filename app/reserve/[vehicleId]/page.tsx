@@ -36,6 +36,7 @@ export default async function ReserveVehiclePage({
       owner: true,
       orders: {
         where: {
+          isArchived: false,
           status: {
             not: "cancelled",
           },

@@ -89,8 +89,8 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
     where: { id: vehicleId },
     include: {
       orders: {
-        where: { status: { not: "cancelled" } },
-        select: { pickupDatetime: true, returnDatetime: true, status: true },
+        where: { isArchived: false, status: { not: "cancelled" } },
+        select: { pickupDatetime: true, returnDatetime: true, status: true, isArchived: true },
       },
     },
   });

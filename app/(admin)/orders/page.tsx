@@ -15,7 +15,7 @@ import {
 
 async function fetchOrders(workspaceId: string) {
   return prisma.order.findMany({
-    where: { workspaceId },
+    where: { workspaceId, isArchived: false },
     include: { vehicle: { include: { owner: true } } },
     orderBy: { pickupDatetime: "desc" },
   });

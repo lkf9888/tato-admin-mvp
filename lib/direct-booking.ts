@@ -2,7 +2,9 @@ import { OrderStatus, type Order } from "@prisma/client";
 
 import { orderRangesOverlap } from "@/lib/orders";
 
-type BookingOrderLike = Pick<Order, "pickupDatetime" | "returnDatetime" | "status">;
+type BookingOrderLike = Pick<Order, "pickupDatetime" | "returnDatetime" | "status"> & {
+  isArchived?: boolean;
+};
 export type DateOnlyBookingWindow = {
   pickupDate: string;
   returnDate: string;
@@ -73,7 +75,7 @@ export function hasVehicleBookingConflict(
   const dropoff = dateOnlyToUtcMidday(returnDate);
 
   return orders.some((order) => {
-    if (order.status === OrderStatus.cancelled) {
+    if (order.isArchived || order.status === OrderStatus.cancelled) {
       return false;
     }
 
@@ -109,6 +111,7 @@ export function getDateOnlyBookingWindows(orders: BookingOrderLike[]) {
   return orders
     .filter(
       (order) =>
+        !order.isArchived &&
         order.status !== OrderStatus.cancelled &&
         order.returnDatetime.getTime() > today.getTime(),
     )
@@ -144,7 +147,7 @@ export function getBlockedBookingWindows(
   limit = 6,
 ) {
   return orders
-    .filter((order) => order.status !== OrderStatus.cancelled)
+    .filter((order) => !order.isArchived && order.status !== OrderStatus.cancelled)
     .sort((left, right) => left.pickupDatetime.getTime() - right.pickupDatetime.getTime())
     .slice(0, limit)
     .map((order) => ({

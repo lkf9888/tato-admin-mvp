@@ -20,6 +20,7 @@ export default async function DashboardPage() {
       prisma.order.findMany({
         where: {
           workspaceId: workspace.id,
+          isArchived: false,
           pickupDatetime: { lte: endOfDay },
           returnDatetime: { gte: startOfDay },
           status: { not: "cancelled" },
@@ -30,14 +31,16 @@ export default async function DashboardPage() {
       prisma.order.findMany({
         where: {
           workspaceId: workspace.id,
+          isArchived: false,
           pickupDatetime: { gte: now },
+          status: { not: "cancelled" },
         },
         include: { vehicle: true },
         orderBy: { pickupDatetime: "asc" },
         take: 5,
       }),
       prisma.order.findMany({
-        where: { workspaceId: workspace.id, hasConflict: true },
+        where: { workspaceId: workspace.id, isArchived: false, hasConflict: true },
         include: { vehicle: true },
         orderBy: { pickupDatetime: "asc" },
       }),

@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireAdminAuth } from "@/lib/auth";
+import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { getOrderNetEarning } from "@/lib/utils";
@@ -23,27 +23,41 @@ function revalidateOrderSurfaces() {
 }
 
 async function fetchOrderForResponse(id: string) {
-  return prisma.order.findUniqueOrThrow({
-    where: { id },
+  const { workspace } = await requireCurrentAdminContext();
+  return prisma.order.findFirstOrThrow({
+    where: { id, workspaceId: workspace.id, isArchived: false },
     include: { vehicle: { include: { owner: true } } },
   });
 }
 
 export async function PATCH(request: Request) {
-  await requireAdminAuth();
+  const { workspace, user } = await requireCurrentAdminContext();
 
   try {
     const parsed = orderNotesSchema.parse(await request.json());
+    const existing = await prisma.order.findFirst({
+      where: {
+        id: parsed.id,
+        workspaceId: workspace.id,
+        isArchived: false,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+    }
 
     const order = await prisma.order.update({
-      where: { id: parsed.id },
+      where: { id: existing.id },
       data: {
         notes: cleanOptional(parsed.notes),
       },
     });
 
     await logActivity({
-      actor: "Admin",
+      workspaceId: workspace.id,
+      actor: user.name,
       action: "order_notes_updated",
       entityType: "Order",
       entityId: order.id,

@@ -23,7 +23,14 @@ export default async function SharePage({
         include: {
           vehicles: {
             include: {
-              orders: true,
+              orders: {
+                where: {
+                  isArchived: false,
+                  status: {
+                    not: "cancelled",
+                  },
+                },
+              },
             },
           },
         },

@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
-import { isAdminAuthenticated } from "@/lib/auth";
+import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 
@@ -10,10 +10,7 @@ function redirectToShareLinks(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const authenticated = await isAdminAuthenticated();
-  if (!authenticated) {
-    return NextResponse.redirect(new URL("/login", request.url), { status: 303 });
-  }
+  const { workspace, user } = await requireCurrentAdminContext();
 
   const formData = await request.formData();
   const id = formData.get("id")?.toString();
@@ -21,8 +18,8 @@ export async function POST(request: Request) {
     return redirectToShareLinks(request);
   }
 
-  const existing = await prisma.shareLink.findUnique({
-    where: { id },
+  const existing = await prisma.shareLink.findFirst({
+    where: { id, workspaceId: workspace.id },
   });
 
   if (!existing) {
@@ -30,11 +27,12 @@ export async function POST(request: Request) {
   }
 
   await prisma.shareLink.delete({
-    where: { id },
+    where: { id: existing.id },
   });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "share_link_deleted",
     entityType: "ShareLink",
     entityId: id,

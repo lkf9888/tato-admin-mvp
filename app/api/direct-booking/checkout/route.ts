@@ -39,6 +39,7 @@ export async function POST(request: Request) {
       include: {
         orders: {
           where: {
+            isArchived: false,
             status: {
               not: "cancelled",
             },

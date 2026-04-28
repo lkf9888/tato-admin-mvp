@@ -4,6 +4,10 @@ import { bootstrapAdminCredentials } from "../lib/constants";
 import { prisma } from "../lib/prisma";
 
 async function main() {
+  if (process.env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT) {
+    throw new Error("Refusing to run the destructive seed script in production.");
+  }
+
   await prisma.user.deleteMany();
   await prisma.activityLog.deleteMany();
   await prisma.order.deleteMany();

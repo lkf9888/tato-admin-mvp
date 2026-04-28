@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
-import { isAdminAuthenticated } from "@/lib/auth";
+import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 
@@ -15,10 +15,7 @@ function revalidateSharePages() {
 }
 
 export async function POST(request: Request) {
-  const authenticated = await isAdminAuthenticated();
-  if (!authenticated) {
-    return redirectTo(request, "/login");
-  }
+  const { workspace, user } = await requireCurrentAdminContext();
 
   const formData = await request.formData();
   const id = formData.get("id")?.toString();
@@ -26,8 +23,8 @@ export async function POST(request: Request) {
     return redirectTo(request, "/share-links");
   }
 
-  const existing = await prisma.shareLink.findUnique({
-    where: { id },
+  const existing = await prisma.shareLink.findFirst({
+    where: { id, workspaceId: workspace.id },
   });
 
   if (!existing) {
@@ -35,12 +32,13 @@ export async function POST(request: Request) {
   }
 
   await prisma.shareLink.update({
-    where: { id },
+    where: { id: existing.id },
     data: { isActive: false },
   });
 
   await logActivity({
-    actor: "Admin",
+    workspaceId: workspace.id,
+    actor: user.name,
     action: "share_link_revoked",
     entityType: "ShareLink",
     entityId: id,

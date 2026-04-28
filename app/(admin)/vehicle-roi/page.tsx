@@ -38,6 +38,9 @@ export default async function VehicleRoiPage() {
       include: {
         owner: true,
         orders: {
+          where: {
+            isArchived: false,
+          },
           orderBy: { pickupDatetime: "desc" },
         },
       },
@@ -53,7 +56,9 @@ export default async function VehicleRoiPage() {
   const monthTimelineKeys = new Set(monthTimeline.map(buildMonthKey));
 
   const vehicleMetricsUnsorted = vehicles.map((vehicle) => {
-    const activeOrders = vehicle.orders.filter((order) => order.status !== "cancelled");
+    const activeOrders = vehicle.orders.filter(
+      (order) => !order.isArchived && order.status !== "cancelled",
+    );
     const monthlyRevenueMap = new Map(monthTimeline.map((month) => [buildMonthKey(month), 0]));
     let currentMonthRevenue = 0;
     let trailingTwelveMonthRevenue = 0;

@@ -47,6 +47,14 @@ function getTransporter(config: SmtpConfig): Transporter {
       port: config.port,
       secure: config.secure,
       auth: { user: config.user, pass: config.pass },
+      // Aggressive timeouts so a stuck request fails the registration in
+      // ~10 seconds instead of nodemailer's 2-minute default. The user
+      // sees an inline error and can retry / contact support immediately
+      // instead of staring at a frozen "Sending verification code..."
+      // spinner.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     });
   }
   return cachedTransporter;
@@ -74,19 +82,25 @@ async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: strin
 
   try {
     const transporter = getTransporter(config);
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: config.from,
       to: input.to,
       subject: input.subject,
       text: input.text,
       html: input.html,
     });
+    // eslint-disable-next-line no-console
+    console.log(
+      `[email] sent ok :: to=${input.to} :: messageId=${info.messageId} :: response=${info.response ?? ""}`,
+    );
     return { ok: true };
   } catch (error) {
-    return {
-      ok: false,
-      reason: error instanceof Error ? error.message : "send_failed",
-    };
+    const reason = error instanceof Error ? error.message : "send_failed";
+    // eslint-disable-next-line no-console
+    console.error(
+      `[email] send failed :: to=${input.to} :: host=${config.host}:${config.port} :: from=${config.from} :: reason=${reason}`,
+    );
+    return { ok: false, reason };
   }
 }
 

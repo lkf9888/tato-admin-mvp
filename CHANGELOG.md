@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.16.4 - 2026-04-28
+
+- Switched the verification-email sender from SMTP (nodemailer → `smtp.resend.com:587`) to Resend's HTTPS API (`POST https://api.resend.com/emails`). Diagnosed via Railway deploy logs showing `[email] send failed :: reason=Connection timeout` paired with an empty Resend dashboard log — i.e. the SMTP TCP session never reached Resend. Railway egress to outbound port 587 isn't reliable in every region, while HTTPS:443 is unblocked everywhere and is Resend's officially recommended path. Registration no longer hangs.
+- Reused existing env vars to keep the Railway config unchanged: `SMTP_PASSWORD` (the `re_…` Resend API key) is read as the bearer token, `SMTP_FROM` is read as the sender address. New `RESEND_API_KEY` and `RESEND_FROM` env vars are also accepted and take priority if set, so the deployment can migrate to clearer names later. `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` are now unused but harmless.
+- Kept the 15-second hard-cap on the send via `AbortController`, so a stuck request fails the registration in 15s with `reason=timeout_15s` instead of leaving the user staring at "Sending verification code…". Resend API errors surface as `reason=resend_<status>` with the response body excerpt logged for diagnosis.
+
 ## v0.16.3 - 2026-04-28
 
 - Cut the email-send hang from 2 minutes to ~10 seconds when SMTP misbehaves. Added `connectionTimeout: 10s`, `greetingTimeout: 10s`, `socketTimeout: 15s` to the nodemailer transporter so a misconfigured / unreachable SMTP server returns an inline error instead of leaving the registration form stuck on "Sending verification code…" forever.

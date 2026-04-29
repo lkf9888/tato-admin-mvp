@@ -1,63 +1,34 @@
 import "server-only";
 
-import nodemailer, { type Transporter } from "nodemailer";
-
 import type { Locale } from "@/lib/i18n";
 
-type SmtpConfig = {
-  host: string;
-  port: number;
-  user: string;
-  pass: string;
+type ResendConfig = {
+  apiKey: string;
   from: string;
-  secure: boolean;
 };
 
-let cachedTransporter: Transporter | null = null;
-
-function getSmtpConfig(): SmtpConfig | null {
-  const host = process.env.SMTP_HOST?.trim();
-  const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASSWORD?.trim();
-  const from = process.env.SMTP_FROM?.trim() || (user ? `TATO <${user}>` : "");
-  const portRaw = process.env.SMTP_PORT?.trim();
-
-  if (!host || !user || !pass || !from) {
+function getResendConfig(): ResendConfig | null {
+  // We send via Resend's HTTPS API (https://api.resend.com/emails) instead of
+  // SMTP. The SMTP path (smtp.resend.com:587) was timing out on Railway —
+  // some egress paths can't hold a TCP session to port 587 reliably, while
+  // outbound HTTPS:443 is unblocked everywhere. Resend also officially
+  // recommends the HTTP API.
+  //
+  // Env-var reuse: SMTP_PASSWORD already holds the Resend API key in the
+  // existing Railway setup, and SMTP_FROM already holds the sender address.
+  // We accept dedicated RESEND_API_KEY / RESEND_FROM if they're set, but
+  // fall back to the SMTP_* names so the deployment doesn't have to be
+  // reconfigured.
+  const apiKey = (process.env.RESEND_API_KEY || process.env.SMTP_PASSWORD || "").trim();
+  const from = (process.env.RESEND_FROM || process.env.SMTP_FROM || "").trim();
+  if (!apiKey || !from) {
     return null;
   }
-
-  const port = portRaw ? Number.parseInt(portRaw, 10) : 587;
-  if (!Number.isFinite(port)) {
-    return null;
-  }
-
-  // Common convention: 465 = TLS-on-connect, others = STARTTLS
-  const secure = port === 465;
-  return { host, port, user, pass, from, secure };
+  return { apiKey, from };
 }
 
 export function isEmailConfigured(): boolean {
-  return getSmtpConfig() !== null;
-}
-
-function getTransporter(config: SmtpConfig): Transporter {
-  if (!cachedTransporter) {
-    cachedTransporter = nodemailer.createTransport({
-      host: config.host,
-      port: config.port,
-      secure: config.secure,
-      auth: { user: config.user, pass: config.pass },
-      // Aggressive timeouts so a stuck request fails the registration in
-      // ~10 seconds instead of nodemailer's 2-minute default. The user
-      // sees an inline error and can retry / contact support immediately
-      // instead of staring at a frozen "Sending verification code..."
-      // spinner.
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 15_000,
-    });
-  }
-  return cachedTransporter;
+  return getResendConfig() !== null;
 }
 
 type SendInput = {
@@ -68,37 +39,68 @@ type SendInput = {
 };
 
 async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: string }> {
-  const config = getSmtpConfig();
+  const config = getResendConfig();
   if (!config) {
     // Dev / unconfigured fallback: log the message so the verification flow
-    // remains testable without an SMTP server. This is the only place we ever
-    // print verification codes; production deployments must set SMTP_* vars.
+    // remains testable without a Resend account. This is the only place we
+    // ever print verification codes; production deployments must set
+    // RESEND_API_KEY (or SMTP_PASSWORD) and SMTP_FROM.
     // eslint-disable-next-line no-console
     console.log(
-      `[email] SMTP not configured. Would have sent to ${input.to} :: ${input.subject}\n${input.text}`,
+      `[email] Resend not configured. Would have sent to ${input.to} :: ${input.subject}\n${input.text}`,
     );
     return { ok: false, reason: "smtp_not_configured" };
   }
 
+  // Hard cap the request at 15s so the registration form fails fast instead
+  // of leaving the user staring at a "Sending verification code…" spinner.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+
   try {
-    const transporter = getTransporter(config);
-    const info = await transporter.sendMail({
-      from: config.from,
-      to: input.to,
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: config.from,
+        to: [input.to],
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+      }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      // eslint-disable-next-line no-console
+      console.error(
+        `[email] Resend API error :: status=${res.status} :: to=${input.to} :: from=${config.from} :: body=${body.slice(0, 500)}`,
+      );
+      return { ok: false, reason: `resend_${res.status}` };
+    }
+
+    const json = (await res.json().catch(() => ({}))) as { id?: string };
     // eslint-disable-next-line no-console
     console.log(
-      `[email] sent ok :: to=${input.to} :: messageId=${info.messageId} :: response=${info.response ?? ""}`,
+      `[email] sent ok :: to=${input.to} :: id=${json.id ?? "?"}`,
     );
     return { ok: true };
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "send_failed";
+    clearTimeout(timeoutId);
+    const reason =
+      error instanceof Error
+        ? error.name === "AbortError"
+          ? "timeout_15s"
+          : error.message
+        : "send_failed";
     // eslint-disable-next-line no-console
     console.error(
-      `[email] send failed :: to=${input.to} :: host=${config.host}:${config.port} :: from=${config.from} :: reason=${reason}`,
+      `[email] send failed :: to=${input.to} :: from=${config.from} :: reason=${reason}`,
     );
     return { ok: false, reason };
   }

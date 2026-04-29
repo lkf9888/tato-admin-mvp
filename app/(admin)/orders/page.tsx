@@ -1,7 +1,7 @@
 import { deleteOrderAction, saveOfflineOrderAction, updateOrderStatusAction } from "@/app/actions";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { StatusBadge } from "@/components/status-badge";
-import { getOrderStatusOptions } from "@/lib/i18n";
+import { getOrderStatusOptions, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import {
@@ -23,7 +23,7 @@ async function fetchOrders(workspaceId: string) {
 
 type SearchableOrder = Awaited<ReturnType<typeof fetchOrders>>[number];
 
-function buildOrderSearchText(order: SearchableOrder, locale: "en" | "zh") {
+function buildOrderSearchText(order: SearchableOrder, locale: Locale) {
   const netEarning = getOrderNetEarning(order.sourceMetadata, order.totalPrice);
 
   return normalizeText(
@@ -57,7 +57,7 @@ function buildOrderSearchText(order: SearchableOrder, locale: "en" | "zh") {
   );
 }
 
-function matchesOrderSearch(order: SearchableOrder, query: string, locale: "en" | "zh") {
+function matchesOrderSearch(order: SearchableOrder, query: string, locale: Locale) {
   const normalizedQuery = normalizeText(query);
   if (!normalizedQuery) return true;
 

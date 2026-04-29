@@ -130,13 +130,13 @@ export function RegisterForm({ locale }: { locale: Locale }) {
 
     return (
       <div>
-        <p className="text-[11px] uppercase tracking-[0.35em] text-[var(--ink-soft)]">
+        <p className="text-[11px] uppercase tracking-[0.35em] text-black/55">
           {t.verifyStepKicker}
         </p>
-        <h2 className="mt-3 font-serif text-[2.2rem] leading-tight text-[var(--ink)]">
+        <h2 className="mt-3 font-serif text-[2.2rem] leading-tight text-black">
           {t.verifyTitle}
         </h2>
-        <p className="mt-3 text-[13px] leading-6 text-[var(--ink-soft)]">{verifyDescription}</p>
+        <p className="mt-3 text-[13px] leading-6 text-black/55">{verifyDescription}</p>
 
         {emailDeliveryNotice === "logged" ? (
           <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -146,7 +146,7 @@ export function RegisterForm({ locale }: { locale: Locale }) {
 
         <div className="mt-6 space-y-4">
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{t.codeLabel}</span>
+            <span className="mb-2 block text-sm font-medium text-black">{t.codeLabel}</span>
             <input
               value={code}
               onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
@@ -154,7 +154,7 @@ export function RegisterForm({ locale }: { locale: Locale }) {
               autoFocus
               autoComplete="one-time-code"
               placeholder={t.codePlaceholder}
-              className="w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3.5 text-center text-[18px] font-mono tracking-[0.4em] outline-none"
+              className="w-full rounded-full border border-black/15 bg-white px-4 py-3.5 text-center text-[18px] font-mono tracking-[0.4em] outline-none"
             />
           </label>
 
@@ -174,7 +174,7 @@ export function RegisterForm({ locale }: { locale: Locale }) {
             type="button"
             onClick={handleVerify}
             disabled={isVerifying || code.length < 6}
-            className="w-full rounded-full bg-[var(--ink)] px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-full bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isVerifying ? t.verifying : t.verifyAction}
           </button>
@@ -184,7 +184,7 @@ export function RegisterForm({ locale }: { locale: Locale }) {
               type="button"
               onClick={handleResendCode}
               disabled={isSendingCode}
-              className="font-medium text-[var(--ink)] underline underline-offset-4 decoration-[var(--accent)] disabled:opacity-50"
+              className="font-medium text-black underline underline-offset-4 decoration-black disabled:opacity-50"
             >
               {isSendingCode ? t.sendingCode : t.resendAction}
             </button>
@@ -196,7 +196,7 @@ export function RegisterForm({ locale }: { locale: Locale }) {
                 setResendNotice(null);
                 setCode("");
               }}
-              className="text-[var(--ink-soft)] hover:text-[var(--ink)]"
+              className="text-black/55 hover:text-black"
             >
               {t.backToDetails}
             </button>
@@ -208,40 +208,40 @@ export function RegisterForm({ locale }: { locale: Locale }) {
 
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-[0.35em] text-[var(--ink-soft)]">{t.kicker}</p>
-      <h2 className="mt-3 font-serif text-[2.85rem] leading-none text-[var(--ink)]">{t.title}</h2>
-      <p className="mt-3 text-[13px] leading-6 text-[var(--ink-soft)]">{t.description}</p>
+      <p className="text-[11px] uppercase tracking-[0.35em] text-black/55">{t.kicker}</p>
+      <h2 className="mt-3 font-serif text-[2.85rem] leading-none text-black">{t.title}</h2>
+      <p className="mt-3 text-[13px] leading-6 text-black/55">{t.description}</p>
 
       <div className="mt-8 space-y-4">
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{t.nameLabel}</span>
+          <span className="mb-2 block text-sm font-medium text-black">{t.nameLabel}</span>
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
             autoComplete="name"
-            className="w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3.5 text-[14px] outline-none"
+            className="w-full rounded-full border border-black/15 bg-white px-4 py-3.5 text-[14px] outline-none"
           />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{t.emailLabel}</span>
+          <span className="mb-2 block text-sm font-medium text-black">{t.emailLabel}</span>
           <input
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="email"
-            className="w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3.5 text-[14px] outline-none"
+            className="w-full rounded-full border border-black/15 bg-white px-4 py-3.5 text-[14px] outline-none"
           />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{t.passwordLabel}</span>
+          <span className="mb-2 block text-sm font-medium text-black">{t.passwordLabel}</span>
           <input
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="new-password"
-            className="w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3.5 text-[14px] outline-none"
+            className="w-full rounded-full border border-black/15 bg-white px-4 py-3.5 text-[14px] outline-none"
           />
         </label>
 
@@ -257,7 +257,7 @@ export function RegisterForm({ locale }: { locale: Locale }) {
           disabled={
             isSendingCode || !name.trim() || !email.trim() || password.length < 6
           }
-          className="w-full rounded-full bg-[var(--ink)] px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-full bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSendingCode ? t.sendingCode : t.sendCode}
         </button>

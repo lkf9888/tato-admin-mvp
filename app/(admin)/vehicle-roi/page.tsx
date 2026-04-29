@@ -1,5 +1,6 @@
 import { saveVehiclePurchasePriceAction } from "@/app/actions";
 import { requireCurrentWorkspace } from "@/lib/auth";
+import { getLocaleTag, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import {
@@ -22,9 +23,10 @@ function buildMonthKey(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function buildMonthLabel(value: Date, locale: "en" | "zh") {
-  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-CA", {
-    month: locale === "zh" ? "numeric" : "short",
+function buildMonthLabel(value: Date, locale: Locale) {
+  const isChinese = locale === "zh" || locale === "zh-Hant";
+  return new Intl.DateTimeFormat(getLocaleTag(locale), {
+    month: isChinese ? "numeric" : "short",
     year: "2-digit",
   }).format(value);
 }

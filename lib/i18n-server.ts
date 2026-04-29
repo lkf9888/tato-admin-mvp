@@ -7,7 +7,10 @@ import { getMessages, LOCALE_COOKIE, resolveLocale, type Locale, type Messages }
 export async function getLocalePreference(): Promise<Locale | "auto"> {
   const cookieStore = await cookies();
   const savedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
-  return savedLocale === "en" || savedLocale === "zh" ? savedLocale : "auto";
+  if (savedLocale === "en" || savedLocale === "zh" || savedLocale === "zh-Hant") {
+    return savedLocale;
+  }
+  return "auto";
 }
 
 export async function getLocale(): Promise<Locale> {
@@ -18,7 +21,19 @@ export async function getLocale(): Promise<Locale> {
 
   const requestHeaders = await headers();
   const acceptLanguage = requestHeaders.get("accept-language")?.toLowerCase() ?? "";
-  return acceptLanguage.includes("zh") ? "zh" : "en";
+  // Traditional-Chinese-leaning locales (Taiwan, Hong Kong, Macau) → zh-Hant.
+  if (
+    acceptLanguage.includes("zh-tw") ||
+    acceptLanguage.includes("zh-hk") ||
+    acceptLanguage.includes("zh-mo") ||
+    acceptLanguage.includes("zh-hant")
+  ) {
+    return "zh-Hant";
+  }
+  if (acceptLanguage.includes("zh")) {
+    return "zh";
+  }
+  return "en";
 }
 
 export async function getI18n(): Promise<{ locale: Locale; messages: Messages }> {

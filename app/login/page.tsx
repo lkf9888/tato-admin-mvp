@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 
 import { loginAction } from "@/app/actions";
+import { CompactLanguageSwitcher } from "@/components/language-switcher";
 import { isAdminAuthenticated } from "@/lib/auth";
-import { getMessages } from "@/lib/i18n";
+import { getI18n } from "@/lib/i18n-server";
 import { APP_VERSION_LABEL } from "@/lib/version";
 
 export default async function LoginPage({
@@ -13,38 +14,42 @@ export default async function LoginPage({
   const authenticated = await isAdminAuthenticated();
   if (authenticated) redirect("/dashboard");
 
-  const [params, messages] = await Promise.all([searchParams, Promise.resolve(getMessages("en"))]);
+  const [params, { locale, messages }] = await Promise.all([searchParams, getI18n()]);
   const loginMessages = messages.login;
 
   return (
-    <main className="min-h-screen bg-[var(--page)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-[86rem] overflow-hidden rounded-xl border border-[var(--line)] bg-[rgba(255, 255, 255, 0.9)] shadow-[0_30px_90px_rgba(17,19,24,0.08)] lg:grid-cols-[1.18fr_0.82fr]">
-        <section className="relative hidden overflow-hidden bg-[#111318] px-12 py-12 text-white lg:block">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(255,127,102,0.22),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(53,110,88,0.28),transparent_30%),linear-gradient(180deg,#171a20_0%,#12141a_58%,#090b12_100%)]" />
-          <div className="absolute inset-y-0 right-0 w-px bg-white/8" />
+    <main className="min-h-screen bg-white text-black">
+      <div className="mx-auto flex min-h-screen max-w-[86rem] flex-col lg:grid lg:grid-cols-[1.18fr_0.82fr] lg:overflow-hidden">
+        {/* Hero column — pure black, hidden on small screens */}
+        <section className="relative hidden overflow-hidden bg-black px-8 py-10 text-white lg:block lg:px-12 lg:py-14">
           <div className="relative flex h-full flex-col justify-between">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.42em] text-white/58">
+              <p className="text-[11px] uppercase tracking-[0.42em] text-white/60">
                 {loginMessages.heroKicker}
               </p>
-              <h1 className="mt-4 font-serif text-[5.4rem] leading-none tracking-[-0.08em]">
+              <h1 className="mt-4 font-serif text-[5rem] leading-none tracking-[-0.08em] xl:text-[5.4rem]">
                 {loginMessages.brandName}
               </h1>
-              <p className="mt-4 max-w-sm text-[13px] leading-6 text-white/68">
+              <p className="mt-4 max-w-sm text-[13px] leading-6 text-white/70">
                 {loginMessages.brandIntro}
               </p>
-              <h2 className="mt-12 max-w-2xl font-serif text-[3.2rem] leading-[1.02] tracking-[-0.05em] text-white">
+              <h2 className="mt-12 max-w-2xl font-serif text-[2.6rem] leading-[1.02] tracking-[-0.04em] text-white xl:text-[3.2rem] xl:tracking-[-0.05em]">
                 {loginMessages.heroTitle}
               </h2>
-              <p className="mt-5 max-w-lg text-[14px] leading-7 text-white/72">
+              <p className="mt-5 max-w-lg text-[14px] leading-7 text-white/70">
                 {loginMessages.heroCopy}
               </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
               {loginMessages.features.map(([label, copy]) => (
-                <div key={label} className="rounded-lg border border-white/10 bg-white/[0.04] p-5 backdrop-blur">
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/94">{label}</p>
+                <div
+                  key={label}
+                  className="rounded-lg border border-white/15 bg-white/[0.04] p-5"
+                >
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white">
+                    {label}
+                  </p>
                   <p className="mt-3 text-[13px] leading-6 text-white/60">{copy}</p>
                 </div>
               ))}
@@ -52,54 +57,72 @@ export default async function LoginPage({
           </div>
         </section>
 
-        <section className="flex items-center bg-[rgba(255, 255, 255, 0.68)] px-6 py-10 sm:px-10 lg:px-14">
-          <div className="mx-auto w-full max-w-md">
-            <div className="rounded-lg border border-[var(--line)] bg-white/78 px-7 py-7 shadow-[0_26px_65px_rgba(17,19,24,0.06)] backdrop-blur">
-              <p className="text-[11px] uppercase tracking-[0.35em] text-[var(--ink-soft)]">{loginMessages.kicker}</p>
-              <h2 className="mt-3 font-serif text-[2.85rem] leading-none text-[var(--ink)]">{loginMessages.title}</h2>
-              <p className="mt-3 text-[13px] leading-6 text-[var(--ink-soft)]">{loginMessages.description}</p>
+        {/* Form column */}
+        <section className="relative flex flex-1 items-start justify-center bg-white px-4 pb-10 pt-6 sm:px-8 sm:pt-10 lg:items-center lg:px-12 lg:py-10">
+          {/* Top bar with mobile branding and language switcher */}
+          <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 pt-5 sm:px-8 lg:left-auto lg:right-6 lg:top-6 lg:justify-end">
+            <p className="font-serif text-2xl font-semibold tracking-tight text-black lg:hidden">
+              {loginMessages.brandName}
+            </p>
+            <CompactLanguageSwitcher locale={locale} />
+          </div>
 
-              <form action={loginAction} className="mt-8 space-y-4">
+          <div className="mt-12 w-full max-w-md sm:mt-16 lg:mt-0">
+            <div className="rounded-lg border border-black/10 bg-white px-5 py-7 shadow-[0_24px_60px_rgba(0,0,0,0.06)] sm:px-7 sm:py-8">
+              <p className="text-[11px] uppercase tracking-[0.35em] text-black/55">
+                {loginMessages.kicker}
+              </p>
+              <h2 className="mt-3 font-serif text-[2.2rem] leading-none text-black sm:text-[2.6rem]">
+                {loginMessages.title}
+              </h2>
+              <p className="mt-3 text-[13px] leading-6 text-black/60">
+                {loginMessages.description}
+              </p>
+
+              <form action={loginAction} className="mt-7 space-y-4">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[var(--ink)]">
+                  <span className="mb-2 block text-sm font-medium text-black">
                     {loginMessages.emailLabel}
                   </span>
                   <input
                     name="email"
                     type="email"
-                    className="w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3.5 text-[14px] outline-none placeholder:text-slate-400"
+                    className="w-full rounded-full border border-black/15 bg-white px-4 py-3.5 text-[14px] text-black outline-none transition focus:border-black placeholder:text-black/40"
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[var(--ink)]">
+                  <span className="mb-2 block text-sm font-medium text-black">
                     {loginMessages.passwordLabel}
                   </span>
                   <input
                     name="password"
                     type="password"
-                    className="w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3.5 text-[14px] outline-none placeholder:text-slate-400"
+                    className="w-full rounded-full border border-black/15 bg-white px-4 py-3.5 text-[14px] text-black outline-none transition focus:border-black placeholder:text-black/40"
                   />
                 </label>
 
                 {params.error ? (
-                  <p className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  <p className="rounded-md border border-black bg-black/5 px-4 py-3 text-sm text-black">
                     {loginMessages.invalidCredentials}
                   </p>
                 ) : null}
 
-                <button className="w-full rounded-full bg-[var(--ink)] px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24]">
+                <button className="w-full rounded-full bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(0,0,0,0.18)] transition hover:translate-y-[-1px] hover:bg-black/90">
                   {loginMessages.submit}
                 </button>
               </form>
 
-              <div className="mt-6 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-5 py-4 text-sm text-[var(--ink-soft)]">
-                <p className="font-medium text-[var(--ink)]">{loginMessages.registerPrompt}</p>
-                <a href="/register" className="mt-2 inline-flex text-sm font-medium text-[var(--ink)] underline underline-offset-4 decoration-[var(--accent)]">
+              <div className="mt-6 rounded-lg border border-black/10 bg-black/[0.025] px-5 py-4 text-sm text-black/65">
+                <p className="font-medium text-black">{loginMessages.registerPrompt}</p>
+                <a
+                  href="/register"
+                  className="mt-2 inline-flex text-sm font-medium text-black underline underline-offset-4 decoration-black"
+                >
                   {loginMessages.registerLink}
                 </a>
               </div>
 
-              <p className="mt-5 text-[11px] uppercase tracking-[0.24em] text-slate-400">
+              <p className="mt-5 text-[11px] uppercase tracking-[0.24em] text-black/40">
                 {loginMessages.versionLabel} {APP_VERSION_LABEL}
               </p>
             </div>

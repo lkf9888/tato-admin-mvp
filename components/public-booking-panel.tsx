@@ -44,10 +44,11 @@ type BookingDatePickerProps = {
 
 const STORAGE_PREFIX = "tato-direct-booking:";
 const DAY_MS = 86_400_000;
-const WEEKDAY_LABELS = {
+const WEEKDAY_LABELS: Record<Locale, readonly string[]> = {
   en: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
   zh: ["一", "二", "三", "四", "五", "六", "日"],
-} as const;
+  "zh-Hant": ["一", "二", "三", "四", "五", "六", "日"],
+};
 
 function parseDateOnly(value: string) {
   const [year, month, day] = value.split("-").map(Number);

@@ -1,10 +1,12 @@
+import { convertMessagesScToTc, convertScToTc } from "@/lib/sc-to-tc";
+
 export const LOCALE_COOKIE = "turo-locale";
 
-export const supportedLocales = ["en", "zh"] as const;
+export const supportedLocales = ["en", "zh", "zh-Hant"] as const;
 
 export type Locale = (typeof supportedLocales)[number];
 
-const statusLabels = {
+const statusLabelsBase = {
   en: {
     turo: "Turo",
     offline: "Offline",
@@ -35,10 +37,16 @@ const statusLabels = {
   },
 } as const;
 
-type StatusLabelKey = keyof (typeof statusLabels)["en"];
-type ActivityLabelKey = keyof (typeof activityLabels)["en"];
+type StatusLabelKey = keyof typeof statusLabelsBase["en"];
+type StatusLabelMap = Record<StatusLabelKey, string>;
 
-const activityLabels = {
+const statusLabels: Record<Locale, StatusLabelMap> = {
+  en: statusLabelsBase.en,
+  zh: statusLabelsBase.zh,
+  "zh-Hant": convertMessagesScToTc(statusLabelsBase.zh) as StatusLabelMap,
+};
+
+const activityLabelsBase = {
   en: {
     owner_created: "Owner created",
     owner_updated: "Owner updated",
@@ -79,12 +87,25 @@ const activityLabels = {
   },
 } as const;
 
+type ActivityLabelKey = keyof typeof activityLabelsBase["en"];
+type ActivityLabelMap = Record<ActivityLabelKey, string>;
+
+const activityLabels: Record<Locale, ActivityLabelMap> = {
+  en: activityLabelsBase.en,
+  zh: activityLabelsBase.zh,
+  "zh-Hant": convertMessagesScToTc(activityLabelsBase.zh) as ActivityLabelMap,
+};
+
 export function resolveLocale(value?: string | null): Locale {
-  return value === "zh" ? "zh" : "en";
+  if (value === "zh") return "zh";
+  if (value === "zh-Hant" || value === "zh-TW" || value === "zh-HK") return "zh-Hant";
+  return "en";
 }
 
 export function getLocaleTag(locale: Locale) {
-  return locale === "zh" ? "zh-CN" : "en-CA";
+  if (locale === "zh") return "zh-CN";
+  if (locale === "zh-Hant") return "zh-Hant";
+  return "en-CA";
 }
 
 export function getStatusLabel(value: string, locale: Locale) {
@@ -1399,8 +1420,29 @@ const messages = {
   },
 } as const;
 
-export type Messages = (typeof messages)[Locale];
+export type Messages = (typeof messages)["zh"];
+
+// Traditional Chinese is computed from the Simplified zh block at module
+// load via a per-character substitution map (see lib/sc-to-tc.ts). The
+// converter preserves functions and non-string values, so message getters
+// like `quoteDays(count)` keep working unchanged. About 95% of admin UI
+// text converts cleanly with this approach; for the remaining ~5% that
+// needs context-sensitive Traditional forms (e.g. 系統 vs 聯繫), tweak
+// the SC_TO_TC map in lib/sc-to-tc.ts or override here.
+const traditionalMessages = convertMessagesScToTc(messages.zh) as Messages;
+
+// Cast through `unknown` because messages.en / messages.zh have different
+// literal-string types from `as const`, even though their shapes match.
+const messagesByLocale: Record<Locale, Messages> = {
+  en: messages.en as unknown as Messages,
+  zh: messages.zh as Messages,
+  "zh-Hant": traditionalMessages,
+};
 
 export function getMessages(locale: Locale): Messages {
-  return messages[locale];
+  return messagesByLocale[locale];
 }
+
+// Re-exported here so callers don't need to import sc-to-tc directly when
+// they want to translate ad-hoc DB strings (e.g. owner names) to TC.
+export { convertScToTc };

@@ -95,13 +95,13 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
+        <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
                 {dashboardMessages.upcomingKicker}
               </p>
-              <h3 className="mt-2 font-serif text-3xl text-slate-950">
+              <h3 className="mt-2 font-serif text-2xl text-slate-950 sm:text-3xl">
                 {dashboardMessages.upcomingTitle}
               </h3>
             </div>
@@ -135,11 +135,11 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
+        <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-6">
           <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
             {dashboardMessages.activityKicker}
           </p>
-          <h3 className="mt-2 font-serif text-3xl text-slate-950">
+          <h3 className="mt-2 font-serif text-2xl text-slate-950 sm:text-3xl">
             {dashboardMessages.activityTitle}
           </h3>
           <div className="mt-6 space-y-4">

@@ -150,7 +150,7 @@ export function PayoutsPanel({
 
   return (
     <div className="space-y-6">
-      <header className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] px-8 py-7">
+      <header className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] px-5 py-6 sm:px-8 sm:py-7">
         <p className="text-[11px] uppercase tracking-[0.38em] text-[var(--ink-soft)]">
           {t.kicker}
         </p>
@@ -170,7 +170,7 @@ export function PayoutsPanel({
         </div>
       )}
 
-      <section className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] px-8 py-6">
+      <section className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] px-5 py-5 sm:px-8 sm:py-6">
         <p className="text-[11px] uppercase tracking-[0.38em] text-[var(--ink-soft)]">
           {t.howItWorks}
         </p>
@@ -186,7 +186,7 @@ export function PayoutsPanel({
         </ol>
       </section>
 
-      <section className={`rounded-3xl border px-8 py-6 ${statusTone.card}`}>
+      <section className={`rounded-3xl border px-5 py-5 sm:px-8 sm:py-6 ${statusTone.card}`}>
         <p className="text-[11px] uppercase tracking-[0.38em] text-[var(--ink-soft)]">
           {t.statusKicker}
         </p>
@@ -246,7 +246,7 @@ export function PayoutsPanel({
         )}
       </section>
 
-      <section className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] px-8 py-6">
+      <section className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] px-5 py-5 sm:px-8 sm:py-6">
         {status === "not_started" ? (
           <div className="space-y-4">
             <div>

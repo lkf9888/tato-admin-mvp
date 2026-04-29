@@ -69,16 +69,16 @@ export default async function ShareLinksPage() {
         {shareLinks.map((shareLink) => (
           <article key={shareLink.id} className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h3 className="font-serif text-3xl text-slate-950">{shareLink.owner.name}</h3>
-                <p className="mt-2 text-sm text-slate-500">
+              <div className="min-w-0">
+                <h3 className="font-serif text-2xl text-slate-950 sm:text-3xl">{shareLink.owner.name}</h3>
+                <p className="mt-2 break-all text-sm text-slate-500">
                   {shareLinkMessages.tokenPrefix}: {shareLink.token}
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 break-all text-sm text-slate-500">
                   {shareLinkMessages.urlPrefix}: /share/{shareLink.token} ·{" "}
                   {shareLinkMessages.createdAt(formatDateTime(shareLink.createdAt, locale))}
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 break-words text-sm text-slate-500">
                   {shareLink.passwordHash
                     ? shareLinkMessages.passwordProtected
                     : shareLinkMessages.noPassword}{" "}

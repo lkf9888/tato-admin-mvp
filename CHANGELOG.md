@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.16.5 - 2026-04-28
+
+- Fixed multiple admin pages that horizontally overflowed the mobile viewport (~375px). Audited every admin page + the panel components rendered inside, identifying real overflow culprits (not just "could be nicer"):
+  - `/imports`: the import-log table had `overflow-hidden` on its scroll container, hiding columns 3-5 entirely on mobile. Switched to `overflow-x-auto` so users can swipe horizontally to read the rest. Also collapsed the section header (`flex items-center justify-between`) to `flex flex-col sm:flex-row` so the "sample file" hint stops fighting the title for width.
+  - `/share-links`: the long share-link UUID and `/share/<token>` URL rendered without `break-all` and pushed each card past the viewport edge. Added `break-all` to those `<p>` tags. Also reduced the owner-name `<h3>` from `text-3xl` to `text-2xl sm:text-3xl` so the article header doesn't dominate small screens.
+  - `/direct-booking`: the rate / insurance / deposit input row was a hard-coded `grid-cols-3` (always 3 cols, no mobile fallback). Each input collapsed to ~104px wide at 375px — labels and number inputs blew out. Switched to `grid-cols-1 sm:grid-cols-3` so the three pricing fields stack on phones.
+  - `/dashboard`: the "Upcoming schedule" header (`flex items-center justify-between` with title + "Open orders" link) overflowed on long Chinese titles. Collapsed to `flex flex-col sm:flex-row` and reduced the heading to `text-2xl sm:text-3xl`. Reduced section padding from `p-6` to `p-4 sm:p-6` so the 24px-each-side padding doesn't eat half the viewport on a phone.
+  - `/payouts`: every section card used `px-8 py-7` / `px-8 py-6` (32px horizontal padding), which on a 375px viewport with the admin shell's `px-3` left only ~287px for content — too tight for the long Stripe account ID. Switched to `px-5 py-5 sm:px-8 sm:py-6` (and `px-5 py-6 sm:px-8 sm:py-7` for the page header) so card content gets ~40px more breathing room on phones.
+- Verified `/calendar` is intentionally horizontally scrollable inside its `overflow-auto` container (the timeline grid is naturally wider than a phone — that's expected behavior, swipe to scrub). The CSV-import preview table is the same: already wrapped in `overflow-x-auto`. No change needed for those.
+
 ## v0.16.4 - 2026-04-28
 
 - Switched the verification-email sender from SMTP (nodemailer → `smtp.resend.com:587`) to Resend's HTTPS API (`POST https://api.resend.com/emails`). Diagnosed via Railway deploy logs showing `[email] send failed :: reason=Connection timeout` paired with an empty Resend dashboard log — i.e. the SMTP TCP session never reached Resend. Railway egress to outbound port 587 isn't reliable in every region, while HTTPS:443 is unblocked everywhere and is Resend's officially recommended path. Registration no longer hangs.

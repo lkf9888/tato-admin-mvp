@@ -176,7 +176,7 @@ export default async function DirectBookingPage() {
                   />
                 </label>
 
-                <div className="grid gap-3 grid-cols-3">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
                   <label className="block min-w-0">
                     <span className="mb-1.5 block text-xs font-medium text-[color:var(--ink)]">
                       {directMessages.rateLabel}

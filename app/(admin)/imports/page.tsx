@@ -42,18 +42,18 @@ export default async function ImportsPage({
         billingState={params.billing ?? null}
       />
 
-      <section className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
+      <section className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
               {importMessages.logKicker}
             </p>
-            <h3 className="mt-2 font-serif text-3xl text-slate-950">{importMessages.logTitle}</h3>
+            <h3 className="mt-2 font-serif text-2xl text-slate-950 sm:text-3xl">{importMessages.logTitle}</h3>
           </div>
           <p className="text-sm text-slate-500">{importMessages.sampleFile}</p>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-lg border border-slate-200">
+        <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200">
           <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
             <thead className="bg-slate-50">
               <tr>

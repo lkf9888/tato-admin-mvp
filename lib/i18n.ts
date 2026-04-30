@@ -357,9 +357,11 @@ const messages = {
       },
       upcomingKicker: "Upcoming orders",
       upcomingTitle: "Next trips to watch",
+      upcomingEmpty: "No upcoming bookings yet. New trips will appear here.",
       openOrders: "Open orders",
       activityKicker: "Activity",
       activityTitle: "Recent actions",
+      activityEmpty: "No activity logged yet.",
     },
     vehicles: {
       deleteError: "Vehicles with related orders cannot be deleted until the orders are removed or reassigned.",
@@ -1034,9 +1036,11 @@ const messages = {
       },
       upcomingKicker: "即将开始订单",
       upcomingTitle: "接下来需要关注的行程",
+      upcomingEmpty: "暂时还没有即将开始的订单，新订单会显示在这里。",
       openOrders: "查看订单",
       activityKicker: "操作记录",
       activityTitle: "最近动作",
+      activityEmpty: "还没有任何操作记录。",
     },
     vehicles: {
       deleteError: "有关联订单的车辆暂时不能删除，请先移除或改绑相关订单。",

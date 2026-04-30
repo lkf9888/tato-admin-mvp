@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.18.1 - 2026-04-30
+
+- **Mobile depth pass — Dashboard.** The five KPI cards used to stack vertically on phones (`md:grid-cols-2` collapsed to one column under 768px), pushing the actual content half a screen down. They now ride in a horizontal snap-scroll strip that bleeds to the screen edge — same pattern Apple Wallet / App Store widget rows use. Each card slot is 58% of viewport so the next one peeks in to signal "swipe me", and `MetricCard` itself picks up tighter mobile padding (`p-4` vs `sm:p-5`) and a smaller value font (`2rem` vs `sm:2.7rem`) so it reads cleanly at half-screen width. Desktop / tablet (`sm:` and up) revert to the original static grid — nothing changes there.
+- **Mobile depth pass — Dashboard rows.** Upcoming-orders rows are now tappable `<Link>`s (whole row is a hit target, like an iOS list cell), with tighter `px-4 py-3` mobile padding and truncated titles for narrow screens. Empty states added for both Upcoming and Activity (`upcomingEmpty` / `activityEmpty` strings, EN + 中文 + auto-繁中) so a brand-new workspace doesn't show two empty white cards.
+- **Mobile depth pass — Orders create form.** The 12-input "Create offline order" panel was eating ~70% of the orders page on a phone, even though most visits are for browsing existing orders. It's now wrapped in a native `<details>`, collapsed by default, with a styled summary that animates a `+` to `×` on open. No client-side JS needed — `<details>` gives free disclosure, keyboard support, and a11y semantics.
+- **Mobile depth pass — Orders cards.** Every order card was rendering its title at `2rem` and using `px-5 py-5` padding, leaving narrow margins on a 375px viewport. Title now scales `1.4rem → 2rem` from mobile to desktop, container padding `p-4 → p-5`, status pill row uses `gap-1.5 → gap-2`, and the data grid drops from `text-sm` to `text-[13px]` on mobile so `Phone / Pickup / Return / Payment / Contract / Created by` fit two-up without truncating.
+
 ## v0.18.0 - 2026-04-30
 
 - **App-like mobile shell — phase 1.** Reframed the mobile experience from "responsive sidebar" to "iOS-style app". This is the foundation for the upcoming native client and for adding the site as a home-screen PWA today.

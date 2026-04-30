@@ -117,13 +117,25 @@ export function VehicleOrdersExportButton({
     }
   };
 
+  // v0.19.3 visual refresh — match the new flat-chip language used in
+  // calendar-view's secondaryActionClass / primaryActionClass. Keeping
+  // styles inline rather than extracting because there's no shared
+  // module for buttons yet (when there are 3+ duplicates we should
+  // promote them to `components/ui/button.tsx`).
+  const triggerClass =
+    "inline-flex h-9 items-center justify-center rounded-full border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] shadow-sm transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
+  const secondaryDialogClass =
+    "inline-flex h-10 items-center justify-center rounded-full border border-[var(--line)] bg-white px-4 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)]";
+  const primaryDialogClass =
+    "inline-flex h-10 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60";
+
   return (
     <>
       <button
         type="button"
         onClick={openDialog}
         disabled={vehicleOptions.length === 0}
-        className="inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_14px_32px_-24px_rgba(17,19,24,0.45)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+        className={triggerClass}
       >
         {calendarMessages.downloadOrders}
       </button>
@@ -143,7 +155,7 @@ export function VehicleOrdersExportButton({
               <button
                 type="button"
                 onClick={closeDialog}
-                className="inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white"
+                className={secondaryDialogClass}
               >
                 {calendarMessages.cancelAction}
               </button>
@@ -198,7 +210,7 @@ export function VehicleOrdersExportButton({
               <button
                 type="button"
                 onClick={closeDialog}
-                className="inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white"
+                className={secondaryDialogClass}
               >
                 {calendarMessages.cancelAction}
               </button>
@@ -206,7 +218,7 @@ export function VehicleOrdersExportButton({
                 type="button"
                 onClick={handleDownload}
                 disabled={isDownloading}
-                className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-60"
+                className={primaryDialogClass}
               >
                 {isDownloading ? calendarMessages.downloadingAction : calendarMessages.downloadAction}
               </button>

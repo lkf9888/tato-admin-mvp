@@ -466,12 +466,23 @@ export function CalendarView({
   );
   const timelineWidth = days.length * dayColumnWidth;
   const tableWidth = Math.max(vehicleColumnWidth + timelineWidth, timelineViewportWidth ?? 0);
+  // v0.19.3 visual refresh: dropped the heavy dark glass-pill container
+  // language entirely. The previous styles relied on placing
+  // `bg-rgba(255,255,255,0.76)` buttons on top of an
+  // `bg-rgba(17,19,24,0.92)` outer pill — the resulting dark-on-darker
+  // gray buttons were low-contrast and didn't match the white/cream
+  // surface used on every other admin page. The new look matches the
+  // login/dashboard chip style: solid white surface, hairline
+  // `var(--line)` border, ink-on-white text. Primary action keeps the
+  // accent purple but flips text to white (the previous `text-ink`
+  // on `bg-accent` was dark-on-dark) and drops the bizarre orange
+  // `#ff7b67` hover that looked like a different brand.
   const secondaryActionClass =
-    "inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_14px_32px_-24px_rgba(17,19,24,0.45)] backdrop-blur hover:border-[rgba(17,19,24,0.22)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-40";
+    "inline-flex h-9 items-center justify-center rounded-full border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] shadow-sm transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
   const primaryActionClass =
-    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89,60,251,0.75)] hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-40";
+    "inline-flex h-9 items-center justify-center rounded-full bg-[var(--accent)] px-3.5 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50";
   const filterSelectClass =
-    "h-11 rounded-full border border-[rgba(17,19,24,0.08)] bg-[rgba(255,255,255,0.72)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_12px_30px_-26px_rgba(17,19,24,0.5)] outline-none backdrop-blur";
+    "h-9 rounded-full border border-[var(--line)] bg-white px-3 text-[12px] font-medium text-[var(--ink)] outline-none transition focus:border-[rgba(17,19,24,0.3)]";
 
   const openCreateOrderDialog = () => {
     const fallbackVehicleId =
@@ -649,10 +660,15 @@ export function CalendarView({
        * those badges were just decorative noise. */}
       <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-3 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
         <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between xl:gap-3">
-          <div className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-[rgba(17,19,24,0.92)] px-1.5 py-1.5 shadow-[0_20px_44px_-28px_rgba(17,19,24,0.85)]">
-            <div className="inline-flex rounded-full bg-white/8 p-0.5">
+          {/* Action row — flat layout instead of a glass pill. The
+           * prev/next pair gets its own tiny segment-control wrapper so
+           * the relationship reads at a glance; everything else stands
+           * on its own with the standard chip look. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="inline-flex rounded-full border border-[var(--line)] bg-white p-0.5 shadow-sm">
               <button
                 type="button"
+                aria-label="Previous range"
                 onClick={() => {
                   setFocusDate((current) =>
                     rangeMode === "month"
@@ -660,12 +676,13 @@ export function CalendarView({
                       : addDays(current, rangeMode === "week" ? -7 : -42),
                   );
                 }}
-                className="rounded-full px-2.5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="rounded-full px-2.5 py-1 text-[14px] font-semibold leading-none text-[var(--ink-soft)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]"
               >
                 &#8249;
               </button>
               <button
                 type="button"
+                aria-label="Next range"
                 onClick={() => {
                   setFocusDate((current) =>
                     rangeMode === "month"
@@ -673,7 +690,7 @@ export function CalendarView({
                       : addDays(current, rangeMode === "week" ? 7 : 42),
                   );
                 }}
-                className="rounded-full px-2.5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="rounded-full px-2.5 py-1 text-[14px] font-semibold leading-none text-[var(--ink-soft)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]"
               >
                 &#8250;
               </button>
@@ -742,7 +759,10 @@ export function CalendarView({
             </select>
           </div>
 
-          <div className="inline-flex rounded-full bg-[rgba(17,19,24,0.92)] p-0.5 shadow-[0_18px_40px_-28px_rgba(17,19,24,0.8)]">
+          {/* iOS-style segmented control. Light track + dark "selected"
+           * thumb (ink fill, white text) is much higher contrast than
+           * the previous accent-purple-on-dark-pill combination. */}
+          <div className="inline-flex rounded-full border border-[var(--line)] bg-white p-0.5 shadow-sm">
             {[
               { value: "week" as const, label: calendarMessages.week },
               { value: "month" as const, label: calendarMessages.month },
@@ -753,10 +773,10 @@ export function CalendarView({
                 type="button"
                 onClick={() => setRangeMode(option.value)}
                 className={cn(
-                  "rounded-full px-3 py-1.5 text-[12px] font-semibold transition",
+                  "rounded-full px-3 py-1 text-[12px] font-semibold transition",
                   rangeMode === option.value
-                    ? "bg-[var(--accent)] text-[color:var(--ink)] shadow-[0_14px_28px_-20px_rgba(89,60,251,0.7)]"
-                    : "text-white/72 hover:text-white",
+                    ? "bg-[var(--ink)] text-white shadow-sm"
+                    : "text-[var(--ink-soft)] hover:text-[var(--ink)]",
                 )}
               >
                 {option.label}

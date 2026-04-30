@@ -716,6 +716,16 @@ const messages = {
       platformFeeNote: "Platform fee per booking: 5%",
     },
     calendar: {
+      mobile: {
+        title: "What's on your plate",
+        subtitle: "Schedule",
+        emptyAll: "No upcoming bookings. New trips will show up here.",
+        today: "Today",
+        tomorrow: "Tomorrow",
+        thisWeek: "This week",
+        later: "Later",
+        noneInBucket: "Nothing scheduled.",
+      },
       allVehicles: "All vehicles",
       allOwners: "All owners",
       allSources: "All sources",
@@ -1390,6 +1400,16 @@ const messages = {
       platformFeeNote: "平台服务费：每笔订单 5%",
     },
     calendar: {
+      mobile: {
+        title: "需要你关注的行程",
+        subtitle: "日程",
+        emptyAll: "暂时没有即将开始的订单，新订单会显示在这里。",
+        today: "今日",
+        tomorrow: "明日",
+        thisWeek: "本周",
+        later: "更晚",
+        noneInBucket: "没有安排。",
+      },
       allVehicles: "全部车辆",
       allOwners: "全部车主",
       allSources: "全部来源",

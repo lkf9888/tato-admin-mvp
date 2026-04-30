@@ -36,11 +36,22 @@ export default async function VehiclesPage({
         </div>
       ) : null}
 
-      <section className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-          {vehicleMessages.createKicker}
-        </p>
-        <form action={saveVehicleAction} className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {/* Create form is 12 inputs deep — collapsed by default on every
+       * viewport so the page opens straight to the existing fleet
+       * cards. Same `<details>` pattern as the orders page. */}
+      <details className="group overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-sm">
+        <summary className="tap-press flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
+          <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500 sm:text-xs sm:tracking-[0.25em]">
+            {vehicleMessages.createKicker}
+          </p>
+          <span
+            aria-hidden
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition group-open:rotate-45 group-open:bg-slate-950 group-open:text-white"
+          >
+            <span className="text-xl leading-none">+</span>
+          </span>
+        </summary>
+        <form action={saveVehicleAction} className="grid gap-3 border-t border-slate-200 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5 md:grid-cols-2 xl:grid-cols-4">
           <input
             name="plateNumber"
             placeholder={vehicleMessages.placeholders.plateNumber}
@@ -117,36 +128,36 @@ export default async function VehiclesPage({
             {vehicleMessages.addVehicle}
           </button>
         </form>
-      </section>
+      </details>
 
-      <section className="grid gap-5 xl:grid-cols-2">
+      <section className="grid gap-4 sm:gap-5 xl:grid-cols-2">
         {vehicles.map((vehicle) => (
-          <article key={vehicle.id} className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
+          <article key={vehicle.id} className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h3 className="font-serif text-3xl text-slate-950">{vehicle.nickname}</h3>
-                <p className="mt-2 text-sm text-slate-500">
+              <div className="min-w-0">
+                <h3 className="font-serif text-xl text-slate-950 sm:text-3xl">{vehicle.nickname}</h3>
+                <p className="mt-1.5 text-[12px] leading-snug text-slate-500 sm:mt-2 sm:text-sm">
                   {vehicle.brand} {vehicle.model} · {vehicle.year} · {vehicle.plateNumber}
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-[12px] leading-snug text-slate-500 sm:text-sm">
                   {vehicleMessages.ownerPrefix}:{" "}
                   {vehicle.owner?.name ?? vehicleMessages.placeholders.unassignedOwner}
                 </p>
                 {vehicle.purchasePrice != null ? (
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-[12px] leading-snug text-slate-500 sm:text-sm">
                     {vehicleMessages.placeholders.purchasePrice}: CA${vehicle.purchasePrice.toFixed(2)}
                   </p>
                 ) : null}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
                 <StatusBadge value={vehicle.status} locale={locale} />
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 sm:px-3 sm:text-xs">
                   {vehicleMessages.orderCount(vehicle.orders.length)}
                 </span>
               </div>
             </div>
 
-            <details className="mt-5 rounded-lg bg-slate-50 px-5 py-4">
+            <details className="mt-4 rounded-lg bg-slate-50 px-4 py-3 sm:mt-5 sm:px-5 sm:py-4">
               <summary className="cursor-pointer text-sm font-medium text-slate-700">
                 {vehicleMessages.editVehicle}
               </summary>

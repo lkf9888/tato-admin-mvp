@@ -638,110 +638,71 @@ export function CalendarView({
   };
 
   return (
-    <div className="space-y-4">
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-4 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="flex flex-col gap-3">
-            <div className="inline-flex flex-wrap items-center gap-2 rounded-full bg-[rgba(17,19,24,0.92)] px-2 py-2 shadow-[0_20px_44px_-28px_rgba(17,19,24,0.85)]">
-              <div className="inline-flex rounded-full bg-white/8 p-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFocusDate((current) =>
-                      rangeMode === "month"
-                        ? addMonths(current, -1)
-                        : addDays(current, rangeMode === "week" ? -7 : -42),
-                    );
-                  }}
-                  className="rounded-full px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-                >
-                  &#8249;
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFocusDate((current) =>
-                      rangeMode === "month"
-                        ? addMonths(current, 1)
-                        : addDays(current, rangeMode === "week" ? 7 : 42),
-                    );
-                  }}
-                  className="rounded-full px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-                >
-                  &#8250;
-                </button>
-              </div>
-              <button type="button" onClick={() => setFocusDate(new Date())} className={secondaryActionClass}>
-                {calendarMessages.today}
-              </button>
-              {!readOnly ? (
-                <button
-                  type="button"
-                  onClick={openCreateOrderDialog}
-                  disabled={vehicleOptions.length === 0}
-                  className={primaryActionClass}
-                >
-                  {calendarMessages.manualCreate}
-                </button>
-              ) : null}
-              {!readOnly ? (
-                <VehicleOrdersExportButton
-                  locale={locale}
-                  vehicleOptions={vehicleOptions}
-                  preferredVehicleId={selectedVehicleId !== "all" ? selectedVehicleId : filteredVehicles[0]?.id}
-                  rangeStart={rangeStart.toISOString()}
-                  rangeEnd={rangeEndInclusive.toISOString()}
-                />
-              ) : null}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--ink-soft)]">
-              <span className="rounded-full bg-white/72 px-3 py-1 font-semibold">
-                {calendarMessages.legend}
-              </span>
-              <span className="rounded-full bg-white/56 px-3 py-1">
-                {calendarMessages.scrollHint}
-              </span>
-            </div>
-          </div>
-
-          <div className="text-center xl:flex-1">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-[color:var(--ink-soft)]">
-              {messages.shell.workspaceKicker}
-            </p>
-            <h3 className="mt-2 font-serif text-3xl font-semibold text-[color:var(--ink)] sm:text-[2.2rem]">
-              {buildRangeTitle(rangeMode, rangeStart, rangeEndInclusive, locale)}
-            </h3>
-            <p className="mt-1.5 text-[12px] text-[color:var(--ink-soft)]">
-              {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
-            </p>
-          </div>
-
-          <div className="inline-flex rounded-full bg-[rgba(17,19,24,0.92)] p-1 shadow-[0_18px_40px_-28px_rgba(17,19,24,0.8)]">
-            {[
-              { value: "week" as const, label: calendarMessages.week },
-              { value: "month" as const, label: calendarMessages.month },
-              { value: "sixWeeks" as const, label: calendarMessages.sixWeeks },
-            ].map((option) => (
+    <div className="space-y-3">
+      {/* v0.19.1 density pass: control bar was using p-4 + gap-4 + a
+       * 2.2rem center title that ate ~250px of vertical space before
+       * the timeline started rendering. Reframed as a single tight
+       * row on xl: prev/next + today + actions on the left, range
+       * mode on the right, with the date title moved INTO the
+       * scrubber row so it doesn't double up. Kicker / legend / hint
+       * badges removed — the timeline itself is self-explanatory and
+       * those badges were just decorative noise. */}
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-3 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+        <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between xl:gap-3">
+          <div className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-[rgba(17,19,24,0.92)] px-1.5 py-1.5 shadow-[0_20px_44px_-28px_rgba(17,19,24,0.85)]">
+            <div className="inline-flex rounded-full bg-white/8 p-0.5">
               <button
-                key={option.value}
                 type="button"
-                onClick={() => setRangeMode(option.value)}
-                className={cn(
-                  "rounded-full px-4 py-2 text-[12px] font-semibold transition",
-                  rangeMode === option.value
-                    ? "bg-[var(--accent)] text-[color:var(--ink)] shadow-[0_14px_28px_-20px_rgba(89,60,251,0.7)]"
-                    : "text-white/72 hover:text-white",
-                )}
+                onClick={() => {
+                  setFocusDate((current) =>
+                    rangeMode === "month"
+                      ? addMonths(current, -1)
+                      : addDays(current, rangeMode === "week" ? -7 : -42),
+                  );
+                }}
+                className="rounded-full px-2.5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/10"
               >
-                {option.label}
+                &#8249;
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setFocusDate((current) =>
+                    rangeMode === "month"
+                      ? addMonths(current, 1)
+                      : addDays(current, rangeMode === "week" ? 7 : 42),
+                  );
+                }}
+                className="rounded-full px-2.5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                &#8250;
+              </button>
+            </div>
+            <button type="button" onClick={() => setFocusDate(new Date())} className={secondaryActionClass}>
+              {calendarMessages.today}
+            </button>
+            {!readOnly ? (
+              <button
+                type="button"
+                onClick={openCreateOrderDialog}
+                disabled={vehicleOptions.length === 0}
+                className={primaryActionClass}
+              >
+                {calendarMessages.manualCreate}
+              </button>
+            ) : null}
+            {!readOnly ? (
+              <VehicleOrdersExportButton
+                locale={locale}
+                vehicleOptions={vehicleOptions}
+                preferredVehicleId={selectedVehicleId !== "all" ? selectedVehicleId : filteredVehicles[0]?.id}
+                rangeStart={rangeStart.toISOString()}
+                rangeEnd={rangeEndInclusive.toISOString()}
+              />
+            ) : null}
           </div>
-        </div>
 
-        <div className="mt-4 flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={selectedVehicleId}
               onChange={(event) => setSelectedVehicleId(event.target.value)}
@@ -781,15 +742,43 @@ export function CalendarView({
             </select>
           </div>
 
-          <div className="hidden text-[11px] text-[color:var(--ink-soft)] xl:block">
-            {calendarMessages.scrollHint}
+          <div className="inline-flex rounded-full bg-[rgba(17,19,24,0.92)] p-0.5 shadow-[0_18px_40px_-28px_rgba(17,19,24,0.8)]">
+            {[
+              { value: "week" as const, label: calendarMessages.week },
+              { value: "month" as const, label: calendarMessages.month },
+              { value: "sixWeeks" as const, label: calendarMessages.sixWeeks },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setRangeMode(option.value)}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-[12px] font-semibold transition",
+                  rangeMode === option.value
+                    ? "bg-[var(--accent)] text-[color:var(--ink)] shadow-[0_14px_28px_-20px_rgba(89,60,251,0.7)]"
+                    : "text-white/72 hover:text-white",
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.78)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-          <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
-            <span>{calendarMessages.scrubberLabel}</span>
-            <span className="rounded-full bg-[rgba(17,19,24,0.06)] px-3 py-1 text-[11px] tracking-[0.18em] text-[color:var(--ink)]">
+        {/* Scrubber + range title combined into one compact row. The
+         * full date title was redundant when the scrubber thumb +
+         * range buttons already convey the same info. */}
+        <div className="mt-2.5 rounded-xl border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.78)] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <div className="flex items-baseline gap-2">
+              <h3 className="font-serif text-[1.05rem] font-semibold leading-none text-[color:var(--ink)] md:text-[1.2rem]">
+                {buildRangeTitle(rangeMode, rangeStart, rangeEndInclusive, locale)}
+              </h3>
+              <span className="text-[11px] text-[color:var(--ink-soft)]">
+                {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
+              </span>
+            </div>
+            <span className="rounded-full bg-[rgba(17,19,24,0.06)] px-2.5 py-0.5 text-[11px] tracking-[0.16em] text-[color:var(--ink)]">
               {formatDate(normalizedFocusDate, locale)}
             </span>
           </div>
@@ -809,9 +798,9 @@ export function CalendarView({
               setFocusDate(addDays(today, Number(event.target.value)));
             }}
             aria-label={calendarMessages.scrubberLabel}
-            className="mt-3 w-full cursor-pointer appearance-none bg-transparent accent-[var(--accent)] [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-[linear-gradient(90deg,rgba(17,19,24,0.08),rgba(89,60,251,0.18),rgba(17,19,24,0.08))] [&::-webkit-slider-thumb]:-mt-2 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[var(--accent)] [&::-webkit-slider-thumb]:shadow-[0_8px_20px_-10px_rgba(89,60,251,0.9)] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-[rgba(17,19,24,0.12)] [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[var(--accent)]"
+            className="mt-2 w-full cursor-pointer appearance-none bg-transparent accent-[var(--accent)] [&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-[linear-gradient(90deg,rgba(17,19,24,0.08),rgba(89,60,251,0.18),rgba(17,19,24,0.08))] [&::-webkit-slider-thumb]:-mt-[7px] [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[var(--accent)] [&::-webkit-slider-thumb]:shadow-[0_8px_20px_-10px_rgba(89,60,251,0.9)] [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-[rgba(17,19,24,0.12)] [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[var(--accent)]"
           />
-          <div className="mt-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
+          <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
             <span>{formatDate(addDays(today, -SCRUBBER_DAY_RANGE), locale)}</span>
             <span>{formatDate(addDays(today, -Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}</span>
             <span className="rounded-full bg-[rgba(89,60,251,0.12)] px-2 py-0.5 text-[color:var(--ink)]">

@@ -94,7 +94,7 @@ export default async function OrdersPage({
     "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]";
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 lg:space-y-3.5">
       {params.error ? (
         <div className="rounded-lg border border-amber-200/70 bg-[rgba(247,247,247,0.92)] px-5 py-4 text-sm text-amber-700 shadow-[0_16px_40px_-36px_rgba(17,19,24,0.45)]">
           {orderMessages.importedReadOnly}
@@ -199,22 +199,22 @@ export default async function OrdersPage({
         </div>
       </details>
 
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:p-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:p-5">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-[color:var(--ink-soft)]">
+            <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
               {orderMessages.searchKicker}
             </p>
-            <h2 className="mt-2 font-serif text-[1.75rem] leading-tight text-[color:var(--ink)]">
+            <h2 className="mt-0.5 font-serif text-[1.25rem] leading-tight text-[color:var(--ink)] lg:text-[1.4rem]">
               {orderMessages.searchTitle}
             </h2>
           </div>
-          <p className="text-sm text-[color:var(--ink-soft)]">
+          <p className="text-[12px] text-[color:var(--ink-soft)] lg:text-[13px]">
             {orderMessages.searchSummary(filteredOrders.length)}
           </p>
         </div>
 
-        <form className="mt-5 flex flex-col gap-3 md:flex-row md:items-center">
+        <form className="mt-3 flex flex-col gap-2.5 md:flex-row md:items-center">
           <input
             name="q"
             defaultValue={searchQuery}
@@ -230,7 +230,7 @@ export default async function OrdersPage({
         </form>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-3 lg:grid-cols-2">
         {filteredOrders.length === 0 ? (
           <div className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] lg:col-span-2">
             {orderMessages.emptySearch}

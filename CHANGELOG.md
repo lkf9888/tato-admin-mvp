@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.19.1 - 2026-04-30
+
+- **Desktop density pass.** Top-of-funnel feedback was that the desktop layout left too much air on the page — large titles, generous padding, and decorative kicker badges. Reduced empty space across every admin surface without removing any actual information. Mobile is unchanged (we just did a deliberate looser-on-mobile pass two releases ago); these are pure desktop-breakpoint adjustments.
+  - **Sidebar nav font bumped from 13px to 15px**, padding tightened by ~1px each side. Group label tracking nudged from 0.32em to 0.3em so the wider labels still fit. Brand title shrunk from 2.15rem to 1.85rem so it stops dominating the column visually now that nav rows are larger. Aside padding `px-5 py-6 → px-4 py-5`. Net effect: navigation reads as the primary block, not the brand block, and every label is comfortably tap- and click-targetable.
+  - **Page-header card** (the "Operations workspace · TATO admin MVP …" badge that wraps every admin page): title down from 2.35rem to 1.6rem on desktop, padding `py-5 → py-3.5`, gap between rows `gap-3 → gap-2`, header bottom margin `mb-5 → mb-3.5`, and the description sized to `12.5px / leading-snug` so it stays readable but stops pretending to be a hero subtitle. ~50% less vertical space, no information removed.
+  - **Calendar top control bar** restructured. The `p-4` outer padding plus a 2.2rem center range title plus a separate filters row plus a separate scrubber block was eating ~250px before the timeline could even start rendering. Reframed:
+    - Outer padding `p-4 → p-3`, inter-row gap `gap-4 → gap-2.5`.
+    - The huge centered range title (`Apr 1 – Apr 30, 2026`) dropped from a standalone block into the scrubber row at 1.05rem next to a small `summary` line — the range buttons + the scrubber thumb already convey that information.
+    - Decorative `legend` and `scrollHint` badges removed (the timeline itself signals what blue/green/red mean; horizontal scrolling is obvious as soon as you touch the trackpad).
+    - Range-mode pill (`Week / Month / 6 weeks`) moved into the same row as actions + filters so the bar is one row on `xl:` instead of three.
+    - Scrubber input slimmed: `mt-3 → mt-2`, track `h-2 → h-1.5`, thumb `h-6 w-6 → h-5 w-5`, scrubber container `px-4 py-3 → px-3 py-2`. Still plenty of grab area, just stops looking like its own UI.
+  - **Page list pages** (Dashboard / Orders / Vehicles / Owners) tightened: `space-y-6 → space-y-4 lg:space-y-3.5`, list card padding `sm:p-6 → sm:p-5` or `sm:p-4 lg:p-5`, title fonts dropped one tier on desktop (e.g. vehicle / owner card titles `text-3xl → text-2xl lg:text-[1.4rem]`). Same content, denser presentation.
+
 ## v0.19.0 - 2026-04-30
 
 - **Floating in-app feedback button.** Added a "Contact" button at the bottom-left of every admin page (above the BottomTabBar on mobile, above the version chip on desktop). Tapping it opens a feedback modal — bottom sheet on phones, centered card on desktop — where the user can write a message and attach up to 5 files (images / video / PDF, ≤10 MB each, ≤25 MB total). On submit the message arrives in the operator's inbox via Resend with the original files as email attachments and the user's account email as `Reply-To`, so the operator can reply once and start a real conversation. The modal also captures lightweight triage context (page URL, locale, app version, user agent, workspace ID) and renders it as a footer table in the email body so "what page were you on?" is answered in the same message.

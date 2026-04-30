@@ -63,7 +63,7 @@ export default async function DashboardPage() {
   const todaysReturns = todayOrders.filter((order) => order.returnDatetime <= endOfDay).length;
 
   return (
-    <div className="space-y-5 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-5 lg:space-y-4">
       {/*
        * Metrics strip. On phones the five cards are hot in a horizontal
        * snap-scroll row — same pattern App Store / Apple Wallet use for
@@ -117,19 +117,22 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+      <section className="grid gap-4 sm:gap-5 lg:gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         {/* Upcoming orders panel. Each row is a tappable Link to /orders
          * so the whole card behaves like a list cell on iOS — finger
          * anywhere on the row navigates. The mobile padding is tighter
-         * (p-4) than desktop (sm:p-6) so the cards don't waste an inch
-         * of margin on a 375px screen. */}
-        <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-6">
+         * (p-4) than desktop (sm:p-5) so the cards don't waste an inch
+         * of margin on a 375px screen. v0.19.1 dropped desktop padding
+         * one tier (p-6 → p-5) and the title from text-3xl → text-xl
+         * so each panel reads as a tight info card rather than an
+         * editorial spread. */}
+        <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500 sm:text-xs">
+              <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500 sm:text-[11px]">
                 {dashboardMessages.upcomingKicker}
               </p>
-              <h3 className="mt-1.5 font-serif text-xl text-slate-950 sm:mt-2 sm:text-3xl">
+              <h3 className="mt-1 font-serif text-xl text-slate-950 sm:text-2xl">
                 {dashboardMessages.upcomingTitle}
               </h3>
             </div>
@@ -142,7 +145,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
 
-          <div className="mt-4 space-y-2 sm:mt-6 sm:space-y-3">
+          <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
             {upcomingOrders.length === 0 ? (
               <p className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
                 {dashboardMessages.upcomingEmpty}
@@ -173,14 +176,14 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-6">
-          <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500 sm:text-xs">
+        <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-5">
+          <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500 sm:text-[11px]">
             {dashboardMessages.activityKicker}
           </p>
-          <h3 className="mt-1.5 font-serif text-xl text-slate-950 sm:mt-2 sm:text-3xl">
+          <h3 className="mt-1 font-serif text-xl text-slate-950 sm:text-2xl">
             {dashboardMessages.activityTitle}
           </h3>
-          <div className="mt-4 space-y-2 sm:mt-6 sm:space-y-3">
+          <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
             {latestLogs.length === 0 ? (
               <p className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
                 {dashboardMessages.activityEmpty}

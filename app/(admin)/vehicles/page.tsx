@@ -29,7 +29,7 @@ export default async function VehiclesPage({
   const vehicleStatusOptions = getVehicleStatusOptions(locale);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 lg:space-y-3.5">
       {params.error ? (
         <div className="rounded-lg bg-amber-50 px-5 py-4 text-sm text-amber-700">
           {vehicleMessages.deleteError}
@@ -130,12 +130,12 @@ export default async function VehiclesPage({
         </form>
       </details>
 
-      <section className="grid gap-4 sm:gap-5 xl:grid-cols-2">
+      <section className="grid gap-3 sm:gap-4 xl:grid-cols-2">
         {vehicles.map((vehicle) => (
-          <article key={vehicle.id} className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <article key={vehicle.id} className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-4 lg:p-5">
+            <div className="flex flex-col gap-2.5 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
-                <h3 className="font-serif text-xl text-slate-950 sm:text-3xl">{vehicle.nickname}</h3>
+                <h3 className="font-serif text-xl text-slate-950 sm:text-2xl lg:text-[1.4rem]">{vehicle.nickname}</h3>
                 <p className="mt-1.5 text-[12px] leading-snug text-slate-500 sm:mt-2 sm:text-sm">
                   {vehicle.brand} {vehicle.model} · {vehicle.year} · {vehicle.plateNumber}
                 </p>

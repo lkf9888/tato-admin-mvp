@@ -2,7 +2,7 @@ import "server-only";
 
 import bcrypt from "bcryptjs";
 
-import { sendVerificationEmail } from "@/lib/email";
+import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email";
 import type { Locale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 
@@ -13,7 +13,7 @@ const MAX_ATTEMPTS = 5;
 // purpose, to keep abusers from spamming SMTP.
 const RESEND_COOLDOWN_MS = 30 * 1000;
 
-export type VerificationPurpose = "registration";
+export type VerificationPurpose = "registration" | "password_reset";
 
 function generateCode(): string {
   // 6 random digits, zero-padded so leading zeros are preserved.
@@ -103,6 +103,118 @@ export async function verifyRegistrationCode(input: {
     where: {
       email,
       purpose: "registration",
+      consumedAt: null,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!record) {
+    return { ok: false, reason: "no_pending_code" };
+  }
+
+  if (record.expiresAt.getTime() <= Date.now()) {
+    return { ok: false, reason: "expired" };
+  }
+
+  if (record.attempts >= MAX_ATTEMPTS) {
+    return { ok: false, reason: "too_many_attempts" };
+  }
+
+  const matches = await bcrypt.compare(trimmedCode, record.codeHash);
+
+  if (!matches) {
+    await prisma.emailVerification.update({
+      where: { id: record.id },
+      data: { attempts: record.attempts + 1 },
+    });
+    return { ok: false, reason: "invalid_code" };
+  }
+
+  await prisma.emailVerification.update({
+    where: { id: record.id },
+    data: {
+      consumedAt: new Date(),
+      attempts: record.attempts + 1,
+    },
+  });
+
+  return { ok: true };
+}
+
+export async function issuePasswordResetCode(input: {
+  email: string;
+  locale: Locale;
+}): Promise<IssueCodeResult> {
+  const email = normalizeEmailAddress(input.email);
+  if (!email || !email.includes("@")) {
+    return { ok: false, reason: "invalid_email" };
+  }
+
+  // Throttle on the same purpose so password-reset spamming is bounded
+  // independently from registration. We deliberately don't reveal
+  // whether the email is registered — the throttling shape is the same
+  // either way.
+  const recent = await prisma.emailVerification.findFirst({
+    where: {
+      email,
+      purpose: "password_reset",
+      consumedAt: null,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (
+    recent &&
+    Date.now() - recent.createdAt.getTime() < RESEND_COOLDOWN_MS
+  ) {
+    return { ok: false, reason: "throttled" };
+  }
+
+  const code = generateCode();
+  const codeHash = await bcrypt.hash(code, 10);
+  const expiresAt = new Date(Date.now() + CODE_TTL_MS);
+
+  await prisma.emailVerification.create({
+    data: {
+      email,
+      codeHash,
+      purpose: "password_reset",
+      expiresAt,
+    },
+  });
+
+  // Only actually send the email when the account exists. We still
+  // return ok:true above either way so the public form can't be used
+  // to enumerate registered emails.
+  const accountExists = await prisma.user.findUnique({ where: { email } });
+  if (!accountExists) {
+    return { ok: true, sent: false, reason: "no_account" };
+  }
+
+  const sendResult = await sendPasswordResetEmail({
+    to: email,
+    code,
+    locale: input.locale,
+  });
+
+  return { ok: true, sent: sendResult.ok, reason: sendResult.reason };
+}
+
+export async function verifyPasswordResetCode(input: {
+  email: string;
+  code: string;
+}): Promise<VerifyCodeResult> {
+  const email = normalizeEmailAddress(input.email);
+  const trimmedCode = input.code.trim();
+
+  if (!email || !trimmedCode) {
+    return { ok: false, reason: "no_pending_code" };
+  }
+
+  const record = await prisma.emailVerification.findFirst({
+    where: {
+      email,
+      purpose: "password_reset",
       consumedAt: null,
     },
     orderBy: { createdAt: "desc" },

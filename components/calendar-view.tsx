@@ -469,7 +469,7 @@ export function CalendarView({
   const secondaryActionClass =
     "inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_14px_32px_-24px_rgba(17,19,24,0.45)] backdrop-blur hover:border-[rgba(17,19,24,0.22)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-40";
   const primaryActionClass =
-    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89, 60, 251, 0.75)] hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-40";
+    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89,60,251,0.75)] hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-40";
   const filterSelectClass =
     "h-11 rounded-full border border-[rgba(17,19,24,0.08)] bg-[rgba(255,255,255,0.72)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_12px_30px_-26px_rgba(17,19,24,0.5)] outline-none backdrop-blur";
 
@@ -639,7 +639,7 @@ export function CalendarView({
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247, 247, 247, 0.96))] p-4 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-4 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="flex flex-col gap-3">
             <div className="inline-flex flex-wrap items-center gap-2 rounded-full bg-[rgba(17,19,24,0.92)] px-2 py-2 shadow-[0_20px_44px_-28px_rgba(17,19,24,0.85)]">
@@ -730,7 +730,7 @@ export function CalendarView({
                 className={cn(
                   "rounded-full px-4 py-2 text-[12px] font-semibold transition",
                   rangeMode === option.value
-                    ? "bg-[var(--accent)] text-[color:var(--ink)] shadow-[0_14px_28px_-20px_rgba(89, 60, 251, 0.7)]"
+                    ? "bg-[var(--accent)] text-[color:var(--ink)] shadow-[0_14px_28px_-20px_rgba(89,60,251,0.7)]"
                     : "text-white/72 hover:text-white",
                 )}
               >
@@ -823,7 +823,7 @@ export function CalendarView({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
         {filteredVehicles.length === 0 ? (
           <div className="rounded-lg bg-[rgba(255,255,255,0.72)] px-4 py-10 text-sm text-[color:var(--ink-soft)]">
             {calendarMessages.noVehicles}
@@ -831,7 +831,7 @@ export function CalendarView({
         ) : (
           <div
             ref={timelineViewportRef}
-            className="max-h-[76vh] overflow-auto rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+            className="max-h-[76vh] overflow-auto rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
           >
             <div style={{ width: tableWidth, minWidth: vehicleColumnWidth + timelineWidth }}>
               <div
@@ -840,7 +840,7 @@ export function CalendarView({
                   gridTemplateColumns: `${vehicleColumnWidth}px repeat(${days.length}, ${dayColumnWidth}px)`,
                 }}
               >
-                <div className="sticky left-0 z-50 border-r border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.98))] px-3 py-3">
+                <div className="sticky left-0 z-50 border-r border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] px-3 py-3">
                   <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
                     {messages.shell.nav.vehicles}
                   </p>
@@ -859,7 +859,7 @@ export function CalendarView({
                       className={cn(
                         "border-r border-[color:var(--line)] px-1.5 py-2.5 text-center",
                         weekend ? "bg-[#f3ede4]" : "bg-[rgba(255,251,246,0.9)]",
-                        todayColumn ? "bg-[rgba(89, 60, 251, 0.14)]" : "",
+                        todayColumn ? "bg-[rgba(89,60,251,0.14)]" : "",
                       )}
                     >
                       <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
@@ -898,7 +898,7 @@ export function CalendarView({
                     <div
                       className={cn(
                         "sticky left-0 z-20 flex flex-col justify-center overflow-hidden border-r border-[color:var(--line)] px-3 py-1.5 backdrop-blur",
-                        alternateRow ? "bg-[#faf4eb]/95" : "bg-[rgba(255, 255, 255, 0.95)]",
+                        alternateRow ? "bg-[#faf4eb]/95" : "bg-[rgba(255,255,255,0.95)]",
                       )}
                       style={{ height: rowHeight }}
                     >
@@ -929,7 +929,7 @@ export function CalendarView({
                             className={cn(
                               "absolute inset-y-0 border-r border-[color:var(--line)]",
                               weekend ? "bg-[#f5eee5]/78" : "bg-transparent",
-                              todayColumn ? "bg-[rgba(89, 60, 251, 0.08)]" : "",
+                              todayColumn ? "bg-[rgba(89,60,251,0.08)]" : "",
                             )}
                             style={{
                               left: dayIndex * dayColumnWidth,
@@ -1001,7 +1001,7 @@ export function CalendarView({
       {selectedOrder && orderPopover ? (
         <div
           ref={orderPopoverRef}
-          className="fixed z-[80] w-[min(22rem,calc(100vw-1.5rem))] rounded-lg border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(255,243,234,0.98))] p-4 shadow-[0_28px_60px_-30px_rgba(17,19,24,0.55)] backdrop-blur"
+          className="fixed z-[80] w-[min(22rem,calc(100vw-1.5rem))] rounded-lg border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,243,234,0.98))] p-4 shadow-[0_28px_60px_-30px_rgba(17,19,24,0.55)] backdrop-blur"
           style={{
             left: orderPopover.left,
             top: orderPopover.top,
@@ -1156,7 +1156,7 @@ export function CalendarView({
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] p-3 shadow-[0_20px_48px_-40px_rgba(17,19,24,0.4)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-3 shadow-[0_20px_48px_-40px_rgba(17,19,24,0.4)]">
         <p className="text-[11px] uppercase tracking-[0.26em] text-[color:var(--ink-soft)]">
           {calendarMessages.detailsKicker}
         </p>
@@ -1199,7 +1199,7 @@ export function CalendarView({
               ) : null}
             </div>
 
-            <div className="bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(255,245,237,0.98))] px-5 py-5">
+            <div className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,245,237,0.98))] px-5 py-5">
               <div className="grid gap-4 text-[13px] text-[color:var(--ink)] sm:grid-cols-2">
                 <div>
                   <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
@@ -1274,7 +1274,7 @@ export function CalendarView({
 
       {!readOnly && isOrderDialogOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 p-4">
-          <div className="w-full max-w-2xl rounded-lg border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
+          <div className="w-full max-w-2xl rounded-lg border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">

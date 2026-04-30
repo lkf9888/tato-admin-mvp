@@ -82,7 +82,11 @@ export default async function SharePage({
               placeholder={shareMessages.sharePassword}
               className="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
             />
-            {query.error ? (
+            {query.error === "throttled" ? (
+              <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {shareMessages.tooManyAttempts}
+              </p>
+            ) : query.error ? (
               <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 {shareMessages.incorrectPassword}
               </p>
@@ -125,7 +129,7 @@ export default async function SharePage({
   return (
     <main className="min-h-screen bg-[var(--page)] px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-[1500px] space-y-6">
-        <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247, 247, 247, 0.96))] px-6 py-8 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+        <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] px-6 py-8 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
           <p className="text-xs uppercase tracking-[0.35em] text-[color:var(--ink-soft)]">
             {shareMessages.readOnlyKicker}
           </p>

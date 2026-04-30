@@ -107,6 +107,22 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
     return;
   }
 
+  // The vehicle must belong to a workspace so the resulting Order is
+  // visible on calendar / dashboard / orders / share pages, all of which
+  // filter by workspaceId. A null workspaceId would leave the booking
+  // orphaned — the host has been paid but the order is invisible.
+  if (!vehicle.workspaceId) {
+    const refundId = await refundCheckoutSession(session, "vehicle_workspace_missing");
+    await logActivity({
+      actor: "stripe-webhook",
+      action: "direct_booking_workspace_missing",
+      entityType: "CheckoutSession",
+      entityId: session.id,
+      metadata: { vehicleId, refundId },
+    });
+    return;
+  }
+
   if (hasVehicleBookingConflict(vehicle.orders, pickupDate, returnDate)) {
     const refundId = await refundCheckoutSession(session, "booking_conflict");
     await logActivity({
@@ -132,6 +148,7 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
 
   const order = await prisma.order.create({
     data: {
+      workspaceId: vehicle.workspaceId,
       vehicleId,
       source: "offline",
       externalOrderId: session.id,

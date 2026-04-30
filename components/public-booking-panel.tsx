@@ -211,7 +211,7 @@ function BookingDatePicker({
                   className={cn(
                     "h-10 rounded-xl text-sm transition",
                     isSelected
-                      ? "bg-[#593cfb] text-white shadow-[0_16px_30px_-18px_rgba(89, 60, 251, 0.95)]"
+                      ? "bg-[#593cfb] text-white shadow-[0_16px_30px_-18px_rgba(89,60,251,0.95)]"
                       : "text-white/88",
                     isOutsideMonth && !isSelected ? "text-white/28" : "",
                     !isDisabled && !isSelected ? "hover:bg-white/8" : "",
@@ -575,7 +575,7 @@ export function PublicBookingPanel({
       <button
         onClick={startCheckout}
         disabled={!stripeReady || !hostPayoutsReady || isPending}
-        className="mt-5 w-full rounded-full bg-[#593cfb] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(89, 60, 251, 0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-5 w-full rounded-full bg-[#593cfb] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(89,60,251,0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
         style={{ backgroundColor: "#593cfb", color: "#ffffff" }}
       >
         {isPending ? reserveMessages.checkoutLoading : reserveMessages.checkoutAction}

@@ -9,7 +9,7 @@ import { APP_VERSION_LABEL } from "@/lib/version";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; retryAfter?: string }>;
 }) {
   const authenticated = await isAdminAuthenticated();
   if (authenticated) redirect("/dashboard");
@@ -101,7 +101,11 @@ export default async function LoginPage({
                   />
                 </label>
 
-                {params.error ? (
+                {params.error === "throttled" ? (
+                  <p className="rounded-md border border-black bg-black/5 px-4 py-3 text-sm text-black">
+                    {loginMessages.throttled}
+                  </p>
+                ) : params.error ? (
                   <p className="rounded-md border border-black bg-black/5 px-4 py-3 text-sm text-black">
                     {loginMessages.invalidCredentials}
                   </p>
@@ -111,6 +115,15 @@ export default async function LoginPage({
                   {loginMessages.submit}
                 </button>
               </form>
+
+              <div className="mt-5">
+                <a
+                  href="/forgot-password"
+                  className="text-sm font-medium text-black/70 underline underline-offset-4 decoration-black/30 hover:text-black hover:decoration-black"
+                >
+                  {loginMessages.forgotPassword}
+                </a>
+              </div>
 
               <div className="mt-6 rounded-lg border border-black/10 bg-black/[0.025] px-5 py-4 text-sm text-black/65">
                 <p className="font-medium text-black">{loginMessages.registerPrompt}</p>

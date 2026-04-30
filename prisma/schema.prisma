@@ -267,3 +267,28 @@ model ActivityLog {
 
   @@index([workspaceId])
 }
+
+// Sliding-window rate limit for sensitive auth surfaces (login,
+// share-link unlock). One row per (scope, identifier). Old rows are
+// best-effort GC'd inside `lib/rate-limit.ts` when checked. The model
+// is intentionally generic so the same primitive covers any future
+// throttled flow (e.g. password-reset request).
+model RateLimitAttempt {
+  id            String   @id @default(cuid())
+  // Stable bucket name, e.g. "login_email" / "login_ip" / "share_unlock".
+  scope         String
+  // Bucket key within the scope, e.g. lowercased email, share token,
+  // or client IP. Combined with scope it forms a unique row.
+  identifier    String
+  // Number of failed attempts within the current window. Resets to 0
+  // by deleting the row once the window expires.
+  attempts      Int      @default(0)
+  // Start of the active window. New row → now(); refreshed when a row
+  // ages past its window before the next failure is recorded.
+  windowStart   DateTime @default(now())
+  // Wall clock of the most recent failure, useful for alerting.
+  lastAttemptAt DateTime @default(now())
+
+  @@unique([scope, identifier])
+  @@index([windowStart])
+}

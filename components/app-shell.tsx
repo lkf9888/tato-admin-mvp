@@ -141,7 +141,7 @@ export function AppShell({
                 {description}
               </p>
             </div>
-            <div className="self-start whitespace-normal break-words rounded-full border border-[rgba(89, 60, 251, 0.12)] bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] leading-tight text-[var(--ink)] shadow-[0_10px_20px_rgba(89, 60, 251, 0.08)] sm:self-auto sm:px-3.5 sm:py-2 sm:text-[11px]">
+            <div className="self-start whitespace-normal break-words rounded-full border border-[rgba(89,60,251,0.12)] bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] leading-tight text-[var(--ink)] shadow-[0_10px_20px_rgba(89,60,251,0.08)] sm:self-auto sm:px-3.5 sm:py-2 sm:text-[11px]">
               {messages.shell.workspaceBadge}
             </div>
           </header>

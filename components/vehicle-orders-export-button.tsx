@@ -130,7 +130,7 @@ export function VehicleOrdersExportButton({
 
       {isOpen ? (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/35 p-4">
-          <div className="w-full max-w-xl rounded-lg border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
+          <div className="w-full max-w-xl rounded-lg border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
@@ -206,7 +206,7 @@ export function VehicleOrdersExportButton({
                 type="button"
                 onClick={handleDownload}
                 disabled={isDownloading}
-                className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89, 60, 251, 0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isDownloading ? calendarMessages.downloadingAction : calendarMessages.downloadAction}
               </button>

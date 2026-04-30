@@ -15,11 +15,35 @@ import {
   setAdminSession,
   validateAdminCredentials,
 } from "@/lib/auth";
-import { issueRegistrationCode, verifyRegistrationCode } from "@/lib/email-verification";
+import {
+  issuePasswordResetCode,
+  issueRegistrationCode,
+  verifyPasswordResetCode,
+  verifyRegistrationCode,
+} from "@/lib/email-verification";
 import { getLocale } from "@/lib/i18n-server";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import {
+  checkRateLimit,
+  formatRetryAfterSeconds,
+  getClientIp,
+  recordFailedAttempt,
+  resetAttempts,
+} from "@/lib/rate-limit";
 import { createWorkspaceForRegistration } from "@/lib/workspaces";
+
+// Brute-force protection. Limits are deliberately permissive enough
+// for typo-and-retry while shutting down credential stuffing: one
+// minute lockout in dev is too short to feel, and an attacker hitting
+// 10 failed logins in 15 minutes from a single IP is almost certainly
+// not legitimate. Both the email *and* the IP are buckets so a
+// distributed attack still trips the IP bucket.
+const LOGIN_EMAIL_LIMIT = 5;
+const LOGIN_IP_LIMIT = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const SHARE_UNLOCK_LIMIT = 6;
+const SHARE_UNLOCK_WINDOW_MS = 15 * 60 * 1000;
 
 const ownerSchema = z.object({
   id: z.string().optional(),
@@ -91,13 +115,60 @@ function revalidateAdminPages() {
 }
 
 export async function loginAction(formData: FormData) {
-  const email = formData.get("email")?.toString().trim() ?? "";
+  const rawEmail = formData.get("email")?.toString().trim() ?? "";
   const password = formData.get("password")?.toString() ?? "";
+  const email = rawEmail ? normalizeEmail(rawEmail) : "";
+  const ip = await getClientIp();
+
+  // Check both buckets up front. Either being locked rejects the
+  // attempt without burning a bcrypt cycle, so the lockout itself
+  // can't be used as a CPU-DoS vector.
+  if (email) {
+    const emailDecision = await checkRateLimit({
+      scope: "login_email",
+      identifier: email,
+      maxAttempts: LOGIN_EMAIL_LIMIT,
+      windowMs: LOGIN_WINDOW_MS,
+    });
+    if (!emailDecision.allowed) {
+      const seconds = formatRetryAfterSeconds(emailDecision.retryAfterMs);
+      redirect(`/login?error=throttled&retryAfter=${seconds}`);
+    }
+  }
+
+  const ipDecision = await checkRateLimit({
+    scope: "login_ip",
+    identifier: ip,
+    maxAttempts: LOGIN_IP_LIMIT,
+    windowMs: LOGIN_WINDOW_MS,
+  });
+  if (!ipDecision.allowed) {
+    const seconds = formatRetryAfterSeconds(ipDecision.retryAfterMs);
+    redirect(`/login?error=throttled&retryAfter=${seconds}`);
+  }
 
   const authenticatedUser = await validateAdminCredentials(email, password);
   if (!authenticatedUser) {
+    if (email) {
+      await recordFailedAttempt({
+        scope: "login_email",
+        identifier: email,
+        windowMs: LOGIN_WINDOW_MS,
+      });
+    }
+    await recordFailedAttempt({
+      scope: "login_ip",
+      identifier: ip,
+      windowMs: LOGIN_WINDOW_MS,
+    });
     redirect("/login?error=invalid");
   }
+
+  // Wipe the buckets so a few earlier typos don't count later.
+  if (email) {
+    await resetAttempts({ scope: "login_email", identifier: email });
+  }
+  await resetAttempts({ scope: "login_ip", identifier: ip });
 
   await setAdminSession(authenticatedUser.sessionValue);
   redirect("/dashboard");
@@ -222,6 +293,107 @@ export async function verifyAndRegisterAction(input: {
   });
 
   await setAdminSession(user.id);
+  return { ok: true };
+}
+
+type PasswordResetActionResult =
+  | { ok: true; sent?: boolean }
+  | {
+      ok: false;
+      error:
+        | "invalid"
+        | "throttled"
+        | "no_pending_code"
+        | "expired"
+        | "invalid_code"
+        | "too_many_attempts";
+    };
+
+const passwordResetRequestSchema = z.object({
+  email: z.string().trim().email(),
+});
+
+const passwordResetVerifySchema = z.object({
+  email: z.string().trim().email(),
+  code: z.string().trim().min(1),
+  password: z.string().min(8),
+});
+
+/**
+ * Step 1 of the password-reset flow. Always returns ok:true (when the
+ * input is well-formed) so the form can't be used to enumerate which
+ * emails are registered. The actual email is only sent when an account
+ * exists — that branch is handled inside `issuePasswordResetCode`.
+ */
+export async function requestPasswordResetCodeAction(input: {
+  email: string;
+}): Promise<PasswordResetActionResult> {
+  const parsed = passwordResetRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "invalid" };
+  }
+
+  const email = normalizeEmail(parsed.data.email);
+  const locale = await getLocale();
+  const result = await issuePasswordResetCode({ email, locale });
+  if (!result.ok) {
+    if (result.reason === "throttled") {
+      return { ok: false, error: "throttled" };
+    }
+    return { ok: false, error: "invalid" };
+  }
+
+  return { ok: true, sent: result.sent };
+}
+
+/**
+ * Step 2 of the password-reset flow. Verifies the code, then writes a
+ * fresh bcrypt hash and clears any active rate-limit buckets for the
+ * email so the user can sign in again immediately.
+ */
+export async function resetPasswordAction(input: {
+  email: string;
+  code: string;
+  password: string;
+}): Promise<PasswordResetActionResult> {
+  const parsed = passwordResetVerifySchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "invalid" };
+  }
+
+  const email = normalizeEmail(parsed.data.email);
+  const verifyResult = await verifyPasswordResetCode({
+    email,
+    code: input.code,
+  });
+  if (!verifyResult.ok) {
+    return { ok: false, error: verifyResult.reason };
+  }
+
+  // The account may not exist (we accepted the code anyway to avoid
+  // leaking which emails are registered). If so, treat the same as a
+  // missing pending code — there's nothing to reset.
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    return { ok: false, error: "no_pending_code" };
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await bcrypt.hash(parsed.data.password, 10) },
+  });
+
+  await resetAttempts({ scope: "login_email", identifier: email });
+
+  await logActivity({
+    workspaceId: user.workspaceId ?? null,
+    actor: user.name,
+    action: "password_reset",
+    entityType: "User",
+    entityId: user.id,
+    metadata: { email: user.email },
+  });
+
   return { ok: true };
 }
 
@@ -713,6 +885,29 @@ export async function unlockShareLinkAction(formData: FormData) {
   const password = formData.get("password")?.toString() ?? "";
   if (!token) redirect("/login");
 
+  const ip = await getClientIp();
+  // Bucket on the token itself — every recipient of the link gets
+  // their own pool. Pair with IP so a single attacker rotating tokens
+  // still trips the IP cap.
+  const tokenDecision = await checkRateLimit({
+    scope: "share_unlock_token",
+    identifier: token,
+    maxAttempts: SHARE_UNLOCK_LIMIT,
+    windowMs: SHARE_UNLOCK_WINDOW_MS,
+  });
+  if (!tokenDecision.allowed) {
+    redirect(`/share/${token}?error=throttled`);
+  }
+  const ipDecision = await checkRateLimit({
+    scope: "share_unlock_ip",
+    identifier: ip,
+    maxAttempts: SHARE_UNLOCK_LIMIT * 4,
+    windowMs: SHARE_UNLOCK_WINDOW_MS,
+  });
+  if (!ipDecision.allowed) {
+    redirect(`/share/${token}?error=throttled`);
+  }
+
   const shareLink = await prisma.shareLink.findUnique({
     where: { token },
   });
@@ -723,9 +918,21 @@ export async function unlockShareLinkAction(formData: FormData) {
 
   const valid = await bcrypt.compare(password, shareLink.passwordHash);
   if (!valid) {
+    await recordFailedAttempt({
+      scope: "share_unlock_token",
+      identifier: token,
+      windowMs: SHARE_UNLOCK_WINDOW_MS,
+    });
+    await recordFailedAttempt({
+      scope: "share_unlock_ip",
+      identifier: ip,
+      windowMs: SHARE_UNLOCK_WINDOW_MS,
+    });
     redirect(`/share/${token}?error=password`);
   }
 
+  await resetAttempts({ scope: "share_unlock_token", identifier: token });
+  await resetAttempts({ scope: "share_unlock_ip", identifier: ip });
   await grantShareAccess(token, shareLink.passwordHash);
   redirect(`/share/${token}`);
 }

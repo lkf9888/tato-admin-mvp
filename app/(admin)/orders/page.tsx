@@ -91,17 +91,17 @@ export default async function OrdersPage({
   const subtleButtonClass =
     "inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white";
   const primaryButtonClass =
-    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89, 60, 251, 0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]";
+    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]";
 
   return (
     <div className="space-y-5">
       {params.error ? (
-        <div className="rounded-lg border border-amber-200/70 bg-[rgba(247, 247, 247, 0.92)] px-5 py-4 text-sm text-amber-700 shadow-[0_16px_40px_-36px_rgba(17,19,24,0.45)]">
+        <div className="rounded-lg border border-amber-200/70 bg-[rgba(247,247,247,0.92)] px-5 py-4 text-sm text-amber-700 shadow-[0_16px_40px_-36px_rgba(17,19,24,0.45)]">
           {orderMessages.importedReadOnly}
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247, 247, 247, 0.96))] p-6 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-6 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-[color:var(--ink-soft)]">
@@ -183,7 +183,7 @@ export default async function OrdersPage({
         </form>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] p-6 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-6 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-[color:var(--ink-soft)]">
@@ -216,7 +216,7 @@ export default async function OrdersPage({
 
       <section className="grid gap-4 lg:grid-cols-2">
         {filteredOrders.length === 0 ? (
-          <div className="rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] lg:col-span-2">
+          <div className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] lg:col-span-2">
             {orderMessages.emptySearch}
           </div>
         ) : null}
@@ -228,9 +228,9 @@ export default async function OrdersPage({
           return (
             <article
               key={order.id}
-              className="h-fit overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
+              className="h-fit overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
             >
-              <div className="bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.98))] px-5 py-5">
+              <div className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] px-5 py-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h3 className="font-serif text-[2rem] leading-tight text-[color:var(--ink)]">

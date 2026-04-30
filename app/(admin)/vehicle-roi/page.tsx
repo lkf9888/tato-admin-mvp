@@ -134,7 +134,7 @@ export default async function VehicleRoiPage() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247, 247, 247, 0.96))] p-6 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-6 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
         <p className="text-xs uppercase tracking-[0.28em] text-[color:var(--ink-soft)]">
           {roiMessages.kicker}
         </p>
@@ -180,7 +180,7 @@ export default async function VehicleRoiPage() {
 
       <section className="space-y-4">
         {vehicleMetrics.length === 0 ? (
-          <div className="rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+          <div className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
             {roiMessages.emptyState}
           </div>
         ) : null}
@@ -188,9 +188,9 @@ export default async function VehicleRoiPage() {
         {vehicleMetrics.map((item, index) => (
           <article
             key={item.vehicle.id}
-            className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
+            className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
           >
-            <div className="bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.98))] px-5 py-5">
+            <div className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] px-5 py-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="flex items-start gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-[var(--ink)] text-lg font-semibold tabular-nums text-white">
@@ -317,7 +317,7 @@ export default async function VehicleRoiPage() {
                       placeholder={roiMessages.purchasePriceLabel}
                       className="h-11 rounded-full border border-white/12 bg-white/8 px-4 text-sm text-white outline-none placeholder:text-white/35"
                     />
-                    <button className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89, 60, 251, 0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]">
+                    <button className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-[color:var(--ink)] shadow-[0_18px_38px_-20px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]">
                       {roiMessages.savePurchasePrice}
                     </button>
                   </form>

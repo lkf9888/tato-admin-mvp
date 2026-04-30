@@ -95,7 +95,7 @@ export default async function DirectBookingPage() {
       </section>
 
       {vehicles.length === 0 ? (
-        <section className="rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+        <section className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
           {directMessages.emptyState}
         </section>
       ) : null}
@@ -110,9 +110,9 @@ export default async function DirectBookingPage() {
           return (
             <article
               key={vehicle.id}
-              className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255, 255, 255, 0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
+              className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
             >
-              <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255, 255, 255, 0.98),rgba(247, 247, 247, 0.96))] px-5 py-4">
+              <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.96))] px-5 py-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-serif text-[1.5rem] leading-tight text-[color:var(--ink)]">
@@ -121,7 +121,7 @@ export default async function DirectBookingPage() {
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-[0.08em] ${
                         isLive
-                          ? "border border-[rgba(89, 60, 251, 0.18)] bg-[var(--accent-soft)] text-[var(--ink)]"
+                          ? "border border-[rgba(89,60,251,0.18)] bg-[var(--accent-soft)] text-[var(--ink)]"
                           : "border border-slate-900/8 bg-slate-200 text-slate-700"
                       }`}
                     >

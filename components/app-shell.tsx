@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { logoutAction } from "@/app/actions";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
+import { ContactButton } from "@/components/contact-button";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { MobileNav } from "@/components/mobile-nav";
 import { getMessages, type Locale } from "@/lib/i18n";
@@ -12,12 +13,19 @@ export function AppShell({
   localePreference,
   title,
   description,
+  currentUserName,
+  currentUserEmail,
   children,
 }: {
   locale: Locale;
   localePreference: Locale | "auto";
   title: string;
   description: string;
+  /** Used by the floating ContactButton to prefill the From row of the
+   *  feedback modal. AppShell already requires an authenticated session
+   *  upstream, so these are always present. */
+  currentUserName: string;
+  currentUserEmail: string;
   children: React.ReactNode;
 }) {
   const messages = getMessages(locale);
@@ -195,6 +203,12 @@ export function AppShell({
         labels={messages.shell.bottomNav}
         moreItems={moreItems}
         moreFooter={moreFooter}
+      />
+
+      <ContactButton
+        labels={messages.contact}
+        currentUserName={currentUserName}
+        currentUserEmail={currentUserEmail}
       />
     </div>
   );

@@ -31,11 +31,34 @@ export function isEmailConfigured(): boolean {
   return getResendConfig() !== null;
 }
 
+export type EmailAttachment = {
+  /** Display name in the recipient's inbox. Pass the original upload
+   *  filename when you want it preserved. */
+  filename: string;
+  /** Base64-encoded file content. Use `Buffer.from(arrayBuffer).toString("base64")`
+   *  on the server side. Resend caps the per-email payload at ~40MB after
+   *  base64 expansion, so callers should enforce a raw byte limit closer
+   *  to ~25-30MB before reaching this layer. */
+  content: string;
+  /** Optional MIME type. Resend will sniff if omitted, but explicit is
+   *  cheaper and keeps Outlook from showing it as `application/octet-stream`. */
+  contentType?: string;
+};
+
 type SendInput = {
   to: string;
   subject: string;
   text: string;
   html: string;
+  /** Optional Reply-To header. Useful for feedback flows where the
+   *  envelope sender (`from`) is the platform domain but the user
+   *  hitting "Reply" should be talking to the original requester. */
+  replyTo?: string;
+  /** Optional file attachments. Caller is responsible for total size. */
+  attachments?: EmailAttachment[];
+  /** Override the timeout. Feedback sends with ~25MB attachments need
+   *  longer than the 15s used by the verification flow. */
+  timeoutMs?: number;
 };
 
 async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: string }> {
@@ -52,10 +75,9 @@ async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: strin
     return { ok: false, reason: "smtp_not_configured" };
   }
 
-  // Hard cap the request at 15s so the registration form fails fast instead
-  // of leaving the user staring at a "Sending verification code…" spinner.
+  const timeoutMs = input.timeoutMs ?? 15_000;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -70,6 +92,10 @@ async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: strin
         subject: input.subject,
         text: input.text,
         html: input.html,
+        ...(input.replyTo ? { reply_to: input.replyTo } : {}),
+        ...(input.attachments && input.attachments.length > 0
+          ? { attachments: input.attachments }
+          : {}),
       }),
       signal: controller.signal,
     });
@@ -95,7 +121,7 @@ async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: strin
     const reason =
       error instanceof Error
         ? error.name === "AbortError"
-          ? "timeout_15s"
+          ? `timeout_${Math.round((input.timeoutMs ?? 15_000) / 1000)}s`
           : error.message
         : "send_failed";
     // eslint-disable-next-line no-console
@@ -234,4 +260,96 @@ export async function sendPasswordResetEmail(input: {
 }): Promise<{ ok: boolean; reason?: string }> {
   const copy = buildPasswordResetCopy(input.code, input.locale);
   return sendMail({ to: input.to, ...copy });
+}
+
+/**
+ * In-app feedback / bug report sender. Routes a TATO admin user's
+ * message + uploaded attachments to the workspace operator (you) so a
+ * user-reported bug arrives as a normal email with the screenshots /
+ * videos already attached, no triage tooling needed.
+ *
+ * Recipient is read from `FEEDBACK_RECIPIENT_EMAIL`; if unset the
+ * feature is treated as disabled and we return a structured error so
+ * the UI can show "feedback not configured yet" rather than failing
+ * silently.
+ *
+ * `replyTo` is the user's own email so the operator can hit Reply
+ * once and start a real conversation — the platform's `from` address
+ * (`SMTP_FROM`) is just the envelope.
+ */
+export async function sendFeedbackEmail(input: {
+  fromName: string;
+  fromEmail: string;
+  message: string;
+  attachments?: EmailAttachment[];
+  /** Lightweight context dump (URL, locale, app version, user agent)
+   *  rendered into the email body so the operator knows where the
+   *  user was when they submitted. */
+  context?: Record<string, string | undefined>;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const recipient = process.env.FEEDBACK_RECIPIENT_EMAIL?.trim();
+  if (!recipient) {
+    return { ok: false, reason: "feedback_recipient_not_configured" };
+  }
+
+  const subject = `[TATO feedback] ${input.fromName} <${input.fromEmail}>`;
+
+  const contextLines = input.context
+    ? Object.entries(input.context)
+        .filter(([, value]) => value && value.trim().length > 0)
+        .map(([key, value]) => `${key}: ${value}`)
+    : [];
+
+  const text = [
+    `From: ${input.fromName} <${input.fromEmail}>`,
+    "",
+    input.message,
+    "",
+    contextLines.length > 0 ? "—" : "",
+    ...contextLines,
+  ]
+    .filter((line) => line !== undefined)
+    .join("\n");
+
+  const escape = (value: string) =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 540px; margin: 0 auto; padding: 24px; color: #111318;">
+      <p style="font-size: 11px; letter-spacing: 0.34em; text-transform: uppercase; color: #6b6f78; margin: 0 0 8px;">TATO feedback</p>
+      <h1 style="font-size: 18px; font-weight: 600; margin: 0 0 12px;">${escape(input.fromName)} &lt;${escape(input.fromEmail)}&gt;</h1>
+      <div style="background: #f4f4f6; border-radius: 12px; padding: 18px; margin-bottom: 16px; white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 22px;">${escape(input.message)}</div>
+      ${
+        contextLines.length > 0
+          ? `<table style="font-size: 12px; color: #3a3d44; border-collapse: collapse; width: 100%;">${contextLines
+              .map((line) => {
+                const [key, ...rest] = line.split(": ");
+                return `<tr><td style="padding: 4px 8px 4px 0; color: #6b6f78;">${escape(key)}</td><td style="padding: 4px 0; word-break: break-all;">${escape(rest.join(": "))}</td></tr>`;
+              })
+              .join("")}</table>`
+          : ""
+      }
+      ${
+        input.attachments && input.attachments.length > 0
+          ? `<p style="font-size: 12px; color: #6b6f78; margin-top: 16px;">📎 ${input.attachments.length} attachment(s)</p>`
+          : ""
+      }
+    </div>
+  `;
+
+  // Larger attachments need longer than the verification-email
+  // budget; 60 seconds is generous without leaving the user staring
+  // forever if the upstream is dead.
+  return sendMail({
+    to: recipient,
+    subject,
+    text,
+    html,
+    replyTo: input.fromEmail,
+    attachments: input.attachments,
+    timeoutMs: 60_000,
+  });
 }

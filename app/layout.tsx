@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 
 import "@/app/globals.css";
 import { getI18n } from "@/lib/i18n-server";
-import { APP_VERSION_LABEL } from "@/lib/version";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { messages } = await getI18n();
@@ -45,17 +44,15 @@ export default async function RootLayout({
 }>) {
   const { locale } = await getI18n();
 
+  // The previous floating version chip pinned at `bottom-3 left-3` was
+  // removed in v0.19.5 — on mobile it sat directly under the
+  // ContactButton (also bottom-left) and the two overlapped, and on
+  // desktop the version is already prominent in the sidebar's footer
+  // block. Keeping it in two places was clutter for no information
+  // gain.
   return (
     <html lang={locale === "zh" ? "zh-CN" : "en"}>
-      <body>
-        {children}
-        {/* Floating version chip — desktop only. On mobile it would
-            collide with the bottom tab bar / iOS home indicator and
-            adds nothing useful, so we hide it under `lg`. */}
-        <div className="pointer-events-none fixed bottom-3 left-3 z-40 hidden rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.92)] px-3 py-1.5 text-[11px] font-medium tracking-[0.08em] text-[var(--ink-soft)] shadow-[0_16px_32px_rgba(17,19,24,0.08)] backdrop-blur lg:block">
-          {APP_VERSION_LABEL}
-        </div>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

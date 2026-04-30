@@ -182,7 +182,18 @@ export function AppShell({
           {sidebarContent}
         </aside>
 
-        <main className="flex-1 px-3 pb-[calc(env(safe-area-inset-bottom)+88px)] pt-4 sm:px-4 lg:px-5 lg:pb-5 lg:pt-3.5">
+        {/* `min-w-0` is the load-bearing fix for mobile horizontal
+         * overflow. Flex items default to `min-width: auto` (= the
+         * child's `min-content` size). If any descendant of <main> has
+         * a wide unbreakable token (long URLs, the sticky-header table
+         * inside the calendar timeline, an overflow-x-auto strip's
+         * inner flex, etc.), <main> grows past 100% and the page
+         * scrolls horizontally. `min-w-0` overrides that to 0 so the
+         * flex parent constrains <main> back to viewport width and
+         * inner sections that NEED horizontal scroll (the metric
+         * strip) keep doing it inside their own `overflow-x-auto`
+         * container. */}
+        <main className="min-w-0 flex-1 px-3 pb-[calc(env(safe-area-inset-bottom)+88px)] pt-4 sm:px-4 lg:px-5 lg:pb-5 lg:pt-3.5">
           {/* v0.19.1 density pass: page-header card was eating ~120px
            * of vertical space on desktop with title at 2.35rem and
            * 20px-each-side padding. Title shrunk to 1.55rem on

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.19.5 - 2026-04-30
+
+- **Real fix for mobile horizontal overflow.** v0.19.4 added `body { overflow-x: clip }` as a safety net but didn't address the root cause — the page-header card was still rendering wider than the viewport, just with the overflowing right edge clipped invisibly. Root cause: `<main>` is a flex child of `<div className="flex min-h-screen w-full">`, and flex items default to `min-width: auto` (= the child's `min-content`). Anything in the page tree with a wide unbreakable token grew `<main>` past 100%, and every block descendant inherited the inflated width — which is why the description card, the metric cards, and the schedule list cards all extended past the viewport edge by the same amount. Added `min-w-0` to `<main>` so its flex-child min-width is 0 and the parent flex constrains it back to viewport width. Inner sections that need horizontal scroll (the dashboard metric strip with `-mx-3 + overflow-x-auto`) keep working because they own their scroll container.
+- **Removed the floating version chip from `app/layout.tsx`.** It was pinned at `bottom-3 left-3` which on mobile sat directly under the ContactButton (also bottom-left), and the two overlapped — the version label peeked out from behind the contact pill, looking broken. The version is already shown prominently in the desktop sidebar's footer and in the More-sheet footer on mobile, so removing the floating duplicate loses no information. `APP_VERSION_LABEL` is still imported wherever it's actually used (sidebar, More sheet, feedback context) — only the duplicate floating chip went away.
+
 ## v0.19.4 - 2026-04-30
 
 - **Mobile: page-level horizontal overflow fixed.** The "Turo 管理后台 MVP · SQLite + Prisma + 手动 CSV 同步" tech-info pill in the page-header card was the culprit. It sat on a `flex flex-col` container with `self-start`, which means the child grows to natural content width *uncapped* — and on a 375px viewport that long string pushed the pill (and therefore the page) ~120px wider than the viewport. Browsers then enabled horizontal scroll on the body, which is what users saw as "页面装不下". Three layered fixes:

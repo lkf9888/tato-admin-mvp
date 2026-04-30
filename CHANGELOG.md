@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.18.2 - 2026-04-30
+
+- **Hotfix — Railway build was failing on type check.** `components/app-shell.tsx` declared `navGroups` inline with no type annotation; because `lib/i18n.ts` uses `as const`, every `messages.shell.nav.*` value is typed as a string literal (`"仪表盘"`, `"Dashboard"`, etc.). TypeScript inferred each group's `items` array as a heterogeneous tuple of literal-typed objects, so `navGroups.flatMap((g) => g.items)` failed to unify the four groups (the four sets of literal labels are mutually incompatible). `next dev` doesn't run a full type-check, which is why the regression slipped through locally — `next build` (Railway's build step) caught it. Annotated `navGroups` with explicit `NavItem` / `NavGroup` types so the labels widen to `string` and flatMap composes cleanly. No runtime change.
+
 ## v0.18.1 - 2026-04-30
 
 - **Mobile depth pass — Dashboard.** The five KPI cards used to stack vertically on phones (`md:grid-cols-2` collapsed to one column under 768px), pushing the actual content half a screen down. They now ride in a horizontal snap-scroll strip that bleeds to the screen edge — same pattern Apple Wallet / App Store widget rows use. Each card slot is 58% of viewport so the next one peeks in to signal "swipe me", and `MetricCard` itself picks up tighter mobile padding (`p-4` vs `sm:p-5`) and a smaller value font (`2rem` vs `sm:2.7rem`) so it reads cleanly at half-screen width. Desktop / tablet (`sm:` and up) revert to the original static grid — nothing changes there.

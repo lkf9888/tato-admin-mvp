@@ -21,7 +21,19 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const messages = getMessages(locale);
-  const navGroups = [
+
+  // The i18n source-of-truth (`lib/i18n.ts`) uses `as const`, so every
+  // `messages.shell.nav.*` value is typed as a string literal (e.g.
+  // `"仪表盘"`, `"Dashboard"`). Without an explicit annotation here,
+  // TypeScript would infer each group's `items` array as a heterogeneous
+  // tuple of literal-typed objects, and `navGroups.flatMap(...)` further
+  // down would fail to unify the four groups (the labels are different
+  // literal types per group). Annotate as `NavItem`/`NavGroup` so the
+  // labels widen to `string` and flatMap composes cleanly.
+  type NavItem = { href: string; label: string };
+  type NavGroup = { label: string; items: NavItem[] };
+
+  const navGroups: NavGroup[] = [
     {
       label: messages.shell.nav.groupOperations,
       items: [

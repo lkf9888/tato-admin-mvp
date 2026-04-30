@@ -190,19 +190,31 @@ export function AppShell({
            * description text held at 12-13px. The workspace badge
            * also dropped one tier. End result: ~70px header on
            * desktop, ~50% denser, no info lost. */}
-          <header className="mb-3.5 flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-3 shadow-[0_24px_70px_rgba(17,19,24,0.06)] backdrop-blur sm:px-4 sm:py-3.5 md:flex-row md:items-center md:justify-between md:gap-4">
+          {/* v0.19.4 mobile: titles were dominating the screen and the
+           * tech-info badge ("Turo MVP · SQLite + …") was forcing
+           * page-level horizontal overflow because `self-start` on a
+           * `flex-col` lets the child grow to natural content width
+           * uncapped. Two fixes: (1) badge gets `max-w-full` so it
+           * wraps at the viewport boundary instead of pushing the
+           * page wider; (2) page title and kicker shrink one tier on
+           * mobile so they read as a header, not a hero. */}
+          <header className="mb-3 flex flex-col gap-1.5 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-3 shadow-[0_24px_70px_rgba(17,19,24,0.06)] backdrop-blur sm:gap-2 sm:px-4 sm:py-3.5 md:flex-row md:items-center md:justify-between md:gap-4">
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-[0.32em] text-[var(--ink-soft)]">
+              <p className="text-[9px] uppercase tracking-[0.24em] text-[var(--ink-soft)] sm:text-[10px] sm:tracking-[0.32em]">
                 {messages.shell.workspaceKicker}
               </p>
-              <h2 className="mt-1 font-serif text-[1.35rem] font-semibold leading-tight text-[var(--ink)] sm:text-[1.5rem] md:text-[1.6rem]">
+              <h2 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-[var(--ink)] sm:mt-1 sm:text-[1.5rem] md:text-[1.6rem]">
                 {title}
               </h2>
-              <p className="mt-1 max-w-3xl text-[12px] leading-snug text-[var(--ink-soft)] sm:text-[12.5px]">
+              <p className="mt-1 max-w-3xl break-words text-[11.5px] leading-snug text-[var(--ink-soft)] sm:text-[12.5px]">
                 {description}
               </p>
             </div>
-            <div className="self-start whitespace-normal break-words rounded-full border border-[rgba(89,60,251,0.12)] bg-[var(--accent-soft)] px-3 py-1 text-[10px] leading-tight text-[var(--ink)] shadow-[0_10px_20px_rgba(89,60,251,0.08)] sm:self-auto md:text-[11px]">
+            {/* Tech metadata pill. Hidden on phones to save vertical
+             * space and prevent overflow — the info is preserved in
+             * the More-sheet footer + sidebar on larger screens, where
+             * there's actually room for it. */}
+            <div className="hidden max-w-full self-start break-words rounded-full border border-[rgba(89,60,251,0.12)] bg-[var(--accent-soft)] px-3 py-1 text-[10px] leading-tight text-[var(--ink)] shadow-[0_10px_20px_rgba(89,60,251,0.08)] sm:inline-flex sm:max-w-none sm:self-auto md:text-[11px]">
               {messages.shell.workspaceBadge}
             </div>
           </header>

@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.19.4 - 2026-04-30
+
+- **Mobile: page-level horizontal overflow fixed.** The "Turo 管理后台 MVP · SQLite + Prisma + 手动 CSV 同步" tech-info pill in the page-header card was the culprit. It sat on a `flex flex-col` container with `self-start`, which means the child grows to natural content width *uncapped* — and on a 375px viewport that long string pushed the pill (and therefore the page) ~120px wider than the viewport. Browsers then enabled horizontal scroll on the body, which is what users saw as "页面装不下". Three layered fixes:
+  - The pill is now hidden on phones (`hidden sm:inline-flex`). The information is technical metadata for the operator, not for the user managing their fleet, and the desktop sidebar / More-sheet footer already surface it. Saves ~32px of vertical space on mobile too.
+  - When the pill *is* visible, it picks up `max-w-full break-words` so a future longer string can't reintroduce the same overflow.
+  - `body { overflow-x: clip }` added in `globals.css` as a safety net. Inner sections that need horizontal scroll (the dashboard metric strip with `-mx-3` + `overflow-x-auto`) keep working — `clip` only contains overflow at the body level, not at descendants. `clip` instead of `hidden` so sticky positioning still works in `<header>` / `<MobileNav>`.
+- **Mobile titles shrunk one tier.** Per feedback that the big bold serif titles dominated the phone screen, every page-level title dropped from `text-xl` / `text-[1.35rem]` / `text-[1.6rem]` to a unified `text-[1.05rem]` (~16.8 px) on phones. Desktop (`sm:` and `lg:`) untouched. Specifically:
+  - `MobileNav` brand "TATO" `text-xl → text-[15px]` and kicker tracking from `0.32em → 0.28em` so it stops fighting the page header below.
+  - `AppShell` page-header `<h2>`: `text-[1.35rem] → text-[1.05rem]` mobile, `sm:text-[1.5rem]` retained.
+  - `MobileScheduleList` title (the giant "需要你关注的行程" on `/calendar`): `text-[1.6rem] → text-[1.1rem]`.
+  - Dashboard "Upcoming" / "Activity" panel titles: `text-xl → text-[1.05rem]` mobile, `sm:text-2xl` retained.
+  - Orders / Vehicles / Owners card titles + the orders create-form / search-section heads: standardized at `text-[1.05rem]` mobile.
+- **Kicker letter-spacing tightened on mobile** (`tracking-[0.32em] → tracking-[0.24em]`, `tracking-[0.28em] → tracking-[0.22em]`) so the small all-caps section labels stop wrapping on a 375 px screen.
+
 ## v0.19.3 - 2026-04-30
 
 - **Calendar control bar visual refresh.** The previous design wrapped action buttons inside a heavy near-black glass pill (`bg-rgba(17,19,24,0.92)`) with semi-transparent white buttons on top — the dark-on-darker-gray result had low contrast and felt detached from the rest of the admin shell, which uses white/cream surfaces with hairline borders and an accent-purple primary action. Three concrete bugs in addition to the visual mismatch:

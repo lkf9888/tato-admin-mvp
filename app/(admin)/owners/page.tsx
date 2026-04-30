@@ -81,7 +81,7 @@ export default async function OwnersPage({
           <article key={owner.id} className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-4 lg:p-5">
             <div className="flex flex-col gap-2.5 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
-                <h3 className="font-serif text-xl text-slate-950 sm:text-2xl lg:text-[1.4rem]">{owner.name}</h3>
+                <h3 className="font-serif text-[1.05rem] font-semibold leading-tight text-slate-950 sm:text-[1.3rem] lg:text-[1.4rem]">{owner.name}</h3>
                 <p className="mt-1.5 text-[12px] leading-snug text-slate-500 sm:mt-2 sm:text-sm">
                   {owner.email || ownerMessages.noEmail} · {owner.phone || ownerMessages.noPhone}
                 </p>

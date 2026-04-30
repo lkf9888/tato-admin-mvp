@@ -129,10 +129,10 @@ export default async function DashboardPage() {
         <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500 sm:text-[11px]">
+              <p className="text-[9px] uppercase tracking-[0.22em] text-slate-500 sm:text-[11px] sm:tracking-[0.25em]">
                 {dashboardMessages.upcomingKicker}
               </p>
-              <h3 className="mt-1 font-serif text-xl text-slate-950 sm:text-2xl">
+              <h3 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-slate-950 sm:mt-1 sm:text-2xl">
                 {dashboardMessages.upcomingTitle}
               </h3>
             </div>
@@ -177,10 +177,10 @@ export default async function DashboardPage() {
         </div>
 
         <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-5">
-          <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500 sm:text-[11px]">
+          <p className="text-[9px] uppercase tracking-[0.22em] text-slate-500 sm:text-[11px] sm:tracking-[0.25em]">
             {dashboardMessages.activityKicker}
           </p>
-          <h3 className="mt-1 font-serif text-xl text-slate-950 sm:text-2xl">
+          <h3 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-slate-950 sm:mt-1 sm:text-2xl">
             {dashboardMessages.activityTitle}
           </h3>
           <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">

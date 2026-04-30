@@ -14,12 +14,12 @@ export function MobileNav({
   brandKicker: string;
 }) {
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--line)] bg-[var(--surface)]/95 px-4 pt-safe pb-3 backdrop-blur lg:hidden">
+    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--line)] bg-[var(--surface)]/95 px-4 pt-safe pb-2.5 backdrop-blur lg:hidden">
       <div>
-        <p className="text-[10px] uppercase tracking-[0.32em] text-[var(--ink-soft)]">
+        <p className="text-[9px] uppercase tracking-[0.28em] text-[var(--ink-soft)]">
           {brandKicker}
         </p>
-        <p className="font-serif text-xl font-semibold leading-none text-[var(--ink)]">
+        <p className="mt-0.5 font-serif text-[15px] font-semibold leading-none text-[var(--ink)]">
           {brandTitle}
         </p>
       </div>

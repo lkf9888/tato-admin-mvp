@@ -114,7 +114,7 @@ export default async function OrdersPage({
             <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)] sm:text-xs sm:tracking-[0.28em]">
               {orderMessages.createKicker}
             </p>
-            <h2 className="mt-1 font-serif text-[1.5rem] leading-tight text-[color:var(--ink)] sm:mt-2 sm:text-[2rem]">
+            <h2 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-[color:var(--ink)] sm:mt-1 sm:text-[1.5rem] lg:text-[1.6rem]">
               {orderMessages.createTitle}
             </h2>
           </div>
@@ -205,7 +205,7 @@ export default async function OrdersPage({
             <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
               {orderMessages.searchKicker}
             </p>
-            <h2 className="mt-0.5 font-serif text-[1.25rem] leading-tight text-[color:var(--ink)] lg:text-[1.4rem]">
+            <h2 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-[color:var(--ink)] sm:text-[1.2rem] lg:text-[1.4rem]">
               {orderMessages.searchTitle}
             </h2>
           </div>
@@ -249,7 +249,7 @@ export default async function OrdersPage({
               <div className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] px-4 py-4 sm:px-5 sm:py-5">
                 <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
-                    <h3 className="font-serif text-[1.4rem] leading-tight text-[color:var(--ink)] sm:text-[2rem]">
+                    <h3 className="font-serif text-[1.05rem] font-semibold leading-tight text-[color:var(--ink)] sm:text-[1.5rem] lg:text-[1.7rem]">
                       {order.vehicle.nickname} · {order.renterName}
                     </h3>
                     <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[color:var(--ink-soft)] sm:mt-3 sm:gap-2">

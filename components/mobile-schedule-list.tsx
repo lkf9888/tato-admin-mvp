@@ -128,11 +128,11 @@ export function MobileScheduleList({
 
   return (
     <section className={className}>
-      <header className="mb-4">
-        <p className="text-[10px] uppercase tracking-[0.28em] text-[var(--ink-soft)]">
+      <header className="mb-3">
+        <p className="text-[9px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
           {labels.subtitle}
         </p>
-        <h2 className="mt-1 font-serif text-[1.6rem] leading-tight text-[var(--ink)]">
+        <h2 className="mt-0.5 font-serif text-[1.1rem] font-semibold leading-tight text-[var(--ink)]">
           {labels.title}
         </h2>
       </header>

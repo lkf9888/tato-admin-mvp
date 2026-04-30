@@ -42,6 +42,15 @@
     background: transparent;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    /* Safety net against page-level horizontal overflow on mobile. If
+       any single child element has min-content wider than the viewport
+       (long-string pill, untruncated user data, etc.), this contains
+       the leak instead of letting the body itself become horizontally
+       scrollable — which on a phone reads as "the page doesn't fit"
+       and is what users actually see. We still let inner sections
+       opt into horizontal scroll via their own `overflow-x-auto`
+       (e.g. the dashboard metric strip). */
+    overflow-x: clip;
   }
 
   /* Inputs default to 16px on mobile to suppress iOS auto-zoom on

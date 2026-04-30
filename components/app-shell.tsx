@@ -217,7 +217,7 @@ export function AppShell({
       />
 
       <ContactButton
-        labels={messages.contact}
+        locale={locale}
         currentUserName={currentUserName}
         currentUserEmail={currentUserEmail}
       />

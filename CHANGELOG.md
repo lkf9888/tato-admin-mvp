@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.19.2 - 2026-04-30
+
+- **Hotfix — production server-side exception on every admin page (digest 3150907871).** The v0.19.0 ContactButton was rendered by AppShell (a server component) with `labels={messages.contact}` as a prop. The `messages.contact` block contains four function-valued strings (`filesSelected(count, sizeMb)`, `errorTooManyFiles(max)`, `errorFileTooLarge(filename, mb)`, `errorTotalTooLarge(mb)`) — and Next.js 15 RSC will not serialize functions across the server-to-client boundary, so every render of the admin shell crashed with "a server-side exception has occurred". The crash made the dashboard, calendar, orders, and every other authenticated page un-loadable; users could reach `/login` (it doesn't render AppShell) but landing on `/dashboard` after sign-in immediately failed. `next dev` does not exercise the same RSC streaming path used in production, which is why this slipped through local development and only surfaced after the Railway deploy.
+  - Refactored `ContactButton` to take `locale: Locale` (a plain string) instead of the labels object, and to call `getMessages(locale).contact` internally. Same pattern `register-form.tsx` already uses. Functions stay client-side, only a plain string crosses the boundary. AppShell updated accordingly.
+  - Added a paragraph to the `ContactButton` JSDoc spelling out the RSC contract so the next person doesn't reintroduce this.
+
 ## v0.19.1 - 2026-04-30
 
 - **Desktop density pass.** Top-of-funnel feedback was that the desktop layout left too much air on the page — large titles, generous padding, and decorative kicker badges. Reduced empty space across every admin surface without removing any actual information. Mobile is unchanged (we just did a deliberate looser-on-mobile pass two releases ago); these are pure desktop-breakpoint adjustments.

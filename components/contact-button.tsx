@@ -4,6 +4,7 @@ import { CheckCircle2, MessageSquare, Paperclip, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
+import { getMessages, type Locale } from "@/lib/i18n";
 import { APP_VERSION_LABEL } from "@/lib/version";
 
 /**
@@ -16,33 +17,14 @@ import { APP_VERSION_LABEL } from "@/lib/version";
  * fingertip target never collides with the navigation. On desktop
  * the floating brand pill / version chip lives in the same corner of
  * the page on `/login` and `/share`, so we keep clearance there too.
+ *
+ * RSC contract: this is a client component, so the parent (a server
+ * component) MUST NOT pass label objects that contain functions —
+ * those can't cross the RSC boundary and Next 15 will throw a
+ * server-side exception at render. Instead we accept the locale
+ * (a plain string) and look up the message bundle internally with
+ * `getMessages(locale).contact`. Same pattern as `register-form.tsx`.
  */
-
-export type ContactButtonLabels = {
-  trigger: string;
-  modalTitle: string;
-  modalSubtitle: string;
-  fromLabel: string;
-  messageLabel: string;
-  messagePlaceholder: string;
-  attachLabel: string;
-  attachHint: string;
-  filesSelected: (count: number, sizeMb: string) => string;
-  removeFile: string;
-  sendAction: string;
-  sendingAction: string;
-  cancelAction: string;
-  closeLabel: string;
-  successTitle: string;
-  successCopy: string;
-  errorGeneric: string;
-  errorMessageTooShort: string;
-  errorTooManyFiles: (max: number) => string;
-  errorFileTooLarge: (filename: string, mb: number) => string;
-  errorFileType: string;
-  errorTotalTooLarge: (mb: number) => string;
-  errorNotConfigured: string;
-};
 
 const ACCEPT_ATTRIBUTE = "image/*,video/*,application/pdf,text/plain";
 const MAX_FILES = 5;
@@ -54,14 +36,15 @@ function formatMb(bytes: number) {
 }
 
 export function ContactButton({
-  labels,
+  locale,
   currentUserName,
   currentUserEmail,
 }: {
-  labels: ContactButtonLabels;
+  locale: Locale;
   currentUserName: string;
   currentUserEmail: string;
 }) {
+  const labels = getMessages(locale).contact;
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);

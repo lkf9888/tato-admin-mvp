@@ -17,10 +17,17 @@
 @layer base {
   * {
     box-sizing: border-box;
+    /* Kill the gray flash iOS Safari shows on tap. We render our own
+       active states (opacity / scale) so the default highlight only
+       fights the design language. */
+    -webkit-tap-highlight-color: transparent;
   }
 
   html {
     background: var(--page);
+    /* Prevent iOS Safari rubber-band overscroll from exposing white
+       behind sticky bars and from making the bottom tab bar wobble. */
+    overscroll-behavior-y: none;
   }
 
   body {
@@ -35,6 +42,28 @@
     background: transparent;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Inputs default to 16px on mobile to suppress iOS auto-zoom on
+     focus. Smaller font sizes inside the design language are still fine
+     on desktop because this rule is mobile-scoped. */
+  @media (max-width: 640px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    input[type="date"],
+    input[type="datetime-local"],
+    input[type="month"],
+    input[type="time"],
+    input[type="week"],
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 
   a {
@@ -107,4 +136,35 @@
 .fc-theme-standard th,
 .fc-theme-standard .fc-scrollgrid {
   border-color: var(--line);
+}
+
+/* iOS safe-area helpers. Tailwind 4 supports arbitrary `env()` values
+   inline, but expressing the four insets as plain utility classes
+   keeps the markup readable and lets us tweak the formula in one
+   place (e.g. add a 4px buffer above the home indicator). */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Active state for tab-bar items. Tailwind's `active:` modifier is
+   pointer-only on some browsers; this scopes the press feedback to
+   touch devices and keeps it visible long enough to feel intentional
+   on a fast tap. */
+@media (hover: none) {
+  .tap-press {
+    transition: transform 80ms ease-out, opacity 80ms ease-out;
+  }
+  .tap-press:active {
+    transform: scale(0.96);
+    opacity: 0.85;
+  }
 }

@@ -214,6 +214,19 @@ const messages = {
         groupBookings: "Customer Booking",
         groupBilling: "Billing",
       },
+      // Mobile bottom tab bar — five primary destinations modeled on
+      // the iOS HIG. The first four are the highest-frequency surfaces
+      // (verified against existing sidebar grouping); "More" opens the
+      // full drawer for the remaining seven entries. Labels are kept
+      // short so they fit a ~75px tab cell on a 375px-wide phone.
+      bottomNav: {
+        home: "Home",
+        calendar: "Calendar",
+        orders: "Orders",
+        fleet: "Fleet",
+        more: "More",
+        moreTitle: "All sections",
+      },
       signOut: "Sign out",
       workspaceKicker: "Operations workspace",
       workspaceBadge: "Turo admin MVP · SQLite + Prisma + manual CSV sync",
@@ -884,6 +897,14 @@ const messages = {
         groupFleet: "车队",
         groupBookings: "客户接入",
         groupBilling: "账务",
+      },
+      bottomNav: {
+        home: "首页",
+        calendar: "日历",
+        orders: "订单",
+        fleet: "车队",
+        more: "更多",
+        moreTitle: "所有功能",
       },
       signOut: "退出登录",
       workspaceKicker: "运营工作台",

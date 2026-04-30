@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { logoutAction } from "@/app/actions";
+import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { MobileNav } from "@/components/mobile-nav";
 import { getMessages, type Locale } from "@/lib/i18n";
@@ -54,8 +55,39 @@ export function AppShell({
     },
   ];
 
-  // Sidebar content is rendered into both the desktop aside and the mobile
-  // drawer (via <MobileNav>) so the layout stays in one place.
+  // Items the BottomTabBar's "More" sheet should list. We intentionally
+  // include the four primary destinations too — even though they're
+  // already in the bar — so the More sheet works as a complete site
+  // map and visitors who learn the app this way can find anything in
+  // one place.
+  const moreItems = navGroups.flatMap((group) => group.items);
+
+  // The non-nav controls (language switcher, sign out, version chip)
+  // need to live somewhere on mobile too. They get tucked into the
+  // footer of the More sheet so the desktop sidebar's full surface is
+  // reachable from a phone.
+  const moreFooter = (
+    <div className="space-y-4">
+      <LanguageSwitcher
+        locale={locale}
+        preference={localePreference}
+        label={messages.shell.languageLabel}
+        hint={messages.shell.languageHint}
+        autoLabel={messages.shell.languageAutoLabel}
+      />
+      <form action={logoutAction}>
+        <button className="tap-press w-full rounded-full border border-[var(--line)] bg-white/72 px-4 py-3 text-[14px] font-medium text-[var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.16)] hover:bg-white hover:text-[var(--ink)]">
+          {messages.shell.signOut}
+        </button>
+      </form>
+      <p className="text-center text-[11px] uppercase tracking-[0.24em] text-[var(--ink-soft)]/70">
+        {messages.shell.versionLabel} · {APP_VERSION_LABEL}
+      </p>
+    </div>
+  );
+
+  // Desktop sidebar — unchanged from prior versions. Mobile gets the
+  // top bar + bottom tab bar + More sheet treatment.
   const sidebarContent = (
     <>
       <div className="space-y-2">
@@ -119,16 +151,14 @@ export function AppShell({
       <MobileNav
         brandTitle={messages.shell.brandTitle}
         brandKicker={messages.shell.brandKicker}
-      >
-        {sidebarContent}
-      </MobileNav>
+      />
 
       <div className="flex min-h-screen w-full">
         <aside className="hidden w-60 shrink-0 border-r border-[var(--line)] bg-[var(--panel-strong)] px-5 py-6 lg:block">
           {sidebarContent}
         </aside>
 
-        <main className="flex-1 px-3 py-4 sm:px-4 lg:px-6">
+        <main className="flex-1 px-3 pb-[calc(env(safe-area-inset-bottom)+88px)] pt-4 sm:px-4 lg:px-6 lg:pb-6 lg:pt-4">
           <header className="mb-5 flex flex-col gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-4 shadow-[0_24px_70px_rgba(17,19,24,0.06)] backdrop-blur sm:px-5 sm:py-5 md:flex-row md:items-end md:justify-between md:gap-4">
             <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-[0.34em] text-[var(--ink-soft)] sm:text-[11px]">
@@ -148,6 +178,12 @@ export function AppShell({
           {children}
         </main>
       </div>
+
+      <BottomTabBar
+        labels={messages.shell.bottomNav}
+        moreItems={moreItems}
+        moreFooter={moreFooter}
+      />
     </div>
   );
 }

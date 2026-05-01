@@ -49,6 +49,7 @@ export function AppShell({
         { href: "/calendar", label: messages.shell.nav.calendar },
         { href: "/orders", label: messages.shell.nav.orders },
         { href: "/imports", label: messages.shell.nav.imports },
+        { href: "/activity", label: messages.shell.nav.activity },
       ],
     },
     {

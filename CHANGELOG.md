@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.20.0 - 2026-04-30
+
+Four-feature batch landing together: orders pagination/filters/search, an `/activity` audit-log browser page, monthly KPI cards on the dashboard, and a refactor of the 1854-line `lib/i18n.ts` into per-page modules.
+
+- **Orders page now paginates, filters, and searches server-side.** Previously `/orders` loaded every order in the workspace and ran a JS `.filter()` on the rendered list — fine for the first dozen orders, painfully slow once a real workspace accumulates hundreds. Restructured the data flow:
+  - URL params: existing `q` (search text) plus new `page`, `status`, `source`, `vehicleId`, `from`, `to`. Single GET form so the URL stays shareable and browser back works correctly.
+  - Server: builds a Prisma `where` clause from `status` / `source` / `vehicleId` / date-range filters before hitting the DB. Free-text `q` runs in JS afterward (we still want diacritic stripping + multi-field matching that SQLite + Prisma can't easily do server-side without raw SQL).
+  - Pagination: 20 cards per page. Pagination nav at the bottom of the list shows `Showing X–Y of N` and disables Prev/Next at the boundaries. Pagination links preserve every active filter via `URLSearchParams`.
+  - Filter UI: collapsible `<details>` block under the search bar, opens automatically when ≥1 filter is already active. Five fields in a 5-col grid on `xl:` (status / source / vehicle / from-date / to-date), stacking down to 2- and 1-col on smaller breakpoints. Active-filter count surfaces as a chip on the disclosure summary.
+  - Reset button surfaces only when there's something to reset, links to bare `/orders`.
+
+- **New `/activity` audit-log page.** Schema (`ActivityLog`) was already there from the foundation work; this release adds the browser UI on top of it.
+  - Filters: actor (substring search), action (canonical dropdown of all 27 known action keys), entity type (dropdown of 7 known types — User / Owner / Vehicle / Order / ImportBatch / ShareLink / Feedback), date range. All combinable; reset link clears the lot.
+  - Pagination: 30 rows per page (denser than the orders cards, since each row is one line). Server-side count + skip/take so we never load more rows than rendered.
+  - Each row shows the readable action label (via `getActivityActionLabel`), the actor, the entity type + ID (mono font for the ID, `break-all` so 30-char cuids don't blow out the row), and the timestamp. Metadata blob is hidden behind a `<details>` toggle and pretty-printed JSON when expanded — keeps the row compact for the common case while staying drillable for incident reviews.
+  - Wired into the sidebar (Operations group, after CSV Imports) and the BottomTabBar's More sheet via the existing `navGroups` flat-map.
+  - Dashboard's Activity panel header gets a new "Open activity log" link that jumps straight to the new page.
+  - Audited and corrected `activityLabelsBase` in `lib/i18n.ts`: removed four dead labels (`order_created`/`order_updated`/`order_deleted`/`import_created` were never written by the code) and added 13 missing labels (`offline_order_*`, `import_csv`, `user_registered`, `feedback_submitted`, `vehicle_auto_created_from_csv`, all six `direct_booking_*` actions). The activity log page would have rendered the missing ones as `direct booking refund failed` (underscore-stripped fallback) — now they read properly.
+
+- **Dashboard now ships a monthly KPI strip below the daily snapshot.** Same snap-scroll-on-mobile / 4-col-grid-on-desktop pattern as the existing daily cards, fed by a single Prisma query that pulls both the current and previous month's orders and buckets in JS. Four cards: Net earnings (MTD, with delta-vs-last-month + last-month absolute in the hint line), Trips (count of orders started this month), Active vehicles (distinct vehicle IDs), Avg per trip. Delta surfaces as `▲ 12.4% vs last month` / `▼ 4.1% vs last month` / `No change vs last month` / `No data for last month` so a brand-new workspace doesn't render `+Infinity %`. Bilingual copy across EN / 中文 / auto-converted 繁中.
+
+- **Refactored `lib/i18n.ts` from 1854 lines into per-page modules.** The old single file was the project's biggest source file and was making targeted edits painful (every "find dashboard strings" workflow scrolled the same wall of translations). New layout:
+  - `lib/i18n.ts` (318 lines) keeps the type system, locale parsing, status/activity label helpers, dropdown option builders (`getOrderStatusOptions` / `getVehicleStatusOptions` / `getShareVisibilityOptions` / `getCsvFieldOptions`), and the new module composer.
+  - `lib/i18n/messages/{shell,contact,auth,dashboard,fleet,direct-booking,orders,imports,billing,calendar,share}.ts` — 11 modules, each `78–235` lines, exporting `{ en: {...}, zh: {...} } as const` with top-level keys matching the destination shape.
+  - `lib/i18n.ts` composes via spread idiom (`{ ...shellMessages.en, ...contactMessages.en, ... }`) inside the `as const` outer wrapper so literal types and function-valued strings are preserved end-to-end. The `Messages` type still derives from `(typeof messages)["zh"]` so all 44 callers across the codebase keep working unchanged — zero breaking surface area.
+  - Total LOC grew slightly (1854 → 2044) due to per-file JSDoc + module wrappers, but the biggest single file dropped from 1854 → 318 lines (84% reduction). Adding a new language string for, say, the orders page now means opening a 136-line file instead of scrolling past 1700 unrelated lines.
+
 ## v0.19.5 - 2026-04-30
 
 - **Real fix for mobile horizontal overflow.** v0.19.4 added `body { overflow-x: clip }` as a safety net but didn't address the root cause — the page-header card was still rendering wider than the viewport, just with the overflowing right edge clipped invisibly. Root cause: `<main>` is a flex child of `<div className="flex min-h-screen w-full">`, and flex items default to `min-width: auto` (= the child's `min-content`). Anything in the page tree with a wide unbreakable token grew `<main>` past 100%, and every block descendant inherited the inflated width — which is why the description card, the metric cards, and the schedule list cards all extended past the viewport edge by the same amount. Added `min-w-0` to `<main>` so its flex-child min-width is 0 and the parent flex constrains it back to viewport width. Inner sections that need horizontal scroll (the dashboard metric strip with `-mx-3 + overflow-x-auto`) keep working because they own their scroll container.

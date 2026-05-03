@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.20.2 - 2026-05-03
+
+- **Dashboard: density pass.** Operator feedback was that the dashboard scrolled — they wanted everything (daily snapshot + monthly KPIs + Today/Tomorrow event panels + Activity log) above the fold on a single page. Tightened every layer of the layout one tier without removing any information:
+  - **`MetricCard` component** (`components/metric-card.tsx`): padding `p-4 sm:p-5 → p-3 sm:p-4`. Value font `text-[2rem] sm:text-[2.7rem] → text-[1.5rem] sm:text-[2rem]` (still glanceable, just stops being editorial). Internal margins `mt-3/mt-4 → mt-1.5/mt-2` and `mt-2/mt-3 → mt-1.5/mt-2`. Hint font `text-[12px] sm:text-[13px] → text-[11px] sm:text-[12px]`. Net: ~24px shorter per card on mobile, ~32px shorter on desktop, 9 cards × that = the daily + monthly strips lose ~280px of vertical space combined.
+  - **Snap-scroll card width** dropped from `w-[58%] → w-[52%]` so a sliver of the second card peeks in at rest — stronger swipe affordance plus a bit more horizontal info per glance.
+  - **Day panels (Today / Tomorrow / Activity)**: outer padding `p-4 sm:p-5 → p-3 sm:p-4`. Title `text-[1.05rem] sm:text-2xl → text-[0.95rem] sm:text-[1.15rem]`. Inner row spacing `mt-3 space-y-2 sm:mt-4 sm:space-y-2.5 → mt-2 space-y-1.5 sm:mt-2.5`. Empty state `px-4 py-6 → px-3 py-3.5`. Header link chip `px-3 py-1.5 text-xs → px-2.5 py-1 text-[11px]`.
+  - **Event row inside day panels**: padding `px-4 py-3 sm:px-5 sm:py-4 → px-3 py-2 sm:px-3.5 sm:py-2.5`. Vehicle line `mt-1.5 → mt-0.5` and font normalized to `text-[13px] sm:text-[13.5px]`. Location line `mt-1 → mt-0.5`, font `text-[12px] sm:text-sm → text-[11px] sm:text-[12px]`. Pickup/return badge padding `px-2 → px-1.5`. Status-badge gap `gap-1.5 → gap-1`.
+  - **Activity log entry**: padding `px-4 py-3 sm:py-4 → px-3 py-1.5 sm:py-2`. Title font `font-medium → text-[12.5px] font-medium sm:text-[13px]`. Meta line same shrink as event location. Six-row activity log fits in roughly half the height it did before.
+  - **Section gaps**: outer page `space-y-4 sm:space-y-5 lg:space-y-4 → space-y-3 sm:space-y-3.5 lg:space-y-3`. Bottom-section grid `gap-4 sm:gap-5 lg:gap-4 → gap-3 sm:gap-3.5 lg:gap-3`. Inner left-column space-y matched. Monthly section heading `space-y-2.5 → space-y-1.5`. Snap-strip horizontal grid gap `sm:gap-4 → sm:gap-3`.
+- Net effect on a 1080p / 1440p laptop: the dashboard now fits without a scrollbar in the typical content area (post sidebar + page header). Mobile still scrolls but the chrome eats far less of the screen, so visible info per tap-scroll is meaningfully higher.
+
 ## v0.20.1 - 2026-05-03
 
 - **Dashboard: replaced "Upcoming orders" panel with separate "Today" and "Tomorrow" panels.** Operator feedback was that "next 5 trips" lumped pickups and returns together with no visible time horizon — you couldn't tell at a glance whether someone was about to drive away with your car in 20 minutes or in two days. The new layout gives the two highest-frequency operational windows their own cards, each surfacing the two key fields the operator actually needs: **time** (just hour:minute, since the panel header already says "today"/"tomorrow") and **pickup/return location**.

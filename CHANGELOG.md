@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.20.1 - 2026-05-03
+
+- **Dashboard: replaced "Upcoming orders" panel with separate "Today" and "Tomorrow" panels.** Operator feedback was that "next 5 trips" lumped pickups and returns together with no visible time horizon — you couldn't tell at a glance whether someone was about to drive away with your car in 20 minutes or in two days. The new layout gives the two highest-frequency operational windows their own cards, each surfacing the two key fields the operator actually needs: **time** (just hour:minute, since the panel header already says "today"/"tomorrow") and **pickup/return location**.
+  - Each card lists distinct events, not orders. An order with pickup AND return on the same day produces two rows (one Pickup, one Return) — they're independent operational actions and conflating them hides the second one.
+  - Pickup events get an accent-purple chip, returns get a slate-900 chip, so the two kinds are colour-distinguishable in peripheral vision while the chip's text label keeps it accessible.
+  - Empty states ("No pickups or returns scheduled for tomorrow") render when nothing's in the window — better than a card with just a header.
+  - Layout: Today and Tomorrow stack in the wider left column (`xl:grid-cols-[1.2fr_0.8fr]`), Activity panel keeps its slot on the right. Mobile stacks all three vertically as before.
+  - Query change: replaced the single `pickupDatetime: { gte: now }` upcoming query (which limited to 5 future pickups) with two day-window queries that match `pickupDatetime` OR `returnDatetime` falling inside the window. SQLite + Prisma handles the OR cleanly.
+  - i18n: removed unused `upcomingKicker` / `upcomingTitle` / `upcomingEmpty` keys from `lib/i18n/messages/dashboard.ts`; added `todayKicker` / `todayTitle` / `todayEmpty`, `tomorrowKicker` / `tomorrowTitle` / `tomorrowEmpty`, and an `event.*` block (badges + location prefixes) so both the EN and 中文 (and auto-converted 繁中) variants stay parallel.
+
 ## v0.20.0 - 2026-04-30
 
 Four-feature batch landing together: orders pagination/filters/search, an `/activity` audit-log browser page, monthly KPI cards on the dashboard, and a refactor of the 1854-line `lib/i18n.ts` into per-page modules.

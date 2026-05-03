@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { MetricCard } from "@/components/metric-card";
 import {
+  cn,
   formatCurrency,
   formatDateTime,
   formatNumber,
@@ -11,8 +12,77 @@ import {
 } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { requireCurrentWorkspace } from "@/lib/auth";
-import { getActivityActionLabel, getLocaleTag } from "@/lib/i18n";
+import { getActivityActionLabel, getLocaleTag, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
+
+/**
+ * Strip the rendered datetime down to "10:30 AM" / "10:30" — when
+ * the panel header already says "Today" or "Tomorrow", showing the
+ * full date next to every event is noise. Falls back to the locale-
+ * appropriate hour:minute pattern.
+ */
+function formatTimeOnly(date: Date, locale: Locale): string {
+  return new Intl.DateTimeFormat(getLocaleTag(locale), {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+/**
+ * One pickup OR one return event derived from an Order. An order with
+ * pickup AND return on the same day produces TWO events (one of each
+ * kind), which is the right behavior — they're independent operational
+ * actions the team needs to handle.
+ */
+type DayOrder = Awaited<ReturnType<typeof fetchDayOrders>>[number];
+type DayEvent = {
+  kind: "pickup" | "return";
+  time: Date;
+  location: string | null;
+  order: DayOrder;
+};
+
+async function fetchDayOrders(workspaceId: string, dayStart: Date, dayEnd: Date) {
+  return prisma.order.findMany({
+    where: {
+      workspaceId,
+      isArchived: false,
+      status: { not: "cancelled" },
+      // Top-level fields combine via AND, the OR captures "either pickup
+      // OR return falls inside the day window" — which is what we want
+      // for an operational hot list.
+      OR: [
+        { pickupDatetime: { gte: dayStart, lte: dayEnd } },
+        { returnDatetime: { gte: dayStart, lte: dayEnd } },
+      ],
+    },
+    include: { vehicle: true },
+    orderBy: { pickupDatetime: "asc" },
+  });
+}
+
+function buildDayEvents(orders: DayOrder[], dayStart: Date, dayEnd: Date): DayEvent[] {
+  const events: DayEvent[] = [];
+  for (const order of orders) {
+    if (order.pickupDatetime >= dayStart && order.pickupDatetime <= dayEnd) {
+      events.push({
+        kind: "pickup",
+        time: order.pickupDatetime,
+        location: order.pickupLocation,
+        order,
+      });
+    }
+    if (order.returnDatetime >= dayStart && order.returnDatetime <= dayEnd) {
+      events.push({
+        kind: "return",
+        time: order.returnDatetime,
+        location: order.returnLocation,
+        order,
+      });
+    }
+  }
+  return events.sort((a, b) => a.time.getTime() - b.time.getTime());
+}
 
 export default async function DashboardPage() {
   const workspace = await requireCurrentWorkspace();
@@ -21,6 +91,14 @@ export default async function DashboardPage() {
   startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date(now);
   endOfDay.setHours(23, 59, 59, 999);
+
+  // Tomorrow boundaries computed off startOfDay so DST shifts don't
+  // skew the math (adding 24h is wrong twice a year; setDate +1 keeps
+  // the wall-clock anchor and lets the JS Date handle DST transparently).
+  const startOfTomorrow = new Date(startOfDay);
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+  const endOfTomorrow = new Date(endOfDay);
+  endOfTomorrow.setDate(endOfTomorrow.getDate() + 1);
 
   // Month boundaries for the new "This month" overview. We pull both
   // the current month and last month in a single query (one round
@@ -31,62 +109,65 @@ export default async function DashboardPage() {
   const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-  const [{ locale, messages }, todayOrders, upcomingOrders, conflictOrders, latestImport, latestLogs, monthlyOrders] =
-    await Promise.all([
-      getI18n(),
-      prisma.order.findMany({
-        where: {
-          workspaceId: workspace.id,
-          isArchived: false,
-          pickupDatetime: { lte: endOfDay },
-          returnDatetime: { gte: startOfDay },
-          status: { not: "cancelled" },
-        },
-        include: { vehicle: true },
-        orderBy: { pickupDatetime: "asc" },
-      }),
-      prisma.order.findMany({
-        where: {
-          workspaceId: workspace.id,
-          isArchived: false,
-          pickupDatetime: { gte: now },
-          status: { not: "cancelled" },
-        },
-        include: { vehicle: true },
-        orderBy: { pickupDatetime: "asc" },
-        take: 5,
-      }),
-      prisma.order.findMany({
-        where: { workspaceId: workspace.id, isArchived: false, hasConflict: true },
-        include: { vehicle: true },
-        orderBy: { pickupDatetime: "asc" },
-      }),
-      prisma.importBatch.findFirst({
-        where: { workspaceId: workspace.id },
-        orderBy: { importedAt: "desc" },
-      }),
-      prisma.activityLog.findMany({
-        where: { workspaceId: workspace.id },
-        orderBy: { createdAt: "desc" },
-        take: 6,
-      }),
-      prisma.order.findMany({
-        where: {
-          workspaceId: workspace.id,
-          isArchived: false,
-          status: { not: "cancelled" },
-          pickupDatetime: { gte: lastMonthStart, lt: nextMonthStart },
-        },
-        select: {
-          vehicleId: true,
-          pickupDatetime: true,
-          totalPrice: true,
-          sourceMetadata: true,
-        },
-      }),
-    ]);
+  const [
+    { locale, messages },
+    todayOrders,
+    todayDayOrders,
+    tomorrowDayOrders,
+    conflictOrders,
+    latestImport,
+    latestLogs,
+    monthlyOrders,
+  ] = await Promise.all([
+    getI18n(),
+    prisma.order.findMany({
+      where: {
+        workspaceId: workspace.id,
+        isArchived: false,
+        pickupDatetime: { lte: endOfDay },
+        returnDatetime: { gte: startOfDay },
+        status: { not: "cancelled" },
+      },
+      include: { vehicle: true },
+      orderBy: { pickupDatetime: "asc" },
+    }),
+    fetchDayOrders(workspace.id, startOfDay, endOfDay),
+    fetchDayOrders(workspace.id, startOfTomorrow, endOfTomorrow),
+    prisma.order.findMany({
+      where: { workspaceId: workspace.id, isArchived: false, hasConflict: true },
+      include: { vehicle: true },
+      orderBy: { pickupDatetime: "asc" },
+    }),
+    prisma.importBatch.findFirst({
+      where: { workspaceId: workspace.id },
+      orderBy: { importedAt: "desc" },
+    }),
+    prisma.activityLog.findMany({
+      where: { workspaceId: workspace.id },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+    }),
+    prisma.order.findMany({
+      where: {
+        workspaceId: workspace.id,
+        isArchived: false,
+        status: { not: "cancelled" },
+        pickupDatetime: { gte: lastMonthStart, lt: nextMonthStart },
+      },
+      select: {
+        vehicleId: true,
+        pickupDatetime: true,
+        totalPrice: true,
+        sourceMetadata: true,
+      },
+    }),
+  ]);
   const dashboardMessages = messages.dashboard;
   const monthlyMessages = dashboardMessages.monthly;
+  const eventMessages = dashboardMessages.event;
+
+  const todayEvents = buildDayEvents(todayDayOrders, startOfDay, endOfDay);
+  const tomorrowEvents = buildDayEvents(tomorrowDayOrders, startOfTomorrow, endOfTomorrow);
 
   const todaysRentals = todayOrders.length;
   const todaysPickups = todayOrders.filter((order) => order.pickupDatetime >= startOfDay).length;
@@ -151,6 +232,98 @@ export default async function DashboardPage() {
     lastMonthNet > 0
       ? `${deltaHint} · ${monthlyMessages.lastMonthAmount(formatCurrency(lastMonthNet, locale))}`
       : deltaHint;
+
+  // Pickup/return event row used by both Today and Tomorrow panels.
+  // Renders as a tappable list cell — the entire row is a Link to
+  // /orders so finger-anywhere navigation works the same as the iOS
+  // list-cell pattern used elsewhere in the dashboard.
+  const renderEvent = (event: DayEvent) => {
+    const isPickup = event.kind === "pickup";
+    const locationPrefix = isPickup
+      ? eventMessages.pickupLocationPrefix
+      : eventMessages.returnLocationPrefix;
+    const locationValue = event.location?.trim() || eventMessages.noLocation;
+    const order = event.order;
+
+    return (
+      <Link
+        key={`${order.id}-${event.kind}`}
+        href="/orders"
+        className="tap-press flex flex-col gap-2 rounded-lg border border-slate-200 px-4 py-3 hover:border-slate-300 hover:bg-slate-50/50 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:px-5 sm:py-4"
+      >
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]",
+                isPickup
+                  ? "bg-[var(--accent-soft)] text-[var(--ink)]"
+                  : "bg-slate-900 text-white",
+              )}
+            >
+              {isPickup ? eventMessages.pickupBadge : eventMessages.returnBadge}
+            </span>
+            <span className="text-[13px] font-semibold tabular-nums text-slate-900 sm:text-sm">
+              {formatTimeOnly(event.time, locale)}
+            </span>
+          </div>
+          <p className="mt-1.5 truncate font-semibold text-slate-900">
+            {order.vehicle.plateNumber
+              ? `${order.vehicle.plateNumber} · ${order.vehicle.nickname}`
+              : order.vehicle.nickname}
+            {" · "}
+            {order.renterName}
+          </p>
+          <p className="mt-1 text-[12px] leading-snug text-slate-500 sm:text-sm">
+            <span className="text-slate-400">{locationPrefix}:</span>{" "}
+            <span className="text-slate-700">{locationValue}</span>
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:flex-nowrap sm:gap-2">
+          <StatusBadge value={order.source} locale={locale} />
+          <StatusBadge value={order.status} locale={locale} />
+          {order.hasConflict ? <StatusBadge value="conflict" locale={locale} /> : null}
+        </div>
+      </Link>
+    );
+  };
+
+  const renderDayPanel = (
+    kicker: string,
+    title: string,
+    events: DayEvent[],
+    emptyMessage: string,
+  ) => (
+    <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <div className="min-w-0">
+          <p className="text-[9px] uppercase tracking-[0.22em] text-slate-500 sm:text-[11px] sm:tracking-[0.25em]">
+            {kicker}
+          </p>
+          <h3 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-slate-950 sm:mt-1 sm:text-2xl">
+            {title}
+          </h3>
+        </div>
+        <Link
+          href="/orders"
+          className="tap-press inline-flex w-fit items-center gap-1 self-start rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 sm:self-auto"
+        >
+          {dashboardMessages.openOrders}
+          <span aria-hidden>→</span>
+        </Link>
+      </div>
+
+      <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
+        {events.length === 0 ? (
+          <p className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+            {emptyMessage}
+          </p>
+        ) : (
+          events.map(renderEvent)
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4 sm:space-y-5 lg:space-y-4">
@@ -258,63 +431,27 @@ export default async function DashboardPage() {
         </div>
       </section>
 
+      {/*
+       * Today / Tomorrow stacked in the wider left column; Activity
+       * stays in the right column. On mobile everything stacks into
+       * a single column. The left column is wrapped in its own
+       * `<div className="space-y-...">` so the two day panels share
+       * spacing without interfering with the outer grid's gap.
+       */}
       <section className="grid gap-4 sm:gap-5 lg:gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        {/* Upcoming orders panel. Each row is a tappable Link to /orders
-         * so the whole card behaves like a list cell on iOS — finger
-         * anywhere on the row navigates. The mobile padding is tighter
-         * (p-4) than desktop (sm:p-5) so the cards don't waste an inch
-         * of margin on a 375px screen. v0.19.1 dropped desktop padding
-         * one tier (p-6 → p-5) and the title from text-3xl → text-xl
-         * so each panel reads as a tight info card rather than an
-         * editorial spread. */}
-        <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-            <div className="min-w-0">
-              <p className="text-[9px] uppercase tracking-[0.22em] text-slate-500 sm:text-[11px] sm:tracking-[0.25em]">
-                {dashboardMessages.upcomingKicker}
-              </p>
-              <h3 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-slate-950 sm:mt-1 sm:text-2xl">
-                {dashboardMessages.upcomingTitle}
-              </h3>
-            </div>
-            <Link
-              href="/orders"
-              className="tap-press inline-flex w-fit items-center gap-1 self-start rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 sm:self-auto"
-            >
-              {dashboardMessages.openOrders}
-              <span aria-hidden>→</span>
-            </Link>
-          </div>
-
-          <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
-            {upcomingOrders.length === 0 ? (
-              <p className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-                {dashboardMessages.upcomingEmpty}
-              </p>
-            ) : null}
-            {upcomingOrders.map((order) => (
-              <Link
-                key={order.id}
-                href="/orders"
-                className="tap-press flex flex-col gap-2 rounded-lg border border-slate-200 px-4 py-3 hover:border-slate-300 hover:bg-slate-50/50 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-5 sm:py-4"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-900">
-                    {order.vehicle.nickname} · {order.renterName}
-                  </p>
-                  <p className="mt-1 text-[12px] leading-snug text-slate-500 sm:text-sm">
-                    {formatDateTime(order.pickupDatetime, locale)} —{" "}
-                    {formatDateTime(order.returnDatetime, locale)}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:gap-2">
-                  <StatusBadge value={order.source} locale={locale} />
-                  <StatusBadge value={order.status} locale={locale} />
-                  {order.hasConflict ? <StatusBadge value="conflict" locale={locale} /> : null}
-                </div>
-              </Link>
-            ))}
-          </div>
+        <div className="space-y-4 sm:space-y-5 lg:space-y-4">
+          {renderDayPanel(
+            dashboardMessages.todayKicker,
+            dashboardMessages.todayTitle,
+            todayEvents,
+            dashboardMessages.todayEmpty,
+          )}
+          {renderDayPanel(
+            dashboardMessages.tomorrowKicker,
+            dashboardMessages.tomorrowTitle,
+            tomorrowEvents,
+            dashboardMessages.tomorrowEmpty,
+          )}
         </div>
 
         <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-5">

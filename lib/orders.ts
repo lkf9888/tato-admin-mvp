@@ -1,6 +1,7 @@
 import { OrderSource, OrderStatus, type Vehicle } from "@prisma/client";
 import { parse } from "date-fns";
 
+import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { prisma } from "@/lib/prisma";
 import { getNetEarningFromFinancials, normalizeText, parseNumberValue, safeString } from "@/lib/utils";
 
@@ -917,6 +918,7 @@ export async function importTuroOrders(input: {
               data: payload,
             });
 
+        await syncOrderOwnerLedger(savedCancelledOrder.id);
         syncedOrderIds.add(savedCancelledOrder.id);
         touchedVehicleIds.add(vehicle.id);
         deletedCancelledRows += 1;
@@ -932,6 +934,7 @@ export async function importTuroOrders(input: {
         : await prisma.order.create({
             data: payload,
           });
+      await syncOrderOwnerLedger(savedOrder.id);
       syncedOrderIds.add(savedOrder.id);
 
       touchedVehicleIds.add(vehicle.id);
@@ -991,6 +994,7 @@ export async function importTuroOrders(input: {
 
       deletedStaleOrders = staleTuroOrders.length;
       for (const order of staleTuroOrders) {
+        await syncOrderOwnerLedger(order.id);
         touchedVehicleIds.add(order.vehicleId);
       }
     }

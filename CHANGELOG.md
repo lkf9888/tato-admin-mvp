@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.21.0 - 2026-05-04
+
+- **Owner revenue share module, adapted from HostHub.** Added a new `/owner-statements` admin surface for vehicle-owner revenue sharing. The page combines a bank-statement-style ledger, a 12-month net chart, and a monthly statement view.
+- **Editable owner ledger.** Added `OwnerLedgerItem` records for owner net earnings, TATO commission, reimbursements, manual adjustments, and settlement payments. Every row can be edited or deleted; editing an auto-generated order row turns it into a manual row so future syncs do not overwrite the manager's correction.
+- **Order-driven auto sync.** Turo imports, offline order edits, order status changes, vehicle owner assignment changes, and manual resync all refresh owner ledger rows without deleting source orders or CSV metadata. Cancelled or archived orders remove only their auto ledger footprint.
+- **Vehicle share settings.** Vehicle create/edit now includes a TATO commission percentage field, following the HostHub property-level commission setting pattern but adapted to Turo vehicles and `Net Earning`.
+
 ## v0.20.2 - 2026-05-03
 
 - **Dashboard: density pass.** Operator feedback was that the dashboard scrolled — they wanted everything (daily snapshot + monthly KPIs + Today/Tomorrow event panels + Activity log) above the fold on a single page. Tightened every layer of the layout one tier without removing any information:

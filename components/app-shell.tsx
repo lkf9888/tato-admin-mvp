@@ -58,6 +58,7 @@ export function AppShell({
         { href: "/vehicles", label: messages.shell.nav.vehicles },
         { href: "/vehicle-roi", label: messages.shell.nav.vehicleRoi },
         { href: "/owners", label: messages.shell.nav.owners },
+        { href: "/owner-statements", label: messages.shell.nav.ownerStatements },
       ],
     },
     {

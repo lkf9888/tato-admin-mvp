@@ -47,111 +47,124 @@ enum WorkspaceBillingStatus {
   paused
 }
 
+enum OwnerLedgerKind {
+  OWNER_NET_EARNING
+  MANAGER_COMMISSION
+  EXPENSE_REIMBURSEMENT
+  MANUAL_ADJUSTMENT
+  SETTLEMENT_PAYMENT
+}
+
 model Workspace {
-  id            String            @id @default(cuid())
-  name          String
-  slug          String            @unique
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  users         User[]
-  owners        Owner[]
-  vehicles      Vehicle[]
-  orders        Order[]
-  importBatches ImportBatch[]
-  shareLinks    ShareLink[]
-  activityLogs  ActivityLog[]
-  billing       WorkspaceBilling?
+  id               String            @id @default(cuid())
+  name             String
+  slug             String            @unique
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  users            User[]
+  owners           Owner[]
+  vehicles         Vehicle[]
+  orders           Order[]
+  importBatches    ImportBatch[]
+  shareLinks       ShareLink[]
+  activityLogs     ActivityLog[]
+  ownerLedgerItems OwnerLedgerItem[]
+  billing          WorkspaceBilling?
 }
 
 model User {
-  id              String    @id @default(cuid())
+  id              String     @id @default(cuid())
   workspaceId     String?
   name            String
-  email           String    @unique
+  email           String     @unique
   passwordHash    String
-  isBillingExempt Boolean @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  isBillingExempt Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
   workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
 }
 
 model Owner {
-  workspaceId  String?
-  id          String          @id @default(cuid())
+  workspaceId String?
+  id          String            @id @default(cuid())
   name        String
   phone       String?
   email       String?
   companyName String?
-  accessType  OwnerAccessType @default(share_link)
+  accessType  OwnerAccessType   @default(share_link)
   notes       String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  workspace   Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  workspace   Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   vehicles    Vehicle[]
   shareLinks  ShareLink[]
+  ledgerItems OwnerLedgerItem[]
 
   @@index([workspaceId])
 }
 
 model Vehicle {
-  workspaceId      String?
-  id              String        @id @default(cuid())
-  ownerId         String?
-  plateNumber     String        @unique
-  nickname        String
-  brand           String
-  model           String
-  year            Int
-  vin             String?
-  status          VehicleStatus @default(available)
-  turoListingName String?
-  turoVehicleCode String?
-  purchasePrice   Float?
-  directBookingEnabled Boolean   @default(false)
+  workspaceId          String?
+  id                   String            @id @default(cuid())
+  ownerId              String?
+  plateNumber          String            @unique
+  nickname             String
+  brand                String
+  model                String
+  year                 Int
+  vin                  String?
+  status               VehicleStatus     @default(available)
+  turoListingName      String?
+  turoVehicleCode      String?
+  purchasePrice        Float?
+  ownerCommissionRate  Float?
+  directBookingEnabled Boolean           @default(false)
   bookingDailyRate     Float?
   bookingInsuranceFee  Float?
   bookingDepositAmount Float?
   bookingIntro         String?
-  notes           String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  workspace       Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  owner           Owner?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  orders          Order[]
+  notes                String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  workspace            Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  owner                Owner?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  orders               Order[]
+  ownerLedgerItems     OwnerLedgerItem[]
 
   @@index([workspaceId])
 }
 
 model Order {
   workspaceId      String?
-  id              String       @id @default(cuid())
-  vehicleId       String
-  importBatchId   String?
-  source          OrderSource
-  externalOrderId String?
-  renterName      String
-  renterPhone     String?
-  pickupDatetime  DateTime
-  returnDatetime  DateTime
-  totalPrice      Float?
-  depositAmount   Float?
-  status          OrderStatus  @default(booked)
-  pickupLocation  String?
-  returnLocation  String?
-  paymentMethod   String?
-  contractNumber  String?
-  notes           String?
-  sourceMetadata  String?
-  createdBy       String
-  isArchived      Boolean      @default(false)
-  hasConflict     Boolean      @default(false)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  workspace       Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  importBatch     ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
-  vehicle         Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  id               String            @id @default(cuid())
+  vehicleId        String
+  importBatchId    String?
+  source           OrderSource
+  externalOrderId  String?
+  renterName       String
+  renterPhone      String?
+  pickupDatetime   DateTime
+  returnDatetime   DateTime
+  totalPrice       Float?
+  depositAmount    Float?
+  status           OrderStatus       @default(booked)
+  pickupLocation   String?
+  returnLocation   String?
+  paymentMethod    String?
+  contractNumber   String?
+  notes            String?
+  sourceMetadata   String?
+  createdBy        String
+  isArchived       Boolean           @default(false)
+  hasConflict      Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  workspace        Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  importBatch      ImportBatch?      @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  vehicle          Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  ownerLedgerItems OwnerLedgerItem[]
 
   @@index([workspaceId])
   @@index([workspaceId, isArchived])
@@ -161,10 +174,10 @@ model Order {
 
 model ImportBatch {
   workspaceId String?
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   fileName    String
   importedBy  String
-  importedAt  DateTime @default(now())
+  importedAt  DateTime   @default(now())
   totalRows   Int
   successRows Int
   failedRows  Int
@@ -177,8 +190,32 @@ model ImportBatch {
   @@index([workspaceId])
 }
 
+model OwnerLedgerItem {
+  workspaceId String?
+  id          String          @id @default(cuid())
+  ownerId     String
+  vehicleId   String?
+  orderId     String?
+  kind        OwnerLedgerKind
+  amount      Float
+  occurredAt  DateTime
+  note        String?
+  isAuto      Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  workspace   Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  owner       Owner           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  vehicle     Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  order       Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([ownerId, occurredAt])
+  @@index([vehicleId, occurredAt])
+  @@index([orderId])
+}
+
 model ShareLink {
-  workspaceId   String?
+  workspaceId  String?
   id           String          @id @default(cuid())
   ownerId      String
   token        String          @unique
@@ -195,47 +232,47 @@ model ShareLink {
 }
 
 model WorkspaceBilling {
-  id                           String                 @id @default(cuid())
-  workspaceId                  String                 @unique
-  freeVehicleSlots             Int                    @default(5)
-  bonusVehicleSlots            Int                    @default(0)
-  purchasedVehicleSlots        Int                    @default(0)
-  stripeCustomerId             String?                @unique
-  stripeSubscriptionId         String?                @unique
-  stripeSubscriptionItemId     String?
-  stripePriceId                String?
-  stripePortalConfigurationId  String?
+  id                            String                    @id @default(cuid())
+  workspaceId                   String?                   @unique
+  freeVehicleSlots              Int                       @default(5)
+  bonusVehicleSlots             Int                       @default(0)
+  purchasedVehicleSlots         Int                       @default(0)
+  stripeCustomerId              String?                   @unique
+  stripeSubscriptionId          String?                   @unique
+  stripeSubscriptionItemId      String?
+  stripePriceId                 String?
+  stripePortalConfigurationId   String?
   stripeLatestCheckoutSessionId String?
-  status                       WorkspaceBillingStatus @default(inactive)
-  currentPeriodStart           DateTime?
-  currentPeriodEnd             DateTime?
-  lastCheckoutAt               DateTime?
-  lastPaidAt                   DateTime?
+  status                        WorkspaceBillingStatus    @default(inactive)
+  currentPeriodStart            DateTime?
+  currentPeriodEnd              DateTime?
+  lastCheckoutAt                DateTime?
+  lastPaidAt                    DateTime?
   // Stripe Connect fields — per-workspace payout account for direct-booking
   // revenue. The platform (site owner) collects a flat application fee and the
   // rest is settled on-behalf-of the host's Connect account, so renters see
   // the host's business name on their statement.
-  stripeConnectAccountId       String?                @unique
-  stripeConnectCountry         String?
-  stripeConnectChargesEnabled  Boolean                @default(false)
-  stripeConnectPayoutsEnabled  Boolean                @default(false)
-  stripeConnectDetailsSubmitted Boolean               @default(false)
-  stripeConnectOnboardedAt     DateTime?
-  createdAt                    DateTime               @default(now())
-  updatedAt                    DateTime               @updatedAt
-  workspace                    Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  couponRedemptions            BillingCouponRedemption[]
+  stripeConnectAccountId        String?                   @unique
+  stripeConnectCountry          String?
+  stripeConnectChargesEnabled   Boolean                   @default(false)
+  stripeConnectPayoutsEnabled   Boolean                   @default(false)
+  stripeConnectDetailsSubmitted Boolean                   @default(false)
+  stripeConnectOnboardedAt      DateTime?
+  createdAt                     DateTime                  @default(now())
+  updatedAt                     DateTime                  @updatedAt
+  workspace                     Workspace?                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  couponRedemptions             BillingCouponRedemption[]
 }
 
 model BillingCouponRedemption {
-  id                String           @id @default(cuid())
+  id                 String           @id @default(cuid())
   workspaceBillingId String
-  code              String           @unique
-  couponType        String
-  bonusVehicleSlots Int              @default(0)
-  metadata          String?
-  createdAt         DateTime         @default(now())
-  workspaceBilling  WorkspaceBilling @relation(fields: [workspaceBillingId], references: [id], onDelete: Cascade)
+  code               String           @unique
+  couponType         String
+  bonusVehicleSlots  Int              @default(0)
+  metadata           String?
+  createdAt          DateTime         @default(now())
+  workspaceBilling   WorkspaceBilling @relation(fields: [workspaceBillingId], references: [id], onDelete: Cascade)
 
   @@index([workspaceBillingId])
 }
@@ -256,14 +293,14 @@ model EmailVerification {
 
 model ActivityLog {
   workspaceId String?
-  id         String   @id @default(cuid())
-  actor      String
-  action     String
-  entityType String
-  entityId   String
-  metadata   String?
-  createdAt  DateTime @default(now())
-  workspace  Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  id          String     @id @default(cuid())
+  actor       String
+  action      String
+  entityType  String
+  entityId    String
+  metadata    String?
+  createdAt   DateTime   @default(now())
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
 }

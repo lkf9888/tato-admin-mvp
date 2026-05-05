@@ -90,6 +90,15 @@ export default async function VehiclesPage({
             placeholder={vehicleMessages.placeholders.purchasePrice}
             className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
           />
+          <input
+            name="ownerCommissionRate"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            placeholder={vehicleMessages.placeholders.ownerCommissionRate}
+            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
+          />
           <select name="ownerId" className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
             <option value="">{vehicleMessages.placeholders.unassignedOwner}</option>
             {owners.map((owner) => (
@@ -148,6 +157,11 @@ export default async function VehiclesPage({
                     {vehicleMessages.placeholders.purchasePrice}: CA${vehicle.purchasePrice.toFixed(2)}
                   </p>
                 ) : null}
+                {vehicle.ownerCommissionRate != null ? (
+                  <p className="mt-1 text-[12px] leading-snug text-slate-500 sm:text-sm">
+                    {vehicleMessages.commissionPrefix}: {(vehicle.ownerCommissionRate * 100).toFixed(2)}%
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-1.5 sm:gap-2">
                 <StatusBadge value={vehicle.status} locale={locale} />
@@ -200,6 +214,20 @@ export default async function VehiclesPage({
                   step="0.01"
                   defaultValue={vehicle.purchasePrice ?? ""}
                   placeholder={vehicleMessages.placeholders.purchasePrice}
+                  className="rounded-md border border-slate-200 bg-white px-4 py-3"
+                />
+                <input
+                  name="ownerCommissionRate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  defaultValue={
+                    vehicle.ownerCommissionRate == null
+                      ? ""
+                      : (vehicle.ownerCommissionRate * 100).toFixed(2)
+                  }
+                  placeholder={vehicleMessages.placeholders.ownerCommissionRate}
                   className="rounded-md border border-slate-200 bg-white px-4 py-3"
                 />
                 <select

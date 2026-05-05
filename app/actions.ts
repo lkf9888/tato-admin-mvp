@@ -22,6 +22,11 @@ import {
   verifyRegistrationCode,
 } from "@/lib/email-verification";
 import { getLocale } from "@/lib/i18n-server";
+import {
+  removeOrderAutoOwnerLedger,
+  syncOrderOwnerLedger,
+  syncVehicleOwnerLedger,
+} from "@/lib/owner-ledger";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import {
@@ -67,6 +72,7 @@ const vehicleSchema = z.object({
   turoListingName: z.string().optional(),
   turoVehicleCode: z.string().optional(),
   purchasePrice: z.coerce.number().nonnegative().optional(),
+  ownerCommissionRate: z.coerce.number().min(0).max(100).optional(),
   notes: z.string().optional(),
 });
 
@@ -104,6 +110,7 @@ function revalidateAdminPages() {
     "/dashboard",
     "/vehicles",
     "/vehicle-roi",
+    "/owner-statements",
     "/direct-booking",
     "/owners",
     "/orders",
@@ -492,10 +499,16 @@ export async function saveVehicleAction(formData: FormData) {
     turoListingName: cleanOptional(formData.get("turoListingName")),
     turoVehicleCode: cleanOptional(formData.get("turoVehicleCode")),
     purchasePrice: cleanOptional(formData.get("purchasePrice")),
+    ownerCommissionRate: cleanOptional(formData.get("ownerCommissionRate")),
     notes: cleanOptional(formData.get("notes")),
   });
 
-  const { id, ...vehicleData } = parsed;
+  const { id, ownerCommissionRate, ...vehicleData } = parsed;
+  const normalizedVehicleData = {
+    ...vehicleData,
+    ownerCommissionRate:
+      ownerCommissionRate == null ? null : +(ownerCommissionRate / 100).toFixed(4),
+  };
 
   const existingVehicle = id
     ? await prisma.vehicle.findFirst({
@@ -506,14 +519,16 @@ export async function saveVehicleAction(formData: FormData) {
   const vehicle = existingVehicle
     ? await prisma.vehicle.update({
         where: { id: existingVehicle.id },
-        data: vehicleData,
+        data: normalizedVehicleData,
       })
     : await prisma.vehicle.create({
         data: {
-          ...vehicleData,
+          ...normalizedVehicleData,
           workspaceId: workspace.id,
         },
       });
+
+  await syncVehicleOwnerLedger(vehicle.id);
 
   await logActivity({
     workspaceId: workspace.id,
@@ -711,6 +726,7 @@ export async function saveOfflineOrderAction(formData: FormData) {
       });
 
   await reconcileVehicleConflicts(parsed.vehicleId);
+  await syncOrderOwnerLedger(order.id);
 
   await logActivity({
     workspaceId: workspace.id,
@@ -746,6 +762,7 @@ export async function updateOrderStatusAction(formData: FormData) {
   });
 
   await reconcileVehicleConflicts(order.vehicleId);
+  await syncOrderOwnerLedger(order.id);
   await logActivity({
     workspaceId: workspace.id,
     actor: user.name,
@@ -772,9 +789,8 @@ export async function deleteOrderAction(formData: FormData) {
     redirect("/orders?error=turo-order-readonly");
   }
 
-  await prisma.order.delete({
-    where: { id: existing.id },
-  });
+  await removeOrderAutoOwnerLedger(existing.id);
+  await prisma.order.delete({ where: { id: existing.id } });
   await reconcileVehicleConflicts(existing.vehicleId);
 
   await logActivity({

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.21.3 - 2026-05-04
+
+- **Owner vehicle binding search.** Owner edit cards now include an in-place vehicle search box inside the binding section. Searching by plate, model, VIN, Turo code, listing name, or owner filters the checkbox list without unbinding hidden selected vehicles.
+- **Vehicles page search.** The Vehicles page now has a compact search bar for plate, model, VIN, owner, listing, and notes, with result counts and a clear action.
+- **Calendar searchable filters.** Calendar vehicle, owner, and source filters are now searchable dropdowns. Typing inside a filter immediately narrows the timeline, and matching vehicle/owner text is highlighted in the calendar and dropdown results.
+
 ## v0.21.2 - 2026-05-04
 
 - **Data-preservation hardening.** Manual offline order deletion now archives the order instead of physically deleting it, so user-created booking data remains in the database even when hidden from operational pages.

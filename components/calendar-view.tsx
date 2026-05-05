@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { StatusBadge } from "@/components/status-badge";
@@ -58,6 +58,22 @@ type OrderPopoverState = {
   top: number;
   left: number;
   placement: "top" | "bottom";
+};
+
+type SearchableFilterOption = {
+  value: string;
+  label: string;
+  searchText?: string;
+};
+
+type SearchableFilterDropdownProps = {
+  value: string;
+  query: string;
+  allLabel: string;
+  searchPlaceholder: string;
+  options: SearchableFilterOption[];
+  onValueChange: (value: string) => void;
+  onQueryChange: (value: string) => void;
 };
 
 const DEFAULT_VEHICLE_COLUMN_WIDTH = 188;
@@ -262,6 +278,155 @@ function buildEditDraft(order: CalendarOrder) {
   } satisfies ManualOrderDraft;
 }
 
+function normalizeFilterText(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function includesFilterText(searchText: string, query: string) {
+  const normalizedQuery = normalizeFilterText(query);
+  return !normalizedQuery || searchText.toLowerCase().includes(normalizedQuery);
+}
+
+function highlightText(value: string, query: string) {
+  const normalizedQuery = normalizeFilterText(query);
+  if (!normalizedQuery) return value;
+
+  const lowerValue = value.toLowerCase();
+  const matchIndex = lowerValue.indexOf(normalizedQuery);
+  if (matchIndex === -1) return value;
+
+  const before = value.slice(0, matchIndex);
+  const match = value.slice(matchIndex, matchIndex + normalizedQuery.length);
+  const after = value.slice(matchIndex + normalizedQuery.length);
+
+  return (
+    <>
+      {before}
+      <mark className="rounded bg-[rgba(255,231,122,0.72)] px-0.5 text-inherit">{match}</mark>
+      {after}
+    </>
+  );
+}
+
+function buildVehicleTimelineSearchText(vehicle: VehicleTimelineOption) {
+  return [
+    vehicle.label,
+    vehicle.plateNumber,
+    vehicle.secondaryLabel,
+    vehicle.ownerName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function SearchableFilterDropdown({
+  value,
+  query,
+  allLabel,
+  searchPlaceholder,
+  options,
+  onValueChange,
+  onQueryChange,
+}: SearchableFilterDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const normalizedQuery = normalizeFilterText(query);
+  const selectedOption = options.find((option) => option.value === value);
+  const filteredOptions = options.filter((option) =>
+    includesFilterText(`${option.label} ${option.searchText ?? ""}`, query),
+  );
+  const buttonLabel =
+    value !== "all" && selectedOption
+      ? selectedOption.label
+      : normalizedQuery
+        ? `${allLabel}: ${query.trim()}`
+        : allLabel;
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={dropdownRef} className="relative min-w-[11rem] flex-1 sm:flex-none">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-full border border-[var(--line)] bg-white px-3 text-left text-[12px] font-medium text-[var(--ink)] outline-none transition hover:border-[rgba(17,19,24,0.22)] focus:border-[rgba(17,19,24,0.3)] sm:w-48 lg:w-56"
+      >
+        <span className="truncate">{highlightText(buttonLabel, query)}</span>
+        <span className="text-[10px] text-[var(--ink-soft)]">⌄</span>
+      </button>
+
+      {open ? (
+        <div className="absolute left-0 top-10 z-[70] w-full min-w-[16rem] rounded-lg border border-[var(--line)] bg-white p-2 shadow-[0_22px_52px_-28px_rgba(17,19,24,0.55)]">
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              onValueChange("all");
+              onQueryChange(event.target.value);
+            }}
+            placeholder={searchPlaceholder}
+            className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-[12px] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            autoFocus
+          />
+          <div className="mt-2 max-h-56 overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => {
+                onValueChange("all");
+                onQueryChange("");
+                setOpen(false);
+              }}
+              className="w-full rounded-md px-2.5 py-2 text-left text-[12px] font-semibold text-slate-900 hover:bg-slate-50"
+            >
+              {allLabel}
+            </button>
+            {filteredOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onValueChange(option.value);
+                  onQueryChange("");
+                  setOpen(false);
+                }}
+                className={cn(
+                  "w-full rounded-md px-2.5 py-2 text-left text-[12px] text-slate-700 hover:bg-slate-50",
+                  value === option.value ? "bg-slate-100 font-semibold text-slate-950" : "",
+                )}
+              >
+                {highlightText(option.label, query)}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function buildOrderPopoverState(anchor: {
   top: number;
   bottom: number;
@@ -312,6 +477,9 @@ export function CalendarView({
   const [selectedVehicleId, setSelectedVehicleId] = useState("all");
   const [selectedOwnerId, setSelectedOwnerId] = useState("all");
   const [selectedSource, setSelectedSource] = useState("all");
+  const [vehicleFilterQuery, setVehicleFilterQuery] = useState("");
+  const [ownerFilterQuery, setOwnerFilterQuery] = useState("");
+  const [sourceFilterQuery, setSourceFilterQuery] = useState("");
   const [rangeMode, setRangeMode] = useState<"week" | "month" | "sixWeeks">("week");
   const [focusDate, setFocusDate] = useState(() => new Date());
   const [selectedOrder, setSelectedOrder] = useState<CalendarOrder | null>(null);
@@ -438,17 +606,104 @@ export function CalendarView({
     };
   }, [orderPopover]);
 
+  const vehicleFilterOptions = useMemo(
+    () =>
+      vehicleOptions.map((vehicle) => ({
+        value: vehicle.id,
+        label: vehicle.plateNumber ? `${vehicle.plateNumber} · ${vehicle.label}` : vehicle.label,
+        searchText: buildVehicleTimelineSearchText(vehicle),
+      })),
+    [vehicleOptions],
+  );
+  const ownerFilterOptions = useMemo(
+    () =>
+      ownerOptions.map((owner) => ({
+        value: owner.id,
+        label: owner.label,
+        searchText: owner.label,
+      })),
+    [ownerOptions],
+  );
+  const sourceFilterOptions = useMemo(
+    () => [
+      {
+        value: "turo",
+        label: getStatusLabel("turo", locale),
+        searchText: `turo ${getStatusLabel("turo", locale)}`,
+      },
+      {
+        value: "offline",
+        label: getStatusLabel("offline", locale),
+        searchText: `offline ${getStatusLabel("offline", locale)}`,
+      },
+    ],
+    [locale],
+  );
+  const normalizedVehicleFilterQuery = normalizeFilterText(vehicleFilterQuery);
+  const normalizedOwnerFilterQuery = normalizeFilterText(ownerFilterQuery);
+  const normalizedSourceFilterQuery = normalizeFilterText(sourceFilterQuery);
+
   const filteredVehicles = vehicleOptions.filter((vehicle) => {
     if (selectedVehicleId !== "all" && vehicle.id !== selectedVehicleId) return false;
+    if (
+      selectedVehicleId === "all" &&
+      normalizedVehicleFilterQuery &&
+      !buildVehicleTimelineSearchText(vehicle).includes(normalizedVehicleFilterQuery)
+    ) {
+      return false;
+    }
     if (!readOnly && selectedOwnerId !== "all" && vehicle.ownerId !== selectedOwnerId) return false;
+    if (
+      !readOnly &&
+      selectedOwnerId === "all" &&
+      normalizedOwnerFilterQuery &&
+      !(vehicle.ownerName ?? calendarMessages.unassignedOwner)
+        .toLowerCase()
+        .includes(normalizedOwnerFilterQuery)
+    ) {
+      return false;
+    }
     return true;
   });
 
   const filteredOrders = orders.filter((order) => {
     if (order.status === "cancelled") return false;
     if (selectedVehicleId !== "all" && order.vehicleId !== selectedVehicleId) return false;
+    if (
+      selectedVehicleId === "all" &&
+      normalizedVehicleFilterQuery &&
+      ![
+        order.vehiclePlateNumber,
+        order.vehicleName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedVehicleFilterQuery)
+    ) {
+      return false;
+    }
     if (selectedSource !== "all" && order.source !== selectedSource) return false;
+    if (
+      selectedSource === "all" &&
+      normalizedSourceFilterQuery &&
+      !`${order.source} ${getStatusLabel(order.source, locale)}`
+        .toLowerCase()
+        .includes(normalizedSourceFilterQuery)
+    ) {
+      return false;
+    }
     if (!readOnly && selectedOwnerId !== "all" && order.ownerId !== selectedOwnerId) return false;
+    if (
+      !readOnly &&
+      selectedOwnerId === "all" &&
+      normalizedOwnerFilterQuery &&
+      !(order.ownerName ?? calendarMessages.unassignedOwner)
+        .toLowerCase()
+        .includes(normalizedOwnerFilterQuery)
+    ) {
+      return false;
+    }
     return true;
   });
 
@@ -481,8 +736,6 @@ export function CalendarView({
     "inline-flex h-9 items-center justify-center rounded-full border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] shadow-sm transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
   const primaryActionClass =
     "inline-flex h-9 items-center justify-center rounded-full bg-[var(--accent)] px-3.5 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50";
-  const filterSelectClass =
-    "h-9 rounded-full border border-[var(--line)] bg-white px-3 text-[12px] font-medium text-[var(--ink)] outline-none transition focus:border-[rgba(17,19,24,0.3)]";
 
   const openCreateOrderDialog = () => {
     const fallbackVehicleId =
@@ -720,43 +973,37 @@ export function CalendarView({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <SearchableFilterDropdown
               value={selectedVehicleId}
-              onChange={(event) => setSelectedVehicleId(event.target.value)}
-              className={filterSelectClass}
-            >
-              <option value="all">{calendarMessages.allVehicles}</option>
-              {vehicleOptions.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.plateNumber ? `${vehicle.plateNumber} · ${vehicle.label}` : vehicle.label}
-                </option>
-              ))}
-            </select>
+              query={vehicleFilterQuery}
+              allLabel={calendarMessages.allVehicles}
+              searchPlaceholder={calendarMessages.searchVehiclesPlaceholder}
+              options={vehicleFilterOptions}
+              onValueChange={setSelectedVehicleId}
+              onQueryChange={setVehicleFilterQuery}
+            />
 
             {!readOnly ? (
-              <select
+              <SearchableFilterDropdown
                 value={selectedOwnerId}
-                onChange={(event) => setSelectedOwnerId(event.target.value)}
-                className={filterSelectClass}
-              >
-                <option value="all">{calendarMessages.allOwners}</option>
-                {ownerOptions.map((owner) => (
-                  <option key={owner.id} value={owner.id}>
-                    {owner.label}
-                  </option>
-                ))}
-              </select>
+                query={ownerFilterQuery}
+                allLabel={calendarMessages.allOwners}
+                searchPlaceholder={calendarMessages.searchOwnersPlaceholder}
+                options={ownerFilterOptions}
+                onValueChange={setSelectedOwnerId}
+                onQueryChange={setOwnerFilterQuery}
+              />
             ) : null}
 
-            <select
+            <SearchableFilterDropdown
               value={selectedSource}
-              onChange={(event) => setSelectedSource(event.target.value)}
-              className={filterSelectClass}
-            >
-              <option value="all">{calendarMessages.allSources}</option>
-              <option value="turo">{getStatusLabel("turo", locale)}</option>
-              <option value="offline">{getStatusLabel("offline", locale)}</option>
-            </select>
+              query={sourceFilterQuery}
+              allLabel={calendarMessages.allSources}
+              searchPlaceholder={calendarMessages.searchSourcesPlaceholder}
+              options={sourceFilterOptions}
+              onValueChange={setSelectedSource}
+              onQueryChange={setSourceFilterQuery}
+            />
           </div>
 
           {/* iOS-style segmented control. Light track + dark "selected"
@@ -912,12 +1159,12 @@ export function CalendarView({
                       style={{ height: rowHeight }}
                     >
                       <p className="truncate text-[12px] font-semibold leading-tight text-[color:var(--ink)]">
-                        {vehicle.plateNumber || vehicle.label}
+                        {highlightText(vehicle.plateNumber || vehicle.label, vehicleFilterQuery)}
                       </p>
                       <p className="mt-0.5 truncate text-[10.5px] leading-tight text-[color:var(--ink-soft)]">
-                        {vehicle.secondaryLabel || vehicle.label}
+                        {highlightText(vehicle.secondaryLabel || vehicle.label, vehicleFilterQuery)}
                         {" · "}
-                        {vehicle.ownerName || calendarMessages.unassignedOwner}
+                        {highlightText(vehicle.ownerName || calendarMessages.unassignedOwner, ownerFilterQuery)}
                       </p>
                     </div>
 

@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 export default async function VehiclesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; q?: string }>;
 }) {
   const workspace = await requireCurrentWorkspace();
   const [{ locale, messages }, vehicles, owners, params] = await Promise.all([
@@ -27,6 +27,28 @@ export default async function VehiclesPage({
 
   const vehicleMessages = messages.vehicles;
   const vehicleStatusOptions = getVehicleStatusOptions(locale);
+  const vehicleQuery = (params.q ?? "").trim();
+  const normalizedVehicleQuery = vehicleQuery.toLowerCase();
+  const filteredVehicles = normalizedVehicleQuery
+    ? vehicles.filter((vehicle) =>
+        [
+          vehicle.plateNumber,
+          vehicle.nickname,
+          vehicle.brand,
+          vehicle.model,
+          vehicle.year.toString(),
+          vehicle.vin,
+          vehicle.turoListingName,
+          vehicle.turoVehicleCode,
+          vehicle.owner?.name,
+          vehicle.notes,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedVehicleQuery),
+      )
+    : vehicles;
 
   return (
     <div className="space-y-2.5">
@@ -139,8 +161,41 @@ export default async function VehiclesPage({
         </form>
       </details>
 
+      <section className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-3.5">
+        <form action="/vehicles" className="flex flex-col gap-2 sm:flex-row">
+          <input
+            type="search"
+            name="q"
+            defaultValue={vehicleQuery}
+            placeholder={vehicleMessages.searchPlaceholder}
+            className="min-h-9 flex-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+          />
+          <div className="flex gap-2">
+            <button className="rounded-md bg-slate-950 px-3 py-2 text-[12px] font-medium text-white">
+              {vehicleMessages.searchButton}
+            </button>
+            {vehicleQuery ? (
+              <a
+                href="/vehicles"
+                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-600"
+              >
+                {vehicleMessages.clearSearch}
+              </a>
+            ) : null}
+          </div>
+        </form>
+        <p className="mt-1.5 text-[10.5px] text-slate-500">
+          {vehicleMessages.searchResults(filteredVehicles.length, vehicles.length)}
+        </p>
+      </section>
+
       <section className="grid gap-2.5 sm:gap-3 xl:grid-cols-3">
-        {vehicles.map((vehicle) => (
+        {filteredVehicles.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-white/80 p-4 text-[12px] text-slate-500 xl:col-span-3">
+            {vehicleMessages.noSearchResults}
+          </div>
+        ) : null}
+        {filteredVehicles.map((vehicle) => (
           <article key={vehicle.id} className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-3.5">
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">

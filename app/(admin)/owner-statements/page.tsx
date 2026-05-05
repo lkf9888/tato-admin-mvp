@@ -56,14 +56,14 @@ export default async function OwnerStatementsPage({
 
   if (!selectedOwner) {
     return (
-      <div className="rounded-lg border border-[var(--line)] bg-white/90 p-8 shadow-sm">
-        <p className="text-[11px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
+      <div className="rounded-lg border border-[var(--line)] bg-white/90 p-4 shadow-sm">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
           {pageCopy.kicker}
         </p>
-        <h1 className="mt-2 font-serif text-3xl font-semibold text-[var(--ink)]">
+        <h1 className="mt-1 font-serif text-[1.2rem] font-semibold text-[var(--ink)]">
           {pageCopy.emptyTitle}
         </h1>
-        <p className="mt-3 max-w-2xl text-sm text-[var(--ink-soft)]">
+        <p className="mt-2 max-w-2xl text-[12px] text-[var(--ink-soft)]">
           {pageCopy.emptyCopy}
         </p>
       </div>
@@ -99,15 +99,15 @@ export default async function OwnerStatementsPage({
   });
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-lg border border-[var(--line)] bg-white/90 p-4 shadow-sm sm:p-5">
-        <p className="text-[11px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
+    <div className="space-y-3">
+      <section className="rounded-lg border border-[var(--line)] bg-white/90 p-3 shadow-sm sm:p-4">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
           {pageCopy.kicker}
         </p>
-        <h1 className="mt-1 font-serif text-2xl font-semibold text-[var(--ink)] sm:text-3xl">
+        <h1 className="mt-1 font-serif text-[1.15rem] font-semibold text-[var(--ink)] sm:text-[1.35rem]">
           {pageCopy.title}
         </h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--ink-soft)]">
+        <p className="mt-1.5 max-w-4xl text-[12px] leading-5 text-[var(--ink-soft)]">
           {pageCopy.description}
         </p>
       </section>

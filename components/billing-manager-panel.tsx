@@ -173,35 +173,35 @@ export function BillingManagerPanel({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {projectedVehicleCount && additionalPaidSlotsNeeded ? (
-        <section className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 shadow-sm">
+        <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-900 shadow-sm">
           {billingMessages.projectedNotice(projectedVehicleCount, additionalPaidSlotsNeeded)}
         </section>
       ) : null}
 
       {billingNotice ? (
-        <section className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900 shadow-sm">
+        <section className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-[12px] text-emerald-900 shadow-sm">
           {billingNotice}
         </section>
       ) : null}
 
       {snapshot.billingBypassActive ? (
-        <section className="rounded-lg border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-900 shadow-sm">
+        <section className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-[12px] text-sky-900 shadow-sm">
           {billingMessages.debugBypassNotice}
         </section>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-        <section className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
+      <div className="grid gap-3 xl:grid-cols-[0.92fr_1.08fr]">
+        <section className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
             {billingMessages.kicker}
           </p>
-          <h3 className="mt-2 font-serif text-3xl text-slate-950">{billingMessages.title}</h3>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">{billingMessages.copy}</p>
+          <h3 className="mt-1 font-serif text-[1.15rem] text-slate-950">{billingMessages.title}</h3>
+          <p className="mt-2 max-w-xl text-[12px] leading-5 text-slate-600">{billingMessages.copy}</p>
 
-          <div className="mt-6 rounded-lg bg-slate-50 p-4">
-            <div className="space-y-3 text-sm text-slate-700">
+          <div className="mt-3 rounded-lg bg-slate-50 p-3">
+            <div className="space-y-2 text-[12px] text-slate-700">
               <div className="flex items-center justify-between">
                 <span>{billingMessages.currentVehicles}</span>
                 <span className="font-semibold text-slate-950">{snapshot.currentVehicleCount}</span>
@@ -236,33 +236,33 @@ export function BillingManagerPanel({
               </div>
             </div>
             {currentPeriodEndLabel ? (
-              <p className="mt-4 text-xs text-slate-500">{billingMessages.renewsAt(currentPeriodEndLabel)}</p>
+              <p className="mt-3 text-[11px] text-slate-500">{billingMessages.renewsAt(currentPeriodEndLabel)}</p>
             ) : null}
           </div>
 
           <Link
             href="/imports"
-            className="mt-5 inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
+            className="mt-3 inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950"
           >
             {billingMessages.backToImports}
           </Link>
         </section>
 
-        <section className="space-y-6">
-          <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
+        <section className="space-y-3">
+          <div className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
               {billingMessages.quantityKicker}
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <h3 className="font-serif text-3xl text-slate-950">{billingMessages.quantityTitle}</h3>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <h3 className="font-serif text-[1.15rem] text-slate-950">{billingMessages.quantityTitle}</h3>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
                 {billingMessages.suggestedTarget(snapshot.requiredPaidSlots)}
               </span>
             </div>
-            <p className="mt-3 text-sm leading-6 text-slate-600">{billingMessages.quantityCopy}</p>
+            <p className="mt-2 text-[12px] leading-5 text-slate-600">{billingMessages.quantityCopy}</p>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,220px)_1fr] md:items-end">
-              <label className="text-sm font-medium text-slate-700">
+            <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,180px)_1fr] md:items-end">
+              <label className="text-[12px] font-medium text-slate-700">
                 {billingMessages.quantityLabel}
                 <input
                   type="number"
@@ -274,10 +274,10 @@ export function BillingManagerPanel({
                       Math.max(1, Number.parseInt(event.target.value || "1", 10) || 1),
                     )
                   }
-                  className="mt-2 w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-slate-900"
+                  className="mt-1.5 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 outline-none transition focus:border-slate-900"
                 />
               </label>
-              <div className="rounded-lg bg-slate-50 px-4 py-4 text-sm text-slate-700">
+              <div className="rounded-lg bg-slate-50 px-3 py-2.5 text-[12px] text-slate-700">
                 <p className="font-medium text-slate-900">{billingMessages.quantityHint(desiredMonthlyPrice)}</p>
                 {appliedPromotion ? (
                   <p className="mt-2 text-xs text-sky-700">
@@ -293,13 +293,13 @@ export function BillingManagerPanel({
             </div>
 
             {!snapshot.stripeConfigured ? (
-              <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
                 {billingMessages.stripeNotConfigured}
               </p>
             ) : null}
 
             {checkoutError ? (
-              <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
                 {checkoutError}
               </p>
             ) : null}
@@ -308,7 +308,7 @@ export function BillingManagerPanel({
               type="button"
               onClick={startCheckout}
               disabled={!snapshot.stripeConfigured || isCheckoutPending}
-              className="mt-5 inline-flex items-center rounded-md bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="mt-3 inline-flex items-center rounded-md bg-slate-950 px-4 py-2 text-[12px] font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {isCheckoutPending
                 ? billingMessages.checkoutLoading
@@ -318,14 +318,14 @@ export function BillingManagerPanel({
             </button>
           </div>
 
-          <div className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
+          <div className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
               {billingMessages.couponKicker}
             </p>
-            <h3 className="mt-2 font-serif text-3xl text-slate-950">{billingMessages.couponTitle}</h3>
-            <p className="mt-3 text-sm leading-6 text-slate-600">{billingMessages.couponCopy}</p>
+            <h3 className="mt-1 font-serif text-[1.15rem] text-slate-950">{billingMessages.couponTitle}</h3>
+            <p className="mt-2 text-[12px] leading-5 text-slate-600">{billingMessages.couponCopy}</p>
 
-            <div className="mt-4 rounded-md border border-[var(--accent)]/20 bg-[var(--accent-soft)]/60 px-4 py-3 text-sm text-slate-700">
+            <div className="mt-3 rounded-md border border-[var(--accent)]/20 bg-[var(--accent-soft)]/60 px-3 py-2 text-[12px] text-slate-700">
               <p className="font-medium text-slate-900">{billingMessages.welcomeCouponHintTitle}</p>
               <p className="mt-1 leading-5">
                 {billingMessages.welcomeCouponHintBefore}
@@ -336,7 +336,7 @@ export function BillingManagerPanel({
               </p>
             </div>
 
-            <label className="mt-5 block text-sm font-medium text-slate-700">
+            <label className="mt-3 block text-[12px] font-medium text-slate-700">
               {billingMessages.couponLabel}
               <input
                 value={couponCode}
@@ -347,12 +347,12 @@ export function BillingManagerPanel({
                   setAppliedPromotion(null);
                 }}
                 placeholder={billingMessages.couponPlaceholder}
-                className="mt-2 w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-slate-900"
+                className="mt-1.5 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 outline-none transition focus:border-slate-900"
               />
             </label>
 
             {couponNotice ? (
-              <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+              <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
                 <p>{couponNotice}</p>
                 {appliedFreeCoupon ? (
                   <p className="mt-1 text-xs text-emerald-800">
@@ -363,7 +363,7 @@ export function BillingManagerPanel({
             ) : null}
 
             {couponError ? (
-              <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
                 {couponError}
               </p>
             ) : null}
@@ -372,7 +372,7 @@ export function BillingManagerPanel({
               type="button"
               onClick={applyCoupon}
               disabled={isCouponPending}
-              className="mt-5 inline-flex items-center rounded-md border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+              className="mt-3 inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-[12px] font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-950 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
             >
               {isCouponPending ? billingMessages.applyingCoupon : billingMessages.applyCoupon}
             </button>

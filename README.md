@@ -28,9 +28,13 @@
 cd /Users/kefei/Documents/New\ project/turo-admin-mvp
 npm install
 npm run db:push
-npm run prisma:seed
+ALLOW_DESTRUCTIVE_SEED=true npm run prisma:seed
 npm run dev
 ```
+
+`prisma:seed` 会清空本地演示数据后重建默认管理员，所以现在必须显式加
+`ALLOW_DESTRUCTIVE_SEED=true`。线上环境不能运行这个 seed。
+同理，`npm run db:reset` 也必须显式加 `ALLOW_DESTRUCTIVE_RESET=true`，避免误删真实数据。
 
 打开 [http://localhost:3000](http://localhost:3000)
 

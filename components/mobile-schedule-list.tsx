@@ -138,7 +138,7 @@ export function MobileScheduleList({
       </header>
 
       {totalUpcoming === 0 ? (
-        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-8 text-center text-sm text-[var(--ink-soft)]">
+        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-5 text-center text-[12px] text-[var(--ink-soft)]">
           {labels.emptyAll}
         </div>
       ) : (

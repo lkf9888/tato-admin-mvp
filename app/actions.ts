@@ -23,7 +23,6 @@ import {
 } from "@/lib/email-verification";
 import { getLocale } from "@/lib/i18n-server";
 import {
-  removeOrderAutoOwnerLedger,
   syncOrderOwnerLedger,
   syncVehicleOwnerLedger,
 } from "@/lib/owner-ledger";
@@ -447,6 +446,82 @@ export async function saveOwnerAction(formData: FormData) {
   revalidateAdminPages();
 }
 
+export async function assignOwnerVehiclesAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+  const ownerId = formData.get("ownerId")?.toString();
+  if (!ownerId) return;
+
+  const owner = await prisma.owner.findFirst({
+    where: { id: ownerId, workspaceId: workspace.id },
+    select: { id: true, name: true },
+  });
+  if (!owner) return;
+
+  const selectedVehicleIds = Array.from(
+    new Set(formData.getAll("vehicleIds").map((value) => value.toString()).filter(Boolean)),
+  );
+
+  const [currentlyAssigned, selectedVehicles] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: { ownerId: owner.id, workspaceId: workspace.id },
+      select: { id: true },
+    }),
+    selectedVehicleIds.length > 0
+      ? prisma.vehicle.findMany({
+          where: { id: { in: selectedVehicleIds }, workspaceId: workspace.id },
+          select: { id: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const validSelectedIds = selectedVehicles.map((vehicle) => vehicle.id);
+  const validSelectedSet = new Set(validSelectedIds);
+  const currentlyAssignedIds = currentlyAssigned.map((vehicle) => vehicle.id);
+  const currentlyAssignedSet = new Set(currentlyAssignedIds);
+  const idsToUnassign = currentlyAssignedIds.filter((id) => !validSelectedSet.has(id));
+  const affectedVehicleIds = Array.from(new Set([...currentlyAssignedIds, ...validSelectedIds]));
+
+  await prisma.$transaction(async (tx) => {
+    if (idsToUnassign.length > 0) {
+      await tx.vehicle.updateMany({
+        where: {
+          workspaceId: workspace.id,
+          ownerId: owner.id,
+          id: { in: idsToUnassign },
+        },
+        data: { ownerId: null },
+      });
+    }
+
+    const idsToAssign = validSelectedIds.filter((id) => !currentlyAssignedSet.has(id));
+    if (idsToAssign.length > 0) {
+      await tx.vehicle.updateMany({
+        where: { workspaceId: workspace.id, id: { in: idsToAssign } },
+        data: { ownerId: owner.id },
+      });
+    }
+  });
+
+  for (const vehicleId of affectedVehicleIds) {
+    await syncVehicleOwnerLedger(vehicleId);
+  }
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "owner_vehicle_assignments_updated",
+    entityType: "Owner",
+    entityId: owner.id,
+    metadata: {
+      ownerName: owner.name,
+      assignedVehicleIds: validSelectedIds,
+      unassignedVehicleIds: idsToUnassign,
+    },
+  });
+
+  revalidateAdminPages();
+}
+
 export async function deleteOwnerAction(formData: FormData) {
   const { workspace, user } = await requireCurrentAdminContext();
   const id = formData.get("id")?.toString();
@@ -789,8 +864,14 @@ export async function deleteOrderAction(formData: FormData) {
     redirect("/orders?error=turo-order-readonly");
   }
 
-  await removeOrderAutoOwnerLedger(existing.id);
-  await prisma.order.delete({ where: { id: existing.id } });
+  const archivedOrder = await prisma.order.update({
+    where: { id: existing.id },
+    data: {
+      isArchived: true,
+      status: OrderStatus.cancelled,
+    },
+  });
+  await syncOrderOwnerLedger(archivedOrder.id);
   await reconcileVehicleConflicts(existing.vehicleId);
 
   await logActivity({

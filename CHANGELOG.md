@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.21.2 - 2026-05-04
+
+- **Data-preservation hardening.** Manual offline order deletion now archives the order instead of physically deleting it, so user-created booking data remains in the database even when hidden from operational pages.
+- **CSV tenant-safety guard.** Turo CSV order dedupe is now scoped to the current workspace, and CSV vehicle matching prioritizes VIN, then Turo vehicle ID, then plate. The importer no longer adopts vehicles or historical orders from another workspace when a global plate collision appears.
+- **CSV field preservation.** CSV refreshes no longer clear existing vehicle/order fields when the incoming CSV row leaves those values blank; raw CSV rows and financial metadata remain stored in `sourceMetadata`.
+- **Destructive local scripts require explicit opt-in.** `prisma:seed` and `db:reset` now refuse to run unless the operator sets an explicit local-only environment flag.
+- **Denser admin UI.** Vehicle cards, owner cards, orders, imports, billing, direct booking, ROI, statements, payouts, badges, and the admin shell use tighter spacing and smaller chrome so more operational data fits on screen.
+
+## v0.21.1 - 2026-05-04
+
+- **Owners page workflow shortcut.** Each owner card's edit panel now includes vehicle assignment and owner share-link creation, so a newly created owner can be fully configured without jumping to the Vehicles or Share Links pages.
+- **Vehicle reassignment from owner cards.** The owner edit panel lists every vehicle in the workspace; selecting a vehicle moves it to that owner, unselecting removes it, and the owner ledger auto rows are resynced for the affected vehicles.
+- **Direct share-link actions.** Active share links are shown inside the owner card, with quick open buttons plus a one-click standard share-link creation button.
+
 ## v0.21.0 - 2026-05-04
 
 - **Owner revenue share module, adapted from HostHub.** Added a new `/owner-statements` admin surface for vehicle-owner revenue sharing. The page combines a bank-statement-style ledger, a 12-month net chart, and a monthly statement view.

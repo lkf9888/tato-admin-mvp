@@ -403,33 +403,33 @@ export function CsvImportPanel({
 
   return (
     <>
-      <section className="rounded-lg border border-[color:var(--line)] bg-white px-6 py-5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+      <section className="rounded-lg border border-[color:var(--line)] bg-white px-3 py-3 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:px-4 sm:py-3.5">
         <div className="flex flex-col gap-1">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--ink-soft)]">
             {importMessages.pageKicker}
           </p>
-          <h2 className="font-serif text-[1.8rem] leading-tight text-[color:var(--ink)]">
+          <h2 className="font-serif text-[1.18rem] leading-tight text-[color:var(--ink)] sm:text-[1.32rem]">
             {importMessages.pageTitle}
           </h2>
-          <p className="text-sm text-[color:var(--ink-soft)]">{importMessages.pageSubtitle}</p>
+          <p className="text-[12px] text-[color:var(--ink-soft)]">{importMessages.pageSubtitle}</p>
         </div>
 
-        <div className="mt-5 border-t border-[color:var(--line)] pt-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
+        <div className="mt-3 border-t border-[color:var(--line)] pt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
             {importMessages.guideTitle}
           </p>
-          <ol className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <ol className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             {importMessages.guideSteps.map((step, index) => (
               <li
                 key={step.title}
-                className="flex gap-3 rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-3"
+                className="flex gap-2.5 rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-2.5 py-2"
               >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-semibold text-white tabular-nums">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-[11px] font-semibold text-white tabular-nums">
                   {index + 1}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-[color:var(--ink)]">{step.title}</p>
-                  <p className="mt-1 text-[12px] leading-5 text-[color:var(--ink-soft)]">{step.body}</p>
+                  <p className="text-[12px] font-semibold text-[color:var(--ink)]">{step.title}</p>
+                  <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--ink-soft)]">{step.body}</p>
                 </div>
               </li>
             ))}
@@ -437,8 +437,8 @@ export function CsvImportPanel({
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="space-y-3">
           <section className="rounded-lg border border-[color:var(--line)] bg-white px-5 py-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -788,21 +788,21 @@ export function CsvImportPanel({
 
       {showBillingModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
-          <div className="w-full max-w-xl rounded-lg border border-white/70 bg-white p-6 shadow-2xl">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
+          <div className="w-full max-w-xl rounded-lg border border-white/70 bg-white p-4 shadow-2xl">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
               {panelMessages.billing.modalKicker}
             </p>
-            <h3 className="mt-2 font-serif text-3xl text-slate-950">
+            <h3 className="mt-1 font-serif text-[1.35rem] text-slate-950">
               {panelMessages.billing.modalTitle}
             </h3>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
+            <p className="mt-2 text-[12px] leading-5 text-slate-600">
               {panelMessages.billing.modalCopy(
                 activeProjection.projectedVehicleCount,
                 activeProjection.allowedVehicleCount,
               )}
             </p>
 
-            <div className="mt-5 grid gap-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 text-[12px] text-slate-700">
               <div className="flex items-center justify-between">
                 <span>{panelMessages.billing.currentVehicles}</span>
                 <span className="font-semibold text-slate-950">{billingSnapshot.currentVehicleCount}</span>
@@ -818,21 +818,21 @@ export function CsvImportPanel({
             </div>
 
             {activeProjection.selectableVehicleOptions.length > 0 ? (
-              <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
                   {panelMessages.chooseVehiclesLabel}
                 </p>
-                <h4 className="mt-2 text-base font-semibold text-slate-950">
+                <h4 className="mt-1 text-[13px] font-semibold text-slate-950">
                   {panelMessages.chooseVehiclesTitle}
                 </h4>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-1.5 text-[12px] leading-5 text-slate-600">
                   {panelMessages.chooseVehiclesCopy(activeProjection.availableNewVehicleSlots)}
                 </p>
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-2 text-[11px] text-slate-500">
                   {panelMessages.selectionLimitNotice(activeProjection.availableNewVehicleSlots)}
                 </p>
 
-                <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+                <div className="mt-3 max-h-64 space-y-1.5 overflow-y-auto pr-1">
                   {activeProjection.selectableVehicleOptions.map((vehicle) => {
                     const checked = selectedVehicleKeys.includes(vehicle.key);
                     const disableUnchecked =
@@ -841,7 +841,7 @@ export function CsvImportPanel({
                     return (
                       <label
                         key={vehicle.key}
-                        className={`flex cursor-pointer items-start gap-3 rounded-md border px-4 py-3 transition ${
+                        className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 transition ${
                           checked
                             ? "border-slate-950 bg-white"
                             : "border-slate-200 bg-white/75"
@@ -852,11 +852,11 @@ export function CsvImportPanel({
                           checked={checked}
                           disabled={disableUnchecked}
                           onChange={() => toggleVehicleSelection(vehicle.key)}
-                          className="mt-1 h-4 w-4 rounded border-slate-300"
+                          className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300"
                         />
                         <span className="block min-w-0">
-                          <span className="block text-sm font-medium text-slate-950">{vehicle.label}</span>
-                          <span className="mt-1 block text-xs text-slate-500">
+                          <span className="block text-[12px] font-medium text-slate-950">{vehicle.label}</span>
+                          <span className="mt-0.5 block text-[10.5px] text-slate-500">
                             {vehicle.secondaryLabel || "—"} · {vehicle.rowCount} row(s)
                           </span>
                         </span>
@@ -866,24 +866,24 @@ export function CsvImportPanel({
                 </div>
 
                 {activeProjection.availableNewVehicleSlots < 1 ? (
-                  <p className="mt-4 rounded-md bg-white px-4 py-3 text-sm text-slate-600">
+                  <p className="mt-3 rounded-md bg-white px-3 py-2 text-[12px] text-slate-600">
                     {panelMessages.selectionNoneAvailable}
                   </p>
                 ) : null}
               </div>
             ) : null}
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <button
                 type="button"
                 onClick={() => setShowBillingModal(false)}
-                className="rounded-md border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
+                className="rounded-md border border-slate-200 px-3 py-2 text-[12px] font-medium text-slate-700"
               >
                 {panelMessages.billing.closeModal}
               </button>
               <Link
                 href={billingPageHref}
-                className="flex-1 rounded-md bg-slate-950 px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-slate-800"
+                className="flex-1 rounded-md bg-slate-950 px-3 py-2 text-center text-[12px] font-medium text-white transition hover:bg-slate-800"
               >
                 {panelMessages.billing.openBillingPage}
               </Link>
@@ -892,7 +892,7 @@ export function CsvImportPanel({
                   type="button"
                   disabled={isImporting || selectedVehicleKeys.length === 0}
                   onClick={() => submitImport({ skipLimitGuard: true })}
-                  className="flex-1 rounded-md bg-white px-4 py-3 text-center text-sm font-medium text-slate-950 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  className="flex-1 rounded-md bg-white px-3 py-2 text-center text-[12px] font-medium text-slate-950 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                 >
                   {panelMessages.importSelectedAction}
                 </button>

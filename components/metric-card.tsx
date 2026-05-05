@@ -25,7 +25,7 @@ export function MetricCard({
       <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)] sm:text-[11px] sm:tracking-[0.26em]">
         {label}
       </p>
-      <p className="mt-1.5 font-serif text-[1.5rem] leading-none text-[var(--ink)] sm:mt-2 sm:text-[2rem]">
+      <p className="mt-1 font-serif text-[1.35rem] leading-none text-[var(--ink)] sm:mt-1.5 sm:text-[1.7rem]">
         {value}
       </p>
       <p className="mt-1.5 line-clamp-2 max-w-[16rem] text-[11px] leading-snug text-[var(--ink-soft)] sm:mt-2 sm:text-[12px]">

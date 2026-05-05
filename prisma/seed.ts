@@ -7,6 +7,11 @@ async function main() {
   if (process.env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT) {
     throw new Error("Refusing to run the destructive seed script in production.");
   }
+  if (process.env.ALLOW_DESTRUCTIVE_SEED !== "true") {
+    throw new Error(
+      "Refusing to delete existing data. Set ALLOW_DESTRUCTIVE_SEED=true only when you intentionally want to reset local demo data.",
+    );
+  }
 
   await prisma.user.deleteMany();
   await prisma.activityLog.deleteMany();

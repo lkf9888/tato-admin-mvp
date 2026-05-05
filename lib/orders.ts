@@ -177,10 +177,37 @@ function resolveVehicleFromCsv(
   vin?: string;
 },
 ) {
+  const normalizedVin = normalizeText(refs.vin);
+  if (normalizedVin) {
+    const byVin = vehicles.find((vehicle) => normalizeText(vehicle.vin) === normalizedVin);
+    if (byVin) return byVin;
+  }
+
+  const normalizedExternalVehicleId = normalizeText(refs.externalVehicleId);
+  if (normalizedExternalVehicleId) {
+    const byTuroVehicleCode = vehicles.find(
+      (vehicle) => normalizeText(vehicle.turoVehicleCode) === normalizedExternalVehicleId,
+    );
+    if (byTuroVehicleCode) return byTuroVehicleCode;
+  }
+
+  const extractedPlate = extractPlateNumber(
+    refs.vehicleLabel,
+    refs.externalVehicleId,
+    refs.vin,
+  );
+  if (extractedPlate) {
+    const byPlate = vehicles.find(
+      (vehicle) => normalizeText(vehicle.plateNumber) === normalizeText(extractedPlate),
+    );
+    if (byPlate) return byPlate;
+  }
+
   return vehicles.find((vehicle) => vehicleMatchesCsvRecord(vehicle, refs));
 }
 
 async function findExistingImportedOrder(input: {
+  workspaceId: string;
   externalOrderId?: string | null;
   vehicleId: string;
   renterName: string;
@@ -190,6 +217,7 @@ async function findExistingImportedOrder(input: {
   if (input.externalOrderId) {
     const exact = await prisma.order.findFirst({
       where: {
+        workspaceId: input.workspaceId,
         source: OrderSource.turo,
         externalOrderId: input.externalOrderId,
       },
@@ -199,6 +227,7 @@ async function findExistingImportedOrder(input: {
 
   return prisma.order.findFirst({
     where: {
+      workspaceId: input.workspaceId,
       source: OrderSource.turo,
       vehicleId: input.vehicleId,
       renterName: input.renterName,
@@ -406,20 +435,58 @@ function extractPlateNumber(vehicleLabel?: string, externalVehicleId?: string, v
   return null;
 }
 
+function buildPlateNumberCandidates(
+  vehicleLabel?: string,
+  externalVehicleId?: string,
+  vin?: string,
+) {
+  return Array.from(
+    new Set(
+      [
+        extractPlateNumber(vehicleLabel, externalVehicleId, vin),
+        externalVehicleId ? `TURO-${externalVehicleId}` : null,
+        vin ? `VIN-${vin.slice(-8).toUpperCase()}` : null,
+      ].filter(Boolean) as string[],
+    ),
+  );
+}
+
+async function findAvailablePlateNumber(candidates: string[], workspaceId: string) {
+  for (const candidate of candidates) {
+    const existing = await prisma.vehicle.findFirst({
+      where: { plateNumber: candidate },
+      select: { workspaceId: true },
+    });
+    if (!existing || existing.workspaceId === workspaceId) {
+      return candidate;
+    }
+  }
+
+  const base = candidates[0];
+  if (!base) return null;
+  const suffix = workspaceId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase() || "LOCAL";
+  const fallback = `${base}-${suffix}`;
+  const existingFallback = await prisma.vehicle.findFirst({
+    where: { plateNumber: fallback },
+    select: { id: true },
+  });
+  return existingFallback ? null : fallback;
+}
+
 function buildProjectedVehicleKey(input: {
   vehicleLabel?: string;
   vehicleName?: string;
   externalVehicleId?: string;
   vin?: string;
 }) {
+  if (input.vin) return `vin:${normalizeText(input.vin)}`;
+  if (input.externalVehicleId) return `vehicle:${normalizeText(input.externalVehicleId)}`;
   const plateNumber = extractPlateNumber(
     input.vehicleLabel,
     input.externalVehicleId,
     input.vin,
   );
   if (plateNumber) return `plate:${plateNumber}`;
-  if (input.externalVehicleId) return `vehicle:${normalizeText(input.externalVehicleId)}`;
-  if (input.vin) return `vin:${normalizeText(input.vin)}`;
   if (input.vehicleName) return `name:${normalizeText(input.vehicleName)}`;
   if (input.vehicleLabel) return `label:${normalizeText(input.vehicleLabel)}`;
   return null;
@@ -518,32 +585,24 @@ async function createVehicleFromCsvRow(input: {
   const vehicleName = safeString(input.row[input.mapping.vehicleName ?? ""]);
   const externalVehicleId = safeString(input.row[input.mapping.externalVehicleId ?? ""]);
   const vin = safeString(input.row[input.mapping.vin ?? ""]);
-  const plateNumber = extractPlateNumber(vehicleLabel, externalVehicleId, vin);
+  const plateNumberCandidates = buildPlateNumberCandidates(vehicleLabel, externalVehicleId, vin);
 
-  if (!plateNumber) return null;
+  if (plateNumberCandidates.length === 0) return null;
 
   const basics = parseVehicleBasics(vehicleName || vehicleLabel);
 
-  // 1. Workspace-scoped plate lookup — cheap primary path.
   const existingVehicle = await prisma.vehicle.findFirst({
     where: {
       workspaceId: input.workspaceId,
-      plateNumber,
+      OR: plateNumberCandidates.map((plateNumber) => ({ plateNumber })),
     },
   });
 
-  // 2. If not found in this workspace, check globally. A plate in another
-  // workspace here almost always means leftover data from the "default"
-  // workspace that was created before the user registered into their own
-  // workspace. Adopt those vehicles into the current workspace instead of
-  // failing the whole row with a global unique-constraint error. Without
-  // this, a CSV import can never succeed once the default workspace owns
-  // any plates that the user later re-imports.
-  const foreignVehicle = existingVehicle
-    ? null
-    : await prisma.vehicle.findFirst({
-        where: { plateNumber },
-      });
+  const plateNumber = existingVehicle
+    ? existingVehicle.plateNumber
+    : await findAvailablePlateNumber(plateNumberCandidates, input.workspaceId);
+
+  if (!plateNumber) return null;
 
   const sharedUpdateData = {
     nickname: vehicleName || vehicleLabel || plateNumber,
@@ -561,32 +620,13 @@ async function createVehicleFromCsvRow(input: {
         where: { id: existingVehicle.id },
         data: sharedUpdateData,
       })
-    : foreignVehicle
-      ? await prisma.vehicle.update({
-          where: { id: foreignVehicle.id },
-          data: {
-            ...sharedUpdateData,
-            workspaceId: input.workspaceId,
-            notes: "Adopted from another workspace during Turo CSV import.",
-          },
-        })
-      : await prisma.vehicle.create({
-          data: {
-            workspaceId: input.workspaceId,
-            plateNumber,
-            ...sharedUpdateData,
-          },
-        });
-
-  // When we adopt a vehicle from another workspace, move its historical orders
-  // with it so findExistingImportedOrder keeps finding them in this workspace
-  // and we don't end up with duplicate rows.
-  if (foreignVehicle) {
-    await prisma.order.updateMany({
-      where: { vehicleId: vehicle.id, workspaceId: { not: input.workspaceId } },
-      data: { workspaceId: input.workspaceId },
-    });
-  }
+    : await prisma.vehicle.create({
+        data: {
+          workspaceId: input.workspaceId,
+          plateNumber,
+          ...sharedUpdateData,
+        },
+      });
 
   await logActivity({
     workspaceId: input.workspaceId,
@@ -624,13 +664,13 @@ async function syncVehicleFromCsvRow(input: {
   // edit the plate directly from the vehicle management UI when they truly
   // need to change it.
   const nextData = {
-    nickname: vehicleName || vehicleLabel || input.vehicle.plateNumber,
+    nickname: vehicleName || vehicleLabel || input.vehicle.nickname,
     brand: basics.brand,
     model: basics.model,
     year: basics.year,
-    vin: vin || null,
-    turoListingName: vehicleName || vehicleLabel || null,
-    turoVehicleCode: externalVehicleId || null,
+    vin: vin || input.vehicle.vin || null,
+    turoListingName: vehicleName || vehicleLabel || input.vehicle.turoListingName || null,
+    turoVehicleCode: externalVehicleId || input.vehicle.turoVehicleCode || null,
   };
 
   const hasChanges =
@@ -875,6 +915,7 @@ export async function importTuroOrders(input: {
 
       const externalOrderId = safeString(row[mapping.externalOrderId ?? ""]) || null;
       const existing = await findExistingImportedOrder({
+        workspaceId: input.workspaceId,
         externalOrderId,
         vehicleId: vehicle.id,
         renterName,
@@ -882,6 +923,15 @@ export async function importTuroOrders(input: {
         returnDatetime,
       });
       const status = parseCsvOrderStatus(row[mapping.status ?? ""]);
+      const importedRenterPhone = safeString(row[mapping.renterPhone ?? ""]);
+      const importedPickupLocation = safeString(row[mapping.pickupLocation ?? ""]);
+      const importedReturnLocation = safeString(row[mapping.returnLocation ?? ""]);
+      const importedTotalPrice = getNetEarningFromFinancials(
+        extractFinancialsFromRow(row),
+        parseNumberValue(row[mapping.totalEarnings ?? ""]) ??
+          parseNumberValue(row[mapping.tripPrice ?? ""]) ??
+          parseNumberValue(row[mapping.totalPrice ?? ""]),
+      );
 
       const payload = {
         vehicleId: vehicle.id,
@@ -890,19 +940,14 @@ export async function importTuroOrders(input: {
         source: OrderSource.turo,
         externalOrderId,
         renterName,
-        renterPhone: safeString(row[mapping.renterPhone ?? ""]) || null,
+        renterPhone: importedRenterPhone || existing?.renterPhone || null,
         pickupDatetime,
         returnDatetime,
-        totalPrice: getNetEarningFromFinancials(
-          extractFinancialsFromRow(row),
-          parseNumberValue(row[mapping.totalEarnings ?? ""]) ??
-            parseNumberValue(row[mapping.tripPrice ?? ""]) ??
-            parseNumberValue(row[mapping.totalPrice ?? ""]),
-        ),
+        totalPrice: importedTotalPrice ?? existing?.totalPrice ?? null,
         status,
         createdBy: input.actor,
-        pickupLocation: safeString(row[mapping.pickupLocation ?? ""]) || null,
-        returnLocation: safeString(row[mapping.returnLocation ?? ""]) || null,
+        pickupLocation: importedPickupLocation || existing?.pickupLocation || null,
+        returnLocation: importedReturnLocation || existing?.returnLocation || null,
         notes: existing?.notes ?? null,
         sourceMetadata: buildSourceMetadata(row),
         isArchived: status === OrderStatus.cancelled,

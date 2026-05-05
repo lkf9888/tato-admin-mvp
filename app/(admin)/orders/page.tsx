@@ -254,18 +254,18 @@ export default async function OrdersPage({
       : null;
 
   const inputClass =
-    "h-12 rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 text-[13px] text-[color:var(--ink)] outline-none";
+    "h-10 rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 text-[12px] text-[color:var(--ink)] outline-none";
   const filterFieldClass =
-    "h-11 rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 text-[13px] text-[color:var(--ink)] outline-none focus:border-[var(--ink)]";
+    "h-9 rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 text-[12px] text-[color:var(--ink)] outline-none focus:border-[var(--ink)]";
   const subtleButtonClass =
-    "inline-flex h-11 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-4 text-[12px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white";
+    "inline-flex h-9 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-3 text-[11px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white";
   const primaryButtonClass =
-    "inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-white shadow-[0_18px_38px_-20px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#4830d4]";
+    "inline-flex h-9 items-center justify-center rounded-full bg-[var(--accent)] px-3 text-[11px] font-semibold text-white shadow-[0_12px_26px_-16px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#4830d4]";
 
   return (
-    <div className="space-y-4 lg:space-y-3.5">
+    <div className="space-y-2.5">
       {params.error ? (
-        <div className="rounded-lg border border-amber-200/70 bg-[rgba(247,247,247,0.92)] px-5 py-4 text-sm text-amber-700 shadow-[0_16px_40px_-36px_rgba(17,19,24,0.45)]">
+        <div className="rounded-lg border border-amber-200/70 bg-[rgba(247,247,247,0.92)] px-4 py-3 text-[12px] text-amber-700 shadow-[0_16px_40px_-36px_rgba(17,19,24,0.45)]">
           {orderMessages.importedReadOnly}
         </div>
       ) : null}
@@ -278,32 +278,32 @@ export default async function OrdersPage({
        * keyboard / a11y focus story without any client JS.
        */}
       <details className="group overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
-        <summary className="tap-press flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
+        <summary className="tap-press flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 sm:px-4 sm:py-3.5">
           <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)] sm:text-xs sm:tracking-[0.28em]">
+            <p className="text-[9px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)] sm:text-[10px] sm:tracking-[0.24em]">
               {orderMessages.createKicker}
             </p>
-            <h2 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-[color:var(--ink)] sm:mt-1 sm:text-[1.5rem] lg:text-[1.6rem]">
+            <h2 className="mt-0.5 font-serif text-[0.98rem] font-semibold leading-tight text-[color:var(--ink)] sm:text-[1.2rem] lg:text-[1.28rem]">
               {orderMessages.createTitle}
             </h2>
           </div>
           <span
             aria-hidden
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-white text-[var(--ink-soft)] transition group-open:rotate-45 group-open:bg-[var(--ink)] group-open:text-white"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-white text-[var(--ink-soft)] transition group-open:rotate-45 group-open:bg-[var(--ink)] group-open:text-white"
           >
-            <span className="text-xl leading-none">+</span>
+            <span className="text-lg leading-none">+</span>
           </span>
         </summary>
 
-        <div className="border-t border-[var(--line)] px-4 py-4 sm:px-6 sm:py-5">
-          <p className="max-w-3xl text-[13px] text-[color:var(--ink-soft)] sm:text-sm">
+        <div className="border-t border-[var(--line)] px-3 py-3 sm:px-4 sm:py-3.5">
+          <p className="max-w-3xl text-[12px] text-[color:var(--ink-soft)]">
             {orderMessages.createCopy}
           </p>
-          <p className="mt-2 text-[11px] text-[color:var(--ink-soft)]">
+          <p className="mt-1 text-[10.5px] text-[color:var(--ink-soft)]">
             {orderMessages.createHint}
           </p>
 
-          <form action={saveOfflineOrderAction} className="mt-5 grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <form action={saveOfflineOrderAction} className="mt-3 grid gap-2 sm:gap-2.5 md:grid-cols-2 xl:grid-cols-4">
           <select name="vehicleId" className={inputClass}>
             {vehicles.map((vehicle) => (
               <option key={vehicle.id} value={vehicle.id}>
@@ -375,28 +375,28 @@ export default async function OrdersPage({
        * opens to a clean "search + results" view; users who want
        * to slice by status / vehicle / date open the panel.
        */}
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:p-5">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-3 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:p-3.5">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
               {orderMessages.searchKicker}
             </p>
-            <h2 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-[color:var(--ink)] sm:text-[1.2rem] lg:text-[1.4rem]">
+            <h2 className="mt-0.5 font-serif text-[0.98rem] font-semibold leading-tight text-[color:var(--ink)] sm:text-[1.12rem] lg:text-[1.2rem]">
               {orderMessages.searchTitle}
             </h2>
           </div>
-          <p className="text-[12px] text-[color:var(--ink-soft)] lg:text-[13px]">
+          <p className="text-[11px] text-[color:var(--ink-soft)] lg:text-[12px]">
             {orderMessages.searchSummary(totalCount)}
           </p>
         </div>
 
-        <form method="get" className="mt-3 space-y-3">
-          <div className="flex flex-col gap-2.5 md:flex-row md:items-center">
+        <form method="get" className="mt-2.5 space-y-2.5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
             <input
               name="q"
               defaultValue={searchQuery}
               placeholder={orderMessages.placeholders.search}
-              className="h-12 flex-1 rounded-full border border-[rgba(17,19,24,0.08)] bg-white/84 px-5 text-sm text-[color:var(--ink)] outline-none"
+              className="h-9 flex-1 rounded-full border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 text-[12px] text-[color:var(--ink)] outline-none"
             />
             <button className={primaryButtonClass}>{orderMessages.searchAction}</button>
             {hasAnyFilter ? (
@@ -410,8 +410,8 @@ export default async function OrdersPage({
             className="group rounded-lg border border-[color:var(--line)] bg-white/65"
             open={activeFilterCount > 0}
           >
-            <summary className="tap-press flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5">
-              <span className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
+            <summary className="tap-press flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2">
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                 {orderMessages.filters.toggleLabel}
                 {activeFilterCount > 0 ? (
                   <span className="rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-semibold tracking-normal text-white">
@@ -427,8 +427,8 @@ export default async function OrdersPage({
               </span>
             </summary>
 
-            <div className="border-t border-[color:var(--line)] px-4 py-4">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="border-t border-[color:var(--line)] px-3 py-3">
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
                     {orderMessages.filters.statusLabel}
@@ -498,7 +498,7 @@ export default async function OrdersPage({
                 </label>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button className={primaryButtonClass}>{orderMessages.filters.applyAction}</button>
                 {hasAnyFilter ? (
                   <a href="/orders" className={subtleButtonClass}>
@@ -511,9 +511,9 @@ export default async function OrdersPage({
         </form>
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-2">
+      <section className="grid gap-2.5 lg:grid-cols-2 2xl:grid-cols-3">
         {pageOrders.length === 0 ? (
-          <div className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-6 py-8 text-sm text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] lg:col-span-2">
+          <div className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-5 text-[12px] text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] lg:col-span-2">
             {orderMessages.emptySearch}
           </div>
         ) : null}
@@ -527,94 +527,94 @@ export default async function OrdersPage({
               key={order.id}
               className="h-fit overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
             >
-              <div className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] px-4 py-4 sm:px-5 sm:py-5">
-                <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] px-3 py-3 sm:px-3.5 sm:py-3.5">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
-                    <h3 className="font-serif text-[1.05rem] font-semibold leading-tight text-[color:var(--ink)] sm:text-[1.5rem] lg:text-[1.7rem]">
+                    <h3 className="font-serif text-[0.95rem] font-semibold leading-tight text-[color:var(--ink)] sm:text-[1.08rem] lg:text-[1.12rem]">
                       {order.vehicle.nickname} · {order.renterName}
                     </h3>
-                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[color:var(--ink-soft)] sm:mt-3 sm:gap-2">
-                      <span className="rounded-full bg-white/76 px-2.5 py-1 font-semibold shadow-[0_14px_28px_-24px_rgba(17,19,24,0.45)] sm:px-3">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10.5px] text-[color:var(--ink-soft)]">
+                      <span className="rounded-full bg-white/76 px-2 py-0.5 font-semibold shadow-[0_14px_28px_-24px_rgba(17,19,24,0.45)]">
                         {orderMessages.platePrefix}: {order.vehicle.plateNumber || "—"}
                       </span>
-                      <span className="rounded-full bg-white/56 px-2.5 py-1 sm:px-3">
+                      <span className="rounded-full bg-white/56 px-2 py-0.5">
                         {orderMessages.ownerPrefix}: {order.vehicle.owner?.name ?? "—"}
                       </span>
                     </div>
-                    <p className="mt-2.5 text-[12px] leading-snug text-[color:var(--ink-soft)] sm:mt-3 sm:text-sm">
+                    <p className="mt-1.5 text-[11px] leading-snug text-[color:var(--ink-soft)] sm:text-[12px]">
                       {formatDateTime(order.pickupDatetime, locale)} —{" "}
                       {formatDateTime(order.returnDatetime, locale)}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                  <div className="flex flex-wrap gap-1">
                     <StatusBadge value={order.source} locale={locale} />
                     <StatusBadge value={order.status} locale={locale} />
                     {order.hasConflict ? <StatusBadge value="conflict" locale={locale} /> : null}
                   </div>
                 </div>
 
-                <div className="mt-3.5 grid gap-2.5 text-[13px] text-[color:var(--ink)] sm:mt-4 sm:gap-3 sm:text-sm sm:grid-cols-2 xl:grid-cols-3">
+                <div className="mt-3 grid gap-2 text-[12px] text-[color:var(--ink)] sm:grid-cols-2 xl:grid-cols-3">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                       {orderMessages.phone}
                     </p>
-                    <p className="mt-1 font-semibold">{order.renterPhone || "—"}</p>
+                    <p className="mt-0.5 font-semibold">{order.renterPhone || "—"}</p>
                   </div>
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                       {orderMessages.pickup}
                     </p>
-                    <p className="mt-1 font-semibold">{order.pickupLocation || "—"}</p>
+                    <p className="mt-0.5 font-semibold">{order.pickupLocation || "—"}</p>
                   </div>
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                       {orderMessages.return}
                     </p>
-                    <p className="mt-1 font-semibold">{order.returnLocation || "—"}</p>
+                    <p className="mt-0.5 font-semibold">{order.returnLocation || "—"}</p>
                   </div>
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                       {orderMessages.payment}
                     </p>
-                    <p className="mt-1 font-semibold">{order.paymentMethod || "—"}</p>
+                    <p className="mt-0.5 font-semibold">{order.paymentMethod || "—"}</p>
                   </div>
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                       {orderMessages.contract}
                     </p>
-                    <p className="mt-1 font-semibold">{order.contractNumber || "—"}</p>
+                    <p className="mt-0.5 font-semibold">{order.contractNumber || "—"}</p>
                   </div>
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                       {orderMessages.createdBy}
                     </p>
-                    <p className="mt-1 font-semibold">{order.createdBy}</p>
+                    <p className="mt-0.5 font-semibold">{order.createdBy}</p>
                   </div>
                 </div>
 
                 {hasNetEarning ? (
-                  <div className="mt-4 overflow-hidden rounded-lg border border-[rgba(17,19,24,0.06)] bg-[linear-gradient(180deg,rgba(17,19,24,0.96),rgba(24,30,41,0.96))] px-4 py-4 text-white">
-                    <p className="text-[11px] uppercase tracking-[0.22em] text-white/60">
+                  <div className="mt-3 overflow-hidden rounded-lg border border-[rgba(17,19,24,0.06)] bg-[linear-gradient(180deg,rgba(17,19,24,0.96),rgba(24,30,41,0.96))] px-3 py-3 text-white">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-white/60">
                       {orderMessages.importedBreakdown}
                     </p>
-                    <div className="mt-3 rounded-md bg-white/8 px-4 py-3">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">
+                    <div className="mt-2 rounded-md bg-white/8 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-white/55">
                         {orderMessages.revenuePrefix}
                       </p>
-                      <p className="mt-2 text-xl font-semibold text-white">
+                      <p className="mt-1 text-base font-semibold text-white">
                         {formatCurrency(netEarning, locale)}
                       </p>
                     </div>
                   </div>
                 ) : null}
 
-                <div className="mt-4 flex flex-col gap-3">
-                  <form action={updateOrderStatusAction} className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mt-3 flex flex-col gap-2">
+                  <form action={updateOrderStatusAction} className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <input type="hidden" name="id" value={order.id} />
                     <select
                       name="status"
                       defaultValue={order.status}
-                      className="h-11 rounded-full border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 text-sm text-[color:var(--ink)]"
+                      className="h-9 rounded-full border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 text-[12px] text-[color:var(--ink)]"
                     >
                       {orderStatusOptions.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -628,7 +628,7 @@ export default async function OrdersPage({
                   {order.source === "offline" ? (
                     <form action={deleteOrderAction}>
                       <input type="hidden" name="id" value={order.id} />
-                      <button className="inline-flex h-11 items-center justify-center rounded-full border border-rose-200 bg-white/76 px-4 text-sm font-semibold text-rose-600 transition hover:border-rose-400 hover:text-rose-700">
+                      <button className="inline-flex h-9 items-center justify-center rounded-full border border-rose-200 bg-white/76 px-3 text-[11px] font-semibold text-rose-600 transition hover:border-rose-400 hover:text-rose-700">
                         {orderMessages.deleteOfflineOrder}
                       </button>
                     </form>
@@ -637,11 +637,11 @@ export default async function OrdersPage({
               </div>
 
               {order.source === "offline" ? (
-                <details className="border-t border-[color:var(--line)] bg-[rgba(255,255,255,0.38)] px-5 py-4">
-                  <summary className="cursor-pointer list-none text-sm font-semibold text-[color:var(--ink)]">
+                <details className="border-t border-[color:var(--line)] bg-[rgba(255,255,255,0.38)] px-3 py-3">
+                  <summary className="cursor-pointer list-none text-[12px] font-semibold text-[color:var(--ink)]">
                     {orderMessages.editOfflineOrder}
                   </summary>
-                  <form action={saveOfflineOrderAction} className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <form action={saveOfflineOrderAction} className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                     <input type="hidden" name="id" value={order.id} />
                     <select name="vehicleId" defaultValue={order.vehicleId} className={inputClass}>
                       {vehicles.map((vehicle) => (
@@ -728,7 +728,7 @@ export default async function OrdersPage({
       {totalCount > PAGE_SIZE ? (
         <nav
           aria-label="Pagination"
-          className="flex flex-col items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-3 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:flex-row sm:justify-between"
+          className="flex flex-col items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-3 py-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:flex-row sm:justify-between"
         >
           <p className="text-[12px] text-[color:var(--ink-soft)]">
             {orderMessages.pagination.showingRange(startIndex + 1, endIndex, totalCount)}

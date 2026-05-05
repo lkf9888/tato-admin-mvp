@@ -39,29 +39,29 @@ export function DeleteShareLinkButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-md border border-rose-300 px-4 py-3 text-sm font-medium text-rose-700"
+        className="rounded-md border border-rose-300 px-3 py-2 text-[12px] font-medium text-rose-700"
       >
         {deleteLabel}
       </button>
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-white/70 bg-white p-6 shadow-2xl">
-            <h4 className="text-xl font-semibold text-slate-950">{confirmTitle}</h4>
-            <p className="mt-3 text-sm leading-6 text-slate-600">{confirmDescription}</p>
+          <div className="w-full max-w-md rounded-lg border border-white/70 bg-white p-4 shadow-2xl">
+            <h4 className="text-lg font-semibold text-slate-950">{confirmTitle}</h4>
+            <p className="mt-2 text-[12px] leading-5 text-slate-600">{confirmDescription}</p>
 
-            <div className="mt-6 flex gap-3">
+            <div className="mt-4 flex gap-2">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex-1 rounded-md border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
+                className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-[12px] font-medium text-slate-700"
               >
                 {confirmNoLabel}
               </button>
 
               <form action="/api/share-links/delete" method="post" className="flex-1">
                 <input type="hidden" name="id" value={id} />
-                <button className="w-full rounded-md bg-rose-600 px-4 py-3 text-sm font-medium text-white">
+                <button className="w-full rounded-md bg-rose-600 px-3 py-2 text-[12px] font-medium text-white">
                   {confirmYesLabel}
                 </button>
               </form>

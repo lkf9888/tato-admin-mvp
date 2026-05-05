@@ -28,7 +28,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex rounded-full px-3 py-1 text-[11px] font-semibold capitalize tracking-[0.08em]",
+        "inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-semibold capitalize tracking-[0.06em]",
         badgeStyles[value] ?? "bg-slate-100 text-slate-700",
         className,
       )}

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
+import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 
@@ -234,10 +235,15 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "READ_ONLY_SOURCE" }, { status: 403 });
     }
 
-    await prisma.order.delete({
+    const archivedOrder = await prisma.order.update({
       where: { id: existing.id },
+      data: {
+        isArchived: true,
+        status: OrderStatus.cancelled,
+      },
     });
 
+    await syncOrderOwnerLedger(archivedOrder.id);
     await reconcileVehicleConflicts(existing.vehicleId);
     await logActivity({
       workspaceId: workspace.id,
@@ -252,7 +258,7 @@ export async function DELETE(request: Request) {
     });
 
     revalidateOrderSurfaces();
-    return NextResponse.json({ deletedId: id });
+    return NextResponse.json({ deletedId: id, archivedId: id });
   } catch {
     return NextResponse.json({ error: "DELETE_FAILED" }, { status: 500 });
   }

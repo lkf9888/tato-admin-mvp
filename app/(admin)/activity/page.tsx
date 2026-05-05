@@ -279,7 +279,7 @@ export default async function ActivityPage({
 
       <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
         {rows.length === 0 ? (
-          <div className="px-6 py-10 text-center text-sm text-[color:var(--ink-soft)]">
+          <div className="px-4 py-6 text-center text-[12px] text-[color:var(--ink-soft)]">
             {t.empty}
           </div>
         ) : (

@@ -149,32 +149,32 @@ export function PayoutsPanel({
   }
 
   return (
-    <div className="space-y-6">
-      <header className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] px-5 py-6 sm:px-8 sm:py-7">
-        <p className="text-[11px] uppercase tracking-[0.38em] text-[var(--ink-soft)]">
+    <div className="space-y-3">
+      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-3 sm:px-4">
+        <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
           {t.kicker}
         </p>
-        <h1 className="mt-2 font-serif text-[2rem] font-semibold leading-tight text-[var(--ink)]">
+        <h1 className="mt-1 font-serif text-[1.25rem] font-semibold leading-tight text-[var(--ink)]">
           {t.title}
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--ink-soft)]">{t.copy}</p>
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/60 px-3 py-1 text-xs text-[var(--ink-soft)]">
+        <p className="mt-2 max-w-2xl text-[12px] leading-5 text-[var(--ink-soft)]">{t.copy}</p>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/60 px-2.5 py-0.5 text-[11px] text-[var(--ink-soft)]">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
           {t.platformFeeNote}
         </div>
       </header>
 
       {!configured && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-800">
           {t.notConfigured}
         </div>
       )}
 
-      <section className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] px-5 py-5 sm:px-8 sm:py-6">
-        <p className="text-[11px] uppercase tracking-[0.38em] text-[var(--ink-soft)]">
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-3 sm:px-4">
+        <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
           {t.howItWorks}
         </p>
-        <ol className="mt-3 space-y-2 text-sm leading-relaxed text-[var(--ink)]">
+        <ol className="mt-2 space-y-1.5 text-[12px] leading-5 text-[var(--ink)]">
           {t.howSteps.map((step, index) => (
             <li key={index} className="flex gap-3">
               <span className="mt-0.5 inline-flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[var(--accent)]/10 text-[11px] font-semibold text-[var(--accent)]">
@@ -186,18 +186,18 @@ export function PayoutsPanel({
         </ol>
       </section>
 
-      <section className={`rounded-3xl border px-5 py-5 sm:px-8 sm:py-6 ${statusTone.card}`}>
-        <p className="text-[11px] uppercase tracking-[0.38em] text-[var(--ink-soft)]">
+      <section className={`rounded-lg border px-3 py-3 sm:px-4 ${statusTone.card}`}>
+        <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
           {t.statusKicker}
         </p>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-1.5 flex items-center gap-2">
           <span className={`h-2.5 w-2.5 rounded-full ${statusTone.dot}`} />
-          <h2 className="text-lg font-semibold text-[var(--ink)]">{statusTitle}</h2>
+          <h2 className="text-[1rem] font-semibold text-[var(--ink)]">{statusTitle}</h2>
         </div>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]">{statusCopy}</p>
+        <p className="mt-1.5 text-[12px] leading-5 text-[var(--ink-soft)]">{statusCopy}</p>
 
         {snapshot.accountId && (
-          <dl className="mt-5 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          <dl className="mt-3 grid grid-cols-1 gap-2 text-[12px] sm:grid-cols-2">
             <div>
               <dt className="text-[11px] uppercase tracking-[0.3em] text-[var(--ink-soft)]">
                 {t.accountIdLabel}
@@ -246,20 +246,20 @@ export function PayoutsPanel({
         )}
       </section>
 
-      <section className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] px-5 py-5 sm:px-8 sm:py-6">
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-3 sm:px-4">
         {status === "not_started" ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
               <label className="text-[11px] uppercase tracking-[0.3em] text-[var(--ink-soft)]">
                 {t.countryLabel}
               </label>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-2 flex gap-2">
                 {(["CA", "US"] as const).map((option) => (
                   <button
                     key={option}
                     type="button"
                     onClick={() => setCountry(option)}
-                    className={`rounded-full border px-4 py-2 text-sm transition ${
+                    className={`rounded-full border px-3 py-1.5 text-[12px] transition ${
                       country === option
                         ? "border-[var(--accent)] bg-[var(--accent)] text-white"
                         : "border-[var(--line)] bg-white text-[var(--ink)] hover:bg-[var(--surface-muted)]"
@@ -274,19 +274,19 @@ export function PayoutsPanel({
               type="button"
               onClick={handleStart}
               disabled={!configured || isStarting}
-              className="inline-flex items-center justify-center rounded-full bg-[var(--ink)] px-6 py-3 text-sm font-medium text-white transition hover:bg-[var(--ink)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center rounded-full bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[var(--ink)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isStarting ? t.connectLoading : t.connectAction}
             </button>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             {status !== "active" && (
               <button
                 type="button"
                 onClick={handleResume}
                 disabled={!configured || isResuming}
-                className="inline-flex items-center justify-center rounded-full bg-[var(--ink)] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--ink)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-full bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[var(--ink)]/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isResuming ? t.connectLoading : t.continueAction}
               </button>
@@ -295,7 +295,7 @@ export function PayoutsPanel({
               type="button"
               onClick={handleDashboard}
               disabled={!configured || isDashboardOpening}
-              className="inline-flex items-center justify-center rounded-full border border-[var(--line)] bg-white px-5 py-2.5 text-sm font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center rounded-full border border-[var(--line)] bg-white px-4 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t.dashboardAction}
             </button>
@@ -303,7 +303,7 @@ export function PayoutsPanel({
               type="button"
               onClick={handleRefresh}
               disabled={!configured || isRefreshing}
-              className="inline-flex items-center justify-center rounded-full border border-[var(--line)] bg-white px-5 py-2.5 text-sm font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center rounded-full border border-[var(--line)] bg-white px-4 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isRefreshing ? t.refreshing : t.refreshAction}
             </button>
@@ -311,12 +311,12 @@ export function PayoutsPanel({
         )}
 
         {error && (
-          <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-800">
             {error}
           </p>
         )}
         {notice && !error && (
-          <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+          <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800">
             {notice}
           </p>
         )}

@@ -269,18 +269,18 @@ export function OwnerLedgerManager({
   }
 
   return (
-    <div className="space-y-4">
-      <section className="grid gap-3 lg:grid-cols-[1.05fr_1.5fr]">
-        <div className="rounded-lg border border-[var(--line)] bg-white/90 p-4 shadow-sm sm:p-5">
-          <div className="flex items-start justify-between gap-4">
+    <div className="space-y-3">
+      <section className="grid gap-2.5 lg:grid-cols-[1.05fr_1.5fr]">
+        <div className="rounded-lg border border-[var(--line)] bg-white/90 p-3 shadow-sm sm:p-4">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--ink-soft)]">
                 {labels.currentBalance}
               </p>
-              <p className="mt-2 font-serif text-3xl font-semibold text-[var(--ink)]">
+              <p className="mt-1 font-serif text-[1.35rem] font-semibold text-[var(--ink)]">
                 {formatCurrency(Math.abs(totalBalance), locale)}
               </p>
-              <p className="mt-1 text-sm text-[var(--ink-soft)]">
+              <p className="mt-0.5 text-[12px] text-[var(--ink-soft)]">
                 {totalBalance > 0
                   ? labels.tatoOwesOwner
                   : totalBalance < 0
@@ -293,7 +293,7 @@ export function OwnerLedgerManager({
                 name="ownerId"
                 value={selectedOwner.id}
                 onChange={(event) => router.push(`/owner-statements?ownerId=${event.target.value}`)}
-                className="h-10 rounded-full border border-[var(--line)] bg-white px-3 text-sm"
+                className="h-9 rounded-full border border-[var(--line)] bg-white px-3 text-[12px]"
               >
                 {owners.map((owner) => (
                   <option key={owner.id} value={owner.id}>
@@ -304,27 +304,27 @@ export function OwnerLedgerManager({
             </form>
           </div>
 
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <button
-              className="rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold"
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
               onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.EXPENSE_REIMBURSEMENT })}
             >
               + {labels.addExpense}
             </button>
             <button
-              className="rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold"
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
               onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.SETTLEMENT_PAYMENT })}
             >
               + {labels.addPayment}
             </button>
             <button
-              className="rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold"
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
               onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.MANUAL_ADJUSTMENT })}
             >
               + {labels.addAdjustment}
             </button>
             <button
-              className="rounded-full bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-full bg-[var(--accent)] px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-50"
               onClick={resync}
               disabled={isPending}
             >
@@ -449,9 +449,9 @@ function Metric({
   tone: "positive" | "negative";
 }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-4 py-3">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">{label}</p>
-      <p className={cn("mt-1 text-xl font-semibold", tone === "positive" ? "text-emerald-700" : "text-rose-700")}>
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--ink-soft)]">{label}</p>
+      <p className={cn("mt-0.5 text-base font-semibold", tone === "positive" ? "text-emerald-700" : "text-rose-700")}>
         {value}
       </p>
     </div>
@@ -474,13 +474,13 @@ function LedgerTable({
   onDelete: (item: LedgerItem) => void;
 }) {
   if (rows.length === 0) {
-    return <div className="mt-4 rounded-lg bg-slate-50 px-5 py-8 text-center text-sm text-[var(--ink-soft)]">{labels.empty}</div>;
+    return <div className="mt-3 rounded-lg bg-slate-50 px-4 py-5 text-center text-[12px] text-[var(--ink-soft)]">{labels.empty}</div>;
   }
 
   return (
-    <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--line)]">
-      <table className="min-w-[760px] w-full text-sm">
-        <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-[0.14em] text-[var(--ink-soft)]">
+    <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--line)]">
+      <table className="min-w-[760px] w-full text-[12px]">
+        <thead className="bg-slate-50 text-left text-[10px] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
           <tr>
             <th className="px-3 py-2">{labels.date}</th>
             <th className="px-3 py-2">{labels.type}</th>

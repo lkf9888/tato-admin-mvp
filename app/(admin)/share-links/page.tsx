@@ -25,13 +25,13 @@ export default async function ShareLinksPage() {
   const shareVisibilityOptions = getShareVisibilityOptions(locale);
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
+    <div className="space-y-3">
+      <section className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
           {shareLinkMessages.createKicker}
         </p>
-        <form action="/api/share-links/create" method="post" className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <select name="ownerId" className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+        <form action="/api/share-links/create" method="post" className="mt-3 grid gap-2 text-[12px] md:grid-cols-2 xl:grid-cols-4">
+          <select name="ownerId" className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
             {owners.map((owner) => (
               <option key={owner.id} value={owner.id}>
                 {owner.name}
@@ -41,7 +41,7 @@ export default async function ShareLinksPage() {
           <select
             name="visibility"
             defaultValue="standard"
-            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
           >
             {shareVisibilityOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -52,33 +52,33 @@ export default async function ShareLinksPage() {
           <input
             name="password"
             placeholder={shareLinkMessages.optionalPassword}
-            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
           />
           <input
             name="expiresAt"
             type="datetime-local"
-            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
           />
-          <button className="rounded-md bg-slate-950 px-4 py-3 font-medium text-white xl:col-span-1">
+          <button className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white xl:col-span-1">
             {shareLinkMessages.generateLink}
           </button>
         </form>
       </section>
 
-      <section className="space-y-4">
+      <section className="grid gap-2.5 xl:grid-cols-2 2xl:grid-cols-3">
         {shareLinks.map((shareLink) => (
-          <article key={shareLink.id} className="rounded-lg border border-white/70 bg-white/90 p-6 shadow-sm">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <article key={shareLink.id} className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-3.5">
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
-                <h3 className="font-serif text-2xl text-slate-950 sm:text-3xl">{shareLink.owner.name}</h3>
-                <p className="mt-2 break-all text-sm text-slate-500">
+                <h3 className="font-serif text-[0.95rem] font-semibold text-slate-950 sm:text-[1.05rem]">{shareLink.owner.name}</h3>
+                <p className="mt-1 break-all text-[11px] text-slate-500">
                   {shareLinkMessages.tokenPrefix}: {shareLink.token}
                 </p>
-                <p className="mt-1 break-all text-sm text-slate-500">
+                <p className="mt-0.5 break-all text-[11px] text-slate-500">
                   {shareLinkMessages.urlPrefix}: /share/{shareLink.token} ·{" "}
                   {shareLinkMessages.createdAt(formatDateTime(shareLink.createdAt, locale))}
                 </p>
-                <p className="mt-1 break-words text-sm text-slate-500">
+                <p className="mt-0.5 break-words text-[11px] text-slate-500">
                   {shareLink.passwordHash
                     ? shareLinkMessages.passwordProtected
                     : shareLinkMessages.noPassword}{" "}
@@ -88,23 +88,23 @@ export default async function ShareLinksPage() {
                     : shareLinkMessages.noExpiry}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1">
                 <StatusBadge value={shareLink.visibility} locale={locale} />
                 <StatusBadge value={shareLink.isActive ? "available" : "inactive"} locale={locale} />
               </div>
             </div>
 
-            <div className="mt-4 flex flex-col gap-3 md:flex-row">
+            <div className="mt-3 flex flex-col gap-2 md:flex-row">
               <a
                 href={`/share/${shareLink.token}`}
-                className="rounded-md border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
+                className="rounded-md border border-slate-200 px-3 py-2 text-[12px] font-medium text-slate-700"
               >
                 {shareLinkMessages.openSharePage}
               </a>
               {shareLink.isActive ? (
                 <form action="/api/share-links/revoke" method="post">
                   <input type="hidden" name="id" value={shareLink.id} />
-                  <button className="rounded-md border border-rose-200 px-4 py-3 text-sm font-medium text-rose-600">
+                  <button className="rounded-md border border-rose-200 px-3 py-2 text-[12px] font-medium text-rose-600">
                     {shareLinkMessages.revokeLink}
                   </button>
                 </form>

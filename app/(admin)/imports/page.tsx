@@ -23,7 +23,7 @@ export default async function ImportsPage({
   const importMessages = messages.imports;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <CsvImportPanel
         locale={locale}
         billingSnapshot={{
@@ -42,30 +42,30 @@ export default async function ImportsPage({
         billingState={params.billing ?? null}
       />
 
-      <section className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
               {importMessages.logKicker}
             </p>
-            <h3 className="mt-2 font-serif text-2xl text-slate-950 sm:text-3xl">{importMessages.logTitle}</h3>
+            <h3 className="mt-1 font-serif text-[1.05rem] text-slate-950 sm:text-[1.25rem]">{importMessages.logTitle}</h3>
           </div>
-          <p className="text-sm text-slate-500">{importMessages.sampleFile}</p>
+          <p className="text-[12px] text-slate-500">{importMessages.sampleFile}</p>
         </div>
 
-        <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200">
-          <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+        <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-[12px]">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-4 py-3 font-semibold text-slate-700">{importMessages.table.file}</th>
-                <th className="px-4 py-3 font-semibold text-slate-700">
+                <th className="px-3 py-2 font-semibold text-slate-700">{importMessages.table.file}</th>
+                <th className="px-3 py-2 font-semibold text-slate-700">
                   {importMessages.table.importedBy}
                 </th>
-                <th className="px-4 py-3 font-semibold text-slate-700">
+                <th className="px-3 py-2 font-semibold text-slate-700">
                   {importMessages.table.importedAt}
                 </th>
-                <th className="px-4 py-3 font-semibold text-slate-700">{importMessages.table.rows}</th>
-                <th className="px-4 py-3 font-semibold text-slate-700">
+                <th className="px-3 py-2 font-semibold text-slate-700">{importMessages.table.rows}</th>
+                <th className="px-3 py-2 font-semibold text-slate-700">
                   {importMessages.table.result}
                 </th>
               </tr>
@@ -73,13 +73,13 @@ export default async function ImportsPage({
             <tbody className="divide-y divide-slate-100 bg-white">
               {batches.map((batch) => (
                 <tr key={batch.id}>
-                  <td className="px-4 py-3 text-slate-700">{batch.fileName}</td>
-                  <td className="px-4 py-3 text-slate-600">{batch.importedBy}</td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-3 py-2 text-slate-700">{batch.fileName}</td>
+                  <td className="px-3 py-2 text-slate-600">{batch.importedBy}</td>
+                  <td className="px-3 py-2 text-slate-600">
                     {formatDateTime(batch.importedAt, locale)}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{batch.totalRows}</td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-3 py-2 text-slate-600">{batch.totalRows}</td>
+                  <td className="px-3 py-2 text-slate-600">
                     {importMessages.table.batchResult(batch.successRows, batch.failedRows)}
                   </td>
                 </tr>

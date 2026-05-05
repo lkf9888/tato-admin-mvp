@@ -89,7 +89,7 @@ export function AppShell({
   // footer of the More sheet so the desktop sidebar's full surface is
   // reachable from a phone.
   const moreFooter = (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <LanguageSwitcher
         locale={locale}
         preference={localePreference}
@@ -98,7 +98,7 @@ export function AppShell({
         autoLabel={messages.shell.languageAutoLabel}
       />
       <form action={logoutAction}>
-        <button className="tap-press w-full rounded-full border border-[var(--line)] bg-white/72 px-4 py-3 text-[14px] font-medium text-[var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.16)] hover:bg-white hover:text-[var(--ink)]">
+        <button className="tap-press w-full rounded-full border border-[var(--line)] bg-white/72 px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.16)] hover:bg-white hover:text-[var(--ink)]">
           {messages.shell.signOut}
         </button>
       </form>
@@ -116,22 +116,22 @@ export function AppShell({
   // becomes the dominant visual block.
   const sidebarContent = (
     <>
-      <div className="space-y-1.5">
-        <p className="text-[10px] uppercase tracking-[0.42em] text-[var(--ink-soft)]">
+      <div className="space-y-1">
+        <p className="text-[9px] uppercase tracking-[0.38em] text-[var(--ink-soft)]">
           {messages.shell.brandKicker}
         </p>
-        <h1 className="font-serif text-[1.85rem] font-semibold leading-none text-[var(--ink)]">
+        <h1 className="font-serif text-[1.55rem] font-semibold leading-none text-[var(--ink)]">
           {messages.shell.brandTitle}
         </h1>
-        <p className="max-w-[13rem] text-[12px] leading-5 text-[var(--ink-soft)]">
+        <p className="max-w-[11.5rem] text-[11px] leading-4 text-[var(--ink-soft)]">
           {messages.shell.brandCopy}
         </p>
       </div>
 
-      <nav className="mt-5 space-y-3.5">
+      <nav className="mt-4 space-y-2.5">
         {navGroups.map((group) => (
-          <div key={group.label} className="space-y-1">
-            <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--ink-soft)]/75">
+          <div key={group.label} className="space-y-0.5">
+            <p className="px-2.5 text-[9px] font-semibold uppercase tracking-[0.24em] text-[var(--ink-soft)]/75">
               {group.label}
             </p>
             <div className="space-y-0.5">
@@ -139,7 +139,7 @@ export function AppShell({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="block rounded-full px-3 py-2 text-[15px] font-medium text-[var(--ink-soft)] transition hover:bg-white/85 hover:text-[var(--ink)] hover:shadow-[0_10px_30px_rgba(17,19,24,0.06)]"
+                  className="block rounded-full px-2.5 py-1.5 text-[13px] font-medium text-[var(--ink-soft)] transition hover:bg-white/85 hover:text-[var(--ink)] hover:shadow-[0_10px_30px_rgba(17,19,24,0.06)]"
                 >
                   {item.label}
                 </Link>
@@ -149,7 +149,7 @@ export function AppShell({
         ))}
       </nav>
 
-      <div className="mt-4">
+      <div className="mt-3">
         <LanguageSwitcher
           locale={locale}
           preference={localePreference}
@@ -159,13 +159,13 @@ export function AppShell({
         />
       </div>
 
-      <div className="mt-4 rounded-lg border border-[var(--line)] bg-white/80 px-3.5 py-2.5 text-[11px] text-[var(--ink-soft)] shadow-[0_14px_35px_rgba(17,19,24,0.05)]">
+      <div className="mt-3 rounded-lg border border-[var(--line)] bg-white/80 px-3 py-2 text-[10px] text-[var(--ink-soft)] shadow-[0_14px_35px_rgba(17,19,24,0.05)]">
         <p className="font-medium text-[var(--ink)]">{messages.shell.versionLabel}</p>
         <p className="mt-0.5">{APP_VERSION_LABEL}</p>
       </div>
 
-      <form action={logoutAction} className="mt-4">
-        <button className="w-full rounded-full border border-[var(--line)] bg-white/72 px-4 py-2.5 text-[13px] font-medium text-[var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.16)] hover:bg-white hover:text-[var(--ink)]">
+      <form action={logoutAction} className="mt-3">
+        <button className="w-full rounded-full border border-[var(--line)] bg-white/72 px-3.5 py-2 text-[12px] font-medium text-[var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.16)] hover:bg-white hover:text-[var(--ink)]">
           {messages.shell.signOut}
         </button>
       </form>
@@ -180,7 +180,7 @@ export function AppShell({
       />
 
       <div className="flex min-h-screen w-full">
-        <aside className="hidden w-60 shrink-0 border-r border-[var(--line)] bg-[var(--panel-strong)] px-4 py-5 lg:block">
+        <aside className="hidden w-52 shrink-0 border-r border-[var(--line)] bg-[var(--panel-strong)] px-3 py-4 lg:block">
           {sidebarContent}
         </aside>
 
@@ -195,7 +195,7 @@ export function AppShell({
          * inner sections that NEED horizontal scroll (the metric
          * strip) keep doing it inside their own `overflow-x-auto`
          * container. */}
-        <main className="min-w-0 flex-1 px-3 pb-[calc(env(safe-area-inset-bottom)+88px)] pt-4 sm:px-4 lg:px-5 lg:pb-5 lg:pt-3.5">
+        <main className="min-w-0 flex-1 px-2.5 pb-[calc(env(safe-area-inset-bottom)+82px)] pt-3 sm:px-3 lg:px-3.5 lg:pb-4 lg:pt-3">
           {/* v0.19.1 density pass: page-header card was eating ~120px
            * of vertical space on desktop with title at 2.35rem and
            * 20px-each-side padding. Title shrunk to 1.55rem on
@@ -211,15 +211,15 @@ export function AppShell({
            * wraps at the viewport boundary instead of pushing the
            * page wider; (2) page title and kicker shrink one tier on
            * mobile so they read as a header, not a hero. */}
-          <header className="mb-3 flex flex-col gap-1.5 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-3 shadow-[0_24px_70px_rgba(17,19,24,0.06)] backdrop-blur sm:gap-2 sm:px-4 sm:py-3.5 md:flex-row md:items-center md:justify-between md:gap-4">
+          <header className="mb-2.5 flex flex-col gap-1 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 shadow-[0_18px_46px_rgba(17,19,24,0.05)] backdrop-blur sm:gap-1.5 sm:px-3.5 sm:py-3 md:flex-row md:items-center md:justify-between md:gap-3">
             <div className="min-w-0">
-              <p className="text-[9px] uppercase tracking-[0.24em] text-[var(--ink-soft)] sm:text-[10px] sm:tracking-[0.32em]">
+              <p className="text-[8.5px] uppercase tracking-[0.22em] text-[var(--ink-soft)] sm:text-[9px] sm:tracking-[0.28em]">
                 {messages.shell.workspaceKicker}
               </p>
-              <h2 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-[var(--ink)] sm:mt-1 sm:text-[1.5rem] md:text-[1.6rem]">
+              <h2 className="mt-0.5 font-serif text-[1rem] font-semibold leading-tight text-[var(--ink)] sm:text-[1.28rem] md:text-[1.38rem]">
                 {title}
               </h2>
-              <p className="mt-1 max-w-3xl break-words text-[11.5px] leading-snug text-[var(--ink-soft)] sm:text-[12.5px]">
+              <p className="mt-0.5 max-w-3xl break-words text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[12px]">
                 {description}
               </p>
             </div>
@@ -227,7 +227,7 @@ export function AppShell({
              * space and prevent overflow — the info is preserved in
              * the More-sheet footer + sidebar on larger screens, where
              * there's actually room for it. */}
-            <div className="hidden max-w-full self-start break-words rounded-full border border-[rgba(89,60,251,0.12)] bg-[var(--accent-soft)] px-3 py-1 text-[10px] leading-tight text-[var(--ink)] shadow-[0_10px_20px_rgba(89,60,251,0.08)] sm:inline-flex sm:max-w-none sm:self-auto md:text-[11px]">
+            <div className="hidden max-w-full self-start break-words rounded-full border border-[rgba(89,60,251,0.12)] bg-[var(--accent-soft)] px-2.5 py-0.5 text-[9.5px] leading-tight text-[var(--ink)] shadow-[0_8px_16px_rgba(89,60,251,0.06)] sm:inline-flex sm:max-w-none sm:self-auto md:text-[10px]">
               {messages.shell.workspaceBadge}
             </div>
           </header>

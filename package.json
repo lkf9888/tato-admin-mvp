@@ -1,6 +1,6 @@
 {
   "name": "turo-admin-mvp",
-  "version": "0.21.0",
+  "version": "0.21.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,7 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "db:push": "prisma db push",
-    "db:reset": "node -e \"if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) { console.error('Refusing to reset the database in production.'); process.exit(1); }\" && prisma migrate reset --force"
+    "db:reset": "node -e \"if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT || process.env.ALLOW_DESTRUCTIVE_RESET !== 'true') { console.error('Refusing to reset the database. Set ALLOW_DESTRUCTIVE_RESET=true only for intentional local resets.'); process.exit(1); }\" && prisma migrate reset --force"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.17",

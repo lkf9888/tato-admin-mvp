@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.21.4 - 2026-05-05
+
+- **Owners page production fix.** Fixed the searchable owner vehicle binding component so it no longer passes translation functions from the server into a client component. This resolves the `/owners` runtime error seen on Railway after `v0.21.3`.
+
 ## v0.21.3 - 2026-05-04
 
 - **Owner vehicle binding search.** Owner edit cards now include an in-place vehicle search box inside the binding section. Searching by plate, model, VIN, Turo code, listing name, or owner filters the checkbox list without unbinding hidden selected vehicles.

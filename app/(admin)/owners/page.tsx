@@ -10,7 +10,7 @@ export default async function OwnersPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const workspace = await requireCurrentWorkspace();
-  const [{ messages }, owners, allVehicles, params] = await Promise.all([
+  const [{ locale, messages }, owners, allVehicles, params] = await Promise.all([
     getI18n(),
     prisma.owner.findMany({
       where: { workspaceId: workspace.id },
@@ -157,6 +157,7 @@ export default async function OwnersPage({
 
                 <OwnerVehicleAssignmentForm
                   ownerId={owner.id}
+                  locale={locale}
                   vehicles={allVehicles.map((vehicle) => ({
                     id: vehicle.id,
                     plateNumber: vehicle.plateNumber,
@@ -174,8 +175,6 @@ export default async function OwnersPage({
                     noVehicles: ownerMessages.noVehicles,
                     searchPlaceholder: ownerMessages.vehicleSearchPlaceholder,
                     noSearchResults: ownerMessages.vehicleNoSearchResults,
-                    resultCount: ownerMessages.vehicleSearchResults,
-                    assignedTo: ownerMessages.assignedTo,
                     saveVehicleAssignments: ownerMessages.saveVehicleAssignments,
                   }}
                 />

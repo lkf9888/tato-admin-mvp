@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { assignOwnerVehiclesAction } from "@/app/actions";
+import type { Locale } from "@/lib/i18n";
 
 type VehicleOption = {
   id: string;
@@ -20,13 +21,12 @@ type VehicleOption = {
 
 type OwnerVehicleAssignmentFormProps = {
   ownerId: string;
+  locale: Locale;
   vehicles: VehicleOption[];
   messages: {
     noVehicles: string;
     searchPlaceholder: string;
     noSearchResults: string;
-    resultCount: (shown: number, total: number) => string;
-    assignedTo: (name: string) => string;
     saveVehicleAssignments: string;
   };
 };
@@ -54,6 +54,7 @@ function buildVehicleSearchText(vehicle: VehicleOption) {
 
 export function OwnerVehicleAssignmentForm({
   ownerId,
+  locale,
   vehicles,
   messages,
 }: OwnerVehicleAssignmentFormProps) {
@@ -80,6 +81,15 @@ export function OwnerVehicleAssignmentForm({
     });
   }
 
+  const resultCount =
+    locale === "zh"
+      ? `当前显示 ${filteredVehicles.length} / ${vehicles.length} 台车`
+      : `${filteredVehicles.length} of ${vehicles.length} vehicle(s) shown`;
+
+  function formatAssignedOwner(ownerName: string) {
+    return locale === "zh" ? `当前属于 ${ownerName}` : `Currently assigned to ${ownerName}`;
+  }
+
   return (
     <form action={assignOwnerVehiclesAction} className="mt-2.5 space-y-2.5">
       <input type="hidden" name="ownerId" value={ownerId} />
@@ -102,7 +112,7 @@ export function OwnerVehicleAssignmentForm({
               className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[12px] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
             />
             <p className="text-[10.5px] text-slate-500">
-              {messages.resultCount(filteredVehicles.length, vehicles.length)}
+              {resultCount}
             </p>
           </div>
 
@@ -134,7 +144,7 @@ export function OwnerVehicleAssignmentForm({
                       <span className="block text-[10.5px] text-slate-500">
                         {vehicle.brand} {vehicle.model} {vehicle.year}
                         {assignedElsewhere && vehicle.ownerName
-                          ? ` · ${messages.assignedTo(vehicle.ownerName)}`
+                          ? ` · ${formatAssignedOwner(vehicle.ownerName)}`
                           : ""}
                       </span>
                     </span>

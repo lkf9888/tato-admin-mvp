@@ -1,4 +1,5 @@
 import { createShareLinkAction, deleteOwnerAction, saveOwnerAction } from "@/app/actions";
+import { OwnerLedgerManager } from "@/components/owner-ledger-manager";
 import { OwnerVehicleAssignmentForm } from "@/components/owner-vehicle-assignment-form";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
@@ -7,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 export default async function OwnersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; ownerId?: string }>;
 }) {
   const workspace = await requireCurrentWorkspace();
   const [{ locale, messages }, owners, allVehicles, params] = await Promise.all([
@@ -29,6 +30,52 @@ export default async function OwnersPage({
   ]);
 
   const ownerMessages = messages.owners;
+  const selectedOwner = owners.find((owner) => owner.id === params.ownerId) ?? owners[0] ?? null;
+  const ledgerItems = selectedOwner
+    ? await prisma.ownerLedgerItem.findMany({
+        where: {
+          workspaceId: workspace.id,
+          ownerId: selectedOwner.id,
+        },
+        orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+        include: {
+          vehicle: {
+            select: {
+              id: true,
+              plateNumber: true,
+              nickname: true,
+              brand: true,
+              model: true,
+              year: true,
+            },
+          },
+          order: {
+            select: {
+              id: true,
+              renterName: true,
+              pickupDatetime: true,
+              returnDatetime: true,
+            },
+          },
+        },
+      })
+    : [];
+  const revenueShareCopy =
+    locale === "zh"
+      ? {
+          kicker: "车主分成",
+          title: "车主分成与 monthly statement",
+          description:
+            "车主资料、绑定车辆、共享链接和分成流水账已经合并在同一个页面。账目可手动新增、修改、删除，也可以按订单重新同步。",
+          empty: "还没有车主。请先新增车主，再绑定车辆并同步分成账目。",
+        }
+      : {
+          kicker: "Owner revenue share",
+          title: "Owner ledger and monthly statement",
+          description:
+            "Owner profiles, vehicle assignment, share links, and editable revenue ledgers now live in one HostHub-style workflow.",
+          empty: "No owners yet. Create an owner, assign vehicles, then resync the ledger.",
+        };
 
   return (
     <div className="space-y-2.5">
@@ -233,6 +280,55 @@ export default async function OwnersPage({
           );
         })}
       </section>
+
+      <section className="rounded-lg border border-[var(--line)] bg-white/90 p-3 shadow-sm sm:p-4">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
+          {revenueShareCopy.kicker}
+        </p>
+        <h2 className="mt-1 font-serif text-[1.1rem] font-semibold text-[var(--ink)] sm:text-[1.3rem]">
+          {revenueShareCopy.title}
+        </h2>
+        <p className="mt-1.5 max-w-4xl text-[12px] leading-5 text-[var(--ink-soft)]">
+          {revenueShareCopy.description}
+        </p>
+      </section>
+
+      {selectedOwner ? (
+        <OwnerLedgerManager
+          locale={locale}
+          owners={owners.map((owner) => ({ id: owner.id, name: owner.name }))}
+          selectedOwner={{ id: selectedOwner.id, name: selectedOwner.name }}
+          vehicles={selectedOwner.vehicles.map((vehicle) => ({
+            id: vehicle.id,
+            label: `${vehicle.plateNumber} · ${vehicle.nickname}`,
+          }))}
+          items={ledgerItems.map((item) => ({
+            id: item.id,
+            ownerId: item.ownerId,
+            vehicleId: item.vehicleId,
+            orderId: item.orderId,
+            kind: item.kind,
+            amount: item.amount,
+            occurredAt: item.occurredAt.toISOString(),
+            note: item.note,
+            isAuto: item.isAuto,
+            createdAt: item.createdAt.toISOString(),
+            vehicle: item.vehicle,
+            order: item.order
+              ? {
+                  id: item.order.id,
+                  renterName: item.order.renterName,
+                  pickupDatetime: item.order.pickupDatetime.toISOString(),
+                  returnDatetime: item.order.returnDatetime.toISOString(),
+                }
+              : null,
+          }))}
+        />
+      ) : (
+        <div className="rounded-lg border border-dashed border-[var(--line)] bg-white/80 px-4 py-6 text-[12px] text-[var(--ink-soft)]">
+          {revenueShareCopy.empty}
+        </div>
+      )}
     </div>
   );
 }

@@ -87,6 +87,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
     metadata: { ownerId: context.owner.id, kind, amount: item.amount },
   });
 
+  revalidatePath("/owners");
   revalidatePath("/owner-statements");
   return NextResponse.json({ item });
 }

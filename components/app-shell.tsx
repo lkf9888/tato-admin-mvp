@@ -48,6 +48,8 @@ export function AppShell({
         { href: "/dashboard", label: messages.shell.nav.dashboard },
         { href: "/calendar", label: messages.shell.nav.calendar },
         { href: "/orders", label: messages.shell.nav.orders },
+        { href: "/photos", label: messages.shell.nav.photos },
+        { href: "/documents", label: messages.shell.nav.documents },
         { href: "/imports", label: messages.shell.nav.imports },
         { href: "/activity", label: messages.shell.nav.activity },
       ],
@@ -58,7 +60,6 @@ export function AppShell({
         { href: "/vehicles", label: messages.shell.nav.vehicles },
         { href: "/vehicle-roi", label: messages.shell.nav.vehicleRoi },
         { href: "/owners", label: messages.shell.nav.owners },
-        { href: "/owner-statements", label: messages.shell.nav.ownerStatements },
       ],
     },
     {

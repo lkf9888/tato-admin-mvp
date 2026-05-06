@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.22.0 - 2026-05-05
+
+- **HostHub-style calendar upgrade.** The TATO calendar now has a HostHub-inspired global timeline search across renter, phone, plate, owner, notes, source, and status, with search matches highlighted in the timeline. A day-width control lets operators widen or tighten date columns, and month / six-week views now behave more like a horizontal operations board instead of being forced into a cramped viewport.
+- **Owners and owner statements merged.** The separate owner-statement workflow now lives directly on the Owners page. Each owner can still be edited, assigned vehicles, and given a share link there, and the same page now includes the editable ledger, monthly statement view, and 12-month net chart. `/owner-statements` redirects to `/owners` for old bookmarks.
+- **Order attachments foundation.** Added order-level photos/videos and contract-file uploads using the Railway persistent data volume (`/app/data/uploads`) instead of Vercel Blob. Attachments are soft-archived when hidden, and uploaded files are served through authenticated API routes so version deploys do not remove user media.
+- **Attachment center pages.** Added Photos & Videos and Contract Files admin pages so uploaded order media can be reviewed outside the individual calendar order detail.
+
 ## v0.21.4 - 2026-05-05
 
 - **Owners page production fix.** Fixed the searchable owner vehicle binding component so it no longer passes translation functions from the server into a client component. This resolves the `/owners` runtime error seen on Railway after `v0.21.3`.

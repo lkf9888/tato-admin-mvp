@@ -34,6 +34,7 @@ export async function POST(_request: Request, { params }: { params: Params }) {
     metadata: result,
   });
 
+  revalidatePath("/owners");
   revalidatePath("/owner-statements");
   return NextResponse.json({ ok: true, ...result });
 }

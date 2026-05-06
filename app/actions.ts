@@ -110,6 +110,8 @@ function revalidateAdminPages() {
     "/vehicles",
     "/vehicle-roi",
     "/owner-statements",
+    "/photos",
+    "/documents",
     "/direct-booking",
     "/owners",
     "/orders",

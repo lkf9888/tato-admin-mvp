@@ -103,6 +103,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     metadata: { ownerId: context.item.ownerId, kind: updated.kind, amount: updated.amount },
   });
 
+  revalidatePath("/owners");
   revalidatePath("/owner-statements");
   return NextResponse.json({ item: updated });
 }
@@ -125,6 +126,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
     metadata: { ownerId: context.item.ownerId, kind: context.item.kind, amount: context.item.amount },
   });
 
+  revalidatePath("/owners");
   revalidatePath("/owner-statements");
   return NextResponse.json({ ok: true });
 }

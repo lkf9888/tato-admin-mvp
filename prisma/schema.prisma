@@ -55,6 +55,11 @@ enum OwnerLedgerKind {
   SETTLEMENT_PAYMENT
 }
 
+enum OrderAttachmentKind {
+  photo
+  document
+}
+
 model Workspace {
   id               String            @id @default(cuid())
   name             String
@@ -69,6 +74,7 @@ model Workspace {
   shareLinks       ShareLink[]
   activityLogs     ActivityLog[]
   ownerLedgerItems OwnerLedgerItem[]
+  orderAttachments OrderAttachment[]
   billing          WorkspaceBilling?
 }
 
@@ -165,6 +171,7 @@ model Order {
   importBatch      ImportBatch?      @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   vehicle          Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   ownerLedgerItems OwnerLedgerItem[]
+  attachments      OrderAttachment[]
 
   @@index([workspaceId])
   @@index([workspaceId, isArchived])
@@ -212,6 +219,29 @@ model OwnerLedgerItem {
   @@index([ownerId, occurredAt])
   @@index([vehicleId, occurredAt])
   @@index([orderId])
+}
+
+model OrderAttachment {
+  workspaceId String?
+  id          String              @id @default(cuid())
+  orderId     String?
+  kind        OrderAttachmentKind
+  url         String?
+  pathname    String
+  filename    String?
+  contentType String?
+  size        Int?
+  isArchived  Boolean             @default(false)
+  uploadedAt  DateTime            @default(now())
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  workspace   Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  order       Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([orderId, kind])
+  @@index([isArchived])
+  @@index([uploadedAt])
 }
 
 model ShareLink {

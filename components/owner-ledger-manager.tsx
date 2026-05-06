@@ -180,12 +180,14 @@ export function OwnerLedgerManager({
   selectedOwner,
   vehicles,
   items,
+  ownerSelectBasePath = "/owners",
 }: {
   locale: Locale;
   owners: OwnerOption[];
   selectedOwner: OwnerOption;
   vehicles: VehicleOption[];
   items: LedgerItem[];
+  ownerSelectBasePath?: string;
 }) {
   const labels = copy(locale);
   const router = useRouter();
@@ -292,7 +294,7 @@ export function OwnerLedgerManager({
               <select
                 name="ownerId"
                 value={selectedOwner.id}
-                onChange={(event) => router.push(`/owner-statements?ownerId=${event.target.value}`)}
+                onChange={(event) => router.push(`${ownerSelectBasePath}?ownerId=${event.target.value}`)}
                 className="h-9 rounded-full border border-[var(--line)] bg-white px-3 text-[12px]"
               >
                 {owners.map((owner) => (

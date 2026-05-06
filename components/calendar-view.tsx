@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { OrderAttachments } from "@/components/order-attachments";
 import { StatusBadge } from "@/components/status-badge";
 import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-button";
 import { getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
@@ -79,7 +80,7 @@ type SearchableFilterDropdownProps = {
 const DEFAULT_VEHICLE_COLUMN_WIDTH = 188;
 const DAY_COLUMN_WIDTHS = {
   week: 92,
-  month: 58,
+  month: 52,
   sixWeeks: 44,
 } as const;
 const MIN_DAY_COLUMN_WIDTHS = {
@@ -87,6 +88,10 @@ const MIN_DAY_COLUMN_WIDTHS = {
   month: 34,
   sixWeeks: 28,
 } as const;
+const DAY_WIDTH_STORAGE_KEY = "tato:calendar-day-width";
+const MIN_CUSTOM_DAY_WIDTH = 30;
+const MAX_CUSTOM_DAY_WIDTH = 104;
+const DEFAULT_CUSTOM_DAY_WIDTH = 52;
 const LANE_HEIGHT = 32;
 const BAR_HEIGHT = 28;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -320,6 +325,24 @@ function buildVehicleTimelineSearchText(vehicle: VehicleTimelineOption) {
     .toLowerCase();
 }
 
+function buildOrderTimelineSearchText(order: CalendarOrder, locale: Locale) {
+  return [
+    order.renterName,
+    order.renterPhone,
+    order.vehicleName,
+    order.vehiclePlateNumber,
+    order.ownerName,
+    order.notes,
+    order.source,
+    getStatusLabel(order.source, locale),
+    getStatusLabel(order.status, locale),
+    order.totalPrice != null ? String(order.totalPrice) : null,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 function SearchableFilterDropdown({
   value,
   query,
@@ -477,9 +500,11 @@ export function CalendarView({
   const [selectedVehicleId, setSelectedVehicleId] = useState("all");
   const [selectedOwnerId, setSelectedOwnerId] = useState("all");
   const [selectedSource, setSelectedSource] = useState("all");
+  const [calendarSearchQuery, setCalendarSearchQuery] = useState("");
   const [vehicleFilterQuery, setVehicleFilterQuery] = useState("");
   const [ownerFilterQuery, setOwnerFilterQuery] = useState("");
   const [sourceFilterQuery, setSourceFilterQuery] = useState("");
+  const [customDayWidth, setCustomDayWidth] = useState(DEFAULT_CUSTOM_DAY_WIDTH);
   const [rangeMode, setRangeMode] = useState<"week" | "month" | "sixWeeks">("week");
   const [focusDate, setFocusDate] = useState(() => new Date());
   const [selectedOrder, setSelectedOrder] = useState<CalendarOrder | null>(null);
@@ -500,6 +525,18 @@ export function CalendarView({
   const orderPopoverRef = useRef<HTMLDivElement | null>(null);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState<number | null>(null);
   const [orderPopover, setOrderPopover] = useState<OrderPopoverState | null>(null);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(DAY_WIDTH_STORAGE_KEY);
+    const parsed = stored ? Number(stored) : NaN;
+    if (Number.isFinite(parsed)) {
+      setCustomDayWidth(Math.min(MAX_CUSTOM_DAY_WIDTH, Math.max(MIN_CUSTOM_DAY_WIDTH, parsed)));
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(DAY_WIDTH_STORAGE_KEY, String(customDayWidth));
+  }, [customDayWidth]);
 
   const normalizedFocusDate = startOfDay(focusDate);
   const rangeStart =
@@ -642,6 +679,7 @@ export function CalendarView({
   const normalizedVehicleFilterQuery = normalizeFilterText(vehicleFilterQuery);
   const normalizedOwnerFilterQuery = normalizeFilterText(ownerFilterQuery);
   const normalizedSourceFilterQuery = normalizeFilterText(sourceFilterQuery);
+  const normalizedCalendarSearchQuery = normalizeFilterText(calendarSearchQuery);
 
   const filteredVehicles = vehicleOptions.filter((vehicle) => {
     if (selectedVehicleId !== "all" && vehicle.id !== selectedVehicleId) return false;
@@ -660,6 +698,17 @@ export function CalendarView({
       !(vehicle.ownerName ?? calendarMessages.unassignedOwner)
         .toLowerCase()
         .includes(normalizedOwnerFilterQuery)
+    ) {
+      return false;
+    }
+    if (
+      normalizedCalendarSearchQuery &&
+      !buildVehicleTimelineSearchText(vehicle).includes(normalizedCalendarSearchQuery) &&
+      !orders.some(
+        (order) =>
+          order.vehicleId === vehicle.id &&
+          buildOrderTimelineSearchText(order, locale).includes(normalizedCalendarSearchQuery),
+      )
     ) {
       return false;
     }
@@ -704,6 +753,12 @@ export function CalendarView({
     ) {
       return false;
     }
+    if (
+      normalizedCalendarSearchQuery &&
+      !buildOrderTimelineSearchText(order, locale).includes(normalizedCalendarSearchQuery)
+    ) {
+      return false;
+    }
     return true;
   });
 
@@ -715,9 +770,9 @@ export function CalendarView({
   const fittedTimelineWidth = Math.max((timelineViewportWidth ?? 0) - vehicleColumnWidth, 0);
   const dayColumnWidth = Math.max(
     MIN_DAY_COLUMN_WIDTHS[rangeMode],
-    fittedTimelineWidth > 0
-      ? Math.floor(fittedTimelineWidth / days.length)
-      : DAY_COLUMN_WIDTHS[rangeMode],
+    rangeMode === "week" && fittedTimelineWidth > 0
+      ? Math.max(Math.floor(fittedTimelineWidth / days.length), customDayWidth)
+      : customDayWidth || DAY_COLUMN_WIDTHS[rangeMode],
   );
   const timelineWidth = days.length * dayColumnWidth;
   const tableWidth = Math.max(vehicleColumnWidth + timelineWidth, timelineViewportWidth ?? 0);
@@ -972,7 +1027,18 @@ export function CalendarView({
             ) : null}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 xl:justify-end">
+            <label className="relative min-w-[15rem] flex-1 sm:flex-none">
+              <span className="sr-only">{calendarMessages.timelineSearch}</span>
+              <input
+                type="search"
+                value={calendarSearchQuery}
+                onChange={(event) => setCalendarSearchQuery(event.target.value)}
+                placeholder={calendarMessages.timelineSearchPlaceholder}
+                className="h-9 w-full rounded-full border border-[var(--line)] bg-white px-3 text-[12px] font-medium text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-soft)]/70 hover:border-[rgba(17,19,24,0.22)] focus:border-[rgba(17,19,24,0.3)] focus:ring-2 focus:ring-[rgba(89,60,251,0.12)] sm:w-[18rem]"
+              />
+            </label>
+
             <SearchableFilterDropdown
               value={selectedVehicleId}
               query={vehicleFilterQuery}
@@ -1067,6 +1133,26 @@ export function CalendarView({
             aria-label={calendarMessages.scrubberLabel}
             className="mt-2 w-full cursor-pointer appearance-none bg-transparent accent-[var(--accent)] [&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-[linear-gradient(90deg,rgba(17,19,24,0.08),rgba(89,60,251,0.18),rgba(17,19,24,0.08))] [&::-webkit-slider-thumb]:-mt-[7px] [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[var(--accent)] [&::-webkit-slider-thumb]:shadow-[0_8px_20px_-10px_rgba(89,60,251,0.9)] [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-[rgba(17,19,24,0.12)] [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[var(--accent)]"
           />
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <label className="flex min-w-[13rem] items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
+              <span>{calendarMessages.dayWidthLabel}</span>
+              <input
+                type="range"
+                min={MIN_CUSTOM_DAY_WIDTH}
+                max={MAX_CUSTOM_DAY_WIDTH}
+                step={2}
+                value={customDayWidth}
+                onChange={(event) => setCustomDayWidth(Number(event.target.value))}
+                className="w-28 cursor-pointer accent-[var(--accent)]"
+              />
+              <span className="tabular-nums">{customDayWidth}px</span>
+            </label>
+            {normalizedCalendarSearchQuery ? (
+              <span className="rounded-full bg-[rgba(255,231,122,0.58)] px-2.5 py-0.5 text-[11px] font-semibold text-[color:var(--ink)]">
+                {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
+              </span>
+            ) : null}
+          </div>
           <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
             <span>{formatDate(addDays(today, -SCRUBBER_DAY_RANGE), locale)}</span>
             <span>{formatDate(addDays(today, -Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}</span>
@@ -1241,7 +1327,7 @@ export function CalendarView({
                               height: BAR_HEIGHT,
                             }}
                           >
-                            <span className="truncate">{shortLabel || fullLabel}</span>
+                            <span className="truncate">{highlightText(shortLabel || fullLabel, calendarSearchQuery)}</span>
                           </button>
                         );
                       })}
@@ -1331,7 +1417,9 @@ export function CalendarView({
           <div className="mt-4 grid gap-3 text-[12px] text-[color:var(--ink)] sm:grid-cols-2">
             <div>
               <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.renter}</span>
-              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">{selectedOrder.renterName}</p>
+              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
+                {highlightText(selectedOrder.renterName, calendarSearchQuery)}
+              </p>
             </div>
             <div>
               <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.phone}</span>
@@ -1425,7 +1513,7 @@ export function CalendarView({
                   : selectedOrder.vehicleName}
               </h3>
               <p className="mt-2 text-sm text-white/62">
-                {selectedOrder.ownerName ?? calendarMessages.unassignedOwner}
+                    {highlightText(selectedOrder.ownerName ?? calendarMessages.unassignedOwner, calendarSearchQuery)}
               </p>
               <div className="mt-4 flex flex-wrap gap-1.5">
                 <StatusBadge value={selectedOrder.source} locale={locale} className="border-white/10" />
@@ -1518,6 +1606,12 @@ export function CalendarView({
                 <p className="mt-4 rounded-md bg-[var(--accent-soft)] px-3 py-2 text-[11px] text-[color:var(--ink-soft)]">
                   {calendarMessages.sharedViewNotice}
                 </p>
+              ) : null}
+
+              {!readOnly ? (
+                <div className="mt-4">
+                  <OrderAttachments orderId={selectedOrder.id} locale={locale} compact />
+                </div>
               ) : null}
             </div>
           </div>

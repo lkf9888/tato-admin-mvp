@@ -1346,7 +1346,7 @@ export function CalendarView({
       {selectedOrder && orderPopover ? (
         <div
           ref={orderPopoverRef}
-          className="fixed z-[80] w-[min(22rem,calc(100vw-1.5rem))] rounded-lg border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,243,234,0.98))] p-4 shadow-[0_28px_60px_-30px_rgba(17,19,24,0.55)] backdrop-blur"
+          className="fixed z-[80] max-h-[calc(100vh-1.5rem)] w-[min(30rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,243,234,0.98))] p-4 shadow-[0_28px_60px_-30px_rgba(17,19,24,0.55)] backdrop-blur"
           style={{
             left: orderPopover.left,
             top: orderPopover.top,
@@ -1489,6 +1489,12 @@ export function CalendarView({
             </div>
           </div>
 
+          {!readOnly ? (
+            <div className="mt-3">
+              <OrderAttachments orderId={selectedOrder.id} locale={locale} compact />
+            </div>
+          ) : null}
+
           {noteActionError ? (
             <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
               {noteActionError}
@@ -1502,128 +1508,6 @@ export function CalendarView({
           ) : null}
         </div>
       ) : null}
-
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-3 shadow-[0_20px_48px_-40px_rgba(17,19,24,0.4)]">
-        <p className="text-[11px] uppercase tracking-[0.26em] text-[color:var(--ink-soft)]">
-          {calendarMessages.detailsKicker}
-        </p>
-        {selectedOrder ? (
-          <div className="mt-3 grid gap-px overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(17,19,24,0.08)] lg:grid-cols-[0.92fr_1.08fr]">
-            <div className="bg-[linear-gradient(180deg,rgba(17,19,24,0.96),rgba(24,30,41,0.96))] px-5 py-5 text-white">
-              <h3 className="font-serif text-[2rem] font-semibold leading-tight text-white">
-                {selectedOrder.vehiclePlateNumber
-                  ? `${selectedOrder.vehiclePlateNumber} · ${selectedOrder.vehicleName}`
-                  : selectedOrder.vehicleName}
-              </h3>
-              <p className="mt-2 text-sm text-white/62">
-                    {highlightText(selectedOrder.ownerName ?? calendarMessages.unassignedOwner, calendarSearchQuery)}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                <StatusBadge value={selectedOrder.source} locale={locale} className="border-white/10" />
-                <StatusBadge value={selectedOrder.status} locale={locale} className="border-white/10" />
-                {selectedOrder.hasConflict ? (
-                  <StatusBadge value="conflict" locale={locale} className="border-white/10" />
-                ) : null}
-              </div>
-              {!readOnly && selectedOrder.source === "offline" ? (
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openEditOrderDialog(selectedOrder)}
-                    className="inline-flex h-11 items-center justify-center rounded-full border border-white/12 bg-white/8 px-4 text-[12px] font-semibold text-white transition hover:bg-white/12"
-                  >
-                    {calendarMessages.manualEdit}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDeleteSelectedOrder}
-                    disabled={isDeletingOrder}
-                    className="inline-flex h-11 items-center justify-center rounded-full border border-rose-300/28 bg-rose-400/10 px-4 text-[12px] font-semibold text-rose-100 transition hover:bg-rose-400/18 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isDeletingOrder ? calendarMessages.deletingAction : calendarMessages.deleteAction}
-                  </button>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,245,237,0.98))] px-5 py-5">
-              <div className="grid gap-4 text-[13px] text-[color:var(--ink)] sm:grid-cols-2">
-                <div>
-                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                    {calendarMessages.renter}
-                  </span>
-                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">{selectedOrder.renterName}</p>
-                </div>
-                <div>
-                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                    {calendarMessages.phone}
-                  </span>
-                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">
-                    {maskSensitive ? maskPhone(selectedOrder.renterPhone) : selectedOrder.renterPhone || "—"}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                    {calendarMessages.pickup}
-                  </span>
-                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">
-                    {formatDateTime(selectedOrder.pickupDatetime, locale)}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                    {calendarMessages.return}
-                  </span>
-                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">
-                    {formatDateTime(selectedOrder.returnDatetime, locale)}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                    {calendarMessages.revenue}
-                  </span>
-                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">
-                    {selectedOrder.totalPrice != null
-                      ? formatCurrency(selectedOrder.totalPrice, locale)
-                      : "—"}
-                  </p>
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                    {calendarMessages.notes}
-                  </span>
-                  <p className="mt-1 text-base font-semibold text-[color:var(--ink)]">
-                    {getDisplayOrderNote(selectedOrder.notes, selectedOrder.source) ??
-                      calendarMessages.noExtraNotes}
-                  </p>
-                </div>
-              </div>
-
-              {!readOnly && detailActionError ? (
-                <p className="mt-4 rounded-md bg-rose-50 px-3 py-2.5 text-[12px] text-rose-700">
-                  {detailActionError}
-                </p>
-              ) : null}
-
-              {readOnly ? (
-                <p className="mt-4 rounded-md bg-[var(--accent-soft)] px-3 py-2 text-[11px] text-[color:var(--ink-soft)]">
-                  {calendarMessages.sharedViewNotice}
-                </p>
-              ) : null}
-
-              {!readOnly ? (
-                <div className="mt-4">
-                  <OrderAttachments orderId={selectedOrder.id} locale={locale} compact />
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3 rounded-lg bg-[rgba(255,255,255,0.72)] px-4 py-6 text-sm text-[color:var(--ink-soft)]">
-            {calendarMessages.emptyState}
-          </div>
-        )}
-      </section>
 
       {!readOnly && isOrderDialogOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 p-4">

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.22.4 - 2026-05-07
+
+- **Calendar detail cleanup.** Removed the persistent order-detail panel below the vehicle timeline so the calendar remains the primary view after selecting a booking.
+- **Attachments preserved in the click detail.** Moved order photo/video and contract upload access into the calendar event popover, with a wider scrollable popover so attachment controls remain reachable without the removed bottom panel.
+- **Local/GitHub alignment.** Brought the local checkout back onto the deployed `main` lineage instead of the older standalone snapshot branch, so local development matches the code deployed to `tatocar.co`.
+
 ## v0.22.3 - 2026-05-07
 
 - **Hotfix — production crash loop on every deploy: ENOSPC on `/app/data`.** Railway's deploy logs were filling with `cp: error copying '/app/data/tato-prod.db' to '/app/data/backups/...': No space left on device`, and because `scripts/docker-entrypoint.sh` runs under `set -eu`, the failed `cp` exited the entrypoint before `next start` ever ran. Railway restarted the container, the next `cp` failed the same way, and so on — a tight crash loop that took the live site offline (`tatocar.co` returned "Application failed to respond"). The volume filled up because the entrypoint had been cutting a fresh `tato-prod-predeploy-<timestamp>.db` on every deploy and **never pruning the old ones**, on top of the new attachment uploads (v0.22.0) sharing the same volume. Two layered fixes:

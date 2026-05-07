@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.22.5 - 2026-05-07
+
+- **CSV import hotfix for large Turo exports.** Fixed SQLite/Prisma parameter-limit failures when importing 1000+ row earnings CSV files. Stale Turo order cleanup now loads candidate orders by vehicle in safe chunks and performs the exclusion in application code, instead of sending a large `notIn` filter that SQLite cannot split.
+- **Verified with real Turo CSV.** `trip_earnings_export_20260507.csv` imported locally with 1028/1028 successful rows, 0 failures, 198 cancelled rows archived, and no parameter-limit error.
+
 ## v0.22.4 - 2026-05-07
 
 - **Calendar detail cleanup.** Removed the persistent order-detail panel below the vehicle timeline so the calendar remains the primary view after selecting a booking.

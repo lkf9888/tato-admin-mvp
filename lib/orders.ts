@@ -48,6 +48,16 @@ const csvFieldKeys = new Set<string>([
   "status",
 ]);
 
+const PRISMA_IN_FILTER_CHUNK_SIZE = 500;
+
+function chunkValues<T>(values: T[], size = PRISMA_IN_FILTER_CHUNK_SIZE) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
 export function orderRangesOverlap(
   startA: Date,
   endA: Date,
@@ -996,46 +1006,43 @@ export async function importTuroOrders(input: {
     }
   }
 
-  if (failures.length === 0) {
-    const staleTuroOrders = await prisma.order.findMany({
-      where: {
-        workspaceId: input.workspaceId,
-        source: OrderSource.turo,
-        isArchived: false,
-        ...(syncedVehicleIds.size > 0
-          ? {
-              vehicleId: {
-                in: Array.from(syncedVehicleIds),
-              },
-            }
-          : {
-              id: "__no_stale_orders__",
-            }),
-        ...(syncedOrderIds.size > 0
-          ? {
-              id: {
-                notIn: Array.from(syncedOrderIds),
-              },
-            }
-          : {}),
-      },
-      select: {
-        id: true,
-        vehicleId: true,
-      },
-    });
+  if (failures.length === 0 && syncedVehicleIds.size > 0) {
+    const candidateTuroOrders: Array<{ id: string; vehicleId: string }> = [];
 
-    if (staleTuroOrders.length > 0) {
-      await prisma.order.updateMany({
+    for (const vehicleIdChunk of chunkValues(Array.from(syncedVehicleIds))) {
+      const orders = await prisma.order.findMany({
         where: {
-          id: {
-            in: staleTuroOrders.map((order) => order.id),
+          workspaceId: input.workspaceId,
+          source: OrderSource.turo,
+          isArchived: false,
+          vehicleId: {
+            in: vehicleIdChunk,
           },
         },
-        data: {
-          isArchived: true,
+        select: {
+          id: true,
+          vehicleId: true,
         },
       });
+
+      candidateTuroOrders.push(...orders);
+    }
+
+    const staleTuroOrders = candidateTuroOrders.filter((order) => !syncedOrderIds.has(order.id));
+
+    if (staleTuroOrders.length > 0) {
+      for (const orderIdChunk of chunkValues(staleTuroOrders.map((order) => order.id))) {
+        await prisma.order.updateMany({
+          where: {
+            id: {
+              in: orderIdChunk,
+            },
+          },
+          data: {
+            isArchived: true,
+          },
+        });
+      }
 
       deletedStaleOrders = staleTuroOrders.length;
       for (const order of staleTuroOrders) {

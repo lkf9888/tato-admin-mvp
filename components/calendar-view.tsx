@@ -56,9 +56,7 @@ type ManualOrderDraft = {
 };
 
 type OrderPopoverState = {
-  top: number;
-  left: number;
-  placement: "top" | "bottom";
+  isOpen: true;
 };
 
 type SearchableFilterOption = {
@@ -450,27 +448,6 @@ function SearchableFilterDropdown({
   );
 }
 
-function buildOrderPopoverState(anchor: {
-  top: number;
-  bottom: number;
-  left: number;
-  width: number;
-}): OrderPopoverState {
-  const popoverWidth = Math.min(352, window.innerWidth - 24);
-  const halfWidth = popoverWidth / 2;
-  const left = Math.min(
-    Math.max(anchor.left + anchor.width / 2, 12 + halfWidth),
-    window.innerWidth - 12 - halfWidth,
-  );
-  const shouldPlaceBelow = anchor.bottom + 360 <= window.innerHeight - 12;
-
-  return {
-    left,
-    top: shouldPlaceBelow ? anchor.bottom + 12 : anchor.top - 12,
-    placement: shouldPlaceBelow ? "bottom" : "top",
-  };
-}
-
 function buildRangeTitle(rangeMode: "week" | "month" | "sixWeeks", rangeStart: Date, rangeEnd: Date, locale: Locale) {
   if (rangeMode === "month") {
     return formatMonthTitle(rangeStart, locale);
@@ -626,41 +603,16 @@ export function CalendarView({
   useEffect(() => {
     if (!orderPopover) return;
 
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (orderPopoverRef.current?.contains(target)) return;
-
-      if (
-        target instanceof Element &&
-        target.closest("[data-calendar-order-bar='true']")
-      ) {
-        return;
-      }
-
-      setOrderPopover(null);
-    };
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOrderPopover(null);
       }
     };
 
-    const handleViewportChange = () => {
-      setOrderPopover(null);
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("resize", handleViewportChange);
-    window.addEventListener("scroll", handleViewportChange, true);
 
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("resize", handleViewportChange);
-      window.removeEventListener("scroll", handleViewportChange, true);
     };
   }, [orderPopover]);
 
@@ -1308,19 +1260,11 @@ export function CalendarView({
                             type="button"
                             data-calendar-order-bar="true"
                             title={`${bar.order.vehicleName} · ${bar.order.renterName}`}
-                            onClick={(event) => {
+                            onClick={() => {
                               setDetailActionError(null);
                               setNoteActionError(null);
                               setSelectedOrder(bar.order);
-                              const rect = event.currentTarget.getBoundingClientRect();
-                              setOrderPopover(
-                                buildOrderPopoverState({
-                                  top: rect.top,
-                                  bottom: rect.bottom,
-                                  left: rect.left,
-                                  width: rect.width,
-                                }),
-                              );
+                              setOrderPopover({ isOpen: true });
                             }}
                             className={getTimelineBarClasses(
                               bar.order,
@@ -1349,40 +1293,39 @@ export function CalendarView({
 
       {selectedOrder && orderPopover ? (
         <div
-          ref={orderPopoverRef}
-          className="fixed z-[80] max-h-[calc(100vh-1.5rem)] w-[min(30rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,243,234,0.98))] p-4 shadow-[0_28px_60px_-30px_rgba(17,19,24,0.55)] backdrop-blur"
-          style={{
-            left: orderPopover.left,
-            top: orderPopover.top,
-            transform:
-              orderPopover.placement === "bottom"
-                ? "translateX(-50%)"
-                : "translate(-50%, -100%)",
-          }}
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm"
+          onClick={() => setOrderPopover(null)}
+          role="dialog"
+          aria-modal="true"
         >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
-                {calendarMessages.detailsKicker}
-              </p>
-              <h3 className="mt-1 text-base font-semibold text-[color:var(--ink)]">
-                {selectedOrder.vehiclePlateNumber
-                  ? `${selectedOrder.vehiclePlateNumber} · ${selectedOrder.vehicleName}`
-                  : selectedOrder.vehicleName}
-              </h3>
-              <p className="mt-1 text-[12px] text-[color:var(--ink-soft)]">
-                {selectedOrder.ownerName ?? calendarMessages.unassignedOwner}
-              </p>
+          <div
+            ref={orderPopoverRef}
+            className="max-h-[calc(100vh-2rem)] w-[min(30rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,243,234,0.98))] p-4 shadow-[0_28px_60px_-30px_rgba(17,19,24,0.55)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
+                  {calendarMessages.detailsKicker}
+                </p>
+                <h3 className="mt-1 text-base font-semibold text-[color:var(--ink)]">
+                  {selectedOrder.vehiclePlateNumber
+                    ? `${selectedOrder.vehiclePlateNumber} · ${selectedOrder.vehicleName}`
+                    : selectedOrder.vehicleName}
+                </h3>
+                <p className="mt-1 text-[12px] text-[color:var(--ink-soft)]">
+                  {selectedOrder.ownerName ?? calendarMessages.unassignedOwner}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrderPopover(null)}
+                className="rounded-full border border-[rgba(17,19,24,0.08)] bg-white/80 px-2.5 py-1 text-[12px] font-semibold text-[color:var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.2)] hover:text-[color:var(--ink)]"
+                aria-label={calendarMessages.cancelAction}
+              >
+                ×
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setOrderPopover(null)}
-              className="rounded-full border border-[rgba(17,19,24,0.08)] bg-white/80 px-2.5 py-1 text-[12px] font-semibold text-[color:var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.2)] hover:text-[color:var(--ink)]"
-              aria-label={calendarMessages.cancelAction}
-            >
-              ×
-            </button>
-          </div>
 
           <div className="mt-3 flex flex-wrap gap-1.5">
             <StatusBadge value={selectedOrder.source} locale={locale} />
@@ -1510,6 +1453,7 @@ export function CalendarView({
               {detailActionError}
             </p>
           ) : null}
+          </div>
         </div>
       ) : null}
 

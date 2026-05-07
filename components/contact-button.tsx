@@ -209,7 +209,7 @@ export function ContactButton({
           role="dialog"
           aria-modal="true"
           aria-label={labels.modalTitle}
-          className="fixed inset-0 z-50"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
         >
           <button
             type="button"
@@ -218,17 +218,7 @@ export function ContactButton({
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           />
 
-          {/*
-           * Bottom sheet on phones, centered card on desktop. On
-           * mobile we use the same drag-handle treatment as the
-           * BottomTabBar More sheet so the design language is
-           * consistent.
-           */}
-          <div className="absolute inset-x-0 bottom-0 max-h-[92vh] overflow-y-auto rounded-t-[1.4rem] bg-[var(--surface)] pb-safe shadow-[0_-30px_80px_rgba(0,0,0,0.25)] sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[85vh] sm:w-[min(34rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:pb-0">
-            <div className="flex justify-center pt-2.5 sm:hidden">
-              <span className="h-1 w-10 rounded-full bg-[var(--ink-soft)]/30" />
-            </div>
-
+          <div className="relative max-h-[85vh] w-[min(34rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl bg-[var(--surface)] pb-safe shadow-[0_30px_80px_rgba(0,0,0,0.25)] sm:pb-0">
             <div className="flex items-start justify-between gap-3 px-5 pb-2 pt-3 sm:px-6 sm:pt-5">
               <div className="min-w-0">
                 <p className="text-[10px] uppercase tracking-[0.32em] text-[var(--ink-soft)]">

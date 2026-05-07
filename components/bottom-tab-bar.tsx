@@ -174,8 +174,7 @@ export function BottomTabBar({
         </div>
       </nav>
 
-      {/* "More" bottom sheet. Slides up from the bar and lists every
-          remaining destination. Tapping outside or on a row closes it
+      {/* "More" modal. Tapping outside or on a row closes it
           (rows close via the route-change effect; the backdrop has
           its own onClick). */}
       {moreOpen ? (
@@ -183,7 +182,7 @@ export function BottomTabBar({
           role="dialog"
           aria-modal="true"
           aria-label={labels.moreTitle}
-          className="fixed inset-0 z-40 lg:hidden"
+          className="fixed inset-0 z-40 flex items-center justify-center p-4 lg:hidden"
         >
           <button
             type="button"
@@ -191,13 +190,7 @@ export function BottomTabBar({
             onClick={() => setMoreOpen(false)}
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
           />
-          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-[1.4rem] bg-[var(--surface)] pb-safe shadow-[0_-30px_80px_rgba(0,0,0,0.25)]">
-            {/* Drag handle, purely cosmetic but signals "swipeable
-                sheet" the way native iOS does. */}
-            <div className="flex justify-center pt-2.5">
-              <span className="h-1 w-10 rounded-full bg-[var(--ink-soft)]/30" />
-            </div>
-
+          <div className="relative max-h-[85vh] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl bg-[var(--surface)] pb-safe shadow-[0_30px_80px_rgba(0,0,0,0.25)]">
             <div className="flex items-center justify-between px-5 pb-3 pt-3">
               <h2 className="font-serif text-lg font-semibold text-[var(--ink)]">
                 {labels.moreTitle}

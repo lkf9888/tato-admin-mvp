@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.22.9 - 2026-05-07
+
+- **Centered modal alignment.** Standardized remaining app dialogs so they open in the center of the page: calendar order details now use a centered modal overlay, and mobile Contact / More dialogs no longer slide up from the bottom.
+
 ## v0.22.8 - 2026-05-07
 
 - **Calendar header density pass.** Compressed the calendar control area without reducing font sizes: action buttons stay on one horizontal row sooner, search and filters use tighter grid columns, and the range title, date scrubber, current date chip, and day-width control now share a compact horizontal layout.

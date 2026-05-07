@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.22.11 - 2026-05-07
+
+- **Admin header cleanup.** Removed the global "Operations workspace / Operations console" banner from authenticated admin pages so each page starts directly with its own operational content.
+
 ## v0.22.10 - 2026-05-07
 
 - **CSV vehicle matching fix.** Rows with strong vehicle identifiers now match only by VIN, Turo vehicle ID, or extracted plate before creating a missing vehicle. They no longer fall back to broad make/model/year matching, which previously merged different cars like `XA707L` into `PT128T` when both were named "Tesla Model 3 2021".

@@ -11,16 +11,12 @@ import { APP_VERSION_LABEL } from "@/lib/version";
 export function AppShell({
   locale,
   localePreference,
-  title,
-  description,
   currentUserName,
   currentUserEmail,
   children,
 }: {
   locale: Locale;
   localePreference: Locale | "auto";
-  title: string;
-  description: string;
   /** Used by the floating ContactButton to prefill the From row of the
    *  feedback modal. AppShell already requires an authenticated session
    *  upstream, so these are always present. */
@@ -197,41 +193,6 @@ export function AppShell({
          * strip) keep doing it inside their own `overflow-x-auto`
          * container. */}
         <main className="min-w-0 flex-1 px-2.5 pb-[calc(env(safe-area-inset-bottom)+82px)] pt-3 sm:px-3 lg:px-3.5 lg:pb-4 lg:pt-3">
-          {/* v0.19.1 density pass: page-header card was eating ~120px
-           * of vertical space on desktop with title at 2.35rem and
-           * 20px-each-side padding. Title shrunk to 1.55rem on
-           * desktop, padding to 14×14, gap to 2px between rows,
-           * description text held at 12-13px. The workspace badge
-           * also dropped one tier. End result: ~70px header on
-           * desktop, ~50% denser, no info lost. */}
-          {/* v0.19.4 mobile: titles were dominating the screen and the
-           * tech-info badge ("Turo MVP · SQLite + …") was forcing
-           * page-level horizontal overflow because `self-start` on a
-           * `flex-col` lets the child grow to natural content width
-           * uncapped. Two fixes: (1) badge gets `max-w-full` so it
-           * wraps at the viewport boundary instead of pushing the
-           * page wider; (2) page title and kicker shrink one tier on
-           * mobile so they read as a header, not a hero. */}
-          <header className="mb-2.5 flex flex-col gap-1 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 shadow-[0_18px_46px_rgba(17,19,24,0.05)] backdrop-blur sm:gap-1.5 sm:px-3.5 sm:py-3 md:flex-row md:items-center md:justify-between md:gap-3">
-            <div className="min-w-0">
-              <p className="text-[8.5px] uppercase tracking-[0.22em] text-[var(--ink-soft)] sm:text-[9px] sm:tracking-[0.28em]">
-                {messages.shell.workspaceKicker}
-              </p>
-              <h2 className="mt-0.5 font-serif text-[1rem] font-semibold leading-tight text-[var(--ink)] sm:text-[1.28rem] md:text-[1.38rem]">
-                {title}
-              </h2>
-              <p className="mt-0.5 max-w-3xl break-words text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[12px]">
-                {description}
-              </p>
-            </div>
-            {/* Tech metadata pill. Hidden on phones to save vertical
-             * space and prevent overflow — the info is preserved in
-             * the More-sheet footer + sidebar on larger screens, where
-             * there's actually room for it. */}
-            <div className="hidden max-w-full self-start break-words rounded-full border border-[rgba(89,60,251,0.12)] bg-[var(--accent-soft)] px-2.5 py-0.5 text-[9.5px] leading-tight text-[var(--ink)] shadow-[0_8px_16px_rgba(89,60,251,0.06)] sm:inline-flex sm:max-w-none sm:self-auto md:text-[10px]">
-              {messages.shell.workspaceBadge}
-            </div>
-          </header>
           {children}
         </main>
       </div>

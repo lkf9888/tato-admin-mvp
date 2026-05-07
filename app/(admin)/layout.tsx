@@ -23,8 +23,6 @@ export default async function AdminLayout({
     <AppShell
       locale={locale}
       localePreference={localePreference}
-      title={messages.adminLayout.title}
-      description={messages.adminLayout.description}
       currentUserName={user.name}
       currentUserEmail={user.email}
     >

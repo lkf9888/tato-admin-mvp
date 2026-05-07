@@ -7,7 +7,7 @@ export function getUploadRoot() {
     return process.env.TATO_UPLOAD_DIR;
   }
 
-  if (process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === "production") {
+  if (process.env.RAILWAY_ENVIRONMENT || process.cwd() === "/app") {
     return "/app/data/uploads";
   }
 
@@ -29,6 +29,12 @@ export function makeOrderAttachmentPath(orderId: string, filename: string) {
   const ext = extensionFromFilename(filename);
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   return path.posix.join("orders", orderId, `${stamp}${ext}`);
+}
+
+export function makeVehicleAttachmentPath(vehicleId: string, filename: string) {
+  const ext = extensionFromFilename(filename);
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return path.posix.join("vehicles", vehicleId, `${stamp}${ext}`);
 }
 
 export function resolveUploadPath(pathname: string) {

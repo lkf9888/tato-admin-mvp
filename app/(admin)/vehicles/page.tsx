@@ -1,5 +1,6 @@
 import { deleteVehicleAction, saveVehicleAction } from "@/app/actions";
 import { StatusBadge } from "@/components/status-badge";
+import { VehicleAttachments } from "@/components/vehicle-attachments";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getVehicleStatusOptions } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
@@ -329,6 +330,9 @@ export default async function VehiclesPage({
                   </button>
                 </div>
               </form>
+              <div className="mt-3">
+                <VehicleAttachments vehicleId={vehicle.id} locale={locale} compact />
+              </div>
             </details>
 
             <form action={deleteVehicleAction} className="mt-3">

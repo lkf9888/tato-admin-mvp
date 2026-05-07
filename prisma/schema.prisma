@@ -138,6 +138,7 @@ model Vehicle {
   owner                Owner?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   orders               Order[]
   ownerLedgerItems     OwnerLedgerItem[]
+  attachments          OrderAttachment[]
 
   @@index([workspaceId])
 }
@@ -225,6 +226,7 @@ model OrderAttachment {
   workspaceId String?
   id          String              @id @default(cuid())
   orderId     String?
+  vehicleId   String?
   kind        OrderAttachmentKind
   url         String?
   pathname    String
@@ -237,9 +239,11 @@ model OrderAttachment {
   updatedAt   DateTime            @updatedAt
   workspace   Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   order       Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  vehicle     Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
   @@index([orderId, kind])
+  @@index([vehicleId, kind])
   @@index([isArchived])
   @@index([uploadedAt])
 }

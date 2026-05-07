@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.22.7 - 2026-05-07
+
+- **Vehicle attachments.** Vehicle edit panels now support uploading and viewing vehicle-level photos/videos plus general files. Vehicle attachments use the same persistent upload storage and authenticated file-serving pattern as order attachments.
+- **Attachment centers include vehicle files.** The Photos & Videos and Contract Files pages now include both order attachments and vehicle-level attachments, with vehicle files labelled as vehicle records when they are not tied to a renter order.
+- **Local upload path hardening.** Local `npm start` now stores uploads under the project `data/uploads` directory instead of incorrectly choosing `/app/data/uploads` just because `NODE_ENV=production`.
+
 ## v0.22.6 - 2026-05-07
 
 - **CSV import result popups.** CSV imports now show a modal popup after every completed import attempt: success responses show an "Import complete" confirmation, while API failures and network/unexpected errors show an "Import failed" popup. The inline result text remains below the import button for reference.

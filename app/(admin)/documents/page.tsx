@@ -19,9 +19,10 @@ export default async function DocumentsPage() {
         workspaceId: workspace.id,
         isArchived: false,
         kind: "document",
-        orderId: { not: null },
+        OR: [{ orderId: { not: null } }, { vehicleId: { not: null } }],
       },
       include: {
+        vehicle: { include: { owner: true } },
         order: {
           include: {
             vehicle: { include: { owner: true } },
@@ -38,22 +39,24 @@ export default async function DocumentsPage() {
       ? {
           kicker: "附件中心",
           title: "合约文件",
-          description: "集中查看所有订单上传的合同、驾驶证、保险或其他文件。",
-          empty: "还没有上传合约文件。请在日历订单详情里上传。",
+          description: "集中查看订单和车辆档案上传的合同、驾驶证、保险或其他文件。",
+          empty: "还没有上传合约文件。请在日历订单详情或车辆编辑里上传。",
           file: "文件",
-          order: "订单",
+          order: "关联对象",
           uploaded: "上传时间",
           open: "打开文件",
+          vehicleFile: "车辆档案",
         }
       : {
           kicker: "Attachment center",
           title: "Contract files",
-          description: "Review contracts, driver licenses, insurance files, and other order documents.",
-          empty: "No contract files yet. Upload from a calendar order detail.",
+          description: "Review contracts, driver licenses, insurance files, and other order or vehicle documents.",
+          empty: "No contract files yet. Upload from a calendar order detail or vehicle editor.",
           file: "File",
-          order: "Order",
+          order: "Related item",
           uploaded: "Uploaded",
           open: "Open file",
+          vehicleFile: "Vehicle file",
         };
 
   return (
@@ -82,8 +85,12 @@ export default async function DocumentsPage() {
           </div>
           <div className="divide-y divide-[var(--line)]">
             {attachments.map((attachment) => {
-              if (!attachment.order) return null;
-              const url = `/api/orders/${attachment.orderId}/attachments/file?attachmentId=${attachment.id}`;
+              const orderVehicle = attachment.order?.vehicle;
+              const vehicle = attachment.vehicle ?? orderVehicle;
+              if (!vehicle) return null;
+              const url = attachment.vehicleId
+                ? `/api/vehicles/${attachment.vehicleId}/attachments/file?attachmentId=${attachment.id}`
+                : `/api/orders/${attachment.orderId}/attachments/file?attachmentId=${attachment.id}`;
               return (
                 <article
                   key={attachment.id}
@@ -99,9 +106,9 @@ export default async function DocumentsPage() {
                   </div>
                   <div className="min-w-0 text-[var(--ink-soft)]">
                     <p className="truncate font-semibold text-[var(--ink)]">
-                      {attachment.order.vehicle.plateNumber} · {attachment.order.vehicle.nickname}
+                      {vehicle.plateNumber} · {vehicle.nickname}
                     </p>
-                    <p className="truncate">{attachment.order.renterName}</p>
+                    <p className="truncate">{attachment.order?.renterName ?? copy.vehicleFile}</p>
                   </div>
                   <p className="text-[var(--ink-soft)]">{formatDateTime(attachment.uploadedAt, locale)}</p>
                   <a

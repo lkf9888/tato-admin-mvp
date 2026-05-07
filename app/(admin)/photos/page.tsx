@@ -18,9 +18,10 @@ export default async function PhotosPage() {
         workspaceId: workspace.id,
         isArchived: false,
         kind: "photo",
-        orderId: { not: null },
+        OR: [{ orderId: { not: null } }, { vehicleId: { not: null } }],
       },
       include: {
+        vehicle: { include: { owner: true } },
         order: {
           include: {
             vehicle: { include: { owner: true } },
@@ -37,14 +38,14 @@ export default async function PhotosPage() {
       ? {
           kicker: "附件中心",
           title: "照片和视频",
-          description: "集中查看所有订单上传的车辆照片、交接视频和其他影像资料。",
-          empty: "还没有上传照片或视频。请在日历订单详情里上传。",
+          description: "集中查看订单和车辆档案上传的车辆照片、交接视频和其他影像资料。",
+          empty: "还没有上传照片或视频。请在日历订单详情或车辆编辑里上传。",
         }
       : {
           kicker: "Attachment center",
           title: "Photos and videos",
-          description: "Review vehicle handoff photos, videos, and media uploaded against orders.",
-          empty: "No photos or videos yet. Upload from a calendar order detail.",
+          description: "Review vehicle handoff photos, videos, and media uploaded against orders or vehicles.",
+          empty: "No photos or videos yet. Upload from a calendar order detail or vehicle editor.",
         };
 
   return (
@@ -66,8 +67,12 @@ export default async function PhotosPage() {
       ) : (
         <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
           {attachments.map((attachment) => {
-            if (!attachment.order) return null;
-            const url = `/api/orders/${attachment.orderId}/attachments/file?attachmentId=${attachment.id}`;
+            const orderVehicle = attachment.order?.vehicle;
+            const vehicle = attachment.vehicle ?? orderVehicle;
+            if (!vehicle) return null;
+            const url = attachment.vehicleId
+              ? `/api/vehicles/${attachment.vehicleId}/attachments/file?attachmentId=${attachment.id}`
+              : `/api/orders/${attachment.orderId}/attachments/file?attachmentId=${attachment.id}`;
             return (
               <article key={attachment.id} className="overflow-hidden rounded-lg border border-[var(--line)] bg-white/90 shadow-sm">
                 <a href={url} target="_blank" rel="noreferrer" className="block">
@@ -84,10 +89,10 @@ export default async function PhotosPage() {
                 </a>
                 <div className="space-y-1 px-3 py-2">
                   <p className="truncate text-[12px] font-semibold text-[var(--ink)]">
-                    {attachment.order.vehicle.plateNumber} · {attachment.order.vehicle.nickname}
+                    {vehicle.plateNumber} · {vehicle.nickname}
                   </p>
                   <p className="truncate text-[11px] text-[var(--ink-soft)]">
-                    {attachment.order.renterName} · {formatDateTime(attachment.uploadedAt, locale)}
+                    {attachment.order?.renterName ?? (locale === "zh" ? "车辆档案" : "Vehicle file")} · {formatDateTime(attachment.uploadedAt, locale)}
                   </p>
                 </div>
               </article>

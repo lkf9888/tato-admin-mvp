@@ -60,6 +60,9 @@ export const importsMessages = {
         runImport: "Run import",
         importing: "Importing...",
         genericFailure: "Import failed",
+        importSuccessTitle: "Import complete",
+        importFailureTitle: "Import failed",
+        importAlertClose: "Close",
         billing: {
           kicker: "0. Subscription",
           title: "Vehicle subscription",
@@ -173,6 +176,9 @@ export const importsMessages = {
         runImport: "执行导入",
         importing: "导入中...",
         genericFailure: "导入失败",
+        importSuccessTitle: "导入完成",
+        importFailureTitle: "导入失败",
+        importAlertClose: "关闭",
         billing: {
           kicker: "0. 订阅计费",
           title: "车辆名额订阅",

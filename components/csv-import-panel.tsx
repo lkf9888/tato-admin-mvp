@@ -137,6 +137,11 @@ export function CsvImportPanel({
   const [showBillingModal, setShowBillingModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isCheckingBilling, setIsCheckingBilling] = useState(false);
+  const [importAlert, setImportAlert] = useState<{
+    type: "success" | "failure";
+    title: string;
+    message: string;
+  } | null>(null);
 
   const previewRows = useMemo(() => rows.slice(0, 5), [rows]);
 
@@ -338,26 +343,38 @@ export function CsvImportPanel({
         const billingDetails = payload.details;
 
         if (response.status === 402 && billingDetails) {
+          const message = payload.error ?? panelMessages.billing.limitExceeded;
           setBillingProjection(billingDetails);
           setShowBillingModal(true);
-          setResult(payload.error ?? panelMessages.billing.limitExceeded);
+          setResult(message);
           return;
         }
 
         if (!response.ok) {
-          setResult(payload.error ?? panelMessages.genericFailure);
+          const message = payload.error ?? panelMessages.genericFailure;
+          setResult(message);
+          setImportAlert({
+            type: "failure",
+            title: panelMessages.importFailureTitle,
+            message,
+          });
           return;
         }
 
-        setShowBillingModal(false);
-        setResult(
-          panelMessages.importResult(
-            payload.successRows ?? 0,
-            payload.createdVehicles ?? 0,
-            payload.failedRows ?? 0,
-            payload.skippedRows ?? 0,
-          ),
+        const message = panelMessages.importResult(
+          payload.successRows ?? 0,
+          payload.createdVehicles ?? 0,
+          payload.failedRows ?? 0,
+          payload.skippedRows ?? 0,
         );
+
+        setShowBillingModal(false);
+        setResult(message);
+        setImportAlert({
+          type: "success",
+          title: panelMessages.importSuccessTitle,
+          message,
+        });
 
         // Aggregate per-reason breakdown so the user can see at a glance why
         // rows were rejected (missing fields, bad date format, unresolved
@@ -376,6 +393,14 @@ export function CsvImportPanel({
             .map(([reason, entry]) => ({ reason, ...entry }))
             .sort((a, b) => b.count - a.count),
         );
+      } catch {
+        const message = panelMessages.genericFailure;
+        setResult(message);
+        setImportAlert({
+          type: "failure",
+          title: panelMessages.importFailureTitle,
+          message,
+        });
       } finally {
         setIsImporting(false);
       }
@@ -897,6 +922,35 @@ export function CsvImportPanel({
                   {panelMessages.importSelectedAction}
                 </button>
               ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {importAlert ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 px-4">
+          <div className="w-full max-w-lg rounded-lg border border-white/70 bg-white p-5 shadow-2xl">
+            <p
+              className={`text-[10px] font-semibold uppercase tracking-[0.22em] ${
+                importAlert.type === "success" ? "text-emerald-600" : "text-rose-600"
+              }`}
+            >
+              {importAlert.type === "success" ? "CSV" : "Error"}
+            </p>
+            <h3 className="mt-2 font-serif text-[1.45rem] text-slate-950">
+              {importAlert.title}
+            </h3>
+            <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-slate-600">
+              {importAlert.message}
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setImportAlert(null)}
+                className="rounded-md bg-slate-950 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-slate-800"
+              >
+                {panelMessages.importAlertClose}
+              </button>
             </div>
           </div>
         </div>

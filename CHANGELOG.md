@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.22.6 - 2026-05-07
+
+- **CSV import result popups.** CSV imports now show a modal popup after every completed import attempt: success responses show an "Import complete" confirmation, while API failures and network/unexpected errors show an "Import failed" popup. The inline result text remains below the import button for reference.
+
 ## v0.22.5 - 2026-05-07
 
 - **CSV import hotfix for large Turo exports.** Fixed SQLite/Prisma parameter-limit failures when importing 1000+ row earnings CSV files. Stale Turo order cleanup now loads candidate orders by vehicle in safe chunks and performs the exclusion in application code, instead of sending a large `notIn` filter that SQLite cannot split.

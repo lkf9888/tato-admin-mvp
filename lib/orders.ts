@@ -213,6 +213,10 @@ function resolveVehicleFromCsv(
     if (byPlate) return byPlate;
   }
 
+  if (normalizedVin || normalizedExternalVehicleId || extractedPlate) {
+    return undefined;
+  }
+
   return vehicles.find((vehicle) => vehicleMatchesCsvRecord(vehicle, refs));
 }
 
@@ -932,6 +936,9 @@ export async function importTuroOrders(input: {
         pickupDatetime,
         returnDatetime,
       });
+      if (existing && existing.vehicleId !== vehicle.id) {
+        touchedVehicleIds.add(existing.vehicleId);
+      }
       const status = parseCsvOrderStatus(row[mapping.status ?? ""]);
       const importedRenterPhone = safeString(row[mapping.renterPhone ?? ""]);
       const importedPickupLocation = safeString(row[mapping.pickupLocation ?? ""]);

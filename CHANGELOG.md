@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.22.10 - 2026-05-07
+
+- **CSV vehicle matching fix.** Rows with strong vehicle identifiers now match only by VIN, Turo vehicle ID, or extracted plate before creating a missing vehicle. They no longer fall back to broad make/model/year matching, which previously merged different cars like `XA707L` into `PT128T` when both were named "Tesla Model 3 2021".
+- **Conflict reconciliation fix.** When a re-import moves an existing Turo order from a previously wrong vehicle to the correct vehicle, both the old and new vehicles have conflict flags recalculated so stale red conflict bars are cleared.
+
 ## v0.22.9 - 2026-05-07
 
 - **Centered modal alignment.** Standardized remaining app dialogs so they open in the center of the page: calendar order details now use a centered modal overlay, and mobile Contact / More dialogs no longer slide up from the bottom.

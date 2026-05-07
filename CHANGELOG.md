@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.22.1 - 2026-05-05
+
+- **Calendar toolbar — removed the Week / Month / 6-week segmented pill.** It overlapped 1-for-1 with the day-width slider that landed in v0.22.0: both controls trade off "show more dates at once" against "show fewer dates at higher detail", and operators reported that having two of them was redundant and confusing. The slider stays as the sole zoom control. The underlying `rangeMode` state is pinned to `"sixWeeks"` so the timeline always covers ~42 days of context — the slider then lets the user fit anywhere from a couple of weeks (wider columns) to all 42 days (narrower columns) inside the viewport. Toolbar keeps the prev/next/today actions, the search box, the filter selects, and the create + export buttons. `rangeMode` keeps its full `"week" | "month" | "sixWeeks"` union type so the existing prev/next stride / range-derivation / column-width-floor branches still type-check; they just always pick the `sixWeeks` path at runtime.
+
 ## v0.22.0 - 2026-05-05
 
 - **HostHub-style calendar upgrade.** The TATO calendar now has a HostHub-inspired global timeline search across renter, phone, plate, owner, notes, source, and status, with search matches highlighted in the timeline. A day-width control lets operators widen or tighten date columns, and month / six-week views now behave more like a horizontal operations board instead of being forced into a cramped viewport.

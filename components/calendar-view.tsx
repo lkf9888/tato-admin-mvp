@@ -505,7 +505,23 @@ export function CalendarView({
   const [ownerFilterQuery, setOwnerFilterQuery] = useState("");
   const [sourceFilterQuery, setSourceFilterQuery] = useState("");
   const [customDayWidth, setCustomDayWidth] = useState(DEFAULT_CUSTOM_DAY_WIDTH);
-  const [rangeMode, setRangeMode] = useState<"week" | "month" | "sixWeeks">("week");
+  // v0.22.1: removed the Week / Month / 6-week segmented pill from the
+  // toolbar. It was redundant with the day-width slider, which already
+  // covers "show more dates at once" (slimmer columns) vs. "show fewer
+  // dates at higher detail" (wider columns). We pin the underlying
+  // range to `sixWeeks` so the timeline always covers ~42 days of
+  // context — wide enough that scrubbing through a season feels
+  // natural, while the slider lets the user fit anywhere from a
+  // couple of weeks (wider columns) to all 42 days (narrower columns)
+  // inside the viewport.
+  //
+  // Typed as the full union (instead of `as const`) so all the
+  // existing `rangeMode === "week"` / `=== "month"` branches —
+  // prev/next stride, range start/end derivation, day-column width
+  // floor — still type-check. They become dead code at runtime, but
+  // TypeScript's strict-equality narrowing won't flag them as
+  // "comparison has no overlap" the way `as const` would.
+  const rangeMode: "week" | "month" | "sixWeeks" = "sixWeeks";
   const [focusDate, setFocusDate] = useState(() => new Date());
   const [selectedOrder, setSelectedOrder] = useState<CalendarOrder | null>(null);
   const [orderDialogMode, setOrderDialogMode] = useState<"create" | "edit">("create");
@@ -1072,30 +1088,12 @@ export function CalendarView({
             />
           </div>
 
-          {/* iOS-style segmented control. Light track + dark "selected"
-           * thumb (ink fill, white text) is much higher contrast than
-           * the previous accent-purple-on-dark-pill combination. */}
-          <div className="inline-flex rounded-full border border-[var(--line)] bg-white p-0.5 shadow-sm">
-            {[
-              { value: "week" as const, label: calendarMessages.week },
-              { value: "month" as const, label: calendarMessages.month },
-              { value: "sixWeeks" as const, label: calendarMessages.sixWeeks },
-            ].map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setRangeMode(option.value)}
-                className={cn(
-                  "rounded-full px-3 py-1 text-[12px] font-semibold transition",
-                  rangeMode === option.value
-                    ? "bg-[var(--ink)] text-white shadow-sm"
-                    : "text-[var(--ink-soft)] hover:text-[var(--ink)]",
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          {/* The Week / Month / 6-week segmented pill that used to live
+           * here was removed in v0.22.1 — it overlapped 1-for-1 with
+           * the day-width slider just below the toolbar. The toolbar
+           * keeps the prev/next/today actions, the filter selects, and
+           * the create + export buttons; range zoom now happens
+           * exclusively through the slider. */}
         </div>
 
         {/* Scrubber + range title combined into one compact row. The

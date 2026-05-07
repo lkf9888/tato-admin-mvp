@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.22.8 - 2026-05-07
+
+- **Calendar header density pass.** Compressed the calendar control area without reducing font sizes: action buttons stay on one horizontal row sooner, search and filters use tighter grid columns, and the range title, date scrubber, current date chip, and day-width control now share a compact horizontal layout.
+
 ## v0.22.7 - 2026-05-07
 
 - **Vehicle attachments.** Vehicle edit panels now support uploading and viewing vehicle-level photos/videos plus general files. Vehicle attachments use the same persistent upload storage and authenticated file-serving pattern as order attachments.

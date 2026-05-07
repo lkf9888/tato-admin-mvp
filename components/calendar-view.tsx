@@ -391,11 +391,11 @@ function SearchableFilterDropdown({
   }, [open]);
 
   return (
-    <div ref={dropdownRef} className="relative min-w-[11rem] flex-1 sm:flex-none">
+    <div ref={dropdownRef} className="relative min-w-0 flex-1 sm:flex-none">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex h-9 w-full items-center justify-between gap-2 rounded-full border border-[var(--line)] bg-white px-3 text-left text-[12px] font-medium text-[var(--ink)] outline-none transition hover:border-[rgba(17,19,24,0.22)] focus:border-[rgba(17,19,24,0.3)] sm:w-48 lg:w-56"
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-full border border-[var(--line)] bg-white px-3 text-left text-[12px] font-medium text-[var(--ink)] outline-none transition hover:border-[rgba(17,19,24,0.22)] focus:border-[rgba(17,19,24,0.3)] sm:w-44 lg:w-48"
       >
         <span className="truncate">{highlightText(buttonLabel, query)}</span>
         <span className="text-[10px] text-[var(--ink-soft)]">⌄</span>
@@ -987,13 +987,13 @@ export function CalendarView({
        * scrubber row so it doesn't double up. Kicker / legend / hint
        * badges removed — the timeline itself is self-explanatory and
        * those badges were just decorative noise. */}
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-3 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
-        <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between xl:gap-3">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-2.5 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+        <div className="grid gap-2 xl:grid-cols-[auto_minmax(42rem,1fr)] xl:items-center">
           {/* Action row — flat layout instead of a glass pill. The
            * prev/next pair gets its own tiny segment-control wrapper so
            * the relationship reads at a glance; everything else stands
            * on its own with the standard chip look. */}
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 xl:flex-nowrap">
             <div className="inline-flex rounded-full border border-[var(--line)] bg-white p-0.5 shadow-sm">
               <button
                 type="button"
@@ -1048,15 +1048,15 @@ export function CalendarView({
             ) : null}
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 xl:justify-end">
-            <label className="relative min-w-[15rem] flex-1 sm:flex-none">
+          <div className="grid min-w-0 gap-1.5 sm:grid-cols-2 xl:grid-cols-[minmax(17rem,1.45fr)_minmax(9.5rem,1fr)_minmax(9.5rem,1fr)_minmax(9.5rem,1fr)]">
+            <label className="relative min-w-0">
               <span className="sr-only">{calendarMessages.timelineSearch}</span>
               <input
                 type="search"
                 value={calendarSearchQuery}
                 onChange={(event) => setCalendarSearchQuery(event.target.value)}
                 placeholder={calendarMessages.timelineSearchPlaceholder}
-                className="h-9 w-full rounded-full border border-[var(--line)] bg-white px-3 text-[12px] font-medium text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-soft)]/70 hover:border-[rgba(17,19,24,0.22)] focus:border-[rgba(17,19,24,0.3)] focus:ring-2 focus:ring-[rgba(89,60,251,0.12)] sm:w-[18rem]"
+                className="h-9 w-full rounded-full border border-[var(--line)] bg-white px-3 text-[12px] font-medium text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-soft)]/70 hover:border-[rgba(17,19,24,0.22)] focus:border-[rgba(17,19,24,0.3)] focus:ring-2 focus:ring-[rgba(89,60,251,0.12)]"
               />
             </label>
 
@@ -1104,9 +1104,9 @@ export function CalendarView({
         {/* Scrubber + range title combined into one compact row. The
          * full date title was redundant when the scrubber thumb +
          * range buttons already convey the same info. */}
-        <div className="mt-2.5 rounded-xl border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.78)] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <div className="flex items-baseline gap-2">
+        <div className="mt-2 rounded-xl border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.78)] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+          <div className="grid gap-x-3 gap-y-1.5 xl:grid-cols-[minmax(18rem,auto)_minmax(24rem,1fr)_minmax(14rem,auto)] xl:items-center">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
               <h3 className="font-serif text-[1.05rem] font-semibold leading-none text-[color:var(--ink)] md:text-[1.2rem]">
                 {buildRangeTitle(rangeMode, rangeStart, rangeEndInclusive, locale)}
               </h3>
@@ -1114,49 +1114,53 @@ export function CalendarView({
                 {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
               </span>
             </div>
-            <span className="rounded-full bg-[rgba(17,19,24,0.06)] px-2.5 py-0.5 text-[11px] tracking-[0.16em] text-[color:var(--ink)]">
-              {formatDate(normalizedFocusDate, locale)}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={-SCRUBBER_DAY_RANGE}
-            max={SCRUBBER_DAY_RANGE}
-            step={1}
-            value={Math.max(
-              -SCRUBBER_DAY_RANGE,
-              Math.min(
-                SCRUBBER_DAY_RANGE,
-                Math.round((normalizedFocusDate.getTime() - today.getTime()) / DAY_IN_MS),
-              ),
-            )}
-            onChange={(event) => {
-              setFocusDate(addDays(today, Number(event.target.value)));
-            }}
-            aria-label={calendarMessages.scrubberLabel}
-            className="mt-2 w-full cursor-pointer appearance-none bg-transparent accent-[var(--accent)] [&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-[linear-gradient(90deg,rgba(17,19,24,0.08),rgba(89,60,251,0.18),rgba(17,19,24,0.08))] [&::-webkit-slider-thumb]:-mt-[7px] [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[var(--accent)] [&::-webkit-slider-thumb]:shadow-[0_8px_20px_-10px_rgba(89,60,251,0.9)] [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-[rgba(17,19,24,0.12)] [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[var(--accent)]"
-          />
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <label className="flex min-w-[13rem] items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
-              <span>{calendarMessages.dayWidthLabel}</span>
+
+            <div className="flex min-w-0 items-center gap-2">
               <input
                 type="range"
-                min={MIN_CUSTOM_DAY_WIDTH}
-                max={MAX_CUSTOM_DAY_WIDTH}
-                step={2}
-                value={customDayWidth}
-                onChange={(event) => setCustomDayWidth(Number(event.target.value))}
-                className="w-28 cursor-pointer accent-[var(--accent)]"
+                min={-SCRUBBER_DAY_RANGE}
+                max={SCRUBBER_DAY_RANGE}
+                step={1}
+                value={Math.max(
+                  -SCRUBBER_DAY_RANGE,
+                  Math.min(
+                    SCRUBBER_DAY_RANGE,
+                    Math.round((normalizedFocusDate.getTime() - today.getTime()) / DAY_IN_MS),
+                  ),
+                )}
+                onChange={(event) => {
+                  setFocusDate(addDays(today, Number(event.target.value)));
+                }}
+                aria-label={calendarMessages.scrubberLabel}
+                className="min-w-0 flex-1 cursor-pointer appearance-none bg-transparent accent-[var(--accent)] [&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-[linear-gradient(90deg,rgba(17,19,24,0.08),rgba(89,60,251,0.18),rgba(17,19,24,0.08))] [&::-webkit-slider-thumb]:-mt-[7px] [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[var(--accent)] [&::-webkit-slider-thumb]:shadow-[0_8px_20px_-10px_rgba(89,60,251,0.9)] [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-[rgba(17,19,24,0.12)] [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[var(--accent)]"
               />
-              <span className="tabular-nums">{customDayWidth}px</span>
-            </label>
-            {normalizedCalendarSearchQuery ? (
-              <span className="rounded-full bg-[rgba(255,231,122,0.58)] px-2.5 py-0.5 text-[11px] font-semibold text-[color:var(--ink)]">
-                {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
+              <span className="shrink-0 rounded-full bg-[rgba(17,19,24,0.06)] px-2.5 py-0.5 text-[11px] tracking-[0.16em] text-[color:var(--ink)]">
+                {formatDate(normalizedFocusDate, locale)}
               </span>
-            ) : null}
+            </div>
+
+            <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 xl:justify-end">
+              <label className="flex min-w-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
+                <span>{calendarMessages.dayWidthLabel}</span>
+                <input
+                  type="range"
+                  min={MIN_CUSTOM_DAY_WIDTH}
+                  max={MAX_CUSTOM_DAY_WIDTH}
+                  step={2}
+                  value={customDayWidth}
+                  onChange={(event) => setCustomDayWidth(Number(event.target.value))}
+                  className="w-28 cursor-pointer accent-[var(--accent)]"
+                />
+                <span className="tabular-nums">{customDayWidth}px</span>
+              </label>
+              {normalizedCalendarSearchQuery ? (
+                <span className="rounded-full bg-[rgba(255,231,122,0.58)] px-2.5 py-0.5 text-[11px] font-semibold text-[color:var(--ink)]">
+                  {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
+                </span>
+              ) : null}
+            </div>
           </div>
-          <div className="mt-1.5 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
+          <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
             <span>{formatDate(addDays(today, -SCRUBBER_DAY_RANGE), locale)}</span>
             <span>{formatDate(addDays(today, -Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}</span>
             <span className="rounded-full bg-[rgba(89,60,251,0.12)] px-2 py-0.5 text-[color:var(--ink)]">

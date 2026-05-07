@@ -515,13 +515,18 @@ export function CalendarView({
   // couple of weeks (wider columns) to all 42 days (narrower columns)
   // inside the viewport.
   //
-  // Typed as the full union (instead of `as const`) so all the
-  // existing `rangeMode === "week"` / `=== "month"` branches —
-  // prev/next stride, range start/end derivation, day-column width
-  // floor — still type-check. They become dead code at runtime, but
-  // TypeScript's strict-equality narrowing won't flag them as
-  // "comparison has no overlap" the way `as const` would.
-  const rangeMode: "week" | "month" | "sixWeeks" = "sixWeeks";
+  // Held in `useState` (no setter destructured) instead of a plain
+  // `const`. TypeScript's strict-equality control-flow narrowing
+  // folds `const x: Union = "sixWeeks"` back to the literal type
+  // `"sixWeeks"` at every usage site, which makes each
+  // `rangeMode === "week"` / `=== "month"` branch — prev/next stride,
+  // range start/end derivation, day-column width floor — fail to
+  // compile with "comparison appears unintentional, the types have
+  // no overlap" (Railway's v0.22.1 build flagged exactly this).
+  // `useState`'s generic argument anchors the declared type as the
+  // full union so those branches type-check; they're dead at runtime,
+  // which is the intent — the slider replaces the segmented pill.
+  const [rangeMode] = useState<"week" | "month" | "sixWeeks">("sixWeeks");
   const [focusDate, setFocusDate] = useState(() => new Date());
   const [selectedOrder, setSelectedOrder] = useState<CalendarOrder | null>(null);
   const [orderDialogMode, setOrderDialogMode] = useState<"create" | "edit">("create");

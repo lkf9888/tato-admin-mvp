@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.22.2 - 2026-05-07
+
+- **Hotfix — Railway build for v0.22.1 failed on type-check.** Demoting `rangeMode` from `useState` to `const rangeMode: "week" | "month" | "sixWeeks" = "sixWeeks"` looked like it would widen the type back to the union, but TypeScript's strict-equality control-flow narrowing tracks the assigned literal value through const declarations and folds it back to `"sixWeeks"` at every usage site. That made every `rangeMode === "week"` / `=== "month"` branch — the prev/next stride, range start/end derivation, day-column width floor — fail compilation with `TS2367 "comparison appears unintentional because the types have no overlap"`. `next dev` doesn't run a full type-check, so the regression only surfaced once Railway hit `next build`. Fix: keep `rangeMode` in `useState` (without destructuring the setter, since nothing reassigns it). The generic argument anchors the declared type as the full union, so the dead-code branches still type-check.
+
 ## v0.22.1 - 2026-05-05
 
 - **Calendar toolbar — removed the Week / Month / 6-week segmented pill.** It overlapped 1-for-1 with the day-width slider that landed in v0.22.0: both controls trade off "show more dates at once" against "show fewer dates at higher detail", and operators reported that having two of them was redundant and confusing. The slider stays as the sole zoom control. The underlying `rangeMode` state is pinned to `"sixWeeks"` so the timeline always covers ~42 days of context — the slider then lets the user fit anywhere from a couple of weeks (wider columns) to all 42 days (narrower columns) inside the viewport. Toolbar keeps the prev/next/today actions, the search box, the filter selects, and the create + export buttons. `rangeMode` keeps its full `"week" | "month" | "sixWeeks"` union type so the existing prev/next stride / range-derivation / column-width-floor branches still type-check; they just always pick the `sixWeeks` path at runtime.

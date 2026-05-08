@@ -62,7 +62,6 @@ export function AppShell({
       label: messages.shell.nav.groupBookings,
       items: [
         { href: "/direct-booking", label: messages.shell.nav.directBooking },
-        { href: "/share-links", label: messages.shell.nav.shareLinks },
       ],
     },
     {

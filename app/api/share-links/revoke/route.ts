@@ -10,7 +10,7 @@ function redirectTo(request: Request, pathname: string) {
 }
 
 function revalidateSharePages() {
-  ["/dashboard", "/share-links"].forEach((path) => revalidatePath(path));
+  ["/dashboard", "/owners", "/share-links"].forEach((path) => revalidatePath(path));
   revalidatePath("/share/[token]", "page");
 }
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const id = formData.get("id")?.toString();
   if (!id) {
-    return redirectTo(request, "/share-links");
+    return redirectTo(request, "/owners");
   }
 
   const existing = await prisma.shareLink.findFirst({
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   });
 
   if (!existing) {
-    return redirectTo(request, "/share-links");
+    return redirectTo(request, "/owners");
   }
 
   await prisma.shareLink.update({
@@ -46,5 +46,5 @@ export async function POST(request: Request) {
 
   revalidateSharePages();
 
-  return redirectTo(request, "/share-links");
+  return redirectTo(request, "/owners");
 }

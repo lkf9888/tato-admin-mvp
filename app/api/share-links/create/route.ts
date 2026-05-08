@@ -19,7 +19,7 @@ function cleanOptional(value: FormDataEntryValue | null) {
 }
 
 function revalidateSharePages() {
-  ["/dashboard", "/share-links"].forEach((path) => revalidatePath(path));
+  ["/dashboard", "/owners", "/share-links"].forEach((path) => revalidatePath(path));
   revalidatePath("/share/[token]", "page");
 }
 
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const ownerId = formData.get("ownerId")?.toString();
   if (!ownerId) {
-    return redirectTo(request, "/share-links");
+    return redirectTo(request, "/owners");
   }
 
   const password = cleanOptional(formData.get("password"));
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   });
 
   if (!owner) {
-    return redirectTo(request, "/share-links");
+    return redirectTo(request, "/owners");
   }
 
   const shareLink = await prisma.shareLink.create({
@@ -71,5 +71,5 @@ export async function POST(request: Request) {
 
   revalidateSharePages();
 
-  return redirectTo(request, "/share-links");
+  return redirectTo(request, "/owners");
 }

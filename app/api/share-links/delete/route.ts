@@ -5,8 +5,8 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 
-function redirectToShareLinks(request: Request) {
-  return NextResponse.redirect(new URL("/share-links", request.url), { status: 303 });
+function redirectToOwners(request: Request) {
+  return NextResponse.redirect(new URL("/owners", request.url), { status: 303 });
 }
 
 export async function POST(request: Request) {
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const id = formData.get("id")?.toString();
   if (!id) {
-    return redirectToShareLinks(request);
+    return redirectToOwners(request);
   }
 
   const existing = await prisma.shareLink.findFirst({
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   });
 
   if (!existing) {
-    return redirectToShareLinks(request);
+    return redirectToOwners(request);
   }
 
   await prisma.shareLink.delete({
@@ -38,8 +38,8 @@ export async function POST(request: Request) {
     entityId: id,
   });
 
-  ["/dashboard", "/share-links"].forEach((path) => revalidatePath(path));
+  ["/dashboard", "/owners", "/share-links"].forEach((path) => revalidatePath(path));
   revalidatePath("/share/[token]", "page");
 
-  return redirectToShareLinks(request);
+  return redirectToOwners(request);
 }

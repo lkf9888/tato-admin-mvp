@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.22.12 - 2026-05-07
+
+- **Share links moved into Owners.** The full share-link management workflow now lives on the Owners & Statements page, including visibility, optional password, expiry, open, revoke, and delete actions. The sidebar/mobile navigation no longer shows Share Links, and the old `/share-links` URL redirects to `/owners`.
+
 ## v0.22.11 - 2026-05-07
 
 - **Admin header cleanup.** Removed the global "Operations workspace / Operations console" banner from authenticated admin pages so each page starts directly with its own operational content.

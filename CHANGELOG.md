@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.23.0 - 2026-05-22
+
+- **HostHub-style admin shell.** Reworked the TATO admin chrome toward HostHub's compact neutral operations UI: fixed left navigation, grouped sections, active route highlighting, HostHub-like button/input/card primitives, and a mobile primary tab for staff scheduling.
+- **Offline staff scheduling.** Added a new Staff Schedule module for dispatching offline work such as handoffs, washes, inspections, repairs, and document handling. Staff members and tasks can be created, edited, assigned to vehicles/orders, completed, reopened, or cancelled, with activity logging for audit history.
+- **Attachment center filtering.** Photos & Videos and Contract Files now support HostHub-style vehicle filters plus search across filenames, renter/order details, plates, vehicle names, contract numbers, and notes while preserving the persistent TATO upload storage pattern.
+- **TATO-specific workflows preserved.** The Turo CSV import/export flow, vehicle management, vehicle ROI, and owner revenue-share workflow remain in place instead of importing HostHub's Hostex/API-sync surfaces.
+
 ## v0.22.12 - 2026-05-07
 
 - **Share links moved into Owners.** The full share-link management workflow now lives on the Owners & Statements page, including visibility, optional password, expiry, open, revoke, and delete actions. The sidebar/mobile navigation no longer shows Share Links, and the old `/share-links` URL redirects to `/owners`.

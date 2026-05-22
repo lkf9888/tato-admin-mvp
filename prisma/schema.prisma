@@ -60,6 +60,19 @@ enum OrderAttachmentKind {
   document
 }
 
+enum StaffTaskStatus {
+  todo
+  in_progress
+  done
+  cancelled
+}
+
+enum StaffTaskPriority {
+  low
+  normal
+  high
+}
+
 model Workspace {
   id               String            @id @default(cuid())
   name             String
@@ -75,6 +88,8 @@ model Workspace {
   activityLogs     ActivityLog[]
   ownerLedgerItems OwnerLedgerItem[]
   orderAttachments OrderAttachment[]
+  staffMembers     StaffMember[]
+  staffTasks       StaffTask[]
   billing          WorkspaceBilling?
 }
 
@@ -139,6 +154,7 @@ model Vehicle {
   orders               Order[]
   ownerLedgerItems     OwnerLedgerItem[]
   attachments          OrderAttachment[]
+  staffTasks           StaffTask[]
 
   @@index([workspaceId])
 }
@@ -173,6 +189,7 @@ model Order {
   vehicle          Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   ownerLedgerItems OwnerLedgerItem[]
   attachments      OrderAttachment[]
+  staffTasks       StaffTask[]
 
   @@index([workspaceId])
   @@index([workspaceId, isArchived])
@@ -246,6 +263,53 @@ model OrderAttachment {
   @@index([vehicleId, kind])
   @@index([isArchived])
   @@index([uploadedAt])
+}
+
+model StaffMember {
+  workspaceId   String?
+  id            String      @id @default(cuid())
+  name          String
+  phone         String?
+  email         String?
+  role          String?
+  color         String      @default("#3456df")
+  notes         String?
+  pinnedMessage String?
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  workspace     Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks         StaffTask[]
+
+  @@index([workspaceId, isActive])
+}
+
+model StaffTask {
+  workspaceId String?
+  id          String            @id @default(cuid())
+  staffId     String?
+  vehicleId   String?
+  orderId     String?
+  title       String
+  details     String?
+  dueDatetime DateTime?
+  timeWindow  String?
+  status      StaffTaskStatus   @default(todo)
+  priority    StaffTaskPriority @default(normal)
+  category    String?
+  sortOrder   Int               @default(0)
+  completedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  workspace   Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  staff        StaffMember?      @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  vehicle      Vehicle?          @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  order        Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, status])
+  @@index([staffId, dueDatetime])
+  @@index([vehicleId, dueDatetime])
+  @@index([orderId])
 }
 
 model ShareLink {

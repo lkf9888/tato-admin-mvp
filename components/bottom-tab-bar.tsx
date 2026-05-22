@@ -2,10 +2,10 @@
 
 import {
   CalendarDays,
-  Car,
   LayoutGrid,
   ListChecks,
   MoreHorizontal,
+  UsersRound,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -40,6 +40,7 @@ export function BottomTabBar({
     home: string;
     calendar: string;
     orders: string;
+    schedule: string;
     fleet: string;
     more: string;
     moreTitle: string;
@@ -101,12 +102,10 @@ export function BottomTabBar({
       matchPrefixes: ["/orders", "/imports"],
     },
     {
-      href: "/vehicles",
-      label: labels.fleet,
-      Icon: Car,
-      // The 'Fleet' tab covers vehicles, ROI, and owners — they're all
-      // about the cars and the people who own them.
-      matchPrefixes: ["/vehicles", "/vehicle-roi", "/owners"],
+      href: "/staff-schedule",
+      label: labels.schedule,
+      Icon: UsersRound,
+      matchPrefixes: ["/staff-schedule"],
     },
   ];
 

@@ -116,6 +116,7 @@ function revalidateAdminPages() {
     "/owners",
     "/orders",
     "/calendar",
+    "/staff-schedule",
     "/imports",
     "/billing",
     "/share-links",

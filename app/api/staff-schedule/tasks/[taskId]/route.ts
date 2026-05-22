@@ -32,6 +32,11 @@ function nullable(value?: string | null) {
 function parseDate(value?: string | null) {
   const trimmed = value?.trim();
   if (!trimmed) return null;
+  const dateOnlyMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12));
+  }
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;

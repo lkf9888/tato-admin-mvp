@@ -268,7 +268,7 @@ export function StaffScheduleClient({
   const activeStaff = staff.filter((member) => member.isActive);
   const activeTasks = tasks.filter((task) => task.status !== "done" && task.status !== "cancelled");
   const completedTasks = tasks.filter((task) => task.status === "done" || task.status === "cancelled");
-  const overdueTasks = activeTasks.filter((task) => task.dueDatetime && new Date(task.dueDatetime) < new Date());
+  const overdueTasks = activeTasks.filter((task) => isTaskOverdue(task.dueDatetime));
   const unassignedTasks = activeTasks.filter((task) => !task.staffId);
 
   const tasksByStaff = useMemo(() => {
@@ -632,6 +632,7 @@ function TaskList({
                   .join(" · ") || copy.none}
               </p>
               {task.details ? <p className="mt-1 text-xs text-neutral-600">{task.details}</p> : null}
+              <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
             </div>
             <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
               <button className="btn-secondary px-2 py-1 text-xs" onClick={() => onEdit(task)}>
@@ -939,7 +940,7 @@ function TaskModal({
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label={copy.due}>
-            <input className="input" type="datetime-local" value={form.dueDatetime} onChange={(event) => setForm({ ...form, dueDatetime: event.target.value })} />
+            <input className="input" type="date" value={form.dueDatetime} onChange={(event) => setForm({ ...form, dueDatetime: event.target.value })} />
           </Field>
           <Field label={copy.window}>
             <input className="input" value={form.timeWindow} onChange={(event) => setForm({ ...form, timeWindow: event.target.value })} />
@@ -1141,6 +1142,39 @@ function TaskPhotoGrid({
   );
 }
 
+function TaskAttachmentStrip({
+  attachments,
+  copy,
+}: {
+  attachments: TaskAttachment[];
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+}) {
+  if (attachments.length === 0) return null;
+
+  const visibleAttachments = attachments.slice(0, 4);
+  const hiddenCount = attachments.length - visibleAttachments.length;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {visibleAttachments.map((attachment) => (
+        <div key={attachment.id} className="h-12 w-12 overflow-hidden border border-neutral-200 bg-neutral-100">
+          <img
+            src={attachment.url}
+            alt={attachment.filename || copy.photos}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      ))}
+      {hiddenCount > 0 ? (
+        <div className="flex h-12 w-12 items-center justify-center border border-neutral-200 bg-neutral-50 text-xs font-semibold text-neutral-600">
+          +{hiddenCount}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function normalizeComboText(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
@@ -1186,25 +1220,31 @@ function formatTaskDue(value: string | null, locale: Locale, fallback: string) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const dayOffset = Math.round((dueDay.getTime() - today.getTime()) / 86400000);
-  const time = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 
   if (locale === "zh") {
-    if (dayOffset === 0) return `今天 ${time}`;
-    if (dayOffset === 1) return `明天 ${time}`;
-    return `${date.getMonth() + 1}/${date.getDate()} ${time}`;
+    if (dayOffset === 0) return "今天";
+    if (dayOffset === 1) return "明天";
+    return `${date.getMonth() + 1}/${date.getDate()}`;
   }
 
-  if (dayOffset === 0) return `Today ${time}`;
-  if (dayOffset === 1) return `Tomorrow ${time}`;
+  if (dayOffset === 0) return "Today";
+  if (dayOffset === 1) return "Tomorrow";
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   }).format(date);
+}
+
+function isTaskOverdue(value: string | null) {
+  if (!value) return false;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return dueDay.getTime() < today.getTime();
 }
 
 function formatFileSize(size: number | null) {
@@ -1270,13 +1310,13 @@ function taskToForm(
     orderInput: orderOption?.label ?? task.orderLabel ?? "",
     title: task.title,
     details: task.details ?? "",
-    dueDatetime: task.dueDatetime ? toLocalDatetimeInput(task.dueDatetime) : "",
+    dueDatetime: task.dueDatetime ? toLocalDateInput(task.dueDatetime) : "",
     timeWindow: task.timeWindow ?? "",
   };
 }
 
-function toLocalDatetimeInput(value: string) {
+function toLocalDateInput(value: string) {
   const date = new Date(value);
   const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }

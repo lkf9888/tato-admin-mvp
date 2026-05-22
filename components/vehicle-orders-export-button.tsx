@@ -123,11 +123,11 @@ export function VehicleOrdersExportButton({
   // module for buttons yet (when there are 3+ duplicates we should
   // promote them to `components/ui/button.tsx`).
   const triggerClass =
-    "inline-flex h-9 items-center justify-center rounded-full border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] shadow-sm transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex h-9 items-center justify-center rounded-md border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] shadow-sm transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
   const secondaryDialogClass =
-    "inline-flex h-10 items-center justify-center rounded-full border border-[var(--line)] bg-white px-4 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)]";
+    "inline-flex h-10 items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)]";
   const primaryDialogClass =
-    "inline-flex h-10 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex h-10 items-center justify-center rounded-md bg-[var(--accent)] px-4 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60";
 
   return (
     <>

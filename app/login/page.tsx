@@ -111,7 +111,7 @@ export default async function LoginPage({
                   </p>
                 ) : null}
 
-                <button className="w-full rounded-full bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(0,0,0,0.18)] transition hover:translate-y-[-1px] hover:bg-black/90">
+                <button className="w-full rounded-md bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(0,0,0,0.18)] transition hover:translate-y-[-1px] hover:bg-black/90">
                   {loginMessages.submit}
                 </button>
               </form>

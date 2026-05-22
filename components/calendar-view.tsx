@@ -141,8 +141,8 @@ function getTimelineBarClasses(order: CalendarOrder, clippedStart: boolean, clip
         : order.source === "turo"
           ? "border-[#1f3aa8] bg-[#3456df]"
           : "border-[#1f5b48] bg-[#2f7f67]",
-    clippedStart ? "rounded-r-xl rounded-l-md" : "rounded-l-xl",
-    clippedEnd ? "rounded-l-xl rounded-r-md" : "rounded-r-xl",
+    clippedStart ? "rounded-r-md rounded-l-md" : "rounded-l-md",
+    clippedEnd ? "rounded-l-md rounded-r-md" : "rounded-r-md",
   );
 }
 
@@ -365,7 +365,7 @@ function SearchableFilterDropdown({
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex h-9 w-full items-center justify-between gap-2 rounded-full border border-[var(--line)] bg-white px-3 text-left text-[12px] font-medium text-[var(--ink)] outline-none transition hover:border-[rgba(17,19,24,0.22)] focus:border-[rgba(17,19,24,0.3)] sm:w-44 lg:w-48"
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-[var(--line)] bg-white px-3 text-left text-[12px] font-medium text-[var(--ink)] outline-none transition hover:border-[rgba(17,19,24,0.22)] focus:border-[rgba(17,19,24,0.3)] sm:w-44 lg:w-48"
       >
         <span className="truncate">{highlightText(buttonLabel, query)}</span>
         <span className="text-[10px] text-[var(--ink-soft)]">⌄</span>
@@ -718,9 +718,9 @@ export function CalendarView({
   // on `bg-accent` was dark-on-dark) and drops the bizarre orange
   // `#ff7b67` hover that looked like a different brand.
   const secondaryActionClass =
-    "inline-flex h-9 items-center justify-center rounded-full border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] shadow-sm transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] shadow-sm transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
   const primaryActionClass =
-    "inline-flex h-9 items-center justify-center rounded-full bg-[var(--accent)] px-3.5 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md bg-[var(--accent)] px-3.5 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50";
 
   const openCreateOrderDialog = () => {
     const fallbackVehicleId =
@@ -812,13 +812,13 @@ export function CalendarView({
        * badges removed — the timeline itself is self-explanatory and
        * those badges were just decorative noise. */}
       <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-2.5 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
-        <div className="grid gap-2 xl:grid-cols-[auto_minmax(42rem,1fr)] xl:items-center">
+        <div className="grid gap-2 2xl:grid-cols-[auto_minmax(42rem,1fr)] 2xl:items-center">
           {/* Action row — flat layout instead of a glass pill. The
            * prev/next pair gets its own tiny segment-control wrapper so
            * the relationship reads at a glance; everything else stands
            * on its own with the standard chip look. */}
-          <div className="flex flex-wrap items-center gap-1.5 xl:flex-nowrap">
-            <div className="inline-flex rounded-full border border-[var(--line)] bg-white p-0.5 shadow-sm">
+          <div className="flex flex-wrap items-center gap-1.5 2xl:flex-nowrap">
+            <div className="inline-flex rounded-md border border-[var(--line)] bg-white p-0.5 shadow-sm">
               <button
                 type="button"
                 aria-label="Previous range"
@@ -829,7 +829,7 @@ export function CalendarView({
                       : addDays(current, rangeMode === "week" ? -7 : -42),
                   );
                 }}
-                className="rounded-full px-2.5 py-1 text-[14px] font-semibold leading-none text-[var(--ink-soft)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]"
+                className="rounded-md px-2.5 py-1 text-[14px] font-semibold leading-none text-[var(--ink-soft)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]"
               >
                 &#8249;
               </button>
@@ -843,7 +843,7 @@ export function CalendarView({
                       : addDays(current, rangeMode === "week" ? 7 : 42),
                   );
                 }}
-                className="rounded-full px-2.5 py-1 text-[14px] font-semibold leading-none text-[var(--ink-soft)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]"
+                className="rounded-md px-2.5 py-1 text-[14px] font-semibold leading-none text-[var(--ink-soft)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]"
               >
                 &#8250;
               </button>

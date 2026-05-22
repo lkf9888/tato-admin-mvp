@@ -104,7 +104,7 @@ export function AppShell({
         autoLabel={messages.shell.languageAutoLabel}
       />
       <form action={logoutAction}>
-        <button className="tap-press w-full rounded-full border border-[var(--line)] bg-white/72 px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.16)] hover:bg-white hover:text-[var(--ink)]">
+        <button className="tap-press w-full rounded-md border border-[var(--line)] bg-white/72 px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.16)] hover:bg-white hover:text-[var(--ink)]">
           {messages.shell.signOut}
         </button>
       </form>
@@ -132,7 +132,7 @@ export function AppShell({
 
       <SidebarNav groups={navGroups} />
 
-      <div className="border-t border-neutral-200 p-3">
+      <div className="border-t border-neutral-200 p-3 pb-16">
         <LanguageSwitcher
           locale={locale}
           preference={localePreference}

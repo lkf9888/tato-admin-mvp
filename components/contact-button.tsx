@@ -198,7 +198,7 @@ export function ContactButton({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={labels.trigger}
-        className="tap-press fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-3 z-30 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2.5 text-[12px] font-medium text-[var(--ink)] shadow-[0_18px_38px_-20px_rgba(17,19,24,0.45)] hover:bg-white lg:bottom-3"
+        className="tap-press fixed right-3 top-[calc(env(safe-area-inset-top)+0.35rem)] z-30 inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2.5 text-[12px] font-medium text-[var(--ink)] shadow-[0_18px_38px_-20px_rgba(17,19,24,0.45)] hover:bg-white lg:bottom-3 lg:left-3 lg:right-auto lg:top-auto lg:z-50"
       >
         <MessageSquare className="h-4 w-4" />
         <span className="hidden sm:inline">{labels.trigger}</span>
@@ -233,7 +233,7 @@ export function ContactButton({
                 onClick={() => !submitting && setOpen(false)}
                 aria-label={labels.closeLabel}
                 disabled={submitting}
-                className="tap-press inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-white text-[var(--ink)] disabled:opacity-50"
+                className="tap-press inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--ink)] disabled:opacity-50"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -300,7 +300,7 @@ export function ContactButton({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="tap-press mt-2 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-2 text-[13px] font-medium text-[var(--ink)] hover:bg-white"
+                      className="tap-press mt-2 inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-2 text-[13px] font-medium text-[var(--ink)] hover:bg-white"
                     >
                       <Paperclip className="h-4 w-4" />
                       {labels.filesSelected(files.length, formatMb(totalBytes))}
@@ -325,7 +325,7 @@ export function ContactButton({
                               type="button"
                               onClick={() => removeFile(index)}
                               aria-label={labels.removeFile}
-                              className="tap-press inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-white text-[var(--ink-soft)]"
+                              className="tap-press inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--ink-soft)]"
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -352,7 +352,7 @@ export function ContactButton({
                       type="button"
                       onClick={() => !submitting && setOpen(false)}
                       disabled={submitting}
-                      className="tap-press rounded-full border border-[var(--line)] bg-white px-5 py-3 text-[14px] font-medium text-[var(--ink-soft)] disabled:opacity-50"
+                      className="tap-press rounded-md border border-[var(--line)] bg-white px-5 py-3 text-[14px] font-medium text-[var(--ink-soft)] disabled:opacity-50"
                     >
                       {labels.cancelAction}
                     </button>
@@ -360,7 +360,7 @@ export function ContactButton({
                       type="button"
                       onClick={handleSubmit}
                       disabled={!canSubmit}
-                      className="tap-press rounded-full bg-[var(--ink)] px-5 py-3 text-[14px] font-semibold text-white shadow-[0_16px_34px_rgba(17,19,24,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="tap-press rounded-md bg-[var(--ink)] px-5 py-3 text-[14px] font-semibold text-white shadow-[0_16px_34px_rgba(17,19,24,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {submitting ? labels.sendingAction : labels.sendAction}
                     </button>

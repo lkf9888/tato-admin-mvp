@@ -317,7 +317,7 @@ export default async function VehicleRoiPage() {
                       placeholder={roiMessages.purchasePriceLabel}
                       className="h-9 rounded-full border border-white/12 bg-white/8 px-3 text-[12px] text-white outline-none placeholder:text-white/35"
                     />
-                    <button className="inline-flex h-9 items-center justify-center rounded-full bg-[var(--accent)] px-3 text-[11px] font-semibold text-[color:var(--ink)] shadow-[0_12px_28px_-18px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]">
+                    <button className="inline-flex h-9 items-center justify-center rounded-md bg-[var(--accent)] px-3 text-[11px] font-semibold text-[color:var(--ink)] shadow-[0_12px_28px_-18px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#ff7b67]">
                       {roiMessages.savePurchasePrice}
                     </button>
                   </form>

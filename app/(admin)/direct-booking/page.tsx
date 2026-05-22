@@ -136,7 +136,7 @@ export default async function DirectBookingPage() {
                 <Link
                   href={shareUrl}
                   target="_blank"
-                  className="inline-flex shrink-0 items-center rounded-full bg-[var(--ink)] px-3 py-1.5 text-[11px] font-medium text-white shadow-[0_16px_30px_-24px_rgba(17,19,24,0.8)] transition hover:translate-y-[-1px]"
+                  className="inline-flex shrink-0 items-center rounded-md bg-[var(--ink)] px-3 py-1.5 text-[11px] font-medium text-white shadow-[0_16px_30px_-24px_rgba(17,19,24,0.8)] transition hover:translate-y-[-1px]"
                   style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
                 >
                   {directMessages.openPreview}
@@ -262,7 +262,7 @@ export default async function DirectBookingPage() {
                 </div>
 
                 <button
-                  className="w-full rounded-full bg-[var(--ink)] px-3 py-2 text-[12px] font-medium text-white shadow-[0_16px_30px_-24px_rgba(17,19,24,0.8)] transition hover:translate-y-[-1px]"
+                  className="w-full rounded-md bg-[var(--ink)] px-3 py-2 text-[12px] font-medium text-white shadow-[0_16px_30px_-24px_rgba(17,19,24,0.8)] transition hover:translate-y-[-1px]"
                   style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
                 >
                   {directMessages.saveAction}

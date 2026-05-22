@@ -198,7 +198,7 @@ export function BottomTabBar({
                 type="button"
                 onClick={() => setMoreOpen(false)}
                 aria-label="Close menu"
-                className="tap-press inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-white text-[var(--ink)]"
+                className="tap-press inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--ink)]"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -212,7 +212,7 @@ export function BottomTabBar({
                     <Link
                       href={item.href}
                       className={cn(
-                        "tap-press flex items-center justify-between rounded-xl px-4 py-3.5 text-[15px] font-medium",
+                        "tap-press flex items-center justify-between rounded-md px-4 py-3.5 text-[15px] font-medium",
                         active
                           ? "bg-[var(--accent-soft)] text-[var(--ink)]"
                           : "bg-[var(--surface-muted)] text-[var(--ink)] hover:bg-[var(--accent-soft)]",

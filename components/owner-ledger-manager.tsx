@@ -295,7 +295,7 @@ export function OwnerLedgerManager({
                 name="ownerId"
                 value={selectedOwner.id}
                 onChange={(event) => router.push(`${ownerSelectBasePath}?ownerId=${event.target.value}`)}
-                className="h-9 rounded-full border border-[var(--line)] bg-white px-3 text-[12px]"
+                className="h-9 rounded-md border border-[var(--line)] bg-white px-3 text-[12px]"
               >
                 {owners.map((owner) => (
                   <option key={owner.id} value={owner.id}>
@@ -308,25 +308,25 @@ export function OwnerLedgerManager({
 
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <button
-              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
+              className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
               onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.EXPENSE_REIMBURSEMENT })}
             >
               + {labels.addExpense}
             </button>
             <button
-              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
+              className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
               onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.SETTLEMENT_PAYMENT })}
             >
               + {labels.addPayment}
             </button>
             <button
-              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
+              className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
               onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.MANUAL_ADJUSTMENT })}
             >
               + {labels.addAdjustment}
             </button>
             <button
-              className="rounded-full bg-[var(--accent)] px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-50"
+              className="rounded-md bg-[var(--accent)] px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-50"
               onClick={resync}
               disabled={isPending}
             >
@@ -378,7 +378,7 @@ export function OwnerLedgerManager({
             <select
               value={selectedMonth}
               onChange={(event) => setSelectedMonth(event.target.value)}
-              className="h-10 rounded-full border border-[var(--line)] bg-white px-3 text-sm"
+              className="h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm"
             >
               {months.map((month) => (
                 <option key={month} value={month}>
@@ -388,7 +388,7 @@ export function OwnerLedgerManager({
             </select>
             <button
               onClick={() => window.print()}
-              className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
+              className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
             >
               {labels.print}
             </button>
@@ -645,7 +645,7 @@ function LedgerModal({
               {labels.kindLabels[kind]}
             </h3>
           </div>
-          <button className="rounded-full border border-[var(--line)] px-3 py-1 text-sm" onClick={onClose}>
+          <button className="rounded-md border border-[var(--line)] px-3 py-1 text-sm" onClick={onClose}>
             {labels.cancel}
           </button>
         </div>
@@ -742,7 +742,7 @@ function LedgerModal({
         </div>
 
         <button
-          className="mt-5 h-11 w-full rounded-full bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-50"
+          className="mt-5 h-11 w-full rounded-md bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-50"
           onClick={save}
           disabled={saving}
         >

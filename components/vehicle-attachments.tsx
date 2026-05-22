@@ -182,7 +182,7 @@ export function VehicleAttachments({
             type="button"
             onClick={() => photoInputRef.current?.click()}
             disabled={uploading !== null}
-            className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[12px] font-semibold text-[var(--ink)] disabled:opacity-60"
+            className="rounded-md border border-[var(--line)] bg-white px-3 py-1.5 text-[12px] font-semibold text-[var(--ink)] disabled:opacity-60"
           >
             {uploading === "photo" ? copy.uploading : copy.uploadPhotos}
           </button>
@@ -190,7 +190,7 @@ export function VehicleAttachments({
             type="button"
             onClick={() => docInputRef.current?.click()}
             disabled={uploading !== null}
-            className="rounded-full bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
+            className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
           >
             {uploading === "document" ? copy.uploading : copy.uploadDocuments}
           </button>

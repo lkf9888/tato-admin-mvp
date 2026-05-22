@@ -298,7 +298,7 @@ export default async function DashboardPage() {
   // `px-3 py-1.5` to `px-2.5 py-1` and the text from `text-xs` to
   // `text-[11px]` so the link doesn't dominate the card header.
   const panelLinkClass =
-    "tap-press inline-flex w-fit items-center gap-1 self-start rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 sm:self-auto";
+    "tap-press inline-flex w-fit items-center gap-1 self-start rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 sm:self-auto";
 
   const renderDayPanel = (
     kicker: string,

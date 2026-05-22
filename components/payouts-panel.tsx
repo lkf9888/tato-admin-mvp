@@ -259,7 +259,7 @@ export function PayoutsPanel({
                     key={option}
                     type="button"
                     onClick={() => setCountry(option)}
-                    className={`rounded-full border px-3 py-1.5 text-[12px] transition ${
+                    className={`rounded-md border px-3 py-1.5 text-[12px] transition ${
                       country === option
                         ? "border-[var(--accent)] bg-[var(--accent)] text-white"
                         : "border-[var(--line)] bg-white text-[var(--ink)] hover:bg-[var(--surface-muted)]"
@@ -274,7 +274,7 @@ export function PayoutsPanel({
               type="button"
               onClick={handleStart}
               disabled={!configured || isStarting}
-              className="inline-flex items-center justify-center rounded-full bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[var(--ink)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[var(--ink)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isStarting ? t.connectLoading : t.connectAction}
             </button>
@@ -286,7 +286,7 @@ export function PayoutsPanel({
                 type="button"
                 onClick={handleResume}
                 disabled={!configured || isResuming}
-                className="inline-flex items-center justify-center rounded-full bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[var(--ink)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[var(--ink)]/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isResuming ? t.connectLoading : t.continueAction}
               </button>
@@ -295,7 +295,7 @@ export function PayoutsPanel({
               type="button"
               onClick={handleDashboard}
               disabled={!configured || isDashboardOpening}
-              className="inline-flex items-center justify-center rounded-full border border-[var(--line)] bg-white px-4 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t.dashboardAction}
             </button>
@@ -303,7 +303,7 @@ export function PayoutsPanel({
               type="button"
               onClick={handleRefresh}
               disabled={!configured || isRefreshing}
-              className="inline-flex items-center justify-center rounded-full border border-[var(--line)] bg-white px-4 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isRefreshing ? t.refreshing : t.refreshAction}
             </button>

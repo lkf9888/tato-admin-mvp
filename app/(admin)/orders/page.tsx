@@ -260,9 +260,9 @@ export default async function OrdersPage({
   const filterFieldClass =
     "h-9 rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 text-[12px] text-[color:var(--ink)] outline-none focus:border-[var(--ink)]";
   const subtleButtonClass =
-    "inline-flex h-9 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-3 text-[11px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white";
+    "inline-flex h-9 items-center justify-center rounded-md border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-3 text-[11px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white";
   const primaryButtonClass =
-    "inline-flex h-9 items-center justify-center rounded-full bg-[var(--accent)] px-3 text-[11px] font-semibold text-white shadow-[0_12px_26px_-16px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#4830d4]";
+    "inline-flex h-9 items-center justify-center rounded-md bg-[var(--accent)] px-3 text-[11px] font-semibold text-white shadow-[0_12px_26px_-16px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#4830d4]";
   const orderRows = pageOrders.map((order) => ({
     id: order.id,
     source: order.source,
@@ -323,7 +323,7 @@ export default async function OrdersPage({
           </div>
           <span
             aria-hidden
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-white text-[var(--ink-soft)] transition group-open:rotate-45 group-open:bg-[var(--ink)] group-open:text-white"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--ink-soft)] transition group-open:rotate-45 group-open:bg-[var(--ink)] group-open:text-white"
           >
             <span className="text-lg leading-none">+</span>
           </span>
@@ -455,7 +455,7 @@ export default async function OrdersPage({
               </span>
               <span
                 aria-hidden
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--line)] bg-white text-[var(--ink-soft)] transition group-open:rotate-45 group-open:bg-[var(--ink)] group-open:text-white"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--ink-soft)] transition group-open:rotate-45 group-open:bg-[var(--ink)] group-open:text-white"
               >
                 <span className="text-base leading-none">+</span>
               </span>
@@ -664,7 +664,7 @@ export default async function OrdersPage({
                   {order.source === "offline" ? (
                     <form action={deleteOrderAction}>
                       <input type="hidden" name="id" value={order.id} />
-                      <button className="inline-flex h-9 items-center justify-center rounded-full border border-rose-200 bg-white/76 px-3 text-[11px] font-semibold text-rose-600 transition hover:border-rose-400 hover:text-rose-700">
+                      <button className="inline-flex h-9 items-center justify-center rounded-md border border-rose-200 bg-white/76 px-3 text-[11px] font-semibold text-rose-600 transition hover:border-rose-400 hover:text-rose-700">
                         {orderMessages.deleteOfflineOrder}
                       </button>
                     </form>

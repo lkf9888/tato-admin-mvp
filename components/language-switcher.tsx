@@ -66,7 +66,7 @@ export function LanguageSwitcher({
                 });
               }}
               className={cn(
-                "rounded-xl px-2 py-2 text-xs font-semibold transition",
+                "rounded-md px-2 py-2 text-xs font-semibold transition",
                 active
                   ? "bg-slate-950 text-white"
                   : "border border-slate-200 bg-white text-slate-700 hover:border-slate-900 hover:text-slate-950",
@@ -105,7 +105,7 @@ export function CompactLanguageSwitcher({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 p-1 shadow-sm backdrop-blur",
+        "inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white/80 p-1 shadow-sm backdrop-blur",
         className,
       )}
     >
@@ -127,7 +127,7 @@ export function CompactLanguageSwitcher({
               });
             }}
             className={cn(
-              "rounded-full px-3 py-1.5 text-xs font-semibold transition",
+              "rounded-md px-3 py-1.5 text-xs font-semibold transition",
               active
                 ? "bg-slate-950 text-white"
                 : "text-slate-700 hover:bg-slate-100",

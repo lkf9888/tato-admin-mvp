@@ -104,7 +104,7 @@ export function ForgotPasswordForm({ locale }: { locale: Locale }) {
         <button
           type="button"
           onClick={() => router.replace("/login")}
-          className="mt-7 w-full rounded-full bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24]"
+          className="mt-7 w-full rounded-md bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24]"
         >
           {t.backToLogin}
         </button>
@@ -166,7 +166,7 @@ export function ForgotPasswordForm({ locale }: { locale: Locale }) {
             type="button"
             onClick={handleReset}
             disabled={isResetting || code.length < 6 || password.length < 8}
-            className="w-full rounded-full bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isResetting ? t.resettingAction : t.resetAction}
           </button>
@@ -227,7 +227,7 @@ export function ForgotPasswordForm({ locale }: { locale: Locale }) {
           type="button"
           onClick={handleSendCode}
           disabled={isSendingCode || !email.trim()}
-          className="w-full rounded-full bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-md bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSendingCode ? t.sendingCode : t.sendCode}
         </button>

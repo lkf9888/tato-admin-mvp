@@ -174,7 +174,7 @@ export function RegisterForm({ locale }: { locale: Locale }) {
             type="button"
             onClick={handleVerify}
             disabled={isVerifying || code.length < 6}
-            className="w-full rounded-full bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isVerifying ? t.verifying : t.verifyAction}
           </button>
@@ -257,7 +257,7 @@ export function RegisterForm({ locale }: { locale: Locale }) {
           disabled={
             isSendingCode || !name.trim() || !email.trim() || password.length < 6
           }
-          className="w-full rounded-full bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-md bg-black px-4 py-3.5 font-medium text-white shadow-[0_16px_34px_rgba(17,19,24,0.16)] transition hover:translate-y-[-1px] hover:bg-[#1a1d24] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSendingCode ? t.sendingCode : t.sendCode}
         </button>

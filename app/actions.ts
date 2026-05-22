@@ -94,6 +94,7 @@ const orderSchema = z.object({
 
 const turoSyncSettingsSchema = z.object({
   csvUrl: z.string().trim().optional(),
+  csvYear: z.coerce.number().int().min(2010).max(2100).optional(),
   csvAuthHeader: z.string().trim().optional(),
   csvHeaders: z.string().trim().optional(),
   csvMapping: z.string().trim().optional(),
@@ -137,10 +138,14 @@ function cleanText(value: string | undefined) {
   return trimmed ? trimmed : null;
 }
 
+function cleanYear(value: number | undefined) {
+  return Number.isInteger(value) ? value : null;
+}
+
 function isValidUrl(value: string | null) {
   if (!value) return true;
   try {
-    const url = new URL(value);
+    const url = new URL(value.replaceAll("{year}", String(new Date().getFullYear())));
     return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
@@ -163,6 +168,7 @@ export async function saveTuroSyncSettingsAction(formData: FormData) {
   const { workspace, user } = await requireCurrentAdminContext();
   const parsed = turoSyncSettingsSchema.parse({
     csvUrl: formData.get("csvUrl")?.toString(),
+    csvYear: formData.get("csvYear")?.toString(),
     csvAuthHeader: formData.get("csvAuthHeader")?.toString(),
     csvHeaders: formData.get("csvHeaders")?.toString(),
     csvMapping: formData.get("csvMapping")?.toString(),
@@ -182,10 +188,12 @@ export async function saveTuroSyncSettingsAction(formData: FormData) {
   }
 
   const csvAuthHeader = cleanText(parsed.csvAuthHeader);
+  const csvYear = cleanYear(parsed.csvYear);
   await prisma.turoSyncConfig.upsert({
     where: { workspaceId: workspace.id },
     update: {
       csvUrl,
+      csvYear,
       csvPath: null,
       csvAuthHeader,
       csvHeaders,
@@ -196,6 +204,7 @@ export async function saveTuroSyncSettingsAction(formData: FormData) {
     create: {
       workspaceId: workspace.id,
       csvUrl,
+      csvYear,
       csvPath: null,
       csvAuthHeader,
       csvHeaders,
@@ -213,6 +222,7 @@ export async function saveTuroSyncSettingsAction(formData: FormData) {
     entityId: workspace.id,
     metadata: {
       hasCsvUrl: Boolean(csvUrl),
+      csvYear,
       hasAuthHeader: Boolean(csvAuthHeader),
       hasHeaders: Boolean(csvHeaders),
       hasMapping: Boolean(csvMapping),

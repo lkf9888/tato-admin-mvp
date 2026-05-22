@@ -33,6 +33,7 @@ type LoadedCsvSource = {
 
 type WorkspaceTuroSyncConfig = {
   csvUrl: string | null;
+  csvYear: number | null;
   csvPath: string | null;
   csvAuthHeader: string | null;
   csvHeaders: string | null;
@@ -104,6 +105,7 @@ async function getWorkspaceTuroSyncConfig(workspaceId: string): Promise<Workspac
     where: { workspaceId },
     select: {
       csvUrl: true,
+      csvYear: true,
       csvPath: true,
       csvAuthHeader: true,
       csvHeaders: true,
@@ -154,6 +156,32 @@ function inferFileNameFromDisposition(value: string | null) {
   } catch {
     return match[1].replaceAll('"', "").trim();
   }
+}
+
+function getConfiguredCsvYear(config: WorkspaceTuroSyncConfig) {
+  if (Number.isInteger(config?.csvYear)) return config?.csvYear ?? null;
+  return parsePositiveInteger(process.env.TURO_SYNC_CSV_YEAR, new Date().getFullYear());
+}
+
+function applyCsvYearTemplate(value: string, config: WorkspaceTuroSyncConfig) {
+  const year = getConfiguredCsvYear(config);
+  if (!year) return value;
+
+  if (value.includes("{year}")) {
+    return value.replaceAll("{year}", String(year));
+  }
+
+  try {
+    const url = new URL(value);
+    if (url.hostname === "turo.com" && url.pathname === "/api/earnings/download") {
+      url.searchParams.set("year", String(year));
+      return url.toString();
+    }
+  } catch {
+    return value;
+  }
+
+  return value;
 }
 
 async function loadCsvFromUrl(url: string, config: WorkspaceTuroSyncConfig): Promise<LoadedCsvSource> {
@@ -210,16 +238,17 @@ async function loadConfiguredCsvSource(config: WorkspaceTuroSyncConfig): Promise
     configuredCsvUrl || (!hasWorkspaceSource ? process.env.TURO_SYNC_CSV_URL?.trim() : undefined);
   const csvPath =
     configuredCsvPath || (!hasWorkspaceSource ? process.env.TURO_SYNC_CSV_PATH?.trim() : undefined);
+  const resolvedCsvUrl = csvUrl ? applyCsvYearTemplate(csvUrl, config) : undefined;
 
-  if (csvUrl && csvPath) {
+  if (resolvedCsvUrl && csvPath) {
     throw new TuroSyncError(
       "Set only one Turo CSV source: TURO_SYNC_CSV_URL or TURO_SYNC_CSV_PATH.",
       "TURO_SYNC_INVALID_CONFIG",
     );
   }
 
-  if (csvUrl) {
-    return loadCsvFromUrl(csvUrl, config);
+  if (resolvedCsvUrl) {
+    return loadCsvFromUrl(resolvedCsvUrl, config);
   }
 
   if (csvPath) {

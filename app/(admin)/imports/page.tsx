@@ -28,6 +28,8 @@ export default async function ImportsPage({
   const importMessages = messages.imports;
   const turoSyncMessages = getTuroSyncSettingsCopy(locale);
   const turoSyncNotice = getTuroSyncSettingsNotice(params.turoSync, locale);
+  const turoSyncYear = turoSyncConfig?.csvYear ?? new Date().getFullYear();
+  const turoYearOptions = getTuroSyncYearOptions(turoSyncYear);
 
   return (
     <div className="space-y-3">
@@ -51,16 +53,41 @@ export default async function ImportsPage({
         ) : null}
 
         <form action={saveTuroSyncSettingsAction} className="mt-3 grid gap-2 text-[12px] sm:gap-2.5">
-          <label className="grid gap-1">
-            <span className="font-medium text-slate-700">{turoSyncMessages.csvUrl}</span>
-            <input
-              name="csvUrl"
-              type="url"
-              defaultValue={turoSyncConfig?.csvUrl ?? ""}
-              placeholder="https://example.com/turo-orders.csv"
-              className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-            />
-          </label>
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px]">
+            <label className="grid gap-1">
+              <span className="font-medium text-slate-700">{turoSyncMessages.csvUrl}</span>
+              <input
+                name="csvUrl"
+                type="text"
+                inputMode="url"
+                defaultValue={turoSyncConfig?.csvUrl ?? ""}
+                placeholder="https://turo.com/api/earnings/download?year={year}"
+                className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="font-medium text-slate-700">{turoSyncMessages.csvYear}</span>
+              <select
+                name="csvYear"
+                defaultValue={turoSyncYear}
+                className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              >
+                {turoYearOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-4 text-slate-500">
+            <span className="font-medium text-slate-700">{turoSyncMessages.discoveredEndpointLabel}</span>{" "}
+            <code className="break-all text-slate-700">
+              https://turo.com/api/earnings/download?year={"{year}"}
+            </code>
+            <span className="block pt-1">{turoSyncMessages.discoveredEndpointHint}</span>
+          </div>
 
           <div className="grid gap-2 md:grid-cols-2">
             <label className="grid gap-1">
@@ -206,6 +233,10 @@ function getTuroSyncSettingsCopy(locale: Locale) {
         copy:
           "把可直接下载 CSV 的链接粘贴到这里保存。日历里的「同步 Turo」按钮会优先使用这里的设置，不需要再去 Railway Variables 改 URL。",
         csvUrl: "CSV 直接下载 URL",
+        csvYear: "下载年份",
+        discoveredEndpointLabel: "Turo 下载接口：",
+        discoveredEndpointHint:
+          "Turo 的 Download CSV 按钮会调用这个接口，但它需要 Turo 登录态；如果直接同步出现 403，需要提供有效授权或继续手动下载上传。",
         authHeader: "Authorization Header（可选）",
         headers: "额外请求 Headers JSON（可选）",
         mapping: "字段映射 JSON（可选）",
@@ -222,6 +253,10 @@ function getTuroSyncSettingsCopy(locale: Locale) {
         copy:
           "Paste a direct-download CSV URL here. The calendar Sync Turo button will use this workspace setting before falling back to Railway variables.",
         csvUrl: "CSV direct-download URL",
+        csvYear: "Download year",
+        discoveredEndpointLabel: "Turo download endpoint:",
+        discoveredEndpointHint:
+          "Turo's Download CSV button calls this endpoint, but it requires a logged-in Turo session. If sync returns 403, provide valid auth or keep uploading the downloaded file manually.",
         authHeader: "Authorization header (optional)",
         headers: "Extra request headers JSON (optional)",
         mapping: "Field mapping JSON (optional)",
@@ -232,6 +267,15 @@ function getTuroSyncSettingsCopy(locale: Locale) {
         note: "After saving, open Calendar and click Sync Turo to test it.",
         save: "Save sync settings",
       };
+}
+
+function getTuroSyncYearOptions(selectedYear: number) {
+  const currentYear = new Date().getFullYear();
+  const years = new Set<number>([selectedYear]);
+  for (let year = currentYear + 1; year >= currentYear - 8; year -= 1) {
+    years.add(year);
+  }
+  return Array.from(years).sort((a, b) => b - a);
 }
 
 function getTuroSyncSettingsNotice(status: string | undefined, locale: Locale) {

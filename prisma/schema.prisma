@@ -221,6 +221,7 @@ model TuroSyncConfig {
   workspaceId           String    @unique
   id                    String    @id @default(cuid())
   csvUrl                String?
+  csvYear               Int?
   csvPath               String?
   csvAuthHeader         String?
   csvHeaders            String?

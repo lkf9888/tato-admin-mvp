@@ -30,6 +30,21 @@ fi
 
 mkdir -p /app/data
 
+UPLOAD_ROOT="${TATO_UPLOAD_DIR:-/app/data/uploads}"
+
+if [ "${NODE_ENV:-production}" = "production" ]; then
+  case "$UPLOAD_ROOT" in
+    /app/data|/app/data/*) ;;
+    *)
+      echo "Refusing to start because TATO_UPLOAD_DIR is not using the persistent data directory."
+      echo "Set TATO_UPLOAD_DIR to a path under /app/data, or leave it empty to use /app/data/uploads."
+      exit 1
+      ;;
+  esac
+fi
+
+mkdir -p "$UPLOAD_ROOT"
+
 if [ "$DB_PATH" != "$DATABASE_URL" ]; then
   mkdir -p "$(dirname "$DB_PATH")"
 fi

@@ -712,29 +712,26 @@ export async function deleteVehicleAction(formData: FormData) {
   const id = formData.get("id")?.toString();
   if (!id) return;
 
-  const orderCount = await prisma.order.count({
-    where: { vehicleId: id, workspaceId: workspace.id },
-  });
-
-  if (orderCount > 0) {
-    redirect("/vehicles?error=vehicle-has-orders");
-  }
-
   const vehicle = await prisma.vehicle.findFirst({
     where: { id, workspaceId: workspace.id },
   });
   if (!vehicle) return;
 
-  await prisma.vehicle.delete({
+  const deactivated = await prisma.vehicle.update({
     where: { id: vehicle.id },
+    data: {
+      status: VehicleStatus.inactive,
+      directBookingEnabled: false,
+    },
   });
 
   await logActivity({
     workspaceId: workspace.id,
     actor: user.name,
-    action: "vehicle_deleted",
+    action: "vehicle_deactivated",
     entityType: "Vehicle",
-    entityId: vehicle.id,
+    entityId: deactivated.id,
+    metadata: { plateNumber: deactivated.plateNumber },
   });
 
   revalidateAdminPages();

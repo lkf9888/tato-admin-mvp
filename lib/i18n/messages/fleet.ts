@@ -6,7 +6,7 @@
 export const fleetMessages = {
   en: {
     vehicles: {
-      deleteError: "Vehicles with related orders cannot be deleted until the orders are removed or reassigned.",
+      deleteError: "Vehicle records are preserved for data safety. Use inactive status to remove a vehicle from active operations.",
       createKicker: "Create vehicle",
       placeholders: {
         plateNumber: "Plate number",
@@ -32,7 +32,7 @@ export const fleetMessages = {
       commissionPrefix: "TATO commission",
       editVehicle: "Edit vehicle",
       saveChanges: "Save changes",
-      deleteVehicle: "Delete vehicle",
+      deleteVehicle: "Deactivate vehicle",
       orderCount: (count: number) => `${count} order(s)`,
     },
     vehicleRoiPage: {
@@ -100,7 +100,7 @@ export const fleetMessages = {
   },
   zh: {
     vehicles: {
-      deleteError: "有关联订单的车辆暂时不能删除，请先移除或改绑相关订单。",
+      deleteError: "为保护车辆数据，系统会保留车辆记录。需要退出运营时请停用车辆。",
       createKicker: "新增车辆",
       placeholders: {
         plateNumber: "车牌号",
@@ -126,7 +126,7 @@ export const fleetMessages = {
       commissionPrefix: "TATO 佣金",
       editVehicle: "编辑车辆",
       saveChanges: "保存修改",
-      deleteVehicle: "删除车辆",
+      deleteVehicle: "停用车辆",
       orderCount: (count: number) => `${count} 个订单`,
     },
     vehicleRoiPage: {

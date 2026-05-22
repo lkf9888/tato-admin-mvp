@@ -1,17 +1,34 @@
 import path from "path";
 
 const SAFE_FILENAME_PATTERN = /[^a-zA-Z0-9._-]/g;
+const PERSISTENT_DATA_ROOT = "/app/data";
+
+function isProductionStorageRuntime() {
+  return process.env.RAILWAY_ENVIRONMENT || process.cwd() === "/app";
+}
+
+function assertPersistentUploadRoot(uploadRoot: string) {
+  if (!isProductionStorageRuntime()) return;
+
+  const resolvedRoot = path.resolve(uploadRoot);
+  const resolvedDataRoot = path.resolve(PERSISTENT_DATA_ROOT);
+
+  if (resolvedRoot !== resolvedDataRoot && !resolvedRoot.startsWith(`${resolvedDataRoot}${path.sep}`)) {
+    throw new Error(
+      `Unsafe upload directory "${uploadRoot}". Production uploads must live under ${PERSISTENT_DATA_ROOT}.`,
+    );
+  }
+}
 
 export function getUploadRoot() {
-  if (process.env.TATO_UPLOAD_DIR) {
-    return process.env.TATO_UPLOAD_DIR;
-  }
+  const uploadRoot =
+    process.env.TATO_UPLOAD_DIR ||
+    (isProductionStorageRuntime()
+      ? path.join(PERSISTENT_DATA_ROOT, "uploads")
+      : path.join(process.cwd(), "data", "uploads"));
 
-  if (process.env.RAILWAY_ENVIRONMENT || process.cwd() === "/app") {
-    return "/app/data/uploads";
-  }
-
-  return path.join(process.cwd(), "data", "uploads");
+  assertPersistentUploadRoot(uploadRoot);
+  return uploadRoot;
 }
 
 export function sanitizeFilename(filename: string) {

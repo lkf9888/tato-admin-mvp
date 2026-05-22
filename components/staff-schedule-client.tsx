@@ -67,6 +67,14 @@ type TaskAttachment = {
   url: string;
 };
 
+type TaskModalState =
+  | StaffTask
+  | {
+      kind: "new";
+      staffId?: string;
+    }
+  | null;
+
 type VehicleOption = {
   id: string;
   plateNumber: string;
@@ -261,7 +269,7 @@ export function StaffScheduleClient({
   const [tasks, setTasks] = useState(initialTasks);
   const [notice, setNotice] = useState<string | null>(null);
   const [staffModal, setStaffModal] = useState<StaffMember | "new" | null>(null);
-  const [taskModal, setTaskModal] = useState<StaffTask | "new" | null>(null);
+  const [taskModal, setTaskModal] = useState<TaskModalState>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
 
@@ -367,7 +375,7 @@ export function StaffScheduleClient({
             <UserPlus className="h-4 w-4" />
             {c.addStaff}
           </button>
-          <button className="btn-primary" onClick={() => setTaskModal("new")}>
+          <button className="btn-primary" onClick={() => setTaskModal({ kind: "new" })}>
             <Plus className="h-4 w-4" />
             {c.addTask}
           </button>
@@ -420,6 +428,10 @@ export function StaffScheduleClient({
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">
+                  <button className="btn-secondary px-2 py-1 text-xs" onClick={() => setTaskModal({ kind: "new", staffId: member.id })}>
+                    <Plus className="h-3.5 w-3.5" />
+                    {c.addTask}
+                  </button>
                   <button className="btn-secondary px-2 py-1 text-xs" onClick={() => setStaffModal(member)}>
                     <Pencil className="h-3.5 w-3.5" />
                     {c.edit}
@@ -536,7 +548,8 @@ export function StaffScheduleClient({
         <TaskModal
           locale={locale}
           copy={c}
-          task={taskModal === "new" ? null : taskModal}
+          task={isNewTaskModal(taskModal) ? null : taskModal}
+          initialStaffId={isNewTaskModal(taskModal) ? taskModal.staffId : undefined}
           staff={activeStaff}
           vehicles={vehicles}
           orders={orders}
@@ -607,31 +620,33 @@ function TaskList({
           )}
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
-                {task.attachments.length > 0 ? (
-                  <span className="badge bg-neutral-100 text-neutral-600">
-                    <ImagePlus className="h-3 w-3" />
-                    {task.attachments.length}
-                  </span>
-                ) : null}
+            <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
+                  {task.attachments.length > 0 ? (
+                    <span className="badge bg-neutral-100 text-neutral-600">
+                      <ImagePlus className="h-3 w-3" />
+                      {task.attachments.length}
+                    </span>
+                  ) : null}
+                </div>
+                <h3 className="mt-1 truncate text-sm font-semibold text-neutral-950">{task.title}</h3>
+                <p className="mt-1 text-xs text-neutral-500">
+                  {formatTaskDue(task.dueDatetime, locale, copy.noDue)}
+                  {task.timeWindow ? ` · ${task.timeWindow}` : ""}
+                </p>
+                <p className="mt-1 truncate text-xs text-neutral-500">
+                  {[
+                    task.staffLabel ? `${copy.staff}: ${task.staffLabel}` : null,
+                    getTaskVehicleLabel(task),
+                    getTaskOrderLabel(task),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || copy.none}
+                </p>
+                {task.details ? <p className="mt-1 text-xs text-neutral-600">{task.details}</p> : null}
               </div>
-              <h3 className="mt-1 truncate text-sm font-semibold text-neutral-950">{task.title}</h3>
-              <p className="mt-1 text-xs text-neutral-500">
-                {formatTaskDue(task.dueDatetime, locale, copy.noDue)}
-                {task.timeWindow ? ` · ${task.timeWindow}` : ""}
-              </p>
-              <p className="mt-1 truncate text-xs text-neutral-500">
-                {[
-                  task.staffLabel ? `${copy.staff}: ${task.staffLabel}` : null,
-                  getTaskVehicleLabel(task),
-                  getTaskOrderLabel(task),
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || copy.none}
-              </p>
-              {task.details ? <p className="mt-1 text-xs text-neutral-600">{task.details}</p> : null}
               <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
             </div>
             <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
@@ -728,6 +743,7 @@ function TaskModal({
   locale,
   copy,
   task,
+  initialStaffId,
   staff,
   vehicles,
   orders,
@@ -737,6 +753,7 @@ function TaskModal({
   locale: Locale;
   copy: ReturnType<typeof getStaffScheduleCopy>;
   task: StaffTask | null;
+  initialStaffId?: string;
   staff: StaffMember[];
   vehicles: VehicleOption[];
   orders: OrderOption[];
@@ -764,7 +781,9 @@ function TaskModal({
     [locale, orders],
   );
   const [form, setForm] = useState(() =>
-    task ? taskToForm(task, staffOptions, vehicleOptions, orderOptions) : defaultTaskForm,
+    task
+      ? taskToForm(task, staffOptions, vehicleOptions, orderOptions)
+      : taskFormWithInitialStaff(initialStaffId, staffOptions),
   );
   const [attachments, setAttachments] = useState<TaskAttachment[]>(task?.attachments ?? []);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -1151,11 +1170,11 @@ function TaskAttachmentStrip({
 }) {
   if (attachments.length === 0) return null;
 
-  const visibleAttachments = attachments.slice(0, 4);
+  const visibleAttachments = attachments.length > 3 ? attachments.slice(0, 2) : attachments.slice(0, 3);
   const hiddenCount = attachments.length - visibleAttachments.length;
 
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
+    <div className="flex w-full shrink-0 flex-wrap gap-1.5 sm:w-[10.125rem] sm:justify-end">
       {visibleAttachments.map((attachment) => (
         <div key={attachment.id} className="h-12 w-12 overflow-hidden border border-neutral-200 bg-neutral-100">
           <img
@@ -1285,6 +1304,21 @@ function staffToForm(staff: StaffMember) {
     color: staff.color,
     notes: staff.notes ?? "",
     pinnedMessage: staff.pinnedMessage ?? "",
+  };
+}
+
+function isNewTaskModal(value: TaskModalState): value is Extract<TaskModalState, { kind: "new" }> {
+  return Boolean(value && typeof value === "object" && "kind" in value);
+}
+
+function taskFormWithInitialStaff(initialStaffId: string | undefined, staffOptions: ComboOption[]) {
+  const staffOption = initialStaffId ? staffOptions.find((option) => option.id === initialStaffId) : null;
+
+  return {
+    ...defaultTaskForm,
+    staffId: staffOption?.id ?? "",
+    staffInput: staffOption?.label ?? "",
+    staffLabel: "",
   };
 }
 

@@ -90,7 +90,14 @@ export default async function CalendarPage() {
             pickupDatetime: order.pickupDatetime.toISOString(),
             returnDatetime: order.returnDatetime.toISOString(),
             totalPrice: getOrderNetEarning(order.sourceMetadata, order.totalPrice),
+            depositAmount: order.depositAmount,
+            pickupLocation: order.pickupLocation,
+            returnLocation: order.returnLocation,
+            paymentMethod: order.paymentMethod,
+            contractNumber: order.contractNumber,
             notes: getDisplayOrderNote(order.notes, order.source),
+            createdBy: order.createdBy,
+            externalOrderId: order.externalOrderId,
           }))}
         />
       </div>

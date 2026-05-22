@@ -58,7 +58,14 @@ function buildResponseOrder(order: OrderForResponse) {
     pickupDatetime: order.pickupDatetime.toISOString(),
     returnDatetime: order.returnDatetime.toISOString(),
     totalPrice: order.totalPrice,
+    depositAmount: order.depositAmount,
+    pickupLocation: order.pickupLocation,
+    returnLocation: order.returnLocation,
+    paymentMethod: order.paymentMethod,
+    contractNumber: order.contractNumber,
     notes: order.notes,
+    createdBy: order.createdBy,
+    externalOrderId: order.externalOrderId,
   };
 }
 

@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 
 import { deleteOrderAction, saveOfflineOrderAction, updateOrderStatusAction } from "@/app/actions";
 import { requireCurrentWorkspace } from "@/lib/auth";
+import { OrdersRowList } from "@/components/orders-row-list";
 import { StatusBadge } from "@/components/status-badge";
 import { getOrderStatusOptions, getStatusLabel, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
@@ -202,6 +203,7 @@ export default async function OrdersPage({
     fetchFilteredOrders(where),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
+      include: { owner: true },
       orderBy: { nickname: "asc" },
     }),
   ]);
@@ -261,6 +263,38 @@ export default async function OrdersPage({
     "inline-flex h-9 items-center justify-center rounded-full border border-[rgba(17,19,24,0.1)] bg-[rgba(255,255,255,0.76)] px-3 text-[11px] font-semibold text-[color:var(--ink)] backdrop-blur transition hover:border-[rgba(17,19,24,0.22)] hover:bg-white";
   const primaryButtonClass =
     "inline-flex h-9 items-center justify-center rounded-full bg-[var(--accent)] px-3 text-[11px] font-semibold text-white shadow-[0_12px_26px_-16px_rgba(89,60,251,0.75)] transition hover:-translate-y-0.5 hover:bg-[#4830d4]";
+  const orderRows = pageOrders.map((order) => ({
+    id: order.id,
+    source: order.source,
+    status: order.status,
+    hasConflict: order.hasConflict,
+    vehicleId: order.vehicleId,
+    vehicleName: order.vehicle.nickname,
+    vehiclePlateNumber: order.vehicle.plateNumber,
+    ownerId: order.vehicle.ownerId,
+    ownerName: order.vehicle.owner?.name ?? null,
+    renterName: order.renterName,
+    renterPhone: order.renterPhone,
+    pickupDatetime: order.pickupDatetime.toISOString(),
+    returnDatetime: order.returnDatetime.toISOString(),
+    totalPrice: getOrderNetEarning(order.sourceMetadata, order.totalPrice),
+    depositAmount: order.depositAmount,
+    pickupLocation: order.pickupLocation,
+    returnLocation: order.returnLocation,
+    paymentMethod: order.paymentMethod,
+    contractNumber: order.contractNumber,
+    notes: order.notes,
+    createdBy: order.createdBy,
+    externalOrderId: order.externalOrderId,
+  }));
+  const orderVehicleOptions = vehicles.map((vehicle) => ({
+    id: vehicle.id,
+    label: vehicle.nickname,
+    plateNumber: vehicle.plateNumber,
+    secondaryLabel: `${vehicle.brand} ${vehicle.model} ${vehicle.year}`,
+    ownerId: vehicle.ownerId,
+    ownerName: vehicle.owner?.name,
+  }));
 
   return (
     <div className="space-y-2.5">
@@ -511,7 +545,9 @@ export default async function OrdersPage({
         </form>
       </section>
 
-      <section className="grid gap-2.5 lg:grid-cols-2 2xl:grid-cols-3">
+      <OrdersRowList orders={orderRows} vehicleOptions={orderVehicleOptions} locale={locale} />
+
+      <section className="hidden">
         {pageOrders.length === 0 ? (
           <div className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-5 text-[12px] text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] lg:col-span-2">
             {orderMessages.emptySearch}

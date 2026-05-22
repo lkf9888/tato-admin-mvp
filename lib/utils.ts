@@ -117,6 +117,8 @@ export function getNetEarningFromFinancials(
 }
 
 export function getOrderNetEarning(sourceMetadata?: string | null, fallbackValue?: number | null) {
+  if (fallbackValue != null) return fallbackValue;
+
   const metadata = parseImportedOrderMetadata(sourceMetadata);
   return getNetEarningFromFinancials(metadata?.financials, fallbackValue);
 }

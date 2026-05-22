@@ -3,29 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { OrderAttachments } from "@/components/order-attachments";
+import { type EditableOrder, OrderDetailModal } from "@/components/order-detail-modal";
 import { StatusBadge } from "@/components/status-badge";
 import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-button";
 import { getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
-import { cn, formatCurrency, formatDate, formatDateTime, getDisplayOrderNote, maskPhone } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
-type CalendarOrder = {
-  id: string;
-  source: "turo" | "offline";
-  status: "booked" | "ongoing" | "completed" | "cancelled";
-  hasConflict: boolean;
-  vehicleId: string;
-  vehicleName: string;
-  vehiclePlateNumber?: string | null;
-  ownerId?: string | null;
-  ownerName?: string | null;
-  renterName: string;
-  renterPhone?: string | null;
-  pickupDatetime: string;
-  returnDatetime: string;
-  totalPrice?: number | null;
-  notes?: string | null;
-};
+type CalendarOrder = EditableOrder;
 
 type VehicleTimelineOption = {
   id: string;
@@ -269,18 +253,6 @@ function buildCreateDraft(baseDate: Date, vehicleId?: string) {
   } satisfies ManualOrderDraft;
 }
 
-function buildEditDraft(order: CalendarOrder) {
-  return {
-    id: order.id,
-    vehicleId: order.vehicleId,
-    renterName: order.renterName,
-    renterPhone: order.renterPhone ?? "",
-    pickupDatetime: formatDateTimeLocalInput(order.pickupDatetime),
-    returnDatetime: formatDateTimeLocalInput(order.returnDatetime),
-    totalPrice: order.totalPrice != null ? String(order.totalPrice) : "",
-  } satisfies ManualOrderDraft;
-}
-
 function normalizeFilterText(value: string) {
   return value.trim().toLowerCase();
 }
@@ -506,21 +478,13 @@ export function CalendarView({
   const [rangeMode] = useState<"week" | "month" | "sixWeeks">("sixWeeks");
   const [focusDate, setFocusDate] = useState(() => new Date());
   const [selectedOrder, setSelectedOrder] = useState<CalendarOrder | null>(null);
-  const [orderDialogMode, setOrderDialogMode] = useState<"create" | "edit">("create");
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [orderDraft, setOrderDraft] = useState<ManualOrderDraft>(() =>
     buildCreateDraft(new Date(), vehicleOptions[0]?.id),
   );
   const [orderFormError, setOrderFormError] = useState<string | null>(null);
-  const [detailActionError, setDetailActionError] = useState<string | null>(null);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
-  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
-  const [isEditingNotes, setIsEditingNotes] = useState(false);
-  const [notesDraft, setNotesDraft] = useState("");
-  const [noteActionError, setNoteActionError] = useState<string | null>(null);
-  const [isSavingNotes, setIsSavingNotes] = useState(false);
   const timelineViewportRef = useRef<HTMLDivElement | null>(null);
-  const orderPopoverRef = useRef<HTMLDivElement | null>(null);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState<number | null>(null);
   const [orderPopover, setOrderPopover] = useState<OrderPopoverState | null>(null);
 
@@ -584,7 +548,6 @@ export function CalendarView({
 
     if (!refreshedOrder && selectedOrder.source === "offline") {
       setSelectedOrder(null);
-      setDetailActionError(null);
     }
   }, [orders, selectedOrder]);
 
@@ -592,12 +555,6 @@ export function CalendarView({
     if (!selectedOrder) {
       setOrderPopover(null);
     }
-  }, [selectedOrder]);
-
-  useEffect(() => {
-    setIsEditingNotes(false);
-    setNoteActionError(null);
-    setNotesDraft(getDisplayOrderNote(selectedOrder?.notes, selectedOrder?.source) ?? "");
   }, [selectedOrder]);
 
   useEffect(() => {
@@ -771,19 +728,8 @@ export function CalendarView({
         ? selectedVehicleId
         : filteredVehicles[0]?.id ?? vehicleOptions[0]?.id ?? "";
 
-    setOrderDialogMode("create");
     setOrderFormError(null);
-    setDetailActionError(null);
     setOrderDraft(buildCreateDraft(normalizedFocusDate, fallbackVehicleId));
-    setIsOrderDialogOpen(true);
-  };
-
-  const openEditOrderDialog = (order: CalendarOrder) => {
-    setOrderDialogMode("edit");
-    setOrderFormError(null);
-    setDetailActionError(null);
-    setOrderPopover(null);
-    setOrderDraft(buildEditDraft(order));
     setIsOrderDialogOpen(true);
   };
 
@@ -791,44 +737,6 @@ export function CalendarView({
     if (isSavingOrder) return;
     setIsOrderDialogOpen(false);
     setOrderFormError(null);
-  };
-
-  const handleSaveOrderNotes = async () => {
-    if (!selectedOrder || isSavingNotes) return;
-
-    setIsSavingNotes(true);
-    setNoteActionError(null);
-
-    try {
-      const response = await fetch("/api/orders/notes", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: selectedOrder.id,
-          notes: notesDraft,
-        }),
-      });
-
-      const payload = (await response.json().catch(() => null)) as
-        | { order?: CalendarOrder; error?: string }
-        | null;
-
-      if (!response.ok || !payload?.order) {
-        setNoteActionError(calendarMessages.noteSaveError);
-        return;
-      }
-
-      setSelectedOrder(payload.order);
-      setNotesDraft(getDisplayOrderNote(payload.order.notes, payload.order.source) ?? "");
-      setIsEditingNotes(false);
-      router.refresh();
-    } catch {
-      setNoteActionError(calendarMessages.noteSaveError);
-    } finally {
-      setIsSavingNotes(false);
-    }
   };
 
   const handleManualOrderSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -855,7 +763,7 @@ export function CalendarView({
 
     try {
       const response = await fetch("/api/orders/offline", {
-        method: orderDialogMode === "create" ? "POST" : "PATCH",
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -884,48 +792,12 @@ export function CalendarView({
       }
 
       setSelectedOrder(payload.order);
-      setDetailActionError(null);
       setIsOrderDialogOpen(false);
       router.refresh();
     } catch {
       setOrderFormError(calendarMessages.formSaveError);
     } finally {
       setIsSavingOrder(false);
-    }
-  };
-
-  const handleDeleteSelectedOrder = async () => {
-    if (!selectedOrder || selectedOrder.source !== "offline" || isDeletingOrder) return;
-    if (!window.confirm(calendarMessages.deleteConfirm)) return;
-
-    setIsDeletingOrder(true);
-    setDetailActionError(null);
-
-    try {
-      const response = await fetch("/api/orders/offline", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ id: selectedOrder.id }),
-      });
-
-      const payload = (await response.json().catch(() => null)) as
-        | { deletedId?: string; error?: string }
-        | null;
-
-      if (!response.ok || payload?.deletedId !== selectedOrder.id) {
-        setDetailActionError(calendarMessages.deleteError);
-        return;
-      }
-
-      setOrderPopover(null);
-      setSelectedOrder(null);
-      router.refresh();
-    } catch {
-      setDetailActionError(calendarMessages.deleteError);
-    } finally {
-      setIsDeletingOrder(false);
     }
   };
 
@@ -1261,8 +1133,6 @@ export function CalendarView({
                             data-calendar-order-bar="true"
                             title={`${bar.order.vehicleName} · ${bar.order.renterName}`}
                             onClick={() => {
-                              setDetailActionError(null);
-                              setNoteActionError(null);
                               setSelectedOrder(bar.order);
                               setOrderPopover({ isOpen: true });
                             }}
@@ -1292,169 +1162,19 @@ export function CalendarView({
       </section>
 
       {selectedOrder && orderPopover ? (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm"
-          onClick={() => setOrderPopover(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            ref={orderPopoverRef}
-            className="max-h-[calc(100vh-2rem)] w-[min(30rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,243,234,0.98))] p-4 shadow-[0_28px_60px_-30px_rgba(17,19,24,0.55)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
-                  {calendarMessages.detailsKicker}
-                </p>
-                <h3 className="mt-1 text-base font-semibold text-[color:var(--ink)]">
-                  {selectedOrder.vehiclePlateNumber
-                    ? `${selectedOrder.vehiclePlateNumber} · ${selectedOrder.vehicleName}`
-                    : selectedOrder.vehicleName}
-                </h3>
-                <p className="mt-1 text-[12px] text-[color:var(--ink-soft)]">
-                  {selectedOrder.ownerName ?? calendarMessages.unassignedOwner}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOrderPopover(null)}
-                className="rounded-full border border-[rgba(17,19,24,0.08)] bg-white/80 px-2.5 py-1 text-[12px] font-semibold text-[color:var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.2)] hover:text-[color:var(--ink)]"
-                aria-label={calendarMessages.cancelAction}
-              >
-                ×
-              </button>
-            </div>
-
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            <StatusBadge value={selectedOrder.source} locale={locale} />
-            <StatusBadge value={selectedOrder.status} locale={locale} />
-            {selectedOrder.hasConflict ? <StatusBadge value="conflict" locale={locale} /> : null}
-          </div>
-
-          {!readOnly && selectedOrder.source === "offline" ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => openEditOrderDialog(selectedOrder)} className={secondaryActionClass}>
-                {calendarMessages.manualEdit}
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteSelectedOrder}
-                disabled={isDeletingOrder}
-                className="inline-flex h-11 items-center justify-center rounded-full border border-rose-200 bg-white/76 px-4 text-[12px] font-semibold text-rose-600 backdrop-blur transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isDeletingOrder ? calendarMessages.deletingAction : calendarMessages.deleteAction}
-              </button>
-            </div>
-          ) : null}
-
-          {!readOnly && !isEditingNotes ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditingNotes(true);
-                  setNoteActionError(null);
-                }}
-                className={secondaryActionClass}
-              >
-                {calendarMessages.editNotes}
-              </button>
-            </div>
-          ) : null}
-
-          <div className="mt-4 grid gap-3 text-[12px] text-[color:var(--ink)] sm:grid-cols-2">
-            <div>
-              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.renter}</span>
-              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
-                {highlightText(selectedOrder.renterName, calendarSearchQuery)}
-              </p>
-            </div>
-            <div>
-              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.phone}</span>
-              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
-                {maskSensitive ? maskPhone(selectedOrder.renterPhone) : selectedOrder.renterPhone || "—"}
-              </p>
-            </div>
-            <div>
-              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.pickup}</span>
-              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
-                {formatDateTime(selectedOrder.pickupDatetime, locale)}
-              </p>
-            </div>
-            <div>
-              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.return}</span>
-              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
-                {formatDateTime(selectedOrder.returnDatetime, locale)}
-              </p>
-            </div>
-            <div>
-              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.revenue}</span>
-              <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
-                {selectedOrder.totalPrice != null
-                  ? formatCurrency(selectedOrder.totalPrice, locale)
-                  : "—"}
-              </p>
-            </div>
-            <div className="sm:col-span-2">
-              <span className="text-[11px] text-[color:var(--ink-soft)]">{calendarMessages.notes}</span>
-              {isEditingNotes && !readOnly ? (
-                <div className="mt-2 space-y-2">
-                  <textarea
-                    value={notesDraft}
-                    onChange={(event) => setNotesDraft(event.target.value)}
-                    placeholder={calendarMessages.notesPlaceholder}
-                    rows={4}
-                    className="w-full rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2 text-[13px] text-[color:var(--ink)] outline-none"
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={handleSaveOrderNotes} disabled={isSavingNotes} className={primaryActionClass}>
-                      {isSavingNotes ? calendarMessages.savingNotesAction : calendarMessages.saveNotesAction}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsEditingNotes(false);
-                        setNoteActionError(null);
-                        setNotesDraft(
-                          getDisplayOrderNote(selectedOrder.notes, selectedOrder.source) ?? "",
-                        );
-                      }}
-                      className={secondaryActionClass}
-                    >
-                      {calendarMessages.cancelAction}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-1 text-[14px] font-semibold text-[color:var(--ink)]">
-                  {getDisplayOrderNote(selectedOrder.notes, selectedOrder.source) ??
-                    calendarMessages.noExtraNotes}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {!readOnly ? (
-            <div className="mt-3">
-              <OrderAttachments orderId={selectedOrder.id} locale={locale} compact />
-            </div>
-          ) : null}
-
-          {noteActionError ? (
-            <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
-              {noteActionError}
-            </p>
-          ) : null}
-
-          {!readOnly && detailActionError ? (
-            <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
-              {detailActionError}
-            </p>
-          ) : null}
-          </div>
-        </div>
+        <OrderDetailModal
+          order={selectedOrder}
+          vehicleOptions={vehicleOptions}
+          locale={locale}
+          readOnly={readOnly}
+          maskSensitive={maskSensitive}
+          onClose={() => setOrderPopover(null)}
+          onSaved={(updatedOrder) => setSelectedOrder(updatedOrder)}
+          onDeleted={() => {
+            setOrderPopover(null);
+            setSelectedOrder(null);
+          }}
+        />
       ) : null}
 
       {!readOnly && isOrderDialogOpen ? (
@@ -1463,9 +1183,7 @@ export function CalendarView({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
-                  {orderDialogMode === "create"
-                    ? calendarMessages.createDialogTitle
-                    : calendarMessages.editDialogTitle}
+                  {calendarMessages.createDialogTitle}
                 </p>
                 <p className="mt-2 max-w-xl text-[13px] leading-5 text-[color:var(--ink-soft)]">
                   {calendarMessages.dialogCopy}
@@ -1572,9 +1290,7 @@ export function CalendarView({
                 <button type="submit" disabled={isSavingOrder} className={primaryActionClass}>
                   {isSavingOrder
                     ? calendarMessages.savingAction
-                    : orderDialogMode === "create"
-                      ? calendarMessages.createAction
-                      : calendarMessages.saveAction}
+                    : calendarMessages.createAction}
                 </button>
               </div>
             </form>

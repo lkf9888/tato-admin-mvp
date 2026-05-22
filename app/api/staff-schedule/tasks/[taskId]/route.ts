@@ -12,6 +12,9 @@ const taskSchema = z.object({
   staffId: z.string().optional().nullable().or(z.literal("")),
   vehicleId: z.string().optional().nullable().or(z.literal("")),
   orderId: z.string().optional().nullable().or(z.literal("")),
+  staffLabel: z.string().trim().optional().nullable().or(z.literal("")),
+  vehicleLabel: z.string().trim().optional().nullable().or(z.literal("")),
+  orderLabel: z.string().trim().optional().nullable().or(z.literal("")),
   title: z.string().trim().min(2).optional(),
   details: z.string().trim().optional().nullable().or(z.literal("")),
   dueDatetime: z.string().optional().nullable().or(z.literal("")),
@@ -39,6 +42,16 @@ async function requireTask(workspaceId: string, taskId: string) {
     where: { id: taskId, workspaceId },
   });
 }
+
+const taskInclude = {
+  staff: true,
+  vehicle: { select: { id: true, plateNumber: true, nickname: true } },
+  order: { select: { id: true, renterName: true, pickupDatetime: true, returnDatetime: true } },
+  attachments: {
+    where: { isArchived: false },
+    orderBy: { uploadedAt: "asc" as const },
+  },
+};
 
 async function ensureWorkspaceRefs(input: {
   workspaceId: string;
@@ -85,6 +98,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   const staffId = parsed.staffId === undefined ? existing.staffId : nullable(parsed.staffId);
   const vehicleId = parsed.vehicleId === undefined ? existing.vehicleId : nullable(parsed.vehicleId);
   const orderId = parsed.orderId === undefined ? existing.orderId : nullable(parsed.orderId);
+  const staffLabel =
+    parsed.staffLabel === undefined ? existing.staffLabel : nullable(parsed.staffLabel);
+  const vehicleLabel =
+    parsed.vehicleLabel === undefined ? existing.vehicleLabel : nullable(parsed.vehicleLabel);
+  const orderLabel =
+    parsed.orderLabel === undefined ? existing.orderLabel : nullable(parsed.orderLabel);
 
   const refError = await ensureWorkspaceRefs({
     workspaceId: workspace.id,
@@ -110,6 +129,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
       staffId,
       vehicleId,
       orderId,
+      staffLabel: staffId ? null : staffLabel,
+      vehicleLabel: vehicleId ? null : vehicleLabel,
+      orderLabel: orderId ? null : orderLabel,
       title: parsed.title ?? existing.title,
       details: parsed.details === undefined ? existing.details : nullable(parsed.details),
       dueDatetime:
@@ -120,11 +142,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
       category: parsed.category === undefined ? existing.category : nullable(parsed.category),
       completedAt,
     },
-    include: {
-      staff: true,
-      vehicle: { select: { id: true, plateNumber: true, nickname: true } },
-      order: { select: { id: true, renterName: true, pickupDatetime: true, returnDatetime: true } },
-    },
+    include: taskInclude,
   });
 
   await logActivity({
@@ -150,11 +168,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
   const task = await prisma.staffTask.update({
     where: { id: existing.id },
     data: { status: StaffTaskStatus.cancelled },
-    include: {
-      staff: true,
-      vehicle: { select: { id: true, plateNumber: true, nickname: true } },
-      order: { select: { id: true, renterName: true, pickupDatetime: true, returnDatetime: true } },
-    },
+    include: taskInclude,
   });
 
   await logActivity({

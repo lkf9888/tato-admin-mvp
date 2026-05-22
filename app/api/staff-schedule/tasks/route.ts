@@ -10,6 +10,9 @@ const taskSchema = z.object({
   staffId: z.string().optional().or(z.literal("")),
   vehicleId: z.string().optional().or(z.literal("")),
   orderId: z.string().optional().or(z.literal("")),
+  staffLabel: z.string().trim().optional().or(z.literal("")),
+  vehicleLabel: z.string().trim().optional().or(z.literal("")),
+  orderLabel: z.string().trim().optional().or(z.literal("")),
   title: z.string().trim().min(2),
   details: z.string().trim().optional().or(z.literal("")),
   dueDatetime: z.string().optional().or(z.literal("")),
@@ -31,6 +34,16 @@ function parseDate(value?: string) {
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
 }
+
+const taskInclude = {
+  staff: true,
+  vehicle: { select: { id: true, plateNumber: true, nickname: true } },
+  order: { select: { id: true, renterName: true, pickupDatetime: true, returnDatetime: true } },
+  attachments: {
+    where: { isArchived: false },
+    orderBy: { uploadedAt: "asc" as const },
+  },
+};
 
 async function ensureWorkspaceRefs(input: {
   workspaceId: string;
@@ -88,6 +101,9 @@ export async function POST(request: NextRequest) {
       staffId,
       vehicleId,
       orderId,
+      staffLabel: staffId ? null : nullable(parsed.staffLabel),
+      vehicleLabel: vehicleId ? null : nullable(parsed.vehicleLabel),
+      orderLabel: orderId ? null : nullable(parsed.orderLabel),
       title: parsed.title,
       details: nullable(parsed.details),
       dueDatetime: parseDate(parsed.dueDatetime),
@@ -96,11 +112,7 @@ export async function POST(request: NextRequest) {
       priority: parsed.priority ?? StaffTaskPriority.normal,
       category: nullable(parsed.category),
     },
-    include: {
-      staff: true,
-      vehicle: { select: { id: true, plateNumber: true, nickname: true } },
-      order: { select: { id: true, renterName: true, pickupDatetime: true, returnDatetime: true } },
-    },
+    include: taskInclude,
   });
 
   await logActivity({

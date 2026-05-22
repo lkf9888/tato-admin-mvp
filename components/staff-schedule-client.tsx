@@ -1,7 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, Circle, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+import {
+  CheckCircle2,
+  Circle,
+  GripVertical,
+  ImagePlus,
+  Pencil,
+  Plus,
+  Trash2,
+  UserPlus,
+  X,
+} from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -26,6 +36,9 @@ type StaffTask = {
   staffId: string | null;
   vehicleId: string | null;
   orderId: string | null;
+  staffLabel: string | null;
+  vehicleLabel: string | null;
+  orderLabel: string | null;
   title: string;
   details: string | null;
   dueDatetime: string | null;
@@ -42,6 +55,16 @@ type StaffTask = {
     pickupDatetime: string;
     returnDatetime: string;
   } | null;
+  attachments: TaskAttachment[];
+};
+
+type TaskAttachment = {
+  id: string;
+  filename: string | null;
+  contentType: string | null;
+  size: number | null;
+  uploadedAt: string;
+  url: string;
 };
 
 type VehicleOption = {
@@ -73,15 +96,18 @@ const defaultStaffForm = {
 
 const defaultTaskForm = {
   staffId: "",
+  staffLabel: "",
+  staffInput: "",
   vehicleId: "",
+  vehicleLabel: "",
+  vehicleInput: "",
   orderId: "",
+  orderLabel: "",
+  orderInput: "",
   title: "",
   details: "",
   dueDatetime: "",
   timeWindow: "",
-  status: "todo" as StaffStatus,
-  priority: "normal" as StaffPriority,
-  category: "",
 };
 
 function getStaffScheduleCopy(locale: Locale) {
@@ -110,6 +136,8 @@ function getStaffScheduleCopy(locale: Locale) {
         deleteTask: "取消这个任务？",
         save: "保存",
         close: "关闭",
+        dragHint: "拖拽任务到员工卡片即可分配",
+        dropToAssign: "松手分配到这里",
         staffName: "姓名",
         phone: "电话",
         email: "邮箱",
@@ -122,11 +150,17 @@ function getStaffScheduleCopy(locale: Locale) {
         staff: "员工",
         vehicle: "车辆",
         order: "关联订单",
-        due: "到期时间",
+        due: "到期",
+        noDue: "无到期",
         window: "时间段",
         status: "状态",
         priority: "优先级",
         category: "类别",
+        photos: "任务照片",
+        uploadPhotos: "点击或拖拽上传照片",
+        pendingPhotos: "保存任务后上传",
+        removePhoto: "移除照片",
+        customHint: "可搜索，也可直接输入自定义文字。",
         none: "不关联",
         created: "已保存",
         failed: "保存失败，请稍后再试。",
@@ -167,6 +201,8 @@ function getStaffScheduleCopy(locale: Locale) {
         deleteTask: "Cancel this task?",
         save: "Save",
         close: "Close",
+        dragHint: "Drag a task card onto a staff card to assign it",
+        dropToAssign: "Drop to assign here",
         staffName: "Name",
         phone: "Phone",
         email: "Email",
@@ -179,11 +215,17 @@ function getStaffScheduleCopy(locale: Locale) {
         staff: "Staff",
         vehicle: "Vehicle",
         order: "Related order",
-        due: "Due time",
+        due: "Due",
+        noDue: "No due date",
         window: "Time window",
         status: "Status",
         priority: "Priority",
         category: "Category",
+        photos: "Task photos",
+        uploadPhotos: "Click or drag photos here",
+        pendingPhotos: "Uploads after saving",
+        removePhoto: "Remove photo",
+        customHint: "Search existing records or type custom text.",
         none: "None",
         created: "Saved",
         failed: "Could not save. Please try again.",
@@ -220,6 +262,8 @@ export function StaffScheduleClient({
   const [notice, setNotice] = useState<string | null>(null);
   const [staffModal, setStaffModal] = useState<StaffMember | "new" | null>(null);
   const [taskModal, setTaskModal] = useState<StaffTask | "new" | null>(null);
+  const [dragTaskId, setDragTaskId] = useState<string | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
 
   const activeStaff = staff.filter((member) => member.isActive);
   const activeTasks = tasks.filter((task) => task.status !== "done" && task.status !== "cancelled");
@@ -272,6 +316,28 @@ export function StaffScheduleClient({
     upsertTask(normalizeTask(payload.task));
   }
 
+  async function assignTaskToStaff(taskId: string, staffId: string | null) {
+    const response = await fetch(`/api/staff-schedule/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ staffId: staffId ?? "", staffLabel: "" }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.task) {
+      setNotice(c.failed);
+      return;
+    }
+    upsertTask(normalizeTask(payload.task));
+    setNotice(c.created);
+  }
+
+  function handleTaskDrop(staffId: string | null) {
+    if (!dragTaskId) return;
+    void assignTaskToStaff(dragTaskId, staffId);
+    setDragTaskId(null);
+    setDragOverTarget(null);
+  }
+
   async function cancelTask(task: StaffTask) {
     if (!window.confirm(c.deleteTask)) return;
     await quickStatus(task, "cancelled");
@@ -314,6 +380,8 @@ export function StaffScheduleClient({
         <Metric label={c.completed} value={completedTasks.length} />
       </section>
 
+      <p className="text-xs text-neutral-500">{c.dragHint}</p>
+
       {notice ? (
         <div className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700">
           {notice}
@@ -325,7 +393,22 @@ export function StaffScheduleClient({
       ) : (
         <section className="grid gap-3 xl:grid-cols-2">
           {activeStaff.map((member) => (
-            <article key={member.id} className="card overflow-hidden">
+            <article
+              key={member.id}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragOverTarget(member.id);
+              }}
+              onDragLeave={() => setDragOverTarget((current) => (current === member.id ? null : current))}
+              onDrop={(event) => {
+                event.preventDefault();
+                handleTaskDrop(member.id);
+              }}
+              className={cn(
+                "card overflow-hidden transition",
+                dragOverTarget === member.id ? "border-neutral-900 bg-neutral-50" : "",
+              )}
+            >
               <div className="flex items-start justify-between gap-3 border-b border-neutral-200 px-4 py-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -350,10 +433,21 @@ export function StaffScheduleClient({
                 <span className="font-medium text-neutral-900">{c.pinned}: </span>
                 {member.pinnedMessage || c.noPinned}
               </div>
+              {dragOverTarget === member.id ? (
+                <div className="border-b border-neutral-200 bg-neutral-950 px-4 py-2 text-xs font-medium text-white">
+                  {c.dropToAssign}
+                </div>
+              ) : null}
               <TaskList
                 tasks={tasksByStaff.get(member.id) ?? []}
                 locale={locale}
                 copy={c}
+                dragTaskId={dragTaskId}
+                onDragStart={setDragTaskId}
+                onDragEnd={() => {
+                  setDragTaskId(null);
+                  setDragOverTarget(null);
+                }}
                 onEdit={setTaskModal}
                 onComplete={(task) => quickStatus(task, task.status === "done" ? "todo" : "done")}
                 onCancel={cancelTask}
@@ -364,15 +458,40 @@ export function StaffScheduleClient({
       )}
 
       <section className="grid gap-3 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <article className="card overflow-hidden">
+        <article
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragOverTarget("unassigned");
+          }}
+          onDragLeave={() => setDragOverTarget((current) => (current === "unassigned" ? null : current))}
+          onDrop={(event) => {
+            event.preventDefault();
+            handleTaskDrop(null);
+          }}
+          className={cn(
+            "card overflow-hidden transition",
+            dragOverTarget === "unassigned" ? "border-neutral-900 bg-neutral-50" : "",
+          )}
+        >
           <div className="border-b border-neutral-200 px-4 py-3">
             <h2 className="text-base font-semibold">{c.unassigned}</h2>
             <p className="text-xs text-neutral-500">{c.unassignedHint}</p>
           </div>
+          {dragOverTarget === "unassigned" ? (
+            <div className="border-b border-neutral-200 bg-neutral-950 px-4 py-2 text-xs font-medium text-white">
+              {c.dropToAssign}
+            </div>
+          ) : null}
           <TaskList
             tasks={unassignedTasks.sort(sortTasks)}
             locale={locale}
             copy={c}
+            dragTaskId={dragTaskId}
+            onDragStart={setDragTaskId}
+            onDragEnd={() => {
+              setDragTaskId(null);
+              setDragOverTarget(null);
+            }}
             onEdit={setTaskModal}
             onComplete={(task) => quickStatus(task, "done")}
             onCancel={cancelTask}
@@ -386,6 +505,12 @@ export function StaffScheduleClient({
             tasks={completedTasks.sort(sortTasks).slice(0, 30)}
             locale={locale}
             copy={c}
+            dragTaskId={dragTaskId}
+            onDragStart={setDragTaskId}
+            onDragEnd={() => {
+              setDragTaskId(null);
+              setDragOverTarget(null);
+            }}
             onEdit={setTaskModal}
             onComplete={(task) => quickStatus(task, "todo")}
             onCancel={cancelTask}
@@ -442,6 +567,9 @@ function TaskList({
   tasks,
   locale,
   copy,
+  dragTaskId,
+  onDragStart,
+  onDragEnd,
   onEdit,
   onComplete,
   onCancel,
@@ -449,6 +577,9 @@ function TaskList({
   tasks: StaffTask[];
   locale: Locale;
   copy: ReturnType<typeof getStaffScheduleCopy>;
+  dragTaskId: string | null;
+  onDragStart: (taskId: string) => void;
+  onDragEnd: () => void;
   onEdit: (task: StaffTask) => void;
   onComplete: (task: StaffTask) => void;
   onCancel: (task: StaffTask) => void;
@@ -460,21 +591,43 @@ function TaskList({
   return (
     <div className="divide-y divide-neutral-200">
       {tasks.map((task) => (
-        <div key={task.id} className="px-4 py-3">
+        <div
+          key={task.id}
+          draggable={task.status !== "done" && task.status !== "cancelled"}
+          onDragStart={(event) => {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", task.id);
+            onDragStart(task.id);
+          }}
+          onDragEnd={onDragEnd}
+          className={cn(
+            "px-4 py-3 transition",
+            task.status !== "done" && task.status !== "cancelled" ? "cursor-grab active:cursor-grabbing" : "",
+            dragTaskId === task.id ? "bg-neutral-50 opacity-60" : "",
+          )}
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <StatusPill task={task} copy={copy} />
-                <PriorityPill task={task} copy={copy} />
-                {task.category ? <span className="badge bg-neutral-100 text-neutral-600">{task.category}</span> : null}
+              <div className="flex items-center gap-2">
+                <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
+                {task.attachments.length > 0 ? (
+                  <span className="badge bg-neutral-100 text-neutral-600">
+                    <ImagePlus className="h-3 w-3" />
+                    {task.attachments.length}
+                  </span>
+                ) : null}
               </div>
               <h3 className="mt-1 truncate text-sm font-semibold text-neutral-950">{task.title}</h3>
               <p className="mt-1 text-xs text-neutral-500">
-                {task.dueDatetime ? formatDateTime(task.dueDatetime, locale) : copy.due}
+                {formatTaskDue(task.dueDatetime, locale, copy.noDue)}
                 {task.timeWindow ? ` · ${task.timeWindow}` : ""}
               </p>
               <p className="mt-1 truncate text-xs text-neutral-500">
-                {[task.vehicle ? `${task.vehicle.plateNumber} · ${task.vehicle.nickname}` : null, task.order?.renterName]
+                {[
+                  task.staffLabel ? `${copy.staff}: ${task.staffLabel}` : null,
+                  getTaskVehicleLabel(task),
+                  getTaskOrderLabel(task),
+                ]
                   .filter(Boolean)
                   .join(" · ") || copy.none}
               </p>
@@ -499,25 +652,6 @@ function TaskList({
       ))}
     </div>
   );
-}
-
-function StatusPill({ task, copy }: { task: StaffTask; copy: ReturnType<typeof getStaffScheduleCopy> }) {
-  const styles = {
-    todo: "bg-neutral-100 text-neutral-700",
-    in_progress: "bg-blue-50 text-blue-700",
-    done: "bg-emerald-50 text-emerald-700",
-    cancelled: "bg-rose-50 text-rose-700",
-  };
-  return <span className={cn("badge", styles[task.status])}>{copy.statusLabels[task.status]}</span>;
-}
-
-function PriorityPill({ task, copy }: { task: StaffTask; copy: ReturnType<typeof getStaffScheduleCopy> }) {
-  const styles = {
-    low: "bg-neutral-100 text-neutral-500",
-    normal: "bg-neutral-100 text-neutral-700",
-    high: "bg-amber-50 text-amber-700",
-  };
-  return <span className={cn("badge", styles[task.priority])}>{copy.priorityLabels[task.priority]}</span>;
 }
 
 function StaffModal({
@@ -608,26 +742,167 @@ function TaskModal({
   onClose: () => void;
   onSaved: (task: StaffTask) => void;
 }) {
-  const [form, setForm] = useState(task ? taskToForm(task) : defaultTaskForm);
+  const staffOptions = useMemo(
+    () => staff.map((member) => ({ id: member.id, label: member.name })),
+    [staff],
+  );
+  const vehicleOptions = useMemo(
+    () =>
+      vehicles.map((vehicle) => ({
+        id: vehicle.id,
+        label: `${vehicle.plateNumber} · ${vehicle.nickname} · ${vehicle.brand} ${vehicle.model} ${vehicle.year}`,
+      })),
+    [vehicles],
+  );
+  const orderOptions = useMemo(
+    () =>
+      orders.map((order) => ({
+        id: order.id,
+        label: `${order.vehicleLabel} · ${order.renterName} · ${formatDateTime(order.pickupDatetime, locale)}`,
+      })),
+    [locale, orders],
+  );
+  const [form, setForm] = useState(() =>
+    task ? taskToForm(task, staffOptions, vehicleOptions, orderOptions) : defaultTaskForm,
+  );
+  const [attachments, setAttachments] = useState<TaskAttachment[]>(task?.attachments ?? []);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [isDraggingPhotos, setIsDraggingPhotos] = useState(false);
+
+  function setStaffInput(value: string) {
+    const match = findComboMatch(staffOptions, value);
+    setForm((current) => ({
+      ...current,
+      staffInput: value,
+      staffId: match?.id ?? "",
+      staffLabel: match ? "" : value,
+    }));
+  }
+
+  function setVehicleInput(value: string) {
+    const match = findComboMatch(vehicleOptions, value);
+    setForm((current) => ({
+      ...current,
+      vehicleInput: value,
+      vehicleId: match?.id ?? "",
+      vehicleLabel: match ? "" : value,
+    }));
+  }
+
+  function setOrderInput(value: string) {
+    const match = findComboMatch(orderOptions, value);
+    setForm((current) => ({
+      ...current,
+      orderInput: value,
+      orderId: match?.id ?? "",
+      orderLabel: match ? "" : value,
+    }));
+  }
+
+  async function uploadTaskPhotos(taskId: string, files: File[]) {
+    if (files.length === 0) return [];
+
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("files", file);
+    }
+
+    const response = await fetch(`/api/staff-schedule/tasks/${taskId}/attachments`, {
+      method: "POST",
+      body: formData,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(payload.attachments)) {
+      throw new Error("UPLOAD_FAILED");
+    }
+
+    return payload.attachments.map((attachment: TaskAttachment) =>
+      normalizeTaskAttachment(taskId, attachment),
+    );
+  }
+
+  async function acceptPhotoFiles(files: FileList | File[]) {
+    const nextFiles = Array.from(files).filter(isPhotoFile);
+    if (nextFiles.length === 0) return;
+
+    if (!task) {
+      setPendingFiles((current) => [...current, ...nextFiles]);
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+    try {
+      const uploaded = await uploadTaskPhotos(task.id, nextFiles);
+      setAttachments((current) => [...current, ...uploaded]);
+    } catch {
+      setError(copy.failed);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function deleteUploadedAttachment(attachment: TaskAttachment) {
+    if (!task) return;
+
+    const response = await fetch(`/api/staff-schedule/tasks/${task.id}/attachments/${attachment.id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      setError(copy.failed);
+      return;
+    }
+    setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
     setError(null);
-    const response = await fetch(task ? `/api/staff-schedule/tasks/${task.id}` : "/api/staff-schedule/tasks", {
-      method: task ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const payload = await response.json().catch(() => ({}));
-    setSaving(false);
-    if (!response.ok || !payload.task) {
+
+    const requestBody = {
+      staffId: form.staffId,
+      staffLabel: form.staffId ? "" : form.staffLabel,
+      vehicleId: form.vehicleId,
+      vehicleLabel: form.vehicleId ? "" : form.vehicleLabel,
+      orderId: form.orderId,
+      orderLabel: form.orderId ? "" : form.orderLabel,
+      title: form.title,
+      details: form.details,
+      dueDatetime: form.dueDatetime,
+      timeWindow: form.timeWindow,
+    };
+
+    try {
+      const response = await fetch(task ? `/api/staff-schedule/tasks/${task.id}` : "/api/staff-schedule/tasks", {
+        method: task ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.task) {
+        setError(copy.failed);
+        return;
+      }
+
+      let savedTask = normalizeTask(payload.task);
+      if (pendingFiles.length > 0) {
+        const uploaded = await uploadTaskPhotos(savedTask.id, pendingFiles);
+        savedTask = normalizeTask({
+          ...savedTask,
+          attachments: [...savedTask.attachments, ...uploaded],
+        });
+      }
+
+      onSaved(savedTask);
+    } catch {
       setError(copy.failed);
-      return;
+    } finally {
+      setSaving(false);
     }
-    onSaved(normalizeTask(payload.task));
   }
 
   return (
@@ -637,33 +912,31 @@ function TaskModal({
           <input className="input" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={copy.staff}>
-            <select className="input" value={form.staffId} onChange={(event) => setForm({ ...form, staffId: event.target.value })}>
-              <option value="">{copy.unassigned}</option>
-              {staff.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
-            </select>
-          </Field>
-          <Field label={copy.vehicle}>
-            <select className="input" value={form.vehicleId} onChange={(event) => setForm({ ...form, vehicleId: event.target.value })}>
-              <option value="">{copy.none}</option>
-              {vehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.plateNumber} · {vehicle.nickname} · {vehicle.brand} {vehicle.model} {vehicle.year}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <SearchTextField
+            label={copy.staff}
+            value={form.staffInput}
+            options={staffOptions}
+            placeholder={copy.unassigned}
+            hint={copy.customHint}
+            onChange={setStaffInput}
+          />
+          <SearchTextField
+            label={copy.vehicle}
+            value={form.vehicleInput}
+            options={vehicleOptions}
+            placeholder={copy.none}
+            hint={copy.customHint}
+            onChange={setVehicleInput}
+          />
         </div>
-        <Field label={copy.order}>
-          <select className="input" value={form.orderId} onChange={(event) => setForm({ ...form, orderId: event.target.value })}>
-            <option value="">{copy.none}</option>
-            {orders.map((order) => (
-              <option key={order.id} value={order.id}>
-                {order.vehicleLabel} · {order.renterName} · {formatDateTime(order.pickupDatetime, locale)}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <SearchTextField
+          label={copy.order}
+          value={form.orderInput}
+          options={orderOptions}
+          placeholder={copy.none}
+          hint={copy.customHint}
+          onChange={setOrderInput}
+        />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label={copy.due}>
             <input className="input" type="datetime-local" value={form.dueDatetime} onChange={(event) => setForm({ ...form, dueDatetime: event.target.value })} />
@@ -672,30 +945,64 @@ function TaskModal({
             <input className="input" value={form.timeWindow} onChange={(event) => setForm({ ...form, timeWindow: event.target.value })} />
           </Field>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label={copy.status}>
-            <select className="input" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as StaffStatus })}>
-              {(["todo", "in_progress", "done", "cancelled"] as StaffStatus[]).map((status) => (
-                <option key={status} value={status}>{copy.statusLabels[status]}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label={copy.priority}>
-            <select className="input" value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as StaffPriority })}>
-              {(["low", "normal", "high"] as StaffPriority[]).map((priority) => (
-                <option key={priority} value={priority}>{copy.priorityLabels[priority]}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label={copy.category}>
-            <input className="input" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} />
-          </Field>
-        </div>
         <Field label={copy.taskDetails}>
           <textarea className="input min-h-24" value={form.details} onChange={(event) => setForm({ ...form, details: event.target.value })} />
         </Field>
+
+        <div>
+          <span className="label">{copy.photos}</span>
+          <label
+            onDragOver={(event) => {
+              event.preventDefault();
+              setIsDraggingPhotos(true);
+            }}
+            onDragLeave={() => setIsDraggingPhotos(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setIsDraggingPhotos(false);
+              void acceptPhotoFiles(event.dataTransfer.files);
+            }}
+            className={cn(
+              "flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-4 text-center text-sm transition",
+              isDraggingPhotos ? "border-neutral-900 bg-neutral-50" : "border-neutral-300 bg-white",
+            )}
+          >
+            <ImagePlus className="h-5 w-5 text-neutral-500" />
+            <span className="font-medium text-neutral-800">
+              {uploading ? `${copy.save}...` : copy.uploadPhotos}
+            </span>
+            {!task && pendingFiles.length > 0 ? (
+              <span className="text-xs text-neutral-500">
+                {pendingFiles.length} · {copy.pendingPhotos}
+              </span>
+            ) : null}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                if (event.target.files) {
+                  void acceptPhotoFiles(event.target.files);
+                  event.target.value = "";
+                }
+              }}
+            />
+          </label>
+          <TaskPhotoGrid
+            taskId={task?.id ?? null}
+            attachments={attachments}
+            pendingFiles={pendingFiles}
+            copy={copy}
+            onDeleteUploaded={deleteUploadedAttachment}
+            onDeletePending={(index) =>
+              setPendingFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))
+            }
+          />
+        </div>
+
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        <button className="btn-primary w-full" disabled={saving}>{copy.save}</button>
+        <button className="btn-primary w-full" disabled={saving || uploading}>{copy.save}</button>
       </form>
     </Modal>
   );
@@ -725,11 +1032,193 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+type ComboOption = {
+  id: string;
+  label: string;
+};
+
+function SearchTextField({
+  label,
+  value,
+  options,
+  placeholder,
+  hint,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: ComboOption[];
+  placeholder: string;
+  hint: string;
+  onChange: (value: string) => void;
+}) {
+  const [listId] = useState(() => `task-combo-${Math.random().toString(36).slice(2)}`);
+
+  return (
+    <Field label={label}>
+      <input
+        className="input"
+        type="search"
+        list={listId}
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <datalist id={listId}>
+        {options.map((option) => (
+          <option key={option.id} value={option.label} />
+        ))}
+      </datalist>
+      <p className="mt-1 text-[11px] leading-4 text-neutral-500">{hint}</p>
+    </Field>
+  );
+}
+
+function TaskPhotoGrid({
+  taskId,
+  attachments,
+  pendingFiles,
+  copy,
+  onDeleteUploaded,
+  onDeletePending,
+}: {
+  taskId: string | null;
+  attachments: TaskAttachment[];
+  pendingFiles: File[];
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+  onDeleteUploaded: (attachment: TaskAttachment) => void;
+  onDeletePending: (index: number) => void;
+}) {
+  if (attachments.length === 0 && pendingFiles.length === 0) return null;
+
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      {attachments.map((attachment) => (
+        <div key={attachment.id} className="group relative overflow-hidden border border-neutral-200 bg-neutral-50">
+          <div className="aspect-[4/3] bg-neutral-100">
+            <img
+              src={attachment.url}
+              alt={attachment.filename || copy.photos}
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <div className="min-w-0 px-2 py-1.5">
+            <p className="truncate text-[11px] font-medium text-neutral-700">
+              {attachment.filename || copy.photos}
+            </p>
+            <p className="text-[10px] text-neutral-500">{formatFileSize(attachment.size)}</p>
+          </div>
+          {taskId ? (
+            <button
+              type="button"
+              className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center border border-neutral-200 bg-white text-neutral-700 shadow-sm"
+              aria-label={copy.removePhoto}
+              onClick={() => onDeleteUploaded(attachment)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+      ))}
+      {pendingFiles.map((file, index) => (
+        <div key={`${file.name}-${index}`} className="relative border border-dashed border-neutral-300 bg-neutral-50 p-3">
+          <div className="flex min-h-20 flex-col items-center justify-center gap-2 text-center text-xs text-neutral-600">
+            <ImagePlus className="h-5 w-5 text-neutral-400" />
+            <span className="line-clamp-2 break-all font-medium text-neutral-800">{file.name}</span>
+            <span>{copy.pendingPhotos}</span>
+          </div>
+          <button
+            type="button"
+            className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center border border-neutral-200 bg-white text-neutral-700 shadow-sm"
+            aria-label={copy.removePhoto}
+            onClick={() => onDeletePending(index)}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function normalizeComboText(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function findComboMatch(options: ComboOption[], value: string) {
+  const normalized = normalizeComboText(value);
+  if (!normalized) return null;
+  return options.find((option) => normalizeComboText(option.label) === normalized) ?? null;
+}
+
+function isPhotoFile(file: File) {
+  return file.type.startsWith("image/") || /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
+}
+
+function normalizeTaskAttachment(taskId: string, raw: TaskAttachment): TaskAttachment {
+  return {
+    id: raw.id,
+    filename: raw.filename ?? null,
+    contentType: raw.contentType ?? null,
+    size: raw.size ?? null,
+    uploadedAt: raw.uploadedAt ? new Date(raw.uploadedAt).toISOString() : new Date().toISOString(),
+    url: raw.url || `/api/staff-schedule/tasks/${taskId}/attachments/file?attachmentId=${raw.id}`,
+  };
+}
+
+function getTaskVehicleLabel(task: StaffTask) {
+  if (task.vehicle) return `${task.vehicle.plateNumber} · ${task.vehicle.nickname}`;
+  return task.vehicleLabel;
+}
+
+function getTaskOrderLabel(task: StaffTask) {
+  if (task.order) return task.order.renterName;
+  return task.orderLabel;
+}
+
+function formatTaskDue(value: string | null, locale: Locale, fallback: string) {
+  if (!value) return fallback;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayOffset = Math.round((dueDay.getTime() - today.getTime()) / 86400000);
+  const time = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+
+  if (locale === "zh") {
+    if (dayOffset === 0) return `今天 ${time}`;
+    if (dayOffset === 1) return `明天 ${time}`;
+    return `${date.getMonth() + 1}/${date.getDate()} ${time}`;
+  }
+
+  if (dayOffset === 0) return `Today ${time}`;
+  if (dayOffset === 1) return `Tomorrow ${time}`;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatFileSize(size: number | null) {
+  if (!size) return "";
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function normalizeTask(raw: StaffTask): StaffTask {
   return {
     ...raw,
     dueDatetime: raw.dueDatetime ? new Date(raw.dueDatetime).toISOString() : null,
     completedAt: raw.completedAt ? new Date(raw.completedAt).toISOString() : null,
+    attachments: (raw.attachments ?? []).map((attachment) => normalizeTaskAttachment(raw.id, attachment)),
     order: raw.order
       ? {
           ...raw.order,
@@ -759,18 +1248,30 @@ function staffToForm(staff: StaffMember) {
   };
 }
 
-function taskToForm(task: StaffTask) {
+function taskToForm(
+  task: StaffTask,
+  staffOptions: ComboOption[],
+  vehicleOptions: ComboOption[],
+  orderOptions: ComboOption[],
+) {
+  const staffOption = task.staffId ? staffOptions.find((option) => option.id === task.staffId) : null;
+  const vehicleOption = task.vehicleId ? vehicleOptions.find((option) => option.id === task.vehicleId) : null;
+  const orderOption = task.orderId ? orderOptions.find((option) => option.id === task.orderId) : null;
+
   return {
     staffId: task.staffId ?? "",
+    staffLabel: task.staffLabel ?? "",
+    staffInput: staffOption?.label ?? task.staffLabel ?? "",
     vehicleId: task.vehicleId ?? "",
+    vehicleLabel: task.vehicleLabel ?? "",
+    vehicleInput: vehicleOption?.label ?? task.vehicleLabel ?? "",
     orderId: task.orderId ?? "",
+    orderLabel: task.orderLabel ?? "",
+    orderInput: orderOption?.label ?? task.orderLabel ?? "",
     title: task.title,
     details: task.details ?? "",
     dueDatetime: task.dueDatetime ? toLocalDatetimeInput(task.dueDatetime) : "",
     timeWindow: task.timeWindow ?? "",
-    status: task.status,
-    priority: task.priority,
-    category: task.category ?? "",
   };
 }
 

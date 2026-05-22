@@ -18,6 +18,10 @@ export default async function StaffSchedulePage() {
         staff: true,
         vehicle: { select: { id: true, plateNumber: true, nickname: true } },
         order: { select: { id: true, renterName: true, pickupDatetime: true, returnDatetime: true } },
+        attachments: {
+          where: { isArchived: false },
+          orderBy: { uploadedAt: "asc" },
+        },
       },
     }),
     prisma.vehicle.findMany({
@@ -62,6 +66,9 @@ export default async function StaffSchedulePage() {
         staffId: task.staffId,
         vehicleId: task.vehicleId,
         orderId: task.orderId,
+        staffLabel: task.staffLabel,
+        vehicleLabel: task.vehicleLabel,
+        orderLabel: task.orderLabel,
         title: task.title,
         details: task.details,
         dueDatetime: task.dueDatetime ? task.dueDatetime.toISOString() : null,
@@ -84,6 +91,14 @@ export default async function StaffSchedulePage() {
             }
           : null,
         vehicle: task.vehicle,
+        attachments: task.attachments.map((attachment) => ({
+          id: attachment.id,
+          filename: attachment.filename,
+          contentType: attachment.contentType,
+          size: attachment.size,
+          uploadedAt: attachment.uploadedAt.toISOString(),
+          url: `/api/staff-schedule/tasks/${task.id}/attachments/file?attachmentId=${attachment.id}`,
+        })),
         order: task.order
           ? {
               ...task.order,

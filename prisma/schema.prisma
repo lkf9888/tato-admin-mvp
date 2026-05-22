@@ -74,23 +74,24 @@ enum StaffTaskPriority {
 }
 
 model Workspace {
-  id               String            @id @default(cuid())
-  name             String
-  slug             String            @unique
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  users            User[]
-  owners           Owner[]
-  vehicles         Vehicle[]
-  orders           Order[]
-  importBatches    ImportBatch[]
-  shareLinks       ShareLink[]
-  activityLogs     ActivityLog[]
-  ownerLedgerItems OwnerLedgerItem[]
-  orderAttachments OrderAttachment[]
-  staffMembers     StaffMember[]
-  staffTasks       StaffTask[]
-  billing          WorkspaceBilling?
+  id                   String                @id @default(cuid())
+  name                 String
+  slug                 String                @unique
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  users                User[]
+  owners               Owner[]
+  vehicles             Vehicle[]
+  orders               Order[]
+  importBatches        ImportBatch[]
+  shareLinks           ShareLink[]
+  activityLogs         ActivityLog[]
+  ownerLedgerItems     OwnerLedgerItem[]
+  orderAttachments     OrderAttachment[]
+  staffMembers         StaffMember[]
+  staffTasks           StaffTask[]
+  staffTaskAttachments StaffTaskAttachment[]
+  billing              WorkspaceBilling?
 }
 
 model User {
@@ -285,31 +286,58 @@ model StaffMember {
 }
 
 model StaffTask {
-  workspaceId String?
-  id          String            @id @default(cuid())
-  staffId     String?
-  vehicleId   String?
-  orderId     String?
-  title       String
-  details     String?
-  dueDatetime DateTime?
-  timeWindow  String?
-  status      StaffTaskStatus   @default(todo)
-  priority    StaffTaskPriority @default(normal)
-  category    String?
-  sortOrder   Int               @default(0)
-  completedAt DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  workspace   Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  staff        StaffMember?      @relation(fields: [staffId], references: [id], onDelete: SetNull)
-  vehicle      Vehicle?          @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  order        Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  workspaceId  String?
+  id           String                @id @default(cuid())
+  staffId      String?
+  vehicleId    String?
+  orderId      String?
+  staffLabel   String?
+  vehicleLabel String?
+  orderLabel   String?
+  title        String
+  details      String?
+  dueDatetime  DateTime?
+  timeWindow   String?
+  status       StaffTaskStatus       @default(todo)
+  priority     StaffTaskPriority     @default(normal)
+  category     String?
+  sortOrder    Int                   @default(0)
+  completedAt  DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  workspace    Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  staff        StaffMember?          @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  vehicle      Vehicle?              @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  order        Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  attachments  StaffTaskAttachment[]
 
   @@index([workspaceId, status])
   @@index([staffId, dueDatetime])
   @@index([vehicleId, dueDatetime])
   @@index([orderId])
+}
+
+model StaffTaskAttachment {
+  workspaceId String?
+  id          String              @id @default(cuid())
+  taskId      String
+  kind        OrderAttachmentKind @default(photo)
+  url         String?
+  pathname    String
+  filename    String?
+  contentType String?
+  size        Int?
+  isArchived  Boolean             @default(false)
+  uploadedAt  DateTime            @default(now())
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  workspace   Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  task        StaffTask           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([taskId, kind])
+  @@index([isArchived])
+  @@index([uploadedAt])
 }
 
 model ShareLink {

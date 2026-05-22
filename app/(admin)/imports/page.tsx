@@ -1,6 +1,8 @@
+import { saveTuroSyncSettingsAction } from "@/app/actions";
 import { CsvImportPanel } from "@/components/csv-import-panel";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getWorkspaceBillingSnapshot } from "@/lib/billing";
+import type { Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { formatDateTime } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
@@ -8,22 +10,126 @@ import { prisma } from "@/lib/prisma";
 export default async function ImportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ billing?: string }>;
+  searchParams: Promise<{ billing?: string; turoSync?: string }>;
 }) {
   const workspace = await requireCurrentWorkspace();
-  const [{ locale, messages }, batches, billingSnapshot, params] = await Promise.all([
+  const [{ locale, messages }, batches, billingSnapshot, turoSyncConfig, params] = await Promise.all([
     getI18n(),
     prisma.importBatch.findMany({
       where: { workspaceId: workspace.id },
       orderBy: { importedAt: "desc" },
     }),
     getWorkspaceBillingSnapshot(),
+    prisma.turoSyncConfig.findUnique({
+      where: { workspaceId: workspace.id },
+    }),
     searchParams,
   ]);
   const importMessages = messages.imports;
+  const turoSyncMessages = getTuroSyncSettingsCopy(locale);
+  const turoSyncNotice = getTuroSyncSettingsNotice(params.turoSync, locale);
 
   return (
     <div className="space-y-3">
+      <section className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-1">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
+            {turoSyncMessages.kicker}
+          </p>
+          <h3 className="font-serif text-[1.05rem] text-slate-950 sm:text-[1.25rem]">
+            {turoSyncMessages.title}
+          </h3>
+          <p className="max-w-3xl text-[12px] leading-5 text-slate-500">
+            {turoSyncMessages.copy}
+          </p>
+        </div>
+
+        {turoSyncNotice ? (
+          <div className={turoSyncNotice.className}>
+            {turoSyncNotice.message}
+          </div>
+        ) : null}
+
+        <form action={saveTuroSyncSettingsAction} className="mt-3 grid gap-2 text-[12px] sm:gap-2.5">
+          <label className="grid gap-1">
+            <span className="font-medium text-slate-700">{turoSyncMessages.csvUrl}</span>
+            <input
+              name="csvUrl"
+              type="url"
+              defaultValue={turoSyncConfig?.csvUrl ?? ""}
+              placeholder="https://example.com/turo-orders.csv"
+              className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+          </label>
+
+          <div className="grid gap-2 md:grid-cols-2">
+            <label className="grid gap-1">
+              <span className="font-medium text-slate-700">{turoSyncMessages.authHeader}</span>
+              <input
+                name="csvAuthHeader"
+                defaultValue={turoSyncConfig?.csvAuthHeader ?? ""}
+                placeholder="Bearer ..."
+                className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="font-medium text-slate-700">{turoSyncMessages.headers}</span>
+              <input
+                name="csvHeaders"
+                defaultValue={turoSyncConfig?.csvHeaders ?? ""}
+                placeholder='{"x-api-key":"..."}'
+                className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              />
+            </label>
+          </div>
+
+          <label className="grid gap-1">
+            <span className="font-medium text-slate-700">{turoSyncMessages.mapping}</span>
+            <textarea
+              name="csvMapping"
+              defaultValue={turoSyncConfig?.csvMapping ?? ""}
+              placeholder='{"Reservation ID":"externalOrderId"}'
+              rows={3}
+              className="border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+          </label>
+
+          <div className="grid gap-2 md:grid-cols-2">
+            <label className="flex items-start gap-2 border border-slate-200 bg-slate-50 px-3 py-2">
+              <input
+                name="createMissingVehicles"
+                type="checkbox"
+                defaultChecked={turoSyncConfig?.createMissingVehicles ?? true}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="block font-medium text-slate-700">{turoSyncMessages.createMissing}</span>
+                <span className="text-slate-500">{turoSyncMessages.createMissingHint}</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 border border-amber-200 bg-amber-50 px-3 py-2">
+              <input
+                name="archiveMissingOrders"
+                type="checkbox"
+                defaultChecked={turoSyncConfig?.archiveMissingOrders ?? false}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="block font-medium text-amber-800">{turoSyncMessages.archiveMissing}</span>
+                <span className="text-amber-700">{turoSyncMessages.archiveMissingHint}</span>
+              </span>
+            </label>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[11px] leading-4 text-slate-500">{turoSyncMessages.note}</p>
+            <button className="min-h-9 bg-slate-950 px-4 py-2 font-medium text-white">
+              {turoSyncMessages.save}
+            </button>
+          </div>
+        </form>
+      </section>
+
       <CsvImportPanel
         locale={locale}
         billingSnapshot={{
@@ -90,4 +196,80 @@ export default async function ImportsPage({
       </section>
     </div>
   );
+}
+
+function getTuroSyncSettingsCopy(locale: Locale) {
+  return locale === "zh"
+    ? {
+        kicker: "Turo 自动同步",
+        title: "同步来源设置",
+        copy:
+          "把可直接下载 CSV 的链接粘贴到这里保存。日历里的「同步 Turo」按钮会优先使用这里的设置，不需要再去 Railway Variables 改 URL。",
+        csvUrl: "CSV 直接下载 URL",
+        authHeader: "Authorization Header（可选）",
+        headers: "额外请求 Headers JSON（可选）",
+        mapping: "字段映射 JSON（可选）",
+        createMissing: "自动创建缺失车辆",
+        createMissingHint: "第一次同步真实 Turo CSV 时建议开启。",
+        archiveMissing: "归档 CSV 中缺失的旧 Turo 订单",
+        archiveMissingHint: "除非 CSV 是完整订单来源，否则建议保持关闭，避免误归档历史订单。",
+        note: "保存后回到日历点击「同步 Turo」即可立即测试。",
+        save: "保存同步设置",
+      }
+    : {
+        kicker: "Turo auto sync",
+        title: "Sync source settings",
+        copy:
+          "Paste a direct-download CSV URL here. The calendar Sync Turo button will use this workspace setting before falling back to Railway variables.",
+        csvUrl: "CSV direct-download URL",
+        authHeader: "Authorization header (optional)",
+        headers: "Extra request headers JSON (optional)",
+        mapping: "Field mapping JSON (optional)",
+        createMissing: "Auto-create missing vehicles",
+        createMissingHint: "Recommended for the first real Turo CSV sync.",
+        archiveMissing: "Archive old Turo orders missing from CSV",
+        archiveMissingHint: "Keep this off unless the CSV is a complete order source.",
+        note: "After saving, open Calendar and click Sync Turo to test it.",
+        save: "Save sync settings",
+      };
+}
+
+function getTuroSyncSettingsNotice(status: string | undefined, locale: Locale) {
+  if (!status) return null;
+  const baseClass = "mt-3 border px-3 py-2 text-[12px]";
+  const messages =
+    locale === "zh"
+      ? {
+          saved: "Turo 同步设置已保存。",
+          invalidUrl: "CSV URL 无效，请填写 http 或 https 开头的直接下载链接。",
+          invalidJson: "Headers 或字段映射必须是有效 JSON 对象。",
+        }
+      : {
+          saved: "Turo sync settings saved.",
+          invalidUrl: "The CSV URL is invalid. Use a direct http or https download link.",
+          invalidJson: "Headers and field mapping must be valid JSON objects.",
+        };
+
+  if (status === "saved") {
+    return {
+      className: `${baseClass} border-emerald-200 bg-emerald-50 text-emerald-700`,
+      message: messages.saved,
+    };
+  }
+
+  if (status === "invalid-url") {
+    return {
+      className: `${baseClass} border-rose-200 bg-rose-50 text-rose-700`,
+      message: messages.invalidUrl,
+    };
+  }
+
+  if (status === "invalid-json") {
+    return {
+      className: `${baseClass} border-rose-200 bg-rose-50 text-rose-700`,
+      message: messages.invalidJson,
+    };
+  }
+
+  return null;
 }

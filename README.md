@@ -98,7 +98,9 @@ https://你的域名/api/stripe/webhook
 
 ## Turo CSV 自动同步
 
-当前版本支持把一个固定 CSV 来源自动导入 TATO。先在环境变量里配置一个来源：
+当前版本支持把一个固定 CSV 来源自动导入 TATO。推荐先在后台“CSV 导入”页面的“Turo 自动同步”模块里粘贴可直接下载的 CSV URL 并保存；日历顶部的“同步 Turo”按钮和自动同步脚本都会优先使用这个工作区配置。
+
+如果需要用环境变量兜底，也可以配置一个来源：
 
 ```env
 TURO_SYNC_CSV_URL=
@@ -111,9 +113,10 @@ TURO_SYNC_SECRET=
 
 说明：
 
-- `TURO_SYNC_CSV_URL` 和 `TURO_SYNC_CSV_PATH` 二选一；URL 适合私有/签名 CSV 地址，PATH 适合持久卷里的文件
-- 如果 URL 需要鉴权，可设置 `TURO_SYNC_CSV_AUTH_HEADER` 或 JSON 格式的 `TURO_SYNC_CSV_HEADERS`
-- 如真实 Turo CSV 表头和默认识别不同，可用 `TURO_SYNC_CSV_MAPPING` 覆盖，支持 `{"Reservation ID":"externalOrderId"}` 或 `{"externalOrderId":"Reservation ID"}`
+- 页面里保存了 CSV URL 后，会覆盖环境变量里的 `TURO_SYNC_CSV_URL` / `TURO_SYNC_CSV_PATH` 来源，避免 Railway 旧变量和新链接冲突
+- 环境变量 `TURO_SYNC_CSV_URL` 和 `TURO_SYNC_CSV_PATH` 二选一；URL 适合私有/签名 CSV 地址，PATH 适合持久卷里的文件
+- 如果 URL 需要鉴权，可在页面里填写 Authorization Header 或额外 Headers JSON；环境变量兜底为 `TURO_SYNC_CSV_AUTH_HEADER` / `TURO_SYNC_CSV_HEADERS`
+- 如真实 Turo CSV 表头和默认识别不同，可在页面里填写字段映射 JSON，或用 `TURO_SYNC_CSV_MAPPING` 兜底；支持 `{"Reservation ID":"externalOrderId"}` 或 `{"externalOrderId":"Reservation ID"}`
 - `TURO_SYNC_ARCHIVE_MISSING` 默认保持 `false`，避免部分导出的 CSV 把历史 Turo 订单误归档；只有当 CSV 是完整订单来源时再改成 `true`
 
 本地或 Railway Cron 可以运行：

@@ -92,6 +92,15 @@ const orderSchema = z.object({
   notes: z.string().optional(),
 });
 
+const turoSyncSettingsSchema = z.object({
+  csvUrl: z.string().trim().optional(),
+  csvAuthHeader: z.string().trim().optional(),
+  csvHeaders: z.string().trim().optional(),
+  csvMapping: z.string().trim().optional(),
+  createMissingVehicles: z.boolean(),
+  archiveMissingOrders: z.boolean(),
+});
+
 const registrationSchema = z.object({
   name: z.string().trim().min(2),
   email: z.string().trim().email(),
@@ -121,6 +130,100 @@ function revalidateAdminPages() {
     "/billing",
     "/share-links",
   ].forEach((path) => revalidatePath(path));
+}
+
+function cleanText(value: string | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function isValidUrl(value: string | null) {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function normalizeJsonObjectText(value: string | null): string | null | "INVALID" {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "INVALID";
+    if (Object.values(parsed).some((raw) => typeof raw !== "string")) return "INVALID";
+    return JSON.stringify(parsed);
+  } catch {
+    return "INVALID";
+  }
+}
+
+export async function saveTuroSyncSettingsAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+  const parsed = turoSyncSettingsSchema.parse({
+    csvUrl: formData.get("csvUrl")?.toString(),
+    csvAuthHeader: formData.get("csvAuthHeader")?.toString(),
+    csvHeaders: formData.get("csvHeaders")?.toString(),
+    csvMapping: formData.get("csvMapping")?.toString(),
+    createMissingVehicles: formData.get("createMissingVehicles") === "on",
+    archiveMissingOrders: formData.get("archiveMissingOrders") === "on",
+  });
+
+  const csvUrl = cleanText(parsed.csvUrl);
+  if (!isValidUrl(csvUrl)) {
+    redirect("/imports?turoSync=invalid-url");
+  }
+
+  const csvHeaders = normalizeJsonObjectText(cleanText(parsed.csvHeaders));
+  const csvMapping = normalizeJsonObjectText(cleanText(parsed.csvMapping));
+  if (csvHeaders === "INVALID" || csvMapping === "INVALID") {
+    redirect("/imports?turoSync=invalid-json");
+  }
+
+  const csvAuthHeader = cleanText(parsed.csvAuthHeader);
+  await prisma.turoSyncConfig.upsert({
+    where: { workspaceId: workspace.id },
+    update: {
+      csvUrl,
+      csvPath: null,
+      csvAuthHeader,
+      csvHeaders,
+      csvMapping,
+      createMissingVehicles: parsed.createMissingVehicles,
+      archiveMissingOrders: parsed.archiveMissingOrders,
+    },
+    create: {
+      workspaceId: workspace.id,
+      csvUrl,
+      csvPath: null,
+      csvAuthHeader,
+      csvHeaders,
+      csvMapping,
+      createMissingVehicles: parsed.createMissingVehicles,
+      archiveMissingOrders: parsed.archiveMissingOrders,
+    },
+  });
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "turo_sync_settings_updated",
+    entityType: "TuroSyncConfig",
+    entityId: workspace.id,
+    metadata: {
+      hasCsvUrl: Boolean(csvUrl),
+      hasAuthHeader: Boolean(csvAuthHeader),
+      hasHeaders: Boolean(csvHeaders),
+      hasMapping: Boolean(csvMapping),
+      createMissingVehicles: parsed.createMissingVehicles,
+      archiveMissingOrders: parsed.archiveMissingOrders,
+    },
+  });
+
+  revalidatePath("/imports");
+  revalidatePath("/calendar");
+  redirect("/imports?turoSync=saved");
 }
 
 export async function loginAction(formData: FormData) {

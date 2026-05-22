@@ -31,6 +31,16 @@ type LoadedCsvSource = {
   sourceType: "url" | "path";
 };
 
+type WorkspaceTuroSyncConfig = {
+  csvUrl: string | null;
+  csvPath: string | null;
+  csvAuthHeader: string | null;
+  csvHeaders: string | null;
+  csvMapping: string | null;
+  createMissingVehicles: boolean;
+  archiveMissingOrders: boolean;
+} | null;
+
 export type TuroCsvSyncResult = Awaited<ReturnType<typeof importTuroOrders>> & {
   fileName: string;
   totalRows: number;
@@ -89,11 +99,27 @@ function parseJsonObjectEnv(value: string | undefined, name: string) {
   }
 }
 
-function getConfiguredRequestHeaders() {
+async function getWorkspaceTuroSyncConfig(workspaceId: string): Promise<WorkspaceTuroSyncConfig> {
+  return prisma.turoSyncConfig.findUnique({
+    where: { workspaceId },
+    select: {
+      csvUrl: true,
+      csvPath: true,
+      csvAuthHeader: true,
+      csvHeaders: true,
+      csvMapping: true,
+      createMissingVehicles: true,
+      archiveMissingOrders: true,
+    },
+  });
+}
+
+function getConfiguredRequestHeaders(config: WorkspaceTuroSyncConfig) {
   const headers = new Headers();
-  const authHeader = process.env.TURO_SYNC_CSV_AUTH_HEADER?.trim();
+  const authHeader =
+    config?.csvAuthHeader?.trim() || process.env.TURO_SYNC_CSV_AUTH_HEADER?.trim();
   const configuredHeaders = parseJsonObjectEnv(
-    process.env.TURO_SYNC_CSV_HEADERS,
+    config?.csvHeaders || process.env.TURO_SYNC_CSV_HEADERS,
     "TURO_SYNC_CSV_HEADERS",
   );
 
@@ -130,7 +156,7 @@ function inferFileNameFromDisposition(value: string | null) {
   }
 }
 
-async function loadCsvFromUrl(url: string): Promise<LoadedCsvSource> {
+async function loadCsvFromUrl(url: string, config: WorkspaceTuroSyncConfig): Promise<LoadedCsvSource> {
   const timeoutMs = parsePositiveInteger(
     process.env.TURO_SYNC_FETCH_TIMEOUT_MS,
     DEFAULT_FETCH_TIMEOUT_MS,
@@ -140,7 +166,7 @@ async function loadCsvFromUrl(url: string): Promise<LoadedCsvSource> {
 
   try {
     const response = await fetch(url, {
-      headers: getConfiguredRequestHeaders(),
+      headers: getConfiguredRequestHeaders(config),
       signal: controller.signal,
       cache: "no-store",
     });
@@ -176,9 +202,14 @@ async function loadCsvFromUrl(url: string): Promise<LoadedCsvSource> {
   }
 }
 
-async function loadConfiguredCsvSource(): Promise<LoadedCsvSource> {
-  const csvUrl = process.env.TURO_SYNC_CSV_URL?.trim();
-  const csvPath = process.env.TURO_SYNC_CSV_PATH?.trim();
+async function loadConfiguredCsvSource(config: WorkspaceTuroSyncConfig): Promise<LoadedCsvSource> {
+  const configuredCsvUrl = config?.csvUrl?.trim();
+  const configuredCsvPath = config?.csvPath?.trim();
+  const hasWorkspaceSource = Boolean(configuredCsvUrl || configuredCsvPath);
+  const csvUrl =
+    configuredCsvUrl || (!hasWorkspaceSource ? process.env.TURO_SYNC_CSV_URL?.trim() : undefined);
+  const csvPath =
+    configuredCsvPath || (!hasWorkspaceSource ? process.env.TURO_SYNC_CSV_PATH?.trim() : undefined);
 
   if (csvUrl && csvPath) {
     throw new TuroSyncError(
@@ -188,7 +219,7 @@ async function loadConfiguredCsvSource(): Promise<LoadedCsvSource> {
   }
 
   if (csvUrl) {
-    return loadCsvFromUrl(csvUrl);
+    return loadCsvFromUrl(csvUrl, config);
   }
 
   if (csvPath) {
@@ -201,7 +232,7 @@ async function loadConfiguredCsvSource(): Promise<LoadedCsvSource> {
   }
 
   throw new TuroSyncError(
-    "Configure TURO_SYNC_CSV_URL or TURO_SYNC_CSV_PATH before syncing Turo CSV data.",
+    "Configure a Turo CSV source on the CSV Import page or set TURO_SYNC_CSV_URL/TURO_SYNC_CSV_PATH before syncing Turo CSV data.",
     "TURO_SYNC_CONFIG_MISSING",
   );
 }
@@ -252,9 +283,9 @@ function parseCsvRows(content: string) {
   return { rows, headers };
 }
 
-function getConfiguredMapping(headers: string[]) {
+function getConfiguredMapping(headers: string[], config: WorkspaceTuroSyncConfig) {
   const configuredMapping = parseJsonObjectEnv(
-    process.env.TURO_SYNC_CSV_MAPPING,
+    config?.csvMapping || process.env.TURO_SYNC_CSV_MAPPING,
     "TURO_SYNC_CSV_MAPPING",
   );
   const mapping = configuredMapping ?? buildCsvHeaderMapping(headers);
@@ -363,17 +394,16 @@ export async function runTuroCsvSync(input: {
   actor: string;
   billingBypassActive?: boolean;
 }) {
-  const source = await loadConfiguredCsvSource();
+  const syncConfig = await getWorkspaceTuroSyncConfig(input.workspaceId);
+  const source = await loadConfiguredCsvSource(syncConfig);
   const { rows, headers } = parseCsvRows(source.content);
-  const mapping = getConfiguredMapping(headers);
-  const createMissingVehicles = parseBooleanEnv(
-    process.env.TURO_SYNC_CREATE_MISSING_VEHICLES,
-    true,
-  );
-  const archiveStaleMissingOrders = parseBooleanEnv(
-    process.env.TURO_SYNC_ARCHIVE_MISSING,
-    false,
-  );
+  const mapping = getConfiguredMapping(headers, syncConfig);
+  const createMissingVehicles =
+    syncConfig?.createMissingVehicles ??
+    parseBooleanEnv(process.env.TURO_SYNC_CREATE_MISSING_VEHICLES, true);
+  const archiveStaleMissingOrders =
+    syncConfig?.archiveMissingOrders ??
+    parseBooleanEnv(process.env.TURO_SYNC_ARCHIVE_MISSING, false);
 
   await assertTuroSyncWithinBillingLimit({
     workspaceId: input.workspaceId,

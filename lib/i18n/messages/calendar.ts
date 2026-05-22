@@ -32,7 +32,7 @@ export const calendarMessages = {
         `Turo sync complete: ${successRows} row(s), ${createdVehicles} new vehicle(s), ${updatedVehicles} refreshed vehicle(s).`,
       turoSyncPartial: (successRows: number, failedRows: number) =>
         `Turo sync finished with ${successRows} imported row(s) and ${failedRows} row(s) needing review.`,
-      turoSyncConfigError: "Turo sync source is not configured. Set TURO_SYNC_CSV_URL or TURO_SYNC_CSV_PATH.",
+      turoSyncConfigError: "Turo sync source is not configured. Set it on the CSV Import page.",
       turoSyncError: "Turo sync failed. Please check the CSV source and try again.",
       downloadOrders: "Download vehicle orders",
       manualEdit: "Edit order",
@@ -126,7 +126,7 @@ export const calendarMessages = {
         `Turo 同步完成：${successRows} 行，新增 ${createdVehicles} 台车，更新 ${updatedVehicles} 台车。`,
       turoSyncPartial: (successRows: number, failedRows: number) =>
         `Turo 同步完成，但有部分行需要检查：成功 ${successRows} 行，失败 ${failedRows} 行。`,
-      turoSyncConfigError: "Turo 同步来源还没有配置，请设置 TURO_SYNC_CSV_URL 或 TURO_SYNC_CSV_PATH。",
+      turoSyncConfigError: "Turo 同步来源还没有配置，请先到「CSV 导入」页面设置。",
       turoSyncError: "Turo 同步失败，请检查 CSV 来源后重试。",
       downloadOrders: "下载车辆订单",
       manualEdit: "修改订单",

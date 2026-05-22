@@ -91,6 +91,7 @@ model Workspace {
   staffMembers         StaffMember[]
   staffTasks           StaffTask[]
   staffTaskAttachments StaffTaskAttachment[]
+  turoSyncConfig       TuroSyncConfig?
   billing              WorkspaceBilling?
 }
 
@@ -212,6 +213,23 @@ model ImportBatch {
   failures    String?
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   orders      Order[]
+
+  @@index([workspaceId])
+}
+
+model TuroSyncConfig {
+  workspaceId           String    @unique
+  id                    String    @id @default(cuid())
+  csvUrl                String?
+  csvPath               String?
+  csvAuthHeader         String?
+  csvHeaders            String?
+  csvMapping            String?
+  createMissingVehicles Boolean   @default(true)
+  archiveMissingOrders  Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
 }

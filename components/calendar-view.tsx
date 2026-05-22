@@ -43,6 +43,20 @@ type OrderPopoverState = {
   isOpen: true;
 };
 
+type TuroSyncNotice = {
+  kind: "success" | "warning" | "error";
+  message: string;
+};
+
+type TuroSyncResponse = {
+  successRows?: number;
+  failedRows?: number;
+  createdVehicles?: number;
+  updatedVehicles?: number;
+  error?: string;
+  code?: string;
+};
+
 type SearchableFilterOption = {
   value: string;
   label: string;
@@ -487,6 +501,8 @@ export function CalendarView({
   const timelineViewportRef = useRef<HTMLDivElement | null>(null);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState<number | null>(null);
   const [orderPopover, setOrderPopover] = useState<OrderPopoverState | null>(null);
+  const [isTuroSyncing, setIsTuroSyncing] = useState(false);
+  const [turoSyncNotice, setTuroSyncNotice] = useState<TuroSyncNotice | null>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(DAY_WIDTH_STORAGE_KEY);
@@ -801,6 +817,50 @@ export function CalendarView({
     }
   };
 
+  const handleTuroSync = async () => {
+    setIsTuroSyncing(true);
+    setTuroSyncNotice(null);
+
+    try {
+      const response = await fetch("/api/turo-sync", {
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => null)) as TuroSyncResponse | null;
+
+      if (!response.ok) {
+        setTuroSyncNotice({
+          kind: "error",
+          message:
+            payload?.code === "TURO_SYNC_CONFIG_MISSING"
+              ? calendarMessages.turoSyncConfigError
+              : payload?.error || calendarMessages.turoSyncError,
+        });
+        return;
+      }
+
+      const successRows = payload?.successRows ?? 0;
+      const failedRows = payload?.failedRows ?? 0;
+      const createdVehicles = payload?.createdVehicles ?? 0;
+      const updatedVehicles = payload?.updatedVehicles ?? 0;
+
+      setTuroSyncNotice({
+        kind: failedRows > 0 ? "warning" : "success",
+        message:
+          failedRows > 0
+            ? calendarMessages.turoSyncPartial(successRows, failedRows)
+            : calendarMessages.turoSyncSuccess(successRows, createdVehicles, updatedVehicles),
+      });
+      router.refresh();
+    } catch {
+      setTuroSyncNotice({
+        kind: "error",
+        message: calendarMessages.turoSyncError,
+      });
+    } finally {
+      setIsTuroSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
       {/* v0.19.1 density pass: control bar was using p-4 + gap-4 + a
@@ -851,6 +911,16 @@ export function CalendarView({
             <button type="button" onClick={() => setFocusDate(new Date())} className={secondaryActionClass}>
               {calendarMessages.today}
             </button>
+            {!readOnly ? (
+              <button
+                type="button"
+                onClick={handleTuroSync}
+                disabled={isTuroSyncing}
+                className={secondaryActionClass}
+              >
+                {isTuroSyncing ? calendarMessages.turoSyncingAction : calendarMessages.turoSyncAction}
+              </button>
+            ) : null}
             {!readOnly ? (
               <button
                 type="button"
@@ -924,6 +994,23 @@ export function CalendarView({
            * the create + export buttons; range zoom now happens
            * exclusively through the slider. */}
         </div>
+
+        {turoSyncNotice ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className={cn(
+              "mt-2 rounded-md border px-3 py-2 text-[12px] font-medium",
+              turoSyncNotice.kind === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : turoSyncNotice.kind === "warning"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : "border-rose-200 bg-rose-50 text-rose-800",
+            )}
+          >
+            {turoSyncNotice.message}
+          </div>
+        ) : null}
 
         {/* Scrubber + range title combined into one compact row. The
          * full date title was redundant when the scrubber thumb +

@@ -804,10 +804,12 @@ export async function importTuroOrders(input: {
   rows: CsvImportRow[];
   createMissingVehicles?: boolean;
   selectedVehicleKeys?: string[];
+  archiveStaleMissingOrders?: boolean;
 }) {
   const mapping = normalizeCsvFieldMapping(input.mapping as Record<string, string>);
   const failures: Array<{ rowNumber: number; reason: string; row: CsvImportRow }> = [];
   const selectedVehicleKeys = new Set((input.selectedVehicleKeys ?? []).filter(Boolean));
+  const archiveStaleMissingOrders = input.archiveStaleMissingOrders ?? true;
 
   const batch = await prisma.importBatch.create({
     data: {
@@ -1013,7 +1015,7 @@ export async function importTuroOrders(input: {
     }
   }
 
-  if (failures.length === 0 && syncedVehicleIds.size > 0) {
+  if (archiveStaleMissingOrders && failures.length === 0 && syncedVehicleIds.size > 0) {
     const candidateTuroOrders: Array<{ id: string; vehicleId: string }> = [];
 
     for (const vehicleIdChunk of chunkValues(Array.from(syncedVehicleIds))) {
@@ -1072,7 +1074,7 @@ export async function importTuroOrders(input: {
       notes:
         failures.length > 0
           ? `${failures.length} row(s) need manual review${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""} · previous Turo orders kept until the file imports cleanly`
-          : `Import completed without row-level issues${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""}${deletedStaleOrders > 0 ? ` · ${deletedStaleOrders} stale Turo order(s) archived` : ""}`,
+          : `Import completed without row-level issues${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""}${deletedStaleOrders > 0 ? ` · ${deletedStaleOrders} stale Turo order(s) archived` : ""}${archiveStaleMissingOrders ? "" : " · previous Turo orders kept by sync settings"}`,
     },
   });
 

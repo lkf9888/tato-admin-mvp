@@ -10,6 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
+    "sync:turo-csv": "tsx scripts/sync-turo-csv.ts",
     "db:push": "prisma db push",
     "db:reset": "node -e \"if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT || process.env.ALLOW_DESTRUCTIVE_RESET !== 'true') { console.error('Refusing to reset the database. Set ALLOW_DESTRUCTIVE_RESET=true only for intentional local resets.'); process.exit(1); }\" && prisma migrate reset --force"
   },

@@ -96,6 +96,41 @@ https://你的域名/api/stripe/webhook
 
 如果你后面提供真实 Turo CSV 样本，可以继续把导入映射和车辆匹配规则收紧。
 
+## Turo CSV 自动同步
+
+当前版本支持把一个固定 CSV 来源自动导入 TATO。先在环境变量里配置一个来源：
+
+```env
+TURO_SYNC_CSV_URL=
+TURO_SYNC_CSV_PATH=
+TURO_SYNC_WORKSPACE_SLUG=default
+TURO_SYNC_CREATE_MISSING_VEHICLES=true
+TURO_SYNC_ARCHIVE_MISSING=false
+TURO_SYNC_SECRET=
+```
+
+说明：
+
+- `TURO_SYNC_CSV_URL` 和 `TURO_SYNC_CSV_PATH` 二选一；URL 适合私有/签名 CSV 地址，PATH 适合持久卷里的文件
+- 如果 URL 需要鉴权，可设置 `TURO_SYNC_CSV_AUTH_HEADER` 或 JSON 格式的 `TURO_SYNC_CSV_HEADERS`
+- 如真实 Turo CSV 表头和默认识别不同，可用 `TURO_SYNC_CSV_MAPPING` 覆盖，支持 `{"Reservation ID":"externalOrderId"}` 或 `{"externalOrderId":"Reservation ID"}`
+- `TURO_SYNC_ARCHIVE_MISSING` 默认保持 `false`，避免部分导出的 CSV 把历史 Turo 订单误归档；只有当 CSV 是完整订单来源时再改成 `true`
+
+本地或 Railway Cron 可以运行：
+
+```bash
+npm run sync:turo-csv
+```
+
+后台日历顶部也有“同步 Turo”按钮，会调用同一套同步逻辑。没有登录态的外部 cron 也可以通过：
+
+```bash
+curl -X POST https://你的域名/api/turo-sync \
+  -H "Authorization: Bearer $TURO_SYNC_SECRET"
+```
+
+Railway Cron 建议单独创建一个 cron 服务，Start Command 使用 `npm run sync:turo-csv`，例如每天温哥华时间凌晨同步时，按 UTC 配置对应 crontab。
+
 ## 公网部署
 
 ### Railway 低成本部署

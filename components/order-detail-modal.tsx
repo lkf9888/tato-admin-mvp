@@ -189,8 +189,8 @@ export function OrderDetailModal({
   }, [order]);
 
   const inputClass =
-    "h-10 rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 text-[13px] text-[color:var(--ink)] outline-none focus:border-[rgba(17,19,24,0.22)]";
-  const labelClass = "grid gap-1.5 text-[11px] font-medium uppercase tracking-[0.13em] text-[color:var(--ink-soft)]";
+    "h-10 w-full min-w-0 max-w-full truncate rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 text-[13px] text-[color:var(--ink)] outline-none focus:border-[rgba(17,19,24,0.22)]";
+  const labelClass = "grid min-w-0 gap-1.5 text-[11px] font-medium uppercase tracking-[0.13em] text-[color:var(--ink-soft)]";
   const primaryButtonClass =
     "inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3.5 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] disabled:cursor-not-allowed disabled:opacity-50";
   const secondaryButtonClass =
@@ -342,33 +342,33 @@ export function OrderDetailModal({
 
         <form onSubmit={saveOrder} className="px-4 py-4">
           <div className="grid gap-3 text-[12px] text-[color:var(--ink)] md:grid-cols-4">
-            <div className="rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
+            <div className="min-w-0 rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                 {t.owner}
               </p>
-              <p className="mt-1 font-semibold">{selectedVehicle?.ownerName ?? currentOrder.ownerName ?? "-"}</p>
+              <p className="mt-1 truncate font-semibold">{selectedVehicle?.ownerName ?? currentOrder.ownerName ?? "-"}</p>
             </div>
-            <div className="rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
+            <div className="min-w-0 rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                 {t.source}
               </p>
-              <p className="mt-1 font-semibold">{getStatusLabel(currentOrder.source, locale)}</p>
+              <p className="mt-1 truncate font-semibold">{getStatusLabel(currentOrder.source, locale)}</p>
             </div>
-            <div className="rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
+            <div className="min-w-0 rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                 {t.totalPrice}
               </p>
-              <p className="mt-1 font-semibold">{formatCurrency(currentOrder.totalPrice, locale)}</p>
+              <p className="mt-1 truncate font-semibold">{formatCurrency(currentOrder.totalPrice, locale)}</p>
             </div>
-            <div className="rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
+            <div className="min-w-0 rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                 {t.phone}
               </p>
-              <p className="mt-1 font-semibold">{displayPhone}</p>
+              <p className="mt-1 truncate font-semibold">{displayPhone}</p>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className={labelClass}>
               <span>{t.vehicle}</span>
               {readOnly ? (
@@ -527,7 +527,7 @@ export function OrderDetailModal({
                 onChange={(event) => updateDraft({ notes: event.target.value })}
                 readOnly={readOnly}
                 rows={4}
-                className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none focus:border-[rgba(17,19,24,0.22)]"
+                className="w-full min-w-0 max-w-full rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none focus:border-[rgba(17,19,24,0.22)]"
               />
             </label>
           </div>

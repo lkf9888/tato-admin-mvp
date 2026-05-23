@@ -98,9 +98,9 @@ function labels(locale: Locale) {
         close: "关闭",
         save: "保存修改",
         saving: "保存中...",
-        delete: "删除线下订单",
+        delete: "删除订单",
         deleting: "删除中...",
-        deleteConfirm: "确认要删除这条线下订单吗？",
+        deleteConfirm: "确认要从日历中删除这条订单吗？照片和文件会保留。",
         saveError: "订单暂时无法保存，请检查必填项后重试。",
         deleteError: "订单暂时无法删除，请稍后再试。",
         validationError: "请填写租客、车辆与正确的取还车时间。",
@@ -130,9 +130,9 @@ function labels(locale: Locale) {
         close: "Close",
         save: "Save changes",
         saving: "Saving...",
-        delete: "Delete offline order",
+        delete: "Delete order",
         deleting: "Deleting...",
-        deleteConfirm: "Delete this offline order?",
+        deleteConfirm: "Delete this order from the calendar? Photos and files will be preserved.",
         saveError: "We could not save this order. Check the required fields and try again.",
         deleteError: "We could not delete this order right now. Please try again.",
         validationError: "Complete renter, vehicle, and a valid pickup/return window.",
@@ -272,16 +272,14 @@ export function OrderDetailModal({
   };
 
   const deleteOrder = async () => {
-    if (readOnly || currentOrder.source !== "offline" || isDeleting) return;
+    if (readOnly || isDeleting) return;
     if (!window.confirm(t.deleteConfirm)) return;
 
     setIsDeleting(true);
     setError(null);
     try {
-      const response = await fetch("/api/orders/offline", {
+      const response = await fetch(`/api/orders/${currentOrder.id}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: currentOrder.id }),
       });
       const payload = (await response.json().catch(() => null)) as
         | { deletedId?: string; error?: string }
@@ -600,19 +598,15 @@ export function OrderDetailModal({
 
           {!readOnly ? (
             <div className="mt-4 flex flex-col gap-2 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
-              {currentOrder.source === "offline" ? (
-                <button
-                  type="button"
-                  onClick={deleteOrder}
-                  disabled={isDeleting || isSaving}
-                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-white px-3.5 text-[12px] font-semibold text-rose-600 transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                  {isDeleting ? t.deleting : t.delete}
-                </button>
-              ) : (
-                <span />
-              )}
+              <button
+                type="button"
+                onClick={deleteOrder}
+                disabled={isDeleting || isSaving}
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-white px-3.5 text-[12px] font-semibold text-rose-600 transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                {isDeleting ? t.deleting : t.delete}
+              </button>
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={onClose} className={secondaryButtonClass}>
                   <X className="h-3.5 w-3.5" aria-hidden />

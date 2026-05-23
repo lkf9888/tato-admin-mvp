@@ -173,3 +173,46 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
     return NextResponse.json({ error: "SAVE_FAILED" }, { status: 500 });
   }
 }
+
+export async function DELETE(_request: Request, { params }: { params: Params }) {
+  const { orderId } = await params;
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  try {
+    const existing = await prisma.order.findFirst({
+      where: { id: orderId, workspaceId: workspace.id, isArchived: false },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+    }
+
+    const archivedOrder = await prisma.order.update({
+      where: { id: existing.id },
+      data: {
+        isArchived: true,
+        status: OrderStatus.cancelled,
+      },
+    });
+
+    await syncOrderOwnerLedger(archivedOrder.id);
+    await reconcileVehicleConflicts(existing.vehicleId);
+    await logActivity({
+      workspaceId: workspace.id,
+      actor: user.name,
+      action: "order_deleted",
+      entityType: "Order",
+      entityId: archivedOrder.id,
+      metadata: {
+        source: archivedOrder.source,
+        vehicleId: archivedOrder.vehicleId,
+        externalOrderId: archivedOrder.externalOrderId,
+      },
+    });
+
+    revalidateOrderSurfaces();
+    return NextResponse.json({ deletedId: archivedOrder.id, archivedId: archivedOrder.id });
+  } catch {
+    return NextResponse.json({ error: "DELETE_FAILED" }, { status: 500 });
+  }
+}

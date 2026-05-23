@@ -224,16 +224,8 @@ function formatWeekday(date: Date, locale: Locale) {
   }).format(date);
 }
 
-function formatDayNumber(date: Date, locale: Locale) {
-  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-CA", {
-    day: "numeric",
-  }).format(date);
-}
-
-function formatMonthMarker(date: Date, locale: Locale) {
-  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-CA", {
-    month: locale === "zh" ? "numeric" : "short",
-  }).format(date);
+function formatTimelineDateLabel(date: Date) {
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
 function formatMonthTitle(date: Date, locale: Locale) {
@@ -561,7 +553,7 @@ export function CalendarView({
       return;
     }
 
-    if (!refreshedOrder && selectedOrder.source === "offline") {
+    if (!refreshedOrder) {
       setSelectedOrder(null);
     }
   }, [orders, selectedOrder]);
@@ -1107,26 +1099,22 @@ export function CalendarView({
                 </div>
                 {days.map((date, index) => {
                   const weekend = [0, 6].includes(date.getDay());
-                  const monthChanged = index === 0 || date.getDate() === 1;
                   const todayColumn = isSameDay(date, today);
 
                   return (
                     <div
                       key={date.toISOString()}
                       className={cn(
-                        "border-r border-[color:var(--line)] px-1.5 py-2.5 text-center",
+                        "border-r border-[color:var(--line)] px-1 py-1.5 text-center",
                         weekend ? "bg-[#f3ede4]" : "bg-[rgba(255,251,246,0.9)]",
                         todayColumn ? "bg-[rgba(89,60,251,0.14)]" : "",
                       )}
                     >
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
+                      <p className="truncate text-[9px] font-semibold uppercase tracking-[0.04em] text-[color:var(--ink-soft)]">
                         {formatWeekday(date, locale)}
                       </p>
-                      <p className="mt-0.5 text-[15px] font-semibold text-[color:var(--ink)]">
-                        {formatDayNumber(date, locale)}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-[color:var(--ink-soft)]/80">
-                        {monthChanged ? formatMonthMarker(date, locale) : ""}
+                      <p className="mt-0.5 whitespace-nowrap text-[12px] font-semibold leading-tight text-[color:var(--ink)] tabular-nums">
+                        {formatTimelineDateLabel(date)}
                       </p>
                     </div>
                   );

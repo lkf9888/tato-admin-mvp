@@ -22,7 +22,7 @@ export const importsMessages = {
         },
         {
           title: "Upload and map",
-          body: "Click Choose file to upload the CSV. We auto-map common columns — review the dropdowns if any required fields are still missing.",
+          body: "Click Choose file to upload the CSV. We auto-map common columns — Reservation ID is required and is the only duplicate-order key.",
         },
         {
           title: "Run the import",
@@ -139,7 +139,7 @@ export const importsMessages = {
         },
         {
           title: "上传并映射字段",
-          body: "点击「选择文件」上传 CSV，系统会自动匹配常见列名。若提示仍有必填字段，请在字段映射里手动选择。",
+          body: "点击「选择文件」上传 CSV，系统会自动匹配常见列名。Reservation ID 是必填项，也是唯一的重复订单判断依据。",
         },
         {
           title: "执行导入",

@@ -101,7 +101,6 @@ const turoSyncSettingsSchema = z.object({
   csvMapping: z.string().trim().optional(),
   clearSyncHeaders: z.boolean(),
   createMissingVehicles: z.boolean(),
-  archiveMissingOrders: z.boolean(),
 });
 
 const registrationSchema = z.object({
@@ -346,7 +345,6 @@ export async function saveTuroSyncSettingsAction(formData: FormData) {
     csvMapping: formData.get("csvMapping")?.toString(),
     clearSyncHeaders: formData.get("clearSyncHeaders") === "on",
     createMissingVehicles: formData.get("createMissingVehicles") === "on",
-    archiveMissingOrders: formData.get("archiveMissingOrders") === "on",
   });
 
   const existingConfig = await prisma.turoSyncConfig.findUnique({
@@ -391,7 +389,7 @@ export async function saveTuroSyncSettingsAction(formData: FormData) {
       csvHeaders,
       csvMapping,
       createMissingVehicles: parsed.createMissingVehicles,
-      archiveMissingOrders: parsed.archiveMissingOrders,
+      archiveMissingOrders: false,
     },
     create: {
       workspaceId: workspace.id,
@@ -402,7 +400,7 @@ export async function saveTuroSyncSettingsAction(formData: FormData) {
       csvHeaders,
       csvMapping,
       createMissingVehicles: parsed.createMissingVehicles,
-      archiveMissingOrders: parsed.archiveMissingOrders,
+      archiveMissingOrders: false,
     },
   });
 
@@ -421,7 +419,7 @@ export async function saveTuroSyncSettingsAction(formData: FormData) {
       storedHeaderNames: Object.keys(parseStoredJsonObject(csvHeaders)),
       hasMapping: Boolean(csvMapping),
       createMissingVehicles: parsed.createMissingVehicles,
-      archiveMissingOrders: parsed.archiveMissingOrders,
+      archiveMissingOrders: false,
     },
   });
 

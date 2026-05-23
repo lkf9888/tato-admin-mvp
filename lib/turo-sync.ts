@@ -430,9 +430,7 @@ export async function runTuroCsvSync(input: {
   const createMissingVehicles =
     syncConfig?.createMissingVehicles ??
     parseBooleanEnv(process.env.TURO_SYNC_CREATE_MISSING_VEHICLES, true);
-  const archiveStaleMissingOrders =
-    syncConfig?.archiveMissingOrders ??
-    parseBooleanEnv(process.env.TURO_SYNC_ARCHIVE_MISSING, false);
+  const archiveStaleMissingOrders = false;
 
   await assertTuroSyncWithinBillingLimit({
     workspaceId: input.workspaceId,
@@ -449,7 +447,6 @@ export async function runTuroCsvSync(input: {
     mapping,
     actor: input.actor,
     createMissingVehicles,
-    archiveStaleMissingOrders,
   });
 
   return {

@@ -87,6 +87,7 @@ export function CsvImportPanel({
     !mappedFields.includes("renterName") ? fieldLabels.renterName : null,
     !mappedFields.includes("pickupDatetime") ? fieldLabels.pickupDatetime : null,
     !mappedFields.includes("returnDatetime") ? fieldLabels.returnDatetime : null,
+    !mappedFields.includes("externalOrderId") ? fieldLabels.externalOrderId : null,
   ].filter(Boolean);
 
   useEffect(() => {

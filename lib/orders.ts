@@ -48,16 +48,6 @@ const csvFieldKeys = new Set<string>([
   "status",
 ]);
 
-const PRISMA_IN_FILTER_CHUNK_SIZE = 500;
-
-function chunkValues<T>(values: T[], size = PRISMA_IN_FILTER_CHUNK_SIZE) {
-  const chunks: T[][] = [];
-  for (let index = 0; index < values.length; index += size) {
-    chunks.push(values.slice(index, index + size));
-  }
-  return chunks;
-}
-
 export function orderRangesOverlap(
   startA: Date,
   endA: Date,
@@ -222,31 +212,17 @@ function resolveVehicleFromCsv(
 
 async function findExistingImportedOrder(input: {
   workspaceId: string;
-  externalOrderId?: string | null;
-  vehicleId: string;
-  renterName: string;
-  pickupDatetime: Date;
-  returnDatetime: Date;
+  externalOrderId: string;
 }) {
-  if (input.externalOrderId) {
-    const exact = await prisma.order.findFirst({
-      where: {
-        workspaceId: input.workspaceId,
-        source: OrderSource.turo,
-        externalOrderId: input.externalOrderId,
-      },
-    });
-    if (exact) return exact;
-  }
-
+  // Turo CSV rows are deduped strictly by Reservation ID. Do not fall
+  // back to vehicle/renter/time matching; trip dates and amounts can
+  // change between exports, and those changes should update the same
+  // order while preserving its attachments.
   return prisma.order.findFirst({
     where: {
       workspaceId: input.workspaceId,
       source: OrderSource.turo,
-      vehicleId: input.vehicleId,
-      renterName: input.renterName,
-      pickupDatetime: input.pickupDatetime,
-      returnDatetime: input.returnDatetime,
+      externalOrderId: input.externalOrderId,
     },
   });
 }
@@ -804,12 +780,10 @@ export async function importTuroOrders(input: {
   rows: CsvImportRow[];
   createMissingVehicles?: boolean;
   selectedVehicleKeys?: string[];
-  archiveStaleMissingOrders?: boolean;
 }) {
   const mapping = normalizeCsvFieldMapping(input.mapping as Record<string, string>);
   const failures: Array<{ rowNumber: number; reason: string; row: CsvImportRow }> = [];
   const selectedVehicleKeys = new Set((input.selectedVehicleKeys ?? []).filter(Boolean));
-  const archiveStaleMissingOrders = input.archiveStaleMissingOrders ?? true;
 
   const batch = await prisma.importBatch.create({
     data: {
@@ -829,11 +803,10 @@ export async function importTuroOrders(input: {
     where: { workspaceId: input.workspaceId },
   });
   const syncedVehicleIds = new Set<string>();
-  const syncedOrderIds = new Set<string>();
   let createdVehicles = 0;
   let updatedVehicles = 0;
   let deletedCancelledRows = 0;
-  let deletedStaleOrders = 0;
+  const deletedStaleOrders = 0;
   let skippedRows = 0;
 
   for (const [index, row] of input.rows.entries()) {
@@ -929,14 +902,19 @@ export async function importTuroOrders(input: {
         continue;
       }
 
-      const externalOrderId = safeString(row[mapping.externalOrderId ?? ""]) || null;
+      const externalOrderId = safeString(row[mapping.externalOrderId ?? ""]);
+      if (!externalOrderId) {
+        failures.push({
+          rowNumber: index + 1,
+          reason: "Missing Reservation ID",
+          row,
+        });
+        continue;
+      }
+
       const existing = await findExistingImportedOrder({
         workspaceId: input.workspaceId,
         externalOrderId,
-        vehicleId: vehicle.id,
-        renterName,
-        pickupDatetime,
-        returnDatetime,
       });
       if (existing && existing.vehicleId !== vehicle.id) {
         touchedVehicleIds.add(existing.vehicleId);
@@ -983,7 +961,6 @@ export async function importTuroOrders(input: {
             });
 
         await syncOrderOwnerLedger(savedCancelledOrder.id);
-        syncedOrderIds.add(savedCancelledOrder.id);
         touchedVehicleIds.add(vehicle.id);
         deletedCancelledRows += 1;
         successRows += 1;
@@ -999,7 +976,6 @@ export async function importTuroOrders(input: {
             data: payload,
           });
       await syncOrderOwnerLedger(savedOrder.id);
-      syncedOrderIds.add(savedOrder.id);
 
       touchedVehicleIds.add(vehicle.id);
       successRows += 1;
@@ -1015,52 +991,6 @@ export async function importTuroOrders(input: {
     }
   }
 
-  if (archiveStaleMissingOrders && failures.length === 0 && syncedVehicleIds.size > 0) {
-    const candidateTuroOrders: Array<{ id: string; vehicleId: string }> = [];
-
-    for (const vehicleIdChunk of chunkValues(Array.from(syncedVehicleIds))) {
-      const orders = await prisma.order.findMany({
-        where: {
-          workspaceId: input.workspaceId,
-          source: OrderSource.turo,
-          isArchived: false,
-          vehicleId: {
-            in: vehicleIdChunk,
-          },
-        },
-        select: {
-          id: true,
-          vehicleId: true,
-        },
-      });
-
-      candidateTuroOrders.push(...orders);
-    }
-
-    const staleTuroOrders = candidateTuroOrders.filter((order) => !syncedOrderIds.has(order.id));
-
-    if (staleTuroOrders.length > 0) {
-      for (const orderIdChunk of chunkValues(staleTuroOrders.map((order) => order.id))) {
-        await prisma.order.updateMany({
-          where: {
-            id: {
-              in: orderIdChunk,
-            },
-          },
-          data: {
-            isArchived: true,
-          },
-        });
-      }
-
-      deletedStaleOrders = staleTuroOrders.length;
-      for (const order of staleTuroOrders) {
-        await syncOrderOwnerLedger(order.id);
-        touchedVehicleIds.add(order.vehicleId);
-      }
-    }
-  }
-
   for (const vehicleId of touchedVehicleIds) {
     await reconcileVehicleConflicts(vehicleId);
   }
@@ -1073,8 +1003,8 @@ export async function importTuroOrders(input: {
       failures: JSON.stringify(failures),
       notes:
         failures.length > 0
-          ? `${failures.length} row(s) need manual review${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""} · previous Turo orders kept until the file imports cleanly`
-          : `Import completed without row-level issues${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""}${deletedStaleOrders > 0 ? ` · ${deletedStaleOrders} stale Turo order(s) archived` : ""}${archiveStaleMissingOrders ? "" : " · previous Turo orders kept by sync settings"}`,
+          ? `${failures.length} row(s) need manual review${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""} · previous Turo orders are kept`
+          : `Import completed without row-level issues${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""} · previous Turo orders are kept`,
     },
   });
 

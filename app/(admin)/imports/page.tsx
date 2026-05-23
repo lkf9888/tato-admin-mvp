@@ -149,7 +149,7 @@ export default async function ImportsPage({
             />
           </label>
 
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2">
             <label className="flex items-start gap-2 border border-slate-200 bg-slate-50 px-3 py-2">
               <input
                 name="createMissingVehicles"
@@ -160,18 +160,6 @@ export default async function ImportsPage({
               <span>
                 <span className="block font-medium text-slate-700">{turoSyncMessages.createMissing}</span>
                 <span className="text-slate-500">{turoSyncMessages.createMissingHint}</span>
-              </span>
-            </label>
-            <label className="flex items-start gap-2 border border-amber-200 bg-amber-50 px-3 py-2">
-              <input
-                name="archiveMissingOrders"
-                type="checkbox"
-                defaultChecked={turoSyncConfig?.archiveMissingOrders ?? false}
-                className="mt-0.5"
-              />
-              <span>
-                <span className="block font-medium text-amber-800">{turoSyncMessages.archiveMissing}</span>
-                <span className="text-amber-700">{turoSyncMessages.archiveMissingHint}</span>
               </span>
             </label>
           </div>
@@ -276,8 +264,6 @@ function getTuroSyncSettingsCopy(locale: Locale) {
         mapping: "字段映射 JSON（可选）",
         createMissing: "自动创建缺失车辆",
         createMissingHint: "第一次同步真实 Turo CSV 时建议开启。",
-        archiveMissing: "归档 CSV 中缺失的旧 Turo 订单",
-        archiveMissingHint: "除非 CSV 是完整订单来源，否则建议保持关闭，避免误归档历史订单。",
         note: "保存后回到日历点击「同步 Turo」即可立即测试。",
         save: "保存同步设置",
       }
@@ -302,8 +288,6 @@ function getTuroSyncSettingsCopy(locale: Locale) {
         mapping: "Field mapping JSON (optional)",
         createMissing: "Auto-create missing vehicles",
         createMissingHint: "Recommended for the first real Turo CSV sync.",
-        archiveMissing: "Archive old Turo orders missing from CSV",
-        archiveMissingHint: "Keep this off unless the CSV is a complete order source.",
         note: "After saving, open Calendar and click Sync Turo to test it.",
         save: "Save sync settings",
       };

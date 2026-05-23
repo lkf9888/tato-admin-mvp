@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { OwnerLedgerManager } from "@/components/owner-ledger-manager";
@@ -23,6 +22,12 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
             plateNumber: true,
             nickname: true,
           },
+        },
+        shareLinks: {
+          where: { isActive: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { token: true },
         },
       },
     }),
@@ -64,51 +69,45 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
   });
 
   return (
-    <div className="max-w-6xl space-y-4 p-4 sm:p-6">
-      <div>
-        <Link href={`/owners/${owner.id}`} className="text-sm text-neutral-500 hover:text-neutral-900">
-          &lt; {owner.name}
-        </Link>
-      </div>
-      <OwnerLedgerManager
-        locale={locale}
-        owners={owners}
-        selectedOwner={{ id: owner.id, name: owner.name }}
-        vehicles={owner.vehicles.map((vehicle) => ({
-          id: vehicle.id,
-          label: `${vehicle.plateNumber} · ${vehicle.nickname}`,
-        }))}
-        ownerSelectRoute="ledger"
-        items={ledgerItems.map((item) => ({
-          id: item.id,
-          ownerId: item.ownerId,
-          vehicleId: item.vehicleId,
-          orderId: item.orderId,
-          kind: item.kind,
-          amount: item.amount,
-          occurredAt: item.occurredAt.toISOString(),
-          note: item.note,
-          isAuto: item.isAuto,
-          createdAt: item.createdAt.toISOString(),
-          receipts: item.receipts.map((receipt) => ({
-            id: receipt.id,
-            url: `/api/owners/${owner.id}/ledger/${item.id}/receipts/file?receiptId=${receipt.id}`,
-            filename: receipt.filename,
-            contentType: receipt.contentType,
-            size: receipt.size,
-            uploadedAt: receipt.uploadedAt.toISOString(),
-          })),
-          vehicle: item.vehicle,
-          order: item.order
-            ? {
-                id: item.order.id,
-                renterName: item.order.renterName,
-                pickupDatetime: item.order.pickupDatetime.toISOString(),
-                returnDatetime: item.order.returnDatetime.toISOString(),
-              }
-            : null,
-        }))}
-      />
-    </div>
+    <OwnerLedgerManager
+      locale={locale}
+      owners={owners}
+      selectedOwner={{ id: owner.id, name: owner.name }}
+      vehicles={owner.vehicles.map((vehicle) => ({
+        id: vehicle.id,
+        label: `${vehicle.plateNumber} · ${vehicle.nickname}`,
+      }))}
+      shareToken={owner.shareLinks[0]?.token ?? null}
+      ownerSelectRoute="ledger"
+      items={ledgerItems.map((item) => ({
+        id: item.id,
+        ownerId: item.ownerId,
+        vehicleId: item.vehicleId,
+        orderId: item.orderId,
+        kind: item.kind,
+        amount: item.amount,
+        occurredAt: item.occurredAt.toISOString(),
+        note: item.note,
+        isAuto: item.isAuto,
+        createdAt: item.createdAt.toISOString(),
+        receipts: item.receipts.map((receipt) => ({
+          id: receipt.id,
+          url: `/api/owners/${owner.id}/ledger/${item.id}/receipts/file?receiptId=${receipt.id}`,
+          filename: receipt.filename,
+          contentType: receipt.contentType,
+          size: receipt.size,
+          uploadedAt: receipt.uploadedAt.toISOString(),
+        })),
+        vehicle: item.vehicle,
+        order: item.order
+          ? {
+              id: item.order.id,
+              renterName: item.order.renterName,
+              pickupDatetime: item.order.pickupDatetime.toISOString(),
+              returnDatetime: item.order.returnDatetime.toISOString(),
+            }
+          : null,
+      }))}
+    />
   );
 }

@@ -1,20 +1,33 @@
 import { unlockShareLinkAction } from "@/app/actions";
-import { CalendarView } from "@/components/calendar-view";
+import { OwnerPublicShareView } from "@/components/owner-public-share-view";
 import { hasShareAccess } from "@/lib/auth";
-import { getStatusLabel } from "@/lib/i18n";
+import { getMessages, getStatusLabel, resolveLocale, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getDisplayOrderNote, getOrderNetEarning } from "@/lib/utils";
+
+type ShareTab = "ledger" | "statements" | "calendar";
+
+function resolveShareTab(value?: string | null): ShareTab {
+  if (value === "statements" || value === "calendar") return value;
+  return "ledger";
+}
+
+function shareMessagesFor(locale: Locale) {
+  return getMessages(locale).sharePage;
+}
 
 export default async function SharePage({
   params,
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; tab?: string; lang?: string }>;
 }) {
-  const [{ token }, query, { locale, messages }] = await Promise.all([params, searchParams, getI18n()]);
-  const shareMessages = messages.sharePage;
+  const [{ token }, query, fallbackI18n] = await Promise.all([params, searchParams, getI18n()]);
+  const locale = query.lang ? resolveLocale(query.lang) : fallbackI18n.locale;
+  const messages = query.lang ? getMessages(locale) : fallbackI18n.messages;
+  const shareMessages = shareMessagesFor(locale);
 
   const shareLink = await prisma.shareLink.findUnique({
     where: { token },
@@ -22,6 +35,7 @@ export default async function SharePage({
       owner: {
         include: {
           vehicles: {
+            orderBy: [{ plateNumber: "asc" }, { nickname: "asc" }],
             include: {
               orders: {
                 where: {
@@ -100,6 +114,32 @@ export default async function SharePage({
     );
   }
 
+  const ledgerItems = await prisma.ownerLedgerItem.findMany({
+    where: {
+      workspaceId: shareLink.workspaceId,
+      ownerId: shareLink.owner.id,
+    },
+    orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+    include: {
+      receipts: { orderBy: { uploadedAt: "asc" } },
+      vehicle: {
+        select: {
+          id: true,
+          plateNumber: true,
+          nickname: true,
+        },
+      },
+      order: {
+        select: {
+          id: true,
+          renterName: true,
+          pickupDatetime: true,
+          returnDatetime: true,
+        },
+      },
+    },
+  });
+
   const vehicles = [...shareLink.owner.vehicles].sort((left, right) =>
     left.plateNumber.localeCompare(right.plateNumber),
   );
@@ -119,47 +159,59 @@ export default async function SharePage({
       pickupDatetime: order.pickupDatetime.toISOString(),
       returnDatetime: order.returnDatetime.toISOString(),
       totalPrice: getOrderNetEarning(order.sourceMetadata, order.totalPrice),
+      depositAmount: order.depositAmount,
+      pickupLocation: order.pickupLocation,
+      returnLocation: order.returnLocation,
+      paymentMethod: order.paymentMethod,
+      contractNumber: order.contractNumber,
+      externalOrderId: order.externalOrderId,
       notes:
         shareLink.visibility === "privacy"
           ? messages.calendar.bookingLabel(getStatusLabel(order.source, locale))
           : getDisplayOrderNote(order.notes, order.source),
+      createdBy: order.createdBy,
     })),
   );
 
   return (
-    <main className="min-h-screen bg-[var(--page)] px-4 py-6 sm:px-6">
-      <div className="mx-auto max-w-[1500px] space-y-6">
-        <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] px-6 py-8 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
-          <p className="text-xs uppercase tracking-[0.35em] text-[color:var(--ink-soft)]">
-            {shareMessages.readOnlyKicker}
-          </p>
-          <h1 className="mt-3 font-serif text-5xl text-[color:var(--ink)]">{shareLink.owner.name}</h1>
-          <p className="mt-3 max-w-3xl text-sm text-[color:var(--ink-soft)]">{shareMessages.readOnlyCopy}</p>
-          <div className="mt-6 flex flex-wrap gap-3 text-sm text-[color:var(--ink-soft)]">
-            {vehicles.map((vehicle) => (
-              <span key={vehicle.id} className="rounded-full bg-white/76 px-4 py-2 shadow-[0_12px_28px_-24px_rgba(17,19,24,0.45)]">
-                {vehicle.nickname}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        <CalendarView
-          locale={locale}
-          readOnly
-          maskSensitive={shareLink.visibility === "privacy"}
-          vehicleOptions={vehicles.map((vehicle) => ({
-            id: vehicle.id,
-            label: vehicle.nickname,
-            plateNumber: vehicle.plateNumber,
-            secondaryLabel: `${vehicle.brand} ${vehicle.model} ${vehicle.year}`,
-            ownerId: shareLink.owner.id,
-            ownerName: shareLink.owner.name,
-          }))}
-          ownerOptions={[{ id: shareLink.owner.id, label: shareLink.owner.name }]}
-          orders={orders}
-        />
-      </div>
-    </main>
+    <OwnerPublicShareView
+      locale={locale}
+      owner={{ id: shareLink.owner.id, name: shareLink.owner.name }}
+      vehicles={vehicles.map((vehicle) => ({
+        id: vehicle.id,
+        label: vehicle.nickname,
+        plateNumber: vehicle.plateNumber,
+        secondaryLabel: `${vehicle.brand} ${vehicle.model} ${vehicle.year}`,
+      }))}
+      ledgerItems={ledgerItems.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        amount: item.amount,
+        occurredAt: item.occurredAt.toISOString(),
+        createdAt: item.createdAt.toISOString(),
+        note: item.note,
+        isAuto: item.isAuto,
+        receipts: item.receipts.map((receipt) => ({
+          id: receipt.id,
+          url: `/api/share/${token}/ledger/${item.id}/receipts/file?receiptId=${receipt.id}`,
+          filename: receipt.filename,
+          contentType: receipt.contentType,
+          size: receipt.size,
+          uploadedAt: receipt.uploadedAt.toISOString(),
+        })),
+        vehicle: item.vehicle,
+        order: item.order
+          ? {
+              id: item.order.id,
+              renterName: item.order.renterName,
+              pickupDatetime: item.order.pickupDatetime.toISOString(),
+              returnDatetime: item.order.returnDatetime.toISOString(),
+            }
+          : null,
+      }))}
+      calendarOrders={orders}
+      activeTab={resolveShareTab(query.tab)}
+      maskSensitive={shareLink.visibility === "privacy"}
+    />
   );
 }

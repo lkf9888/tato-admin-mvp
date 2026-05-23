@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { SearchableSelect } from "@/components/searchable-select";
 import type { Locale } from "@/lib/i18n";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatCurrency, formatCurrencyInputText, formatDate } from "@/lib/utils";
 
 const OwnerLedgerKind = {
   OWNER_NET_EARNING: "OWNER_NET_EARNING",
@@ -27,6 +28,15 @@ type VehicleOption = {
   label: string;
 };
 
+type LedgerReceipt = {
+  id: string;
+  url: string;
+  filename: string | null;
+  contentType: string | null;
+  size: number | null;
+  uploadedAt: string;
+};
+
 type LedgerItem = {
   id: string;
   ownerId: string;
@@ -38,14 +48,7 @@ type LedgerItem = {
   note: string | null;
   isAuto: boolean;
   createdAt: string;
-  receipts?: {
-    id: string;
-    url: string;
-    filename: string | null;
-    contentType: string | null;
-    size: number | null;
-    uploadedAt: string;
-  }[];
+  receipts?: LedgerReceipt[];
   vehicle: {
     id: string;
     plateNumber: string;
@@ -67,44 +70,35 @@ type ModalState =
   | { mode: "create"; kind: OwnerLedgerKind }
   | { mode: "edit"; item: LedgerItem };
 
-const STATEMENT_KINDS = new Set<OwnerLedgerKind>([
-  OwnerLedgerKind.OWNER_NET_EARNING,
-  OwnerLedgerKind.MANAGER_COMMISSION,
-  OwnerLedgerKind.EXPENSE_REIMBURSEMENT,
-  OwnerLedgerKind.MANUAL_ADJUSTMENT,
-]);
-
 function copy(locale: Locale) {
   return locale !== "en"
     ? {
-        currentBalance: "当前应结余额",
+        title: "流水账",
+        backPrefix: "返回",
+        viewAsOwner: "以车主视角查看",
+        currentBalance: "当前余额",
         tatoOwesOwner: "TATO 应付给车主",
         ownerOwesTato: "车主应付给 TATO",
         zeroBalance: "账目已结清",
-        monthlyStatement: "Monthly statement",
-        ledger: "流水账",
-        chartTitle: "最近 12 个月净额",
-        empty: "暂无账目。请先给车辆绑定车主并点击重新同步，或手动添加一条账目。",
-        month: "月份",
-        print: "打印 statement",
-        addExpense: "添加费用",
-        addPayment: "记录付款",
+        periodSubtotal: "筛选区间小计",
+        addExpense: "添加报销",
+        addPayment: "记录收款",
         addAdjustment: "手动调整",
-        resync: "重新同步订单",
+        resync: "重新同步自动行",
         resyncing: "同步中...",
+        confirmResync: "重新同步会按订单重建自动账目，手动账目和凭证会保留。继续吗？",
+        dateFrom: "起始",
+        dateTo: "截止",
+        clearDateRange: "清除筛选",
+        empty: "暂无账目。请先给车辆绑定车主并重新同步，或手动添加一条账目。",
         date: "日期",
         type: "类型",
         detail: "说明",
-        credit: "收入 / 应收",
-        debit: "扣减 / 已付",
-        balance: "余额",
-        auto: "自动",
+        credit: "收入（车主得款）",
+        debit: "支出（车主抵扣）",
+        auto: "auto",
         edit: "修改",
         delete: "删除",
-        receipts: "凭证",
-        uploadReceipts: "上传凭证",
-        receiptFileCount: (count: number) => `${count} 个文件待上传`,
-        receiptUploadFailed: "账目已保存，但凭证上传失败，请重新打开账目补传。",
         confirmDelete: "确定删除这条账目吗？",
         save: "保存",
         saving: "保存中...",
@@ -120,43 +114,47 @@ function copy(locale: Locale) {
         createTitle: "新增账目",
         editTitle: "修改账目",
         autoEditHint: "自动生成的账目被修改后，会变成手动账目，后续订单同步不会覆盖这条修改。",
+        receipts: "凭证",
+        uploadReceipts: "上传凭证",
+        dragHint: "选择图片或 PDF",
+        fileCount: (count: number) => `${count} 个文件待上传`,
+        uploadFailed: "账目已保存，但凭证上传失败，请重新打开账目补传。",
+        remove: "移除",
         kindLabels: {
           OWNER_NET_EARNING: "车主净收益",
-          MANAGER_COMMISSION: "TATO 管理佣金",
-          EXPENSE_REIMBURSEMENT: "费用报销",
+          MANAGER_COMMISSION: "TATO 佣金",
+          EXPENSE_REIMBURSEMENT: "报销",
           MANUAL_ADJUSTMENT: "手动调整",
-          SETTLEMENT_PAYMENT: "结算付款",
+          SETTLEMENT_PAYMENT: "Payment",
         },
       }
     : {
-        currentBalance: "Current settlement balance",
+        title: "Ledger",
+        backPrefix: "Back",
+        viewAsOwner: "View as owner",
+        currentBalance: "Current balance",
         tatoOwesOwner: "TATO owes owner",
         ownerOwesTato: "Owner owes TATO",
         zeroBalance: "Settled",
-        monthlyStatement: "Monthly statement",
-        ledger: "Ledger",
-        chartTitle: "Last 12 months net",
-        empty: "No ledger items yet. Assign vehicles to this owner and resync, or add a manual item.",
-        month: "Month",
-        print: "Print statement",
-        addExpense: "Add expense",
+        periodSubtotal: "Period subtotal",
+        addExpense: "Add reimbursement",
         addPayment: "Record payment",
         addAdjustment: "Manual adjustment",
-        resync: "Resync orders",
+        resync: "Resync auto rows",
         resyncing: "Syncing...",
+        confirmResync: "Resyncing rebuilds automatic rows from orders. Manual rows and receipts are preserved. Continue?",
+        dateFrom: "From",
+        dateTo: "To",
+        clearDateRange: "Clear",
+        empty: "No ledger items yet. Assign vehicles to this owner and resync, or add a manual item.",
         date: "Date",
         type: "Type",
-        detail: "Detail",
-        credit: "Credit",
-        debit: "Debit",
-        balance: "Balance",
-        auto: "Auto",
+        detail: "Description",
+        credit: "Income",
+        debit: "Deductions",
+        auto: "auto",
         edit: "Edit",
         delete: "Delete",
-        receipts: "Receipts",
-        uploadReceipts: "Upload receipts",
-        receiptFileCount: (count: number) => `${count} file(s) ready`,
-        receiptUploadFailed: "The ledger item was saved, but receipt upload failed. Reopen it to retry.",
         confirmDelete: "Delete this ledger item?",
         save: "Save",
         saving: "Saving...",
@@ -172,23 +170,37 @@ function copy(locale: Locale) {
         createTitle: "Add ledger item",
         editTitle: "Edit ledger item",
         autoEditHint: "Editing an auto row turns it into a manual row so future order syncs will not overwrite it.",
+        receipts: "Receipts",
+        uploadReceipts: "Upload receipts",
+        dragHint: "Choose images or PDFs",
+        fileCount: (count: number) => `${count} file(s) ready`,
+        uploadFailed: "The ledger item was saved, but receipt upload failed. Reopen it to retry.",
+        remove: "Remove",
         kindLabels: {
           OWNER_NET_EARNING: "Owner net earning",
           MANAGER_COMMISSION: "TATO commission",
-          EXPENSE_REIMBURSEMENT: "Expense reimbursement",
-          MANUAL_ADJUSTMENT: "Manual adjustment",
-          SETTLEMENT_PAYMENT: "Settlement payment",
+          EXPENSE_REIMBURSEMENT: "Reimbursement",
+          MANUAL_ADJUSTMENT: "Adjustment",
+          SETTLEMENT_PAYMENT: "Payment",
         },
       };
 }
 
-function monthKey(value: string | Date) {
-  const date = new Date(value);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
 function toDateInput(value: string | Date) {
   return new Date(value).toISOString().slice(0, 10);
+}
+
+function isImageReceipt(receipt: Pick<LedgerReceipt, "contentType" | "filename" | "url">) {
+  if (receipt.contentType?.startsWith("image/")) return true;
+  return /\.(jpe?g|png|webp|gif|heic|heif|avif)$/i.test(receipt.filename || receipt.url);
+}
+
+function sortLedgerItems(items: LedgerItem[]) {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime() ||
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
 }
 
 export function OwnerLedgerManager({
@@ -197,7 +209,7 @@ export function OwnerLedgerManager({
   selectedOwner,
   vehicles,
   items,
-  ownerSelectBasePath = "/owners",
+  shareToken,
   ownerSelectRoute = "query",
 }: {
   locale: Locale;
@@ -205,73 +217,29 @@ export function OwnerLedgerManager({
   selectedOwner: OwnerOption;
   vehicles: VehicleOption[];
   items: LedgerItem[];
-  ownerSelectBasePath?: string;
+  shareToken?: string | null;
   ownerSelectRoute?: "query" | "ledger";
 }) {
   const labels = copy(locale);
-  const ownerSelectOptions = owners.map((owner) => ({ value: owner.id, label: owner.name }));
-  const ownerLabel = locale !== "en" ? "车主" : "Owner";
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const newest = [...items]
-      .filter((item) => STATEMENT_KINDS.has(item.kind))
-      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())[0];
-    return newest ? monthKey(newest.occurredAt) : monthKey(new Date());
-  });
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [isPending, startTransition] = useTransition();
-
-  const sortedItems = useMemo(
-    () =>
-      [...items].sort(
-        (a, b) =>
-          new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime() ||
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
-    [items],
-  );
-
-  const runningRows = useMemo(() => {
-    let running = 0;
-    return [...items]
-      .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime())
-      .map((item) => {
-        running += item.amount;
-        return { item, running };
-      })
-      .reverse();
-  }, [items]);
-
-  const statementItems = useMemo(
-    () => sortedItems.filter((item) => STATEMENT_KINDS.has(item.kind)),
-    [sortedItems],
-  );
-
-  const months = useMemo(() => {
-    const set = new Set(statementItems.map((item) => monthKey(item.occurredAt)));
-    set.add(monthKey(new Date()));
-    return Array.from(set).sort().reverse();
-  }, [statementItems]);
-  const monthSelectOptions = months.map((month) => ({ value: month, label: month }));
-
-  const selectedStatementItems = statementItems.filter((item) => monthKey(item.occurredAt) === selectedMonth);
-  const statementIncome = selectedStatementItems.filter((item) => item.amount > 0).reduce((sum, item) => sum + item.amount, 0);
-  const statementDeductions = selectedStatementItems.filter((item) => item.amount < 0).reduce((sum, item) => sum + item.amount, 0);
-  const statementNet = statementIncome + statementDeductions;
-  const totalBalance = items.reduce((sum, item) => sum + item.amount, 0);
-
-  const chartMonths = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 12 }, (_, index) => {
-      const date = new Date(now.getFullYear(), now.getMonth() - (11 - index), 1);
-      const key = monthKey(date);
-      const total = statementItems
-        .filter((item) => monthKey(item.occurredAt) === key)
-        .reduce((sum, item) => sum + item.amount, 0);
-      return { key, label: key.slice(5), total };
+  const ownerOptions = owners.map((owner) => ({ value: owner.id, label: owner.name }));
+  const sortedItems = useMemo(() => sortLedgerItems(items), [items]);
+  const totalBalance = useMemo(() => items.reduce((sum, item) => sum + item.amount, 0), [items]);
+  const filteredItems = useMemo(() => {
+    if (!dateFrom && !dateTo) return sortedItems;
+    return sortedItems.filter((item) => {
+      const value = item.occurredAt.slice(0, 10);
+      if (dateFrom && value < dateFrom) return false;
+      if (dateTo && value > dateTo) return false;
+      return true;
     });
-  }, [statementItems]);
-  const maxChartValue = Math.max(1, ...chartMonths.map((month) => Math.abs(month.total)));
+  }, [dateFrom, dateTo, sortedItems]);
+  const filterActive = Boolean(dateFrom || dateTo);
+  const periodSubtotal = filteredItems.reduce((sum, item) => sum + item.amount, 0);
 
   async function deleteItem(item: LedgerItem) {
     if (!confirm(labels.confirmDelete)) return;
@@ -284,6 +252,7 @@ export function OwnerLedgerManager({
   }
 
   async function resync() {
+    if (!confirm(labels.confirmResync)) return;
     const response = await fetch(`/api/owners/${selectedOwner.id}/ledger/resync`, {
       method: "POST",
     });
@@ -293,161 +262,143 @@ export function OwnerLedgerManager({
   }
 
   return (
-    <div className="space-y-3">
-      <section className="grid gap-2.5 lg:grid-cols-[1.05fr_1.5fr]">
-        <div className="rounded-lg border border-[var(--line)] bg-white/90 p-3 shadow-sm sm:p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--ink-soft)]">
-                {labels.currentBalance}
-              </p>
-              <p className="mt-1 font-serif text-[1.35rem] font-semibold text-[var(--ink)]">
-                {formatCurrency(Math.abs(totalBalance), locale)}
-              </p>
-              <p className="mt-0.5 text-[12px] text-[var(--ink-soft)]">
-                {totalBalance > 0
-                  ? labels.tatoOwesOwner
-                  : totalBalance < 0
-                    ? labels.ownerOwesTato
-                    : labels.zeroBalance}
-              </p>
-            </div>
-            <form>
-              <SearchableSelect
-                value={selectedOwner.id}
-                onChange={(value) =>
-                  router.push(
-                    ownerSelectRoute === "ledger"
-                      ? `/owners/${value}/ledger`
-                      : `${ownerSelectBasePath}?ownerId=${value}`,
-                  )
-                }
-                options={ownerSelectOptions}
-                placeholder={ownerLabel}
-                searchPlaceholder={ownerLabel}
-                className="h-9 rounded-md border border-[var(--line)] bg-white px-3 text-[12px]"
-              />
-            </form>
-          </div>
-
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <button
-              className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
-              onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.EXPENSE_REIMBURSEMENT })}
+    <div className="max-w-5xl p-3 sm:p-6">
+      <div className="mb-4">
+        <Link href={`/owners/${selectedOwner.id}`} className="text-sm text-neutral-500 hover:text-neutral-900">
+          &lt; {selectedOwner.name}
+        </Link>
+        <div className="mt-2 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between sm:gap-2">
+          <h1 className="text-2xl font-semibold">{labels.title}</h1>
+          {shareToken ? (
+            <a
+              href={`/share/${shareToken}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-blue-600 hover:underline"
             >
-              + {labels.addExpense}
-            </button>
-            <button
-              className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
-              onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.SETTLEMENT_PAYMENT })}
-            >
-              + {labels.addPayment}
-            </button>
-            <button
-              className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
-              onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.MANUAL_ADJUSTMENT })}
-            >
-              + {labels.addAdjustment}
-            </button>
-            <button
-              className="rounded-md bg-[var(--accent)] px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-50"
-              onClick={resync}
-              disabled={isPending}
-            >
-              {isPending ? labels.resyncing : labels.resync}
-            </button>
-          </div>
+              {labels.viewAsOwner} ↗
+            </a>
+          ) : null}
         </div>
+      </div>
 
-        <div className="rounded-lg border border-[var(--line)] bg-white/90 p-4 shadow-sm sm:p-5">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
-              {labels.chartTitle}
-            </p>
-            <p className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--ink)]">
-              {formatCurrency(statementNet, locale)} · {selectedMonth}
-            </p>
+      <section
+        className={cn(
+          "card mb-4 flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between",
+          totalBalance > 0
+            ? "border-emerald-200 bg-emerald-50"
+            : totalBalance < 0
+              ? "border-amber-200 bg-amber-50"
+              : "",
+        )}
+      >
+        <div>
+          <div className="text-xs uppercase tracking-wide text-neutral-500">{labels.currentBalance}</div>
+          <div className="mt-1 text-2xl font-semibold tabular-nums">
+            {formatCurrency(Math.abs(totalBalance), locale)}
           </div>
-          <div className="mt-4 flex h-36 items-end gap-2">
-            {chartMonths.map((month) => (
-              <div key={month.key} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-                <div className="flex h-28 w-full items-end rounded-full bg-slate-100 px-1">
-                  <div
-                    className={cn(
-                      "w-full rounded-full transition-all",
-                      month.total >= 0 ? "bg-[var(--accent)]" : "bg-rose-400",
-                    )}
-                    style={{ height: `${Math.max(6, (Math.abs(month.total) / maxChartValue) * 100)}%` }}
-                    title={`${month.key}: ${formatCurrency(month.total, locale)}`}
-                  />
-                </div>
-                <span className="text-[10px] text-[var(--ink-soft)]">{month.label}</span>
+          <div className="mt-1 text-sm text-neutral-600">
+            {totalBalance > 0
+              ? labels.tatoOwesOwner
+              : totalBalance < 0
+                ? labels.ownerOwesTato
+                : labels.zeroBalance}
+          </div>
+          {filterActive ? (
+            <div className="mt-3 border-t border-neutral-200/70 pt-3">
+              <div className="text-xs uppercase tracking-wide text-neutral-500">{labels.periodSubtotal}</div>
+              <div className="text-lg font-semibold tabular-nums">
+                {periodSubtotal >= 0 ? "+" : "-"}
+                {formatCurrency(Math.abs(periodSubtotal), locale)}
               </div>
-            ))}
-          </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid w-full grid-cols-2 gap-1.5 sm:w-auto sm:flex sm:flex-wrap sm:justify-end sm:gap-2">
+          <button
+            className="btn-secondary"
+            onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.EXPENSE_REIMBURSEMENT })}
+          >
+            + {labels.addExpense}
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.SETTLEMENT_PAYMENT })}
+          >
+            + {labels.addPayment}
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={() => setModal({ mode: "create", kind: OwnerLedgerKind.MANUAL_ADJUSTMENT })}
+          >
+            + {labels.addAdjustment}
+          </button>
+          <button className="btn-secondary" onClick={resync} disabled={isPending}>
+            ↻ {isPending ? labels.resyncing : labels.resync}
+          </button>
         </div>
       </section>
 
-      <section className="rounded-lg border border-[var(--line)] bg-white/90 p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
-              {labels.monthlyStatement}
-            </p>
-            <h2 className="mt-1 font-serif text-2xl font-semibold text-[var(--ink)]">
-              {selectedOwner.name} · {selectedMonth}
-            </h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <SearchableSelect
-              value={selectedMonth}
-              onChange={setSelectedMonth}
-              options={monthSelectOptions}
-              placeholder={labels.date}
-              searchPlaceholder={labels.date}
-              className="h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm"
-            />
-            <button
-              onClick={() => window.print()}
-              className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
-            >
-              {labels.print}
-            </button>
-          </div>
+      <section className="card mb-4 grid grid-cols-2 gap-2 p-2 sm:flex sm:flex-wrap sm:items-center">
+        <label className="inline-flex flex-col gap-1 text-xs text-neutral-500 sm:flex-row sm:items-center sm:gap-2">
+          {labels.dateFrom}
+          <input
+            type="date"
+            className="input text-sm"
+            value={dateFrom}
+            max={dateTo || undefined}
+            onChange={(event) => setDateFrom(event.target.value)}
+          />
+        </label>
+        <label className="inline-flex flex-col gap-1 text-xs text-neutral-500 sm:flex-row sm:items-center sm:gap-2">
+          {labels.dateTo}
+          <input
+            type="date"
+            className="input text-sm"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={(event) => setDateTo(event.target.value)}
+          />
+        </label>
+        {filterActive ? (
+          <button
+            type="button"
+            className="btn-secondary text-xs"
+            onClick={() => {
+              setDateFrom("");
+              setDateTo("");
+            }}
+          >
+            {labels.clearDateRange}
+          </button>
+        ) : null}
+        <div className="min-w-[12rem] sm:ml-auto">
+          <SearchableSelect
+            value={selectedOwner.id}
+            onChange={(value) =>
+              router.push(ownerSelectRoute === "ledger" ? `/owners/${value}/ledger` : `/owners?ownerId=${value}`)
+            }
+            options={ownerOptions}
+            placeholder={locale !== "en" ? "车主" : "Owner"}
+            searchPlaceholder={locale !== "en" ? "搜索车主" : "Search owner"}
+            className="h-10"
+          />
         </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <Metric label={labels.credit} value={formatCurrency(statementIncome, locale)} tone="positive" />
-          <Metric label={labels.debit} value={formatCurrency(Math.abs(statementDeductions), locale)} tone="negative" />
-          <Metric label="Net" value={formatCurrency(statementNet, locale)} tone={statementNet >= 0 ? "positive" : "negative"} />
-        </div>
-
-        <LedgerTable
-          labels={labels}
-          locale={locale}
-          rows={selectedStatementItems.map((item) => ({ item, running: 0 }))}
-          statementMode
-          onEdit={(item) => setModal({ mode: "edit", item })}
-          onDelete={deleteItem}
-        />
       </section>
 
-      <section className="rounded-lg border border-[var(--line)] bg-white/90 p-4 shadow-sm sm:p-5">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
-          {labels.ledger}
-        </p>
-        <LedgerTable
-          labels={labels}
-          locale={locale}
-          rows={runningRows}
-          onEdit={(item) => setModal({ mode: "edit", item })}
-          onDelete={deleteItem}
-        />
-      </section>
+      <LedgerRows
+        labels={labels}
+        locale={locale}
+        rows={filteredItems}
+        onEdit={(item) => setModal({ mode: "edit", item })}
+        onDelete={deleteItem}
+      />
 
       {modal ? (
         <LedgerModal
           labels={labels}
+          locale={locale}
           ownerId={selectedOwner.id}
           vehicles={vehicles}
           modal={modal}
@@ -462,133 +413,238 @@ export function OwnerLedgerManager({
   );
 }
 
-function Metric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "positive" | "negative";
-}) {
-  return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2">
-      <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--ink-soft)]">{label}</p>
-      <p className={cn("mt-0.5 text-base font-semibold", tone === "positive" ? "text-emerald-700" : "text-rose-700")}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function LedgerTable({
+function LedgerRows({
   labels,
   locale,
   rows,
-  statementMode = false,
   onEdit,
   onDelete,
 }: {
   labels: ReturnType<typeof copy>;
   locale: Locale;
-  rows: { item: LedgerItem; running: number }[];
-  statementMode?: boolean;
+  rows: LedgerItem[];
   onEdit: (item: LedgerItem) => void;
   onDelete: (item: LedgerItem) => void;
 }) {
   if (rows.length === 0) {
-    return <div className="mt-3 rounded-lg bg-slate-50 px-4 py-5 text-center text-[12px] text-[var(--ink-soft)]">{labels.empty}</div>;
+    return <div className="card p-10 text-center text-neutral-500">{labels.empty}</div>;
   }
 
   return (
-    <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--line)]">
-      <table className="min-w-[760px] w-full text-[12px]">
-        <thead className="bg-slate-50 text-left text-[10px] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
-          <tr>
-            <th className="px-3 py-2">{labels.date}</th>
-            <th className="px-3 py-2">{labels.type}</th>
-            <th className="px-3 py-2">{labels.detail}</th>
-            <th className="px-3 py-2 text-right">{labels.credit}</th>
-            <th className="px-3 py-2 text-right">{labels.debit}</th>
-            {!statementMode ? <th className="px-3 py-2 text-right">{labels.balance}</th> : null}
-            <th className="px-3 py-2" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[var(--line)] bg-white">
-          {rows.map(({ item, running }) => (
-            <tr key={item.id} className="align-top">
-              <td className="whitespace-nowrap px-3 py-3 text-[var(--ink-soft)]">
-                {formatDate(item.occurredAt, locale)}
-              </td>
-              <td className="px-3 py-3">
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-[var(--ink)]">
-                  {labels.kindLabels[item.kind]}
-                </span>
-                {item.isAuto ? (
-                  <span className="ml-1 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
-                    {labels.auto}
-                  </span>
-                ) : null}
-              </td>
-              <td className="px-3 py-3">
-                {item.vehicle ? (
-                  <p className="font-semibold text-[var(--ink)]">
-                    {item.vehicle.plateNumber} · {item.vehicle.nickname}
-                  </p>
-                ) : null}
-                {item.order ? (
-                  <p className="mt-0.5 text-xs text-[var(--ink-soft)]">
-                    {item.order.renterName} · {formatDate(item.order.pickupDatetime, locale)}
-                  </p>
-                ) : null}
-                {item.note ? (
-                  <p className="mt-1 whitespace-pre-wrap text-[13px] text-[var(--ink-soft)]">{item.note}</p>
-                ) : null}
-                {item.receipts?.length ? (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {item.receipts.map((receipt, index) => (
-                      <a
-                        key={receipt.id}
-                        href={receipt.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-md border border-[var(--line)] bg-white px-2 py-1 text-[11px] font-semibold text-[var(--ink)]"
-                      >
-                        {labels.receipts} {index + 1}
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
-              </td>
-              <td className="whitespace-nowrap px-3 py-3 text-right font-semibold text-emerald-700">
-                {item.amount > 0 ? formatCurrency(item.amount, locale) : ""}
-              </td>
-              <td className="whitespace-nowrap px-3 py-3 text-right font-semibold text-rose-700">
-                {item.amount < 0 ? formatCurrency(Math.abs(item.amount), locale) : ""}
-              </td>
-              {!statementMode ? (
-                <td className="whitespace-nowrap px-3 py-3 text-right text-[var(--ink-soft)]">
-                  {formatCurrency(running, locale)}
-                </td>
-              ) : null}
-              <td className="whitespace-nowrap px-3 py-3 text-right">
-                <button className="mr-3 text-xs font-semibold text-[var(--ink)]" onClick={() => onEdit(item)}>
-                  {labels.edit}
-                </button>
-                <button className="text-xs font-semibold text-rose-600" onClick={() => onDelete(item)}>
-                  {labels.delete}
-                </button>
-              </td>
+    <>
+      <div className="space-y-2 md:hidden">
+        {rows.map((item) => (
+          <article key={item.id} className="card p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs tabular-nums text-neutral-500">
+                  {formatDate(item.occurredAt, locale)}
+                </div>
+                <KindBadge labels={labels} item={item} />
+              </div>
+              <SignedAmount amount={item.amount} locale={locale} />
+            </div>
+            <ItemDetail labels={labels} locale={locale} item={item} />
+            <div className="mt-3 flex justify-end gap-3 border-t border-neutral-100 pt-3 text-sm">
+              <button className="text-neutral-600 hover:text-neutral-900" onClick={() => onEdit(item)}>
+                {labels.edit}
+              </button>
+              <button className="text-red-600 hover:text-red-800" onClick={() => onDelete(item)}>
+                {labels.delete}
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="card hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="bg-neutral-50">
+            <tr className="text-left">
+              <th className="px-3 py-2 font-medium">{labels.date}</th>
+              <th className="px-3 py-2 font-medium">{labels.type}</th>
+              <th className="px-3 py-2 font-medium">{labels.detail}</th>
+              <th className="px-3 py-2 text-right font-medium">{labels.credit}</th>
+              <th className="px-3 py-2 text-right font-medium">{labels.debit}</th>
+              <th className="px-3 py-2" />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {rows.map((item) => (
+              <tr key={item.id} className="group align-top hover:bg-neutral-50">
+                <td className="whitespace-nowrap px-3 py-3 text-neutral-600">
+                  {formatDate(item.occurredAt, locale)}
+                </td>
+                <td className="px-3 py-3">
+                  <KindBadge labels={labels} item={item} />
+                </td>
+                <td className="px-3 py-3">
+                  <ItemDetail labels={labels} locale={locale} item={item} compact />
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 text-right">
+                  {item.amount > 0 ? <SignedAmount amount={item.amount} locale={locale} /> : null}
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 text-right">
+                  {item.amount < 0 ? <SignedAmount amount={item.amount} locale={locale} /> : null}
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 text-right">
+                  <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100">
+                    <button className="text-xs font-semibold text-neutral-600" onClick={() => onEdit(item)}>
+                      {labels.edit}
+                    </button>
+                    <button className="text-xs font-semibold text-red-600" onClick={() => onDelete(item)}>
+                      {labels.delete}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function KindBadge({ labels, item }: { labels: ReturnType<typeof copy>; item: LedgerItem }) {
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+      <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs">{labels.kindLabels[item.kind]}</span>
+      {item.isAuto ? <span className="text-[10px] text-neutral-400">{labels.auto}</span> : null}
     </div>
+  );
+}
+
+function SignedAmount({ amount, locale }: { amount: number; locale: Locale }) {
+  return (
+    <span
+      className={cn(
+        "font-medium tabular-nums",
+        amount >= 0 ? "text-emerald-700" : "text-amber-700",
+      )}
+    >
+      {formatCurrency(amount, locale)}
+    </span>
+  );
+}
+
+function ItemDetail({
+  labels,
+  locale,
+  item,
+  compact = false,
+}: {
+  labels: ReturnType<typeof copy>;
+  locale: Locale;
+  item: LedgerItem;
+  compact?: boolean;
+}) {
+  return (
+    <div className={compact ? "" : "mt-3"}>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+        {item.vehicle ? (
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-blue-600" />
+            {item.vehicle.plateNumber} · {item.vehicle.nickname}
+          </span>
+        ) : null}
+        {item.order ? (
+          <span>
+            {item.order.renterName} · {formatDate(item.order.pickupDatetime, locale)} →{" "}
+            {formatDate(item.order.returnDatetime, locale)}
+          </span>
+        ) : null}
+      </div>
+      {item.note ? (
+        <div className="mt-1 whitespace-pre-wrap text-neutral-700">{item.note}</div>
+      ) : null}
+      <ReceiptPreviewList receipts={item.receipts ?? []} label={labels.receipts} />
+    </div>
+  );
+}
+
+function ReceiptPreviewList({
+  receipts,
+  label,
+  onRemove,
+}: {
+  receipts: LedgerReceipt[];
+  label: string;
+  onRemove?: (id: string) => void;
+}) {
+  const [preview, setPreview] = useState<LedgerReceipt | null>(null);
+  if (receipts.length === 0) return null;
+
+  return (
+    <>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {receipts.map((receipt) =>
+          isImageReceipt(receipt) ? (
+            <div key={receipt.id} className="group relative">
+              <button
+                type="button"
+                className="h-14 w-14 overflow-hidden rounded border border-neutral-200 bg-neutral-100 hover:opacity-90"
+                onClick={() => setPreview(receipt)}
+                title={receipt.filename || label}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={receipt.url} alt={receipt.filename || label} className="h-full w-full object-cover" />
+              </button>
+              {onRemove ? (
+                <button
+                  type="button"
+                  className="absolute right-1 top-1 h-5 w-5 rounded-full bg-red-600 text-xs text-white opacity-0 group-hover:opacity-100"
+                  onClick={() => onRemove(receipt.id)}
+                >
+                  x
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <a
+              key={receipt.id}
+              href={receipt.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+            >
+              {receipt.filename || label}
+            </a>
+          ),
+        )}
+      </div>
+      {preview ? (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setPreview(null)}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded text-3xl leading-none text-white hover:bg-white/10"
+            onClick={(event) => {
+              event.stopPropagation();
+              setPreview(null);
+            }}
+            aria-label="Close"
+          >
+            x
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview.url}
+            alt={preview.filename || label}
+            className="max-h-full max-w-full object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      ) : null}
+    </>
   );
 }
 
 function LedgerModal({
   labels,
+  locale,
   ownerId,
   vehicles,
   modal,
@@ -596,6 +652,7 @@ function LedgerModal({
   onSaved,
 }: {
   labels: ReturnType<typeof copy>;
+  locale: Locale;
   ownerId: string;
   vehicles: VehicleOption[];
   modal: NonNullable<ModalState>;
@@ -605,6 +662,7 @@ function LedgerModal({
   const isEdit = modal.mode === "edit";
   const initialItem = modal.mode === "edit" ? modal.item : null;
   const fixedKind = modal.mode === "edit" ? modal.item.kind : modal.kind;
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [kind, setKind] = useState<OwnerLedgerKind>(fixedKind);
   const [amount, setAmount] = useState(
     initialItem
@@ -621,32 +679,25 @@ function LedgerModal({
   );
   const [vehicleId, setVehicleId] = useState(initialItem?.vehicleId ?? "");
   const [note, setNote] = useState(initialItem?.note ?? "");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const existingReceipts = initialItem?.receipts ?? [];
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const kindOptions = [
-    {
-      value: OwnerLedgerKind.EXPENSE_REIMBURSEMENT,
-      label: labels.kindLabels.EXPENSE_REIMBURSEMENT,
-    },
-    {
-      value: OwnerLedgerKind.SETTLEMENT_PAYMENT,
-      label: labels.kindLabels.SETTLEMENT_PAYMENT,
-    },
-    {
-      value: OwnerLedgerKind.MANUAL_ADJUSTMENT,
-      label: labels.kindLabels.MANUAL_ADJUSTMENT,
-    },
-  ];
-  const directionOptions = [
-    { value: "managerToOwner", label: labels.managerToOwner },
-    { value: "ownerToManager", label: labels.ownerToManager },
+    { value: OwnerLedgerKind.EXPENSE_REIMBURSEMENT, label: labels.kindLabels.EXPENSE_REIMBURSEMENT },
+    { value: OwnerLedgerKind.SETTLEMENT_PAYMENT, label: labels.kindLabels.SETTLEMENT_PAYMENT },
+    { value: OwnerLedgerKind.MANUAL_ADJUSTMENT, label: labels.kindLabels.MANUAL_ADJUSTMENT },
   ];
   const vehicleOptions = [
     { value: "", label: labels.noVehicle },
     ...vehicles.map((vehicle) => ({ value: vehicle.id, label: vehicle.label })),
   ];
+
+  function appendFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setReceiptFiles((current) => [...current, ...Array.from(files)]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   async function save() {
     const parsed = Number(amount);
@@ -667,9 +718,7 @@ function LedgerModal({
     setSaving(true);
     setError(null);
     const response = await fetch(
-      isEdit
-        ? `/api/owners/${ownerId}/ledger/${initialItem!.id}`
-        : `/api/owners/${ownerId}/ledger`,
+      isEdit ? `/api/owners/${ownerId}/ledger/${initialItem!.id}` : `/api/owners/${ownerId}/ledger`,
       {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -695,13 +744,13 @@ function LedgerModal({
     if (savedItemId && receiptFiles.length > 0) {
       const formData = new FormData();
       receiptFiles.forEach((file) => formData.append("files", file));
-      const receiptResponse = await fetch(
-        `/api/owners/${ownerId}/ledger/${savedItemId}/receipts`,
-        { method: "POST", body: formData },
-      );
+      const receiptResponse = await fetch(`/api/owners/${ownerId}/ledger/${savedItemId}/receipts`, {
+        method: "POST",
+        body: formData,
+      });
       if (!receiptResponse.ok) {
         setSaving(false);
-        setError(labels.receiptUploadFailed);
+        setError(labels.uploadFailed);
         return;
       }
     }
@@ -711,161 +760,113 @@ function LedgerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
-              {isEdit ? labels.editTitle : labels.createTitle}
-            </p>
-            <h3 className="mt-1 font-serif text-2xl font-semibold text-[var(--ink)]">
-              {labels.kindLabels[kind]}
-            </h3>
-          </div>
-          <button className="rounded-md border border-[var(--line)] px-3 py-1 text-sm" onClick={onClose}>
-            {labels.cancel}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-5 shadow-xl">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <h3 className="text-lg font-semibold">{isEdit ? labels.editTitle : labels.createTitle}</h3>
+          <button
+            type="button"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-2xl leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            onClick={onClose}
+            aria-label={labels.cancel}
+          >
+            x
           </button>
         </div>
 
-        {initialItem?.isAuto ? (
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            {labels.autoEditHint}
-          </p>
-        ) : null}
-        {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
+        {initialItem?.isAuto ? <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{labels.autoEditHint}</p> : null}
+        {error ? <p className="mb-3 text-sm text-rose-600">{error}</p> : null}
 
-        <div className="mt-4 grid gap-3">
+        <div className="space-y-3">
           {!isEdit ? (
-            <label className="grid gap-1 text-sm font-medium">
-              {labels.type}
-              <SearchableSelect
-                value={kind}
-                onChange={(value) => setKind(value as OwnerLedgerKind)}
-                options={kindOptions}
-                placeholder={labels.type}
-                searchPlaceholder={labels.type}
-                className="h-11 rounded-md border border-[var(--line)] bg-white px-3"
-              />
-            </label>
+            <div>
+              <label className="label">{labels.type}</label>
+              <SearchableSelect value={kind} onChange={(value) => setKind(value as OwnerLedgerKind)} options={kindOptions} />
+            </div>
           ) : null}
 
           {kind === OwnerLedgerKind.SETTLEMENT_PAYMENT ? (
-            <label className="grid gap-1 text-sm font-medium">
-              {labels.direction}
+            <div>
+              <label className="label">{labels.direction}</label>
               <SearchableSelect
                 value={direction}
                 onChange={(value) => setDirection(value as "managerToOwner" | "ownerToManager")}
-                options={directionOptions}
-                placeholder={labels.direction}
-                searchPlaceholder={labels.direction}
-                className="h-11 rounded-md border border-[var(--line)] bg-white px-3"
+                options={[
+                  { value: "managerToOwner", label: labels.managerToOwner },
+                  { value: "ownerToManager", label: labels.ownerToManager },
+                ]}
               />
-            </label>
+            </div>
           ) : null}
 
-          <label className="grid gap-1 text-sm font-medium">
-            {kind === OwnerLedgerKind.MANUAL_ADJUSTMENT ? labels.signedAmount : labels.amount}
+          <div>
+            <label className="label">{kind === OwnerLedgerKind.MANUAL_ADJUSTMENT ? labels.signedAmount : labels.amount}</label>
             <input
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
+              onBlur={(event) => setAmount(formatCurrencyInputText(event.target.value))}
               type="number"
               step="0.01"
-              className="h-11 rounded-md border border-[var(--line)] bg-white px-3"
+              className="input"
             />
-          </label>
+          </div>
 
-          <label className="grid gap-1 text-sm font-medium">
-            {labels.date}
+          <div>
+            <label className="label">{labels.date}</label>
+            <input value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} type="date" className="input" />
+          </div>
+
+          <div>
+            <label className="label">{labels.vehicle}</label>
+            <SearchableSelect value={vehicleId} onChange={setVehicleId} options={vehicleOptions} placeholder={labels.noVehicle} />
+          </div>
+
+          <div>
+            <label className="label">{labels.note}</label>
+            <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} className="input" />
+          </div>
+
+          <div>
+            <label className="label">{labels.receipts}</label>
             <input
-              value={occurredAt}
-              onChange={(event) => setOccurredAt(event.target.value)}
-              type="date"
-              className="h-11 rounded-md border border-[var(--line)] bg-white px-3"
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={(event) => appendFiles(event.target.files)}
             />
-          </label>
-
-          <label className="grid gap-1 text-sm font-medium">
-            {labels.vehicle}
-            <SearchableSelect
-              value={vehicleId}
-              onChange={setVehicleId}
-              options={vehicleOptions}
-              placeholder={labels.noVehicle}
-              searchPlaceholder={labels.vehicle}
-              className="h-11 rounded-md border border-[var(--line)] bg-white px-3"
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm font-medium">
-            {labels.note}
-            <textarea
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              rows={3}
-              className="rounded-md border border-[var(--line)] bg-white px-3 py-2"
-            />
-          </label>
-
-          {kind === OwnerLedgerKind.EXPENSE_REIMBURSEMENT ? (
-            <div className="grid gap-2 text-sm font-medium">
-              {labels.receipts}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,application/pdf"
-                multiple
-                className="hidden"
-                onChange={(event) => {
-                  const files = event.target.files ? Array.from(event.target.files) : [];
-                  setReceiptFiles((current) => [...current, ...files]);
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-              />
-              <div className="rounded-lg border border-dashed border-[var(--line)] bg-slate-50 px-3 py-3">
-                <button
-                  type="button"
-                  className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={saving}
-                >
-                  {labels.uploadReceipts}
-                </button>
-                {receiptFiles.length > 0 ? (
-                  <div className="mt-2 space-y-1 text-xs text-[var(--ink-soft)]">
-                    <p>{labels.receiptFileCount(receiptFiles.length)}</p>
-                    {receiptFiles.map((file, index) => (
-                      <div
-                        key={`${file.name}-${file.size}-${index}`}
-                        className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1"
-                      >
-                        <span className="min-w-0 truncate">{file.name}</span>
-                        <button
-                          type="button"
-                          className="shrink-0 text-rose-600"
-                          onClick={() =>
-                            setReceiptFiles((current) =>
-                              current.filter((_, itemIndex) => itemIndex !== index),
-                            )
-                          }
-                        >
-                          x
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+            <div className="rounded-lg border-2 border-dashed border-neutral-300 px-3 py-3">
+              <button type="button" className="btn-secondary text-sm" disabled={saving} onClick={() => fileInputRef.current?.click()}>
+                {labels.uploadReceipts}
+              </button>
+              <span className="ml-2 text-xs text-neutral-500">{labels.dragHint}</span>
             </div>
-          ) : null}
+            <ReceiptPreviewList receipts={existingReceipts} label={labels.receipts} />
+            {receiptFiles.length > 0 ? (
+              <div className="mt-2 space-y-1 text-xs text-neutral-500">
+                <p>{labels.fileCount(receiptFiles.length)}</p>
+                {receiptFiles.map((file, index) => (
+                  <div key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between rounded bg-neutral-50 px-2 py-1">
+                    <span className="min-w-0 truncate">{file.name}</span>
+                    <button
+                      type="button"
+                      className="text-red-600"
+                      onClick={() => setReceiptFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    >
+                      {labels.remove}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        <button
-          className="mt-5 h-11 w-full rounded-md bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-50"
-          onClick={save}
-          disabled={saving}
-        >
-          {saving ? labels.saving : labels.save}
-        </button>
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="btn-secondary" onClick={onClose} disabled={saving}>{labels.cancel}</button>
+          <button className="btn-primary" onClick={save} disabled={saving || !amount}>{saving ? labels.saving : labels.save}</button>
+        </div>
       </div>
     </div>
   );

@@ -95,9 +95,11 @@ const orderSchema = z.object({
 const turoSyncSettingsSchema = z.object({
   csvUrl: z.string().trim().optional(),
   csvYear: z.coerce.number().int().min(2010).max(2100).optional(),
+  csvCurl: z.string().trim().optional(),
   csvAuthHeader: z.string().trim().optional(),
   csvHeaders: z.string().trim().optional(),
   csvMapping: z.string().trim().optional(),
+  clearSyncHeaders: z.boolean(),
   createMissingVehicles: z.boolean(),
   archiveMissingOrders: z.boolean(),
 });
@@ -164,31 +166,221 @@ function normalizeJsonObjectText(value: string | null): string | null | "INVALID
   }
 }
 
+function parseStoredJsonObject(value: string | null | undefined) {
+  if (!value?.trim()) return {};
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).flatMap(([key, raw]) =>
+        typeof raw === "string" ? [[key, raw]] : [],
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function tokenizeCurlCommand(value: string) {
+  const tokens: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
+  let escaping = false;
+  const normalizedValue = value.replace(/\\\r?\n/g, " ");
+
+  for (const char of normalizedValue) {
+    if (escaping) {
+      current += char;
+      escaping = false;
+      continue;
+    }
+
+    if (char === "\\" && quote !== "'") {
+      escaping = true;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      if (current === "$") current = "";
+      quote = char;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      if (current) {
+        tokens.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (escaping || quote) return null;
+  if (current) tokens.push(current);
+  return tokens;
+}
+
+const turoCurlHeaderAllowlist = new Set([
+  "accept",
+  "accept-language",
+  "authorization",
+  "content-type",
+  "cookie",
+  "origin",
+  "referer",
+  "user-agent",
+  "x-csrf-token",
+  "x-requested-with",
+  "x-xsrf-token",
+]);
+
+function normalizeTuroDownloadUrl(value: string) {
+  const url = new URL(value.replaceAll("{year}", String(new Date().getFullYear())));
+  const yearValue = Number.parseInt(url.searchParams.get("year") ?? "", 10);
+  const year = Number.isFinite(yearValue) ? yearValue : null;
+
+  if (url.hostname === "turo.com" && url.pathname === "/api/earnings/download") {
+    url.searchParams.set("year", "{year}");
+    return {
+      url: url.toString().replaceAll("%7Byear%7D", "{year}"),
+      year,
+    };
+  }
+
+  return { url: value, year };
+}
+
+function parseTuroCurlCommand(value: string | null) {
+  if (!value) return null;
+  const tokens = tokenizeCurlCommand(value);
+  if (!tokens || tokens.length === 0 || tokens[0] !== "curl") return "INVALID" as const;
+
+  let urlValue: string | null = null;
+  const headers: Record<string, string> = {};
+
+  for (let index = 1; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    const nextToken = tokens[index + 1];
+    const inlineHeader = token.startsWith("--header=")
+      ? token.slice("--header=".length)
+      : token.startsWith("-H") && token.length > 2
+        ? token.slice(2)
+        : null;
+    const inlineUrl = token.startsWith("--url=") ? token.slice("--url=".length) : null;
+    const inlineCookie = token.startsWith("--cookie=")
+      ? token.slice("--cookie=".length)
+      : token.startsWith("-b") && token.length > 2
+        ? token.slice(2)
+        : null;
+
+    if ((token === "-H" || token === "--header" || inlineHeader) && (nextToken || inlineHeader)) {
+      const rawHeader = inlineHeader ?? nextToken ?? "";
+      const separatorIndex = rawHeader.indexOf(":");
+      if (separatorIndex > 0) {
+        const headerName = rawHeader.slice(0, separatorIndex).trim();
+        const headerValue = rawHeader.slice(separatorIndex + 1).trim();
+        const normalizedName = headerName.toLowerCase();
+        if (turoCurlHeaderAllowlist.has(normalizedName) && headerValue) {
+          headers[headerName] = headerValue;
+        }
+      }
+      if (!inlineHeader) index += 1;
+      continue;
+    }
+
+    if ((token === "-b" || token === "--cookie" || inlineCookie) && (nextToken || inlineCookie)) {
+      headers.Cookie = (inlineCookie ?? nextToken ?? "").trim();
+      if (!inlineCookie) index += 1;
+      continue;
+    }
+
+    if (inlineUrl) {
+      urlValue = inlineUrl;
+      continue;
+    }
+
+    if ((token === "--url" || token === "-X" || token === "--request") && nextToken) {
+      if (token === "--url") urlValue = nextToken;
+      index += 1;
+      continue;
+    }
+
+    if (!token.startsWith("-") && /^https?:\/\//i.test(token) && !urlValue) {
+      urlValue = token;
+    }
+  }
+
+  if (!urlValue) return "INVALID" as const;
+
+  try {
+    const normalized = normalizeTuroDownloadUrl(urlValue);
+    return {
+      url: normalized.url,
+      year: normalized.year,
+      headers,
+    };
+  } catch {
+    return "INVALID" as const;
+  }
+}
+
 export async function saveTuroSyncSettingsAction(formData: FormData) {
   const { workspace, user } = await requireCurrentAdminContext();
   const parsed = turoSyncSettingsSchema.parse({
     csvUrl: formData.get("csvUrl")?.toString(),
     csvYear: formData.get("csvYear")?.toString(),
+    csvCurl: formData.get("csvCurl")?.toString(),
     csvAuthHeader: formData.get("csvAuthHeader")?.toString(),
     csvHeaders: formData.get("csvHeaders")?.toString(),
     csvMapping: formData.get("csvMapping")?.toString(),
+    clearSyncHeaders: formData.get("clearSyncHeaders") === "on",
     createMissingVehicles: formData.get("createMissingVehicles") === "on",
     archiveMissingOrders: formData.get("archiveMissingOrders") === "on",
   });
 
-  const csvUrl = cleanText(parsed.csvUrl);
+  const existingConfig = await prisma.turoSyncConfig.findUnique({
+    where: { workspaceId: workspace.id },
+  });
+  const curlConfig = parseTuroCurlCommand(cleanText(parsed.csvCurl));
+  if (curlConfig === "INVALID") {
+    redirect("/imports?turoSync=invalid-curl");
+  }
+
+  const csvUrl = curlConfig?.url ?? cleanText(parsed.csvUrl);
   if (!isValidUrl(csvUrl)) {
     redirect("/imports?turoSync=invalid-url");
   }
 
-  const csvHeaders = normalizeJsonObjectText(cleanText(parsed.csvHeaders));
+  const normalizedManualHeaders = normalizeJsonObjectText(cleanText(parsed.csvHeaders));
   const csvMapping = normalizeJsonObjectText(cleanText(parsed.csvMapping));
-  if (csvHeaders === "INVALID" || csvMapping === "INVALID") {
+  if (normalizedManualHeaders === "INVALID" || csvMapping === "INVALID") {
     redirect("/imports?turoSync=invalid-json");
   }
 
-  const csvAuthHeader = cleanText(parsed.csvAuthHeader);
-  const csvYear = cleanYear(parsed.csvYear);
+  const curlHeaders =
+    curlConfig && Object.keys(curlConfig.headers).length > 0
+      ? JSON.stringify(curlConfig.headers)
+      : null;
+  const csvHeaders =
+    parsed.clearSyncHeaders
+      ? null
+      : curlHeaders ?? normalizedManualHeaders ?? existingConfig?.csvHeaders ?? null;
+  const csvAuthHeader =
+    parsed.clearSyncHeaders
+      ? null
+      : cleanText(parsed.csvAuthHeader) ?? existingConfig?.csvAuthHeader ?? null;
+  const csvYear = curlConfig?.year ?? cleanYear(parsed.csvYear);
   await prisma.turoSyncConfig.upsert({
     where: { workspaceId: workspace.id },
     update: {
@@ -225,6 +417,8 @@ export async function saveTuroSyncSettingsAction(formData: FormData) {
       csvYear,
       hasAuthHeader: Boolean(csvAuthHeader),
       hasHeaders: Boolean(csvHeaders),
+      importedCurlHeaders: Boolean(curlConfig),
+      storedHeaderNames: Object.keys(parseStoredJsonObject(csvHeaders)),
       hasMapping: Boolean(csvMapping),
       createMissingVehicles: parsed.createMissingVehicles,
       archiveMissingOrders: parsed.archiveMissingOrders,

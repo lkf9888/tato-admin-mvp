@@ -30,6 +30,9 @@ export default async function ImportsPage({
   const turoSyncNotice = getTuroSyncSettingsNotice(params.turoSync, locale);
   const turoSyncYear = turoSyncConfig?.csvYear ?? new Date().getFullYear();
   const turoYearOptions = getTuroSyncYearOptions(turoSyncYear);
+  const hasSavedRequestHeaders = Boolean(
+    turoSyncConfig?.csvAuthHeader || turoSyncConfig?.csvHeaders,
+  );
 
   return (
     <div className="space-y-3">
@@ -89,13 +92,27 @@ export default async function ImportsPage({
             <span className="block pt-1">{turoSyncMessages.discoveredEndpointHint}</span>
           </div>
 
+          <label className="grid gap-1">
+            <span className="font-medium text-slate-700">{turoSyncMessages.curlLabel}</span>
+            <textarea
+              name="csvCurl"
+              placeholder="curl 'https://turo.com/api/earnings/download?year=2026' -H 'cookie: ...'"
+              rows={4}
+              className="border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-[11px] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+            <span className="text-[11px] leading-4 text-slate-500">{turoSyncMessages.curlHint}</span>
+          </label>
+
           <div className="grid gap-2 md:grid-cols-2">
             <label className="grid gap-1">
               <span className="font-medium text-slate-700">{turoSyncMessages.authHeader}</span>
               <input
                 name="csvAuthHeader"
-                defaultValue={turoSyncConfig?.csvAuthHeader ?? ""}
-                placeholder="Bearer ..."
+                placeholder={
+                  turoSyncConfig?.csvAuthHeader
+                    ? turoSyncMessages.savedSecretPlaceholder
+                    : "Bearer ..."
+                }
                 className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
               />
             </label>
@@ -103,12 +120,25 @@ export default async function ImportsPage({
               <span className="font-medium text-slate-700">{turoSyncMessages.headers}</span>
               <input
                 name="csvHeaders"
-                defaultValue={turoSyncConfig?.csvHeaders ?? ""}
-                placeholder='{"x-api-key":"..."}'
+                placeholder={
+                  turoSyncConfig?.csvHeaders
+                    ? turoSyncMessages.savedSecretPlaceholder
+                    : '{"x-api-key":"..."}'
+                }
                 className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
               />
             </label>
           </div>
+
+          {hasSavedRequestHeaders ? (
+            <label className="flex items-start gap-2 border border-slate-200 bg-slate-50 px-3 py-2">
+              <input name="clearSyncHeaders" type="checkbox" className="mt-0.5" />
+              <span>
+                <span className="block font-medium text-slate-700">{turoSyncMessages.clearHeaders}</span>
+                <span className="text-[11px] leading-4 text-slate-500">{turoSyncMessages.clearHeadersHint}</span>
+              </span>
+            </label>
+          ) : null}
 
           <label className="grid gap-1">
             <span className="font-medium text-slate-700">{turoSyncMessages.mapping}</span>
@@ -237,6 +267,12 @@ function getTuroSyncSettingsCopy(locale: Locale) {
         discoveredEndpointLabel: "Turo 下载接口：",
         discoveredEndpointHint:
           "Turo 的 Download CSV 按钮会调用这个接口，但它需要 Turo 登录态；如果直接同步出现 403，需要提供有效授权或继续手动下载上传。",
+        curlLabel: "粘贴 Turo Download CSV cURL（推荐）",
+        curlHint:
+          "从 Chrome DevTools 的 Network 里对 download 请求使用 Copy as cURL。保存后不会回显 Cookie 或 Authorization。",
+        savedSecretPlaceholder: "已保存，留空表示保持不变",
+        clearHeaders: "清除已保存请求 Header",
+        clearHeadersHint: "勾选后会删除已保存的 Cookie、Authorization 和额外 Headers。",
         authHeader: "Authorization Header（可选）",
         headers: "额外请求 Headers JSON（可选）",
         mapping: "字段映射 JSON（可选）",
@@ -257,6 +293,12 @@ function getTuroSyncSettingsCopy(locale: Locale) {
         discoveredEndpointLabel: "Turo download endpoint:",
         discoveredEndpointHint:
           "Turo's Download CSV button calls this endpoint, but it requires a logged-in Turo session. If sync returns 403, provide valid auth or keep uploading the downloaded file manually.",
+        curlLabel: "Paste Turo Download CSV cURL (recommended)",
+        curlHint:
+          "Use Copy as cURL on the download request in Chrome DevTools Network. Saved Cookie or Authorization values are not shown back on this page.",
+        savedSecretPlaceholder: "Saved; leave blank to keep unchanged",
+        clearHeaders: "Clear saved request headers",
+        clearHeadersHint: "Removes saved Cookie, Authorization, and extra headers.",
         authHeader: "Authorization header (optional)",
         headers: "Extra request headers JSON (optional)",
         mapping: "Field mapping JSON (optional)",
@@ -287,11 +329,13 @@ function getTuroSyncSettingsNotice(status: string | undefined, locale: Locale) {
           saved: "Turo 同步设置已保存。",
           invalidUrl: "CSV URL 无效，请填写 http 或 https 开头的直接下载链接。",
           invalidJson: "Headers 或字段映射必须是有效 JSON 对象。",
+          invalidCurl: "cURL 无法解析，请确认复制的是 Turo download 请求的 Copy as cURL。",
         }
       : {
           saved: "Turo sync settings saved.",
           invalidUrl: "The CSV URL is invalid. Use a direct http or https download link.",
           invalidJson: "Headers and field mapping must be valid JSON objects.",
+          invalidCurl: "The cURL could not be parsed. Copy the Turo download request as cURL.",
         };
 
   if (status === "saved") {
@@ -312,6 +356,13 @@ function getTuroSyncSettingsNotice(status: string | undefined, locale: Locale) {
     return {
       className: `${baseClass} border-rose-200 bg-rose-50 text-rose-700`,
       message: messages.invalidJson,
+    };
+  }
+
+  if (status === "invalid-curl") {
+    return {
+      className: `${baseClass} border-rose-200 bg-rose-50 text-rose-700`,
+      message: messages.invalidCurl,
     };
   }
 

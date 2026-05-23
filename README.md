@@ -118,6 +118,7 @@ TURO_SYNC_SECRET=
 - 环境变量 `TURO_SYNC_CSV_URL` 和 `TURO_SYNC_CSV_PATH` 二选一；URL 适合私有/签名 CSV 地址，PATH 适合持久卷里的文件
 - Turo Earnings 页面的下载按钮当前会请求 `https://turo.com/api/earnings/download?year=2026` 这类地址；页面里可以保存下载年份，URL 写成 `https://turo.com/api/earnings/download?year={year}` 时会自动替换年份
 - Turo 的下载接口需要登录态；普通 Railway 后端直接访问通常会返回 `403`。要做全自动同步，需要提供 Turo 允许的有效授权 Header，或改用手动下载 CSV 后上传
+- 最省事的配置方式：在 Chrome 打开 Turo Earnings 页，打开 DevTools 的 Network，点击 `Download CSV`，找到 `/api/earnings/download?year=...` 请求，右键 `Copy as cURL`，粘贴到 TATO 的 `粘贴 Turo Download CSV cURL` 输入框保存。TATO 会解析 URL、年份和必要 Header，保存后不会回显 Cookie 或 Authorization
 - 如果 URL 需要鉴权，可在页面里填写 Authorization Header 或额外 Headers JSON；环境变量兜底为 `TURO_SYNC_CSV_AUTH_HEADER` / `TURO_SYNC_CSV_HEADERS`
 - 如真实 Turo CSV 表头和默认识别不同，可在页面里填写字段映射 JSON，或用 `TURO_SYNC_CSV_MAPPING` 兜底；支持 `{"Reservation ID":"externalOrderId"}` 或 `{"externalOrderId":"Reservation ID"}`
 - `TURO_SYNC_ARCHIVE_MISSING` 默认保持 `false`，避免部分导出的 CSV 把历史 Turo 订单误归档；只有当 CSV 是完整订单来源时再改成 `true`

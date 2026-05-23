@@ -1,7 +1,9 @@
 import { createShareLinkAction, deleteOwnerAction, saveOwnerAction } from "@/app/actions";
+import { DateTimeField } from "@/components/date-time-field";
 import { DeleteShareLinkButton } from "@/components/delete-share-link-button";
 import { OwnerLedgerManager } from "@/components/owner-ledger-manager";
 import { OwnerVehicleAssignmentForm } from "@/components/owner-vehicle-assignment-form";
+import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getShareVisibilityOptions } from "@/lib/i18n";
@@ -41,6 +43,12 @@ export default async function OwnersPage({
   const ownerMessages = messages.owners;
   const shareLinkMessages = messages.shareLinks;
   const shareVisibilityOptions = getShareVisibilityOptions(locale);
+  const ownerSelectOptions = owners.map((owner) => ({ value: owner.id, label: owner.name }));
+  const shareVisibilitySelectOptions = shareVisibilityOptions.map((option) => ({
+    value: option.value,
+    label: option.label,
+  }));
+  const visibilityLabel = locale === "zh" ? "可见范围" : "Visibility";
   const selectedOwner = owners.find((owner) => owner.id === params.ownerId) ?? owners[0] ?? null;
   const ledgerItems = selectedOwner
     ? await prisma.ownerLedgerItem.findMany({
@@ -298,34 +306,28 @@ export default async function OwnersPage({
             {shareLinkMessages.createKicker}
           </p>
           <form action="/api/share-links/create" method="post" className="mt-3 grid gap-2 text-[12px] md:grid-cols-2 xl:grid-cols-4">
-            <select name="ownerId" className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              {owners.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.name}
-                </option>
-              ))}
-            </select>
-            <select
+            <SearchableSelect
+              name="ownerId"
+              defaultValue={owners[0]?.id ?? ""}
+              options={ownerSelectOptions}
+              placeholder={ownerMessages.placeholders.name}
+              searchPlaceholder={ownerMessages.placeholders.name}
+              className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+            />
+            <SearchableSelect
               name="visibility"
               defaultValue="standard"
+              options={shareVisibilitySelectOptions}
+              placeholder={visibilityLabel}
+              searchPlaceholder={visibilityLabel}
               className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-            >
-              {shareVisibilityOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            />
             <input
               name="password"
               placeholder={shareLinkMessages.optionalPassword}
               className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
             />
-            <input
-              name="expiresAt"
-              type="datetime-local"
-              className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-            />
+            <DateTimeField name="expiresAt" className="min-w-0 xl:col-span-1" />
             <button className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white xl:col-span-1">
               {shareLinkMessages.generateLink}
             </button>

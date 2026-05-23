@@ -1,5 +1,6 @@
 import { saveTuroSyncSettingsAction } from "@/app/actions";
 import { CsvImportPanel } from "@/components/csv-import-panel";
+import { SearchableSelect } from "@/components/searchable-select";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getWorkspaceBillingSnapshot } from "@/lib/billing";
 import type { Locale } from "@/lib/i18n";
@@ -70,17 +71,14 @@ export default async function ImportsPage({
             </label>
             <label className="grid gap-1">
               <span className="font-medium text-slate-700">{turoSyncMessages.csvYear}</span>
-              <select
+              <SearchableSelect
                 name="csvYear"
-                defaultValue={turoSyncYear}
+                defaultValue={String(turoSyncYear)}
+                options={turoYearOptions.map((year) => ({ value: String(year), label: String(year) }))}
+                placeholder={turoSyncMessages.csvYear}
+                searchPlaceholder={turoSyncMessages.csvYear}
                 className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-              >
-                {turoYearOptions.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
           </div>
 

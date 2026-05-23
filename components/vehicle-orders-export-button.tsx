@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { SearchableSelect } from "@/components/searchable-select";
 import { getMessages, type Locale } from "@/lib/i18n";
 
 type VehicleExportOption = {
@@ -164,19 +165,22 @@ export function VehicleOrdersExportButton({
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)] sm:col-span-3">
                 <span>{calendarMessages.vehicleField}</span>
-                <select
+                <SearchableSelect
                   value={vehicleId}
-                  onChange={(event) => setVehicleId(event.target.value)}
+                  onChange={setVehicleId}
+                  options={vehicleOptions.map((vehicle) => ({
+                    value: vehicle.id,
+                    label: vehicle.plateNumber
+                      ? `${vehicle.plateNumber} · ${vehicle.label}`
+                      : vehicle.label,
+                    searchText: [vehicle.plateNumber, vehicle.label, vehicle.secondaryLabel]
+                      .filter(Boolean)
+                      .join(" "),
+                  }))}
+                  placeholder={calendarMessages.vehicleField}
+                  searchPlaceholder={calendarMessages.searchVehiclesPlaceholder}
                   className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 py-3 text-[13px] text-[color:var(--ink)] outline-none"
-                >
-                  {vehicleOptions.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.plateNumber
-                        ? `${vehicle.plateNumber} · ${vehicle.label}`
-                        : vehicle.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
 
               <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">

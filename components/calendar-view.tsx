@@ -4,10 +4,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { type EditableOrder, OrderDetailModal } from "@/components/order-detail-modal";
+import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-button";
 import { getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
-import { cn, formatDate } from "@/lib/utils";
+import {
+  cn,
+  formatDate,
+  formatDateInputDisplay,
+  formatTime as formatTime24,
+  formatTimeInputDisplay,
+  parseDateTimeInputParts,
+} from "@/lib/utils";
 
 type CalendarOrder = EditableOrder;
 
@@ -34,8 +42,10 @@ type ManualOrderDraft = {
   vehicleId: string;
   renterName: string;
   renterPhone: string;
-  pickupDatetime: string;
-  returnDatetime: string;
+  pickupDate: string;
+  pickupTime: string;
+  returnDate: string;
+  returnTime: string;
   totalPrice: string;
 };
 
@@ -233,21 +243,8 @@ function formatMonthTitle(date: Date, locale: Locale) {
   }).format(date);
 }
 
-function formatTime(value: Date | string, locale: Locale) {
-  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-CA", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: locale !== "zh",
-  }).format(new Date(value));
-}
-
-function padNumber(value: number) {
-  return value.toString().padStart(2, "0");
-}
-
-function formatDateTimeLocalInput(value: Date | string) {
-  const date = new Date(value);
-  return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}T${padNumber(date.getHours())}:${padNumber(date.getMinutes())}`;
+function formatTime(value: Date | string) {
+  return formatTime24(value);
 }
 
 function buildCreateDraft(baseDate: Date, vehicleId?: string) {
@@ -261,8 +258,10 @@ function buildCreateDraft(baseDate: Date, vehicleId?: string) {
     vehicleId: vehicleId ?? "",
     renterName: "",
     renterPhone: "",
-    pickupDatetime: formatDateTimeLocalInput(pickup),
-    returnDatetime: formatDateTimeLocalInput(returnDatetime),
+    pickupDate: formatDateInputDisplay(pickup),
+    pickupTime: formatTimeInputDisplay(pickup),
+    returnDate: formatDateInputDisplay(returnDatetime),
+    returnTime: formatTimeInputDisplay(returnDatetime),
     totalPrice: "",
   } satisfies ManualOrderDraft;
 }
@@ -758,16 +757,14 @@ export function CalendarView({
   const handleManualOrderSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const pickupDatetime = new Date(orderDraft.pickupDatetime);
-    const returnDatetime = new Date(orderDraft.returnDatetime);
+    const pickupDatetime = parseDateTimeInputParts(orderDraft.pickupDate, orderDraft.pickupTime);
+    const returnDatetime = parseDateTimeInputParts(orderDraft.returnDate, orderDraft.returnTime);
 
     if (
       !orderDraft.vehicleId ||
       !orderDraft.renterName.trim() ||
-      !orderDraft.pickupDatetime ||
-      !orderDraft.returnDatetime ||
-      Number.isNaN(pickupDatetime.getTime()) ||
-      Number.isNaN(returnDatetime.getTime()) ||
+      !pickupDatetime ||
+      !returnDatetime ||
       returnDatetime <= pickupDatetime
     ) {
       setOrderFormError(calendarMessages.formValidationError);
@@ -1206,7 +1203,7 @@ export function CalendarView({
                       ) : null}
 
                       {bars.map((bar) => {
-                        const startTime = formatTime(bar.order.pickupDatetime, locale);
+                        const startTime = formatTime(bar.order.pickupDatetime);
                         const shortLabel =
                           bar.width < 96
                             ? startTime
@@ -1284,19 +1281,20 @@ export function CalendarView({
             <form onSubmit={handleManualOrderSubmit} className="mt-5 grid gap-3 sm:grid-cols-2">
               <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.vehicleField}</span>
-                <select
+                <SearchableSelect
                   value={orderDraft.vehicleId}
-                  onChange={(event) =>
-                    setOrderDraft((current) => ({ ...current, vehicleId: event.target.value }))
-                  }
+                  onChange={(value) => setOrderDraft((current) => ({ ...current, vehicleId: value }))}
+                  options={vehicleOptions.map((vehicle) => ({
+                    value: vehicle.id,
+                    label: vehicle.plateNumber ? `${vehicle.plateNumber} · ${vehicle.label}` : vehicle.label,
+                    searchText: [vehicle.plateNumber, vehicle.label, vehicle.secondaryLabel, vehicle.ownerName]
+                      .filter(Boolean)
+                      .join(" "),
+                  }))}
+                  placeholder={calendarMessages.vehicleField}
+                  searchPlaceholder={calendarMessages.searchVehiclesPlaceholder}
                   className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
-                >
-                  {vehicleOptions.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.plateNumber ? `${vehicle.plateNumber} · ${vehicle.label}` : vehicle.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
 
               <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
@@ -1338,26 +1336,50 @@ export function CalendarView({
 
               <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.pickup}</span>
-                <input
-                  type="datetime-local"
-                  value={orderDraft.pickupDatetime}
-                  onChange={(event) =>
-                    setOrderDraft((current) => ({ ...current, pickupDatetime: event.target.value }))
-                  }
-                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
-                />
+                <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_7rem]">
+                  <input
+                    value={orderDraft.pickupDate}
+                    onChange={(event) =>
+                      setOrderDraft((current) => ({ ...current, pickupDate: event.target.value }))
+                    }
+                    inputMode="numeric"
+                    placeholder="yyyy/mm/dd"
+                    className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
+                  />
+                  <input
+                    value={orderDraft.pickupTime}
+                    onChange={(event) =>
+                      setOrderDraft((current) => ({ ...current, pickupTime: event.target.value }))
+                    }
+                    inputMode="numeric"
+                    placeholder="HH:mm"
+                    className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
+                  />
+                </div>
               </label>
 
               <label className="grid gap-1.5 text-[11px] text-[color:var(--ink-soft)]">
                 <span>{calendarMessages.return}</span>
-                <input
-                  type="datetime-local"
-                  value={orderDraft.returnDatetime}
-                  onChange={(event) =>
-                    setOrderDraft((current) => ({ ...current, returnDatetime: event.target.value }))
-                  }
-                  className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
-                />
+                <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_7rem]">
+                  <input
+                    value={orderDraft.returnDate}
+                    onChange={(event) =>
+                      setOrderDraft((current) => ({ ...current, returnDate: event.target.value }))
+                    }
+                    inputMode="numeric"
+                    placeholder="yyyy/mm/dd"
+                    className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
+                  />
+                  <input
+                    value={orderDraft.returnTime}
+                    onChange={(event) =>
+                      setOrderDraft((current) => ({ ...current, returnTime: event.target.value }))
+                    }
+                    inputMode="numeric"
+                    placeholder="HH:mm"
+                    className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
+                  />
+                </div>
               </label>
 
               <div className="rounded-md bg-[rgba(255,255,255,0.72)] px-3 py-3 text-[11px] leading-5 text-[color:var(--ink-soft)] sm:col-span-2">

@@ -5,9 +5,18 @@ import { Save, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { OrderAttachments } from "@/components/order-attachments";
+import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { getOrderStatusOptions, getStatusLabel, type Locale } from "@/lib/i18n";
-import { cn, formatCurrency, formatDateTime, maskPhone } from "@/lib/utils";
+import {
+  cn,
+  formatCurrency,
+  formatDateInputDisplay,
+  formatDateTime,
+  formatTimeInputDisplay,
+  maskPhone,
+  parseDateTimeInputParts,
+} from "@/lib/utils";
 
 export type EditableOrder = {
   id: string;
@@ -48,8 +57,10 @@ type OrderDraft = {
   status: EditableOrder["status"];
   renterName: string;
   renterPhone: string;
-  pickupDatetime: string;
-  returnDatetime: string;
+  pickupDate: string;
+  pickupTime: string;
+  returnDate: string;
+  returnTime: string;
   totalPrice: string;
   depositAmount: string;
   pickupLocation: string;
@@ -59,23 +70,16 @@ type OrderDraft = {
   notes: string;
 };
 
-function padNumber(value: number) {
-  return value.toString().padStart(2, "0");
-}
-
-function formatDateTimeLocalInput(value: Date | string) {
-  const date = new Date(value);
-  return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}T${padNumber(date.getHours())}:${padNumber(date.getMinutes())}`;
-}
-
 function buildDraft(order: EditableOrder): OrderDraft {
   return {
     vehicleId: order.vehicleId,
     status: order.status,
     renterName: order.renterName,
     renterPhone: order.renterPhone ?? "",
-    pickupDatetime: formatDateTimeLocalInput(order.pickupDatetime),
-    returnDatetime: formatDateTimeLocalInput(order.returnDatetime),
+    pickupDate: formatDateInputDisplay(order.pickupDatetime),
+    pickupTime: formatTimeInputDisplay(order.pickupDatetime),
+    returnDate: formatDateInputDisplay(order.returnDatetime),
+    returnTime: formatTimeInputDisplay(order.returnDatetime),
     totalPrice: order.totalPrice != null ? String(order.totalPrice) : "",
     depositAmount: order.depositAmount != null ? String(order.depositAmount) : "",
     pickupLocation: order.pickupLocation ?? "",
@@ -207,13 +211,13 @@ export function OrderDetailModal({
     event.preventDefault();
     if (readOnly || isSaving) return;
 
-    const pickupDatetime = new Date(draft.pickupDatetime);
-    const returnDatetime = new Date(draft.returnDatetime);
+    const pickupDatetime = parseDateTimeInputParts(draft.pickupDate, draft.pickupTime);
+    const returnDatetime = parseDateTimeInputParts(draft.returnDate, draft.returnTime);
     if (
       !draft.vehicleId ||
       !draft.renterName.trim() ||
-      Number.isNaN(pickupDatetime.getTime()) ||
-      Number.isNaN(returnDatetime.getTime()) ||
+      !pickupDatetime ||
+      !returnDatetime ||
       returnDatetime <= pickupDatetime
     ) {
       setError(t.validationError);
@@ -378,17 +382,20 @@ export function OrderDetailModal({
                     : currentOrder.vehicleName}
                 </span>
               ) : (
-                <select
+                <SearchableSelect
                   value={draft.vehicleId}
-                  onChange={(event) => updateDraft({ vehicleId: event.target.value })}
+                  onChange={(value) => updateDraft({ vehicleId: value })}
+                  options={vehicleOptions.map((vehicle) => ({
+                    value: vehicle.id,
+                    label: vehicle.plateNumber ? `${vehicle.plateNumber} · ${vehicle.label}` : vehicle.label,
+                    searchText: [vehicle.plateNumber, vehicle.label, vehicle.secondaryLabel, vehicle.ownerName]
+                      .filter(Boolean)
+                      .join(" "),
+                  }))}
+                  placeholder={t.vehicle}
+                  searchPlaceholder={t.vehicle}
                   className={inputClass}
-                >
-                  {vehicleOptions.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.plateNumber ? `${vehicle.plateNumber} · ${vehicle.label}` : vehicle.label}
-                    </option>
-                  ))}
-                </select>
+                />
               )}
             </label>
 
@@ -397,17 +404,17 @@ export function OrderDetailModal({
               {readOnly ? (
                 <span className={cn(inputClass, "flex items-center")}>{getStatusLabel(currentOrder.status, locale)}</span>
               ) : (
-                <select
+                <SearchableSelect
                   value={draft.status}
-                  onChange={(event) => updateDraft({ status: event.target.value as EditableOrder["status"] })}
+                  onChange={(value) => updateDraft({ status: value as EditableOrder["status"] })}
+                  options={statusOptions.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  placeholder={t.status}
+                  searchPlaceholder={t.status}
                   className={inputClass}
-                >
-                  {statusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                />
               )}
             </label>
 
@@ -432,26 +439,56 @@ export function OrderDetailModal({
               />
             </label>
 
-            <label className={labelClass}>
+            <label className={cn(labelClass, "lg:col-span-2")}>
               <span>{t.pickupTime}</span>
-              <input
-                type={readOnly ? "text" : "datetime-local"}
-                value={readOnly ? formatDateTime(currentOrder.pickupDatetime, locale) : draft.pickupDatetime}
-                onChange={(event) => updateDraft({ pickupDatetime: event.target.value })}
-                readOnly={readOnly}
-                className={inputClass}
-              />
+              {readOnly ? (
+                <span className={cn(inputClass, "flex items-center")}>
+                  {formatDateTime(currentOrder.pickupDatetime, locale)}
+                </span>
+              ) : (
+                <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_6rem]">
+                  <input
+                    value={draft.pickupDate}
+                    onChange={(event) => updateDraft({ pickupDate: event.target.value })}
+                    inputMode="numeric"
+                    placeholder="yyyy/mm/dd"
+                    className={inputClass}
+                  />
+                  <input
+                    value={draft.pickupTime}
+                    onChange={(event) => updateDraft({ pickupTime: event.target.value })}
+                    inputMode="numeric"
+                    placeholder="HH:mm"
+                    className={inputClass}
+                  />
+                </div>
+              )}
             </label>
 
-            <label className={labelClass}>
+            <label className={cn(labelClass, "lg:col-span-2")}>
               <span>{t.returnTime}</span>
-              <input
-                type={readOnly ? "text" : "datetime-local"}
-                value={readOnly ? formatDateTime(currentOrder.returnDatetime, locale) : draft.returnDatetime}
-                onChange={(event) => updateDraft({ returnDatetime: event.target.value })}
-                readOnly={readOnly}
-                className={inputClass}
-              />
+              {readOnly ? (
+                <span className={cn(inputClass, "flex items-center")}>
+                  {formatDateTime(currentOrder.returnDatetime, locale)}
+                </span>
+              ) : (
+                <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_6rem]">
+                  <input
+                    value={draft.returnDate}
+                    onChange={(event) => updateDraft({ returnDate: event.target.value })}
+                    inputMode="numeric"
+                    placeholder="yyyy/mm/dd"
+                    className={inputClass}
+                  />
+                  <input
+                    value={draft.returnTime}
+                    onChange={(event) => updateDraft({ returnTime: event.target.value })}
+                    inputMode="numeric"
+                    placeholder="HH:mm"
+                    className={inputClass}
+                  />
+                </div>
+              )}
             </label>
 
             <label className={labelClass}>

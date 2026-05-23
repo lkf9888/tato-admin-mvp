@@ -6,6 +6,7 @@ import {
   cn,
   formatCurrency,
   formatDateTime,
+  formatTime,
   formatNumber,
   formatPercentage,
   getOrderNetEarning,
@@ -21,11 +22,8 @@ import { getI18n } from "@/lib/i18n-server";
  * full date next to every event is noise. Falls back to the locale-
  * appropriate hour:minute pattern.
  */
-function formatTimeOnly(date: Date, locale: Locale): string {
-  return new Intl.DateTimeFormat(getLocaleTag(locale), {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+function formatTimeOnly(date: Date): string {
+  return formatTime(date);
 }
 
 /**
@@ -269,7 +267,7 @@ export default async function DashboardPage() {
               {isPickup ? eventMessages.pickupBadge : eventMessages.returnBadge}
             </span>
             <span className="text-[12px] font-semibold tabular-nums text-slate-900 sm:text-[13px]">
-              {formatTimeOnly(event.time, locale)}
+              {formatTimeOnly(event.time)}
             </span>
           </div>
           <p className="mt-0.5 truncate text-[13px] font-semibold text-slate-900 sm:text-[13.5px]">

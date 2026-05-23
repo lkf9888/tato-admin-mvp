@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { Prisma } from "@prisma/client";
 
+import { SearchableSelect } from "@/components/searchable-select";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import {
   ACTIVITY_ENTITY_TYPES,
@@ -121,6 +122,14 @@ export default async function ActivityPage({
 
   const t = messages.activityPage;
   const actionOptions = getActivityActionOptions(locale);
+  const actionSelectOptions = [
+    { value: "", label: t.filters.allActions },
+    ...actionOptions.map((option) => ({ value: option.value, label: option.label })),
+  ];
+  const entityTypeSelectOptions = [
+    { value: "", label: t.filters.allEntityTypes },
+    ...ACTIVITY_ENTITY_TYPES.map((entityType) => ({ value: entityType, label: entityType })),
+  ];
 
   const activeFilterCount = [
     actorFilter,
@@ -214,31 +223,27 @@ export default async function ActivityPage({
                   <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
                     {t.filters.actionLabel}
                   </span>
-                  <select name="action" defaultValue={actionFilter} className={filterFieldClass}>
-                    <option value="">{t.filters.allActions}</option>
-                    {actionOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <SearchableSelect
+                    name="action"
+                    defaultValue={actionFilter}
+                    options={actionSelectOptions}
+                    placeholder={t.filters.allActions}
+                    searchPlaceholder={t.filters.actionLabel}
+                    className={filterFieldClass}
+                  />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
                     {t.filters.entityTypeLabel}
                   </span>
-                  <select
+                  <SearchableSelect
                     name="entityType"
                     defaultValue={entityTypeFilter}
+                    options={entityTypeSelectOptions}
+                    placeholder={t.filters.allEntityTypes}
+                    searchPlaceholder={t.filters.entityTypeLabel}
                     className={filterFieldClass}
-                  >
-                    <option value="">{t.filters.allEntityTypes}</option>
-                    {ACTIVITY_ENTITY_TYPES.map((entityType) => (
-                      <option key={entityType} value={entityType}>
-                        {entityType}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">

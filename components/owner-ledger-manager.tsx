@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { SearchableSelect } from "@/components/searchable-select";
 import type { Locale } from "@/lib/i18n";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
@@ -190,6 +191,8 @@ export function OwnerLedgerManager({
   ownerSelectBasePath?: string;
 }) {
   const labels = copy(locale);
+  const ownerSelectOptions = owners.map((owner) => ({ value: owner.id, label: owner.name }));
+  const ownerLabel = locale === "zh" ? "车主" : "Owner";
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -231,6 +234,7 @@ export function OwnerLedgerManager({
     set.add(monthKey(new Date()));
     return Array.from(set).sort().reverse();
   }, [statementItems]);
+  const monthSelectOptions = months.map((month) => ({ value: month, label: month }));
 
   const selectedStatementItems = statementItems.filter((item) => monthKey(item.occurredAt) === selectedMonth);
   const statementIncome = selectedStatementItems.filter((item) => item.amount > 0).reduce((sum, item) => sum + item.amount, 0);
@@ -291,18 +295,14 @@ export function OwnerLedgerManager({
               </p>
             </div>
             <form>
-              <select
-                name="ownerId"
+              <SearchableSelect
                 value={selectedOwner.id}
-                onChange={(event) => router.push(`${ownerSelectBasePath}?ownerId=${event.target.value}`)}
+                onChange={(value) => router.push(`${ownerSelectBasePath}?ownerId=${value}`)}
+                options={ownerSelectOptions}
+                placeholder={ownerLabel}
+                searchPlaceholder={ownerLabel}
                 className="h-9 rounded-md border border-[var(--line)] bg-white px-3 text-[12px]"
-              >
-                {owners.map((owner) => (
-                  <option key={owner.id} value={owner.id}>
-                    {owner.name}
-                  </option>
-                ))}
-              </select>
+              />
             </form>
           </div>
 
@@ -375,17 +375,14 @@ export function OwnerLedgerManager({
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            <select
+            <SearchableSelect
               value={selectedMonth}
-              onChange={(event) => setSelectedMonth(event.target.value)}
+              onChange={setSelectedMonth}
+              options={monthSelectOptions}
+              placeholder={labels.date}
+              searchPlaceholder={labels.date}
               className="h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm"
-            >
-              {months.map((month) => (
-                <option key={month} value={month}>
-                  {month}
-                </option>
-              ))}
-            </select>
+            />
             <button
               onClick={() => window.print()}
               className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
@@ -587,6 +584,28 @@ function LedgerModal({
   const [note, setNote] = useState(initialItem?.note ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const kindOptions = [
+    {
+      value: OwnerLedgerKind.EXPENSE_REIMBURSEMENT,
+      label: labels.kindLabels.EXPENSE_REIMBURSEMENT,
+    },
+    {
+      value: OwnerLedgerKind.SETTLEMENT_PAYMENT,
+      label: labels.kindLabels.SETTLEMENT_PAYMENT,
+    },
+    {
+      value: OwnerLedgerKind.MANUAL_ADJUSTMENT,
+      label: labels.kindLabels.MANUAL_ADJUSTMENT,
+    },
+  ];
+  const directionOptions = [
+    { value: "managerToOwner", label: labels.managerToOwner },
+    { value: "ownerToManager", label: labels.ownerToManager },
+  ];
+  const vehicleOptions = [
+    { value: "", label: labels.noVehicle },
+    ...vehicles.map((vehicle) => ({ value: vehicle.id, label: vehicle.label })),
+  ];
 
   async function save() {
     const parsed = Number(amount);
@@ -661,35 +680,28 @@ function LedgerModal({
           {!isEdit ? (
             <label className="grid gap-1 text-sm font-medium">
               {labels.type}
-              <select
+              <SearchableSelect
                 value={kind}
-                onChange={(event) => setKind(event.target.value as OwnerLedgerKind)}
+                onChange={(value) => setKind(value as OwnerLedgerKind)}
+                options={kindOptions}
+                placeholder={labels.type}
+                searchPlaceholder={labels.type}
                 className="h-11 rounded-md border border-[var(--line)] bg-white px-3"
-              >
-                <option value={OwnerLedgerKind.EXPENSE_REIMBURSEMENT}>
-                  {labels.kindLabels.EXPENSE_REIMBURSEMENT}
-                </option>
-                <option value={OwnerLedgerKind.SETTLEMENT_PAYMENT}>
-                  {labels.kindLabels.SETTLEMENT_PAYMENT}
-                </option>
-                <option value={OwnerLedgerKind.MANUAL_ADJUSTMENT}>
-                  {labels.kindLabels.MANUAL_ADJUSTMENT}
-                </option>
-              </select>
+              />
             </label>
           ) : null}
 
           {kind === OwnerLedgerKind.SETTLEMENT_PAYMENT ? (
             <label className="grid gap-1 text-sm font-medium">
               {labels.direction}
-              <select
+              <SearchableSelect
                 value={direction}
-                onChange={(event) => setDirection(event.target.value as "managerToOwner" | "ownerToManager")}
+                onChange={(value) => setDirection(value as "managerToOwner" | "ownerToManager")}
+                options={directionOptions}
+                placeholder={labels.direction}
+                searchPlaceholder={labels.direction}
                 className="h-11 rounded-md border border-[var(--line)] bg-white px-3"
-              >
-                <option value="managerToOwner">{labels.managerToOwner}</option>
-                <option value="ownerToManager">{labels.ownerToManager}</option>
-              </select>
+              />
             </label>
           ) : null}
 
@@ -716,18 +728,14 @@ function LedgerModal({
 
           <label className="grid gap-1 text-sm font-medium">
             {labels.vehicle}
-            <select
+            <SearchableSelect
               value={vehicleId}
-              onChange={(event) => setVehicleId(event.target.value)}
+              onChange={setVehicleId}
+              options={vehicleOptions}
+              placeholder={labels.noVehicle}
+              searchPlaceholder={labels.vehicle}
               className="h-11 rounded-md border border-[var(--line)] bg-white px-3"
-            >
-              <option value="">{labels.noVehicle}</option>
-              {vehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.label}
-                </option>
-              ))}
-            </select>
+            />
           </label>
 
           <label className="grid gap-1 text-sm font-medium">

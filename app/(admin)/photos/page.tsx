@@ -1,3 +1,4 @@
+import { SearchableSelect } from "@/components/searchable-select";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
@@ -98,6 +99,14 @@ export default async function PhotosPage({
           search: "Search",
           apply: "Filter",
         };
+  const vehicleOptions = [
+    { value: "", label: copy.allVehicles },
+    ...vehicles.map((vehicle) => ({
+      value: vehicle.id,
+      label: `${vehicle.plateNumber} · ${vehicle.nickname}`,
+      searchText: `${vehicle.plateNumber} ${vehicle.nickname}`,
+    })),
+  ];
 
   return (
     <div className="space-y-3">
@@ -114,14 +123,14 @@ export default async function PhotosPage({
       <form className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-3 text-sm sm:grid-cols-[12rem_minmax(0,1fr)_auto]">
         <label className="block">
           <span className="label">{copy.filterLabel}</span>
-          <select name="vehicle" defaultValue={selectedVehicleIds[0] ?? ""} className="input">
-            <option value="">{copy.allVehicles}</option>
-            {vehicles.map((vehicle) => (
-              <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.plateNumber} · {vehicle.nickname}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            name="vehicle"
+            defaultValue={selectedVehicleIds[0] ?? ""}
+            options={vehicleOptions}
+            placeholder={copy.allVehicles}
+            searchPlaceholder={copy.filterLabel}
+            className="input"
+          />
         </label>
         <label className="block">
           <span className="label">{copy.search}</span>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
 
+import { SearchableSelect } from "@/components/searchable-select";
 import { buildCsvHeaderMapping } from "@/lib/csv-mapping";
 import { getCsvFieldOptions, getMessages, type Locale } from "@/lib/i18n";
 
@@ -512,23 +513,25 @@ export function CsvImportPanel({
                 {headers.map((header) => (
                   <label key={header} className="block space-y-1">
                     <span className="text-[12px] font-medium text-[color:var(--ink)]">{header}</span>
-                    <select
+                    <SearchableSelect
                       value={mapping[header] ?? ""}
-                      onChange={(event) =>
+                      onChange={(value) =>
                         setMapping((current) => ({
                           ...current,
-                          [header]: event.target.value,
+                          [header]: value,
                         }))
                       }
+                      options={[
+                        { value: "", label: panelMessages.ignoreColumn },
+                        ...csvFieldOptions.map((option) => ({
+                          value: option.value,
+                          label: option.label,
+                        })),
+                      ]}
+                      placeholder={panelMessages.ignoreColumn}
+                      searchPlaceholder={panelMessages.mappingKicker}
                       className="h-9 w-full rounded-md border border-[color:var(--line)] bg-white px-2 text-[13px] text-[color:var(--ink)] outline-none focus:border-[var(--ink)]"
-                    >
-                      <option value="">{panelMessages.ignoreColumn}</option>
-                      {csvFieldOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </label>
                 ))}
               </div>

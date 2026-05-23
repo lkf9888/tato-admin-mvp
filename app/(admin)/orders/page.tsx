@@ -3,8 +3,10 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 
 import { deleteOrderAction, saveOfflineOrderAction, updateOrderStatusAction } from "@/app/actions";
+import { DateTimeField } from "@/components/date-time-field";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { OrdersRowList } from "@/components/orders-row-list";
+import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { getOrderStatusOptions, getStatusLabel, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
@@ -13,6 +15,7 @@ import {
   cn,
   formatCurrency,
   formatDateTime,
+  formatDateTimeLocalInput,
   getDisplayOrderNote,
   getOrderNetEarning,
   normalizeText,
@@ -25,7 +28,7 @@ import {
 const PAGE_SIZE = 20;
 
 // Order sources are the same two enum values used elsewhere in the
-// app; declared here so the filter <select> stays a typed source of
+// app; declared here so the filter controls stay a typed source of
 // truth instead of a magic-string list.
 const ORDER_SOURCES = ["turo", "offline"] as const;
 type OrderSource = (typeof ORDER_SOURCES)[number];
@@ -210,6 +213,24 @@ export default async function OrdersPage({
 
   const orderMessages = messages.orders;
   const orderStatusOptions = getOrderStatusOptions(locale);
+  const statusSelectOptions = orderStatusOptions.map((option) => ({
+    value: option.value,
+    label: option.label,
+  }));
+  const sourceSelectOptions = [
+    { value: "", label: orderMessages.filters.allSources },
+    ...ORDER_SOURCES.map((source) => ({
+      value: source,
+      label: getStatusLabel(source, locale),
+    })),
+  ];
+  const vehicleSelectOptions = vehicles.map((vehicle) => ({
+    value: vehicle.id,
+    label: vehicle.plateNumber ? `${vehicle.plateNumber} · ${vehicle.nickname}` : vehicle.nickname,
+    searchText: [vehicle.plateNumber, vehicle.nickname, vehicle.brand, vehicle.model, vehicle.year, vehicle.owner?.name]
+      .filter(Boolean)
+      .join(" "),
+  }));
 
   // Apply free-text search after the structured DB filter. We keep this
   // in JS because (a) SQLite + Prisma doesn't ship case-insensitive
@@ -338,24 +359,26 @@ export default async function OrdersPage({
           </p>
 
           <form action={saveOfflineOrderAction} className="mt-3 grid gap-2 sm:gap-2.5 md:grid-cols-2 xl:grid-cols-4">
-          <select name="vehicleId" className={inputClass}>
-            {vehicles.map((vehicle) => (
-              <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.nickname}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            name="vehicleId"
+            defaultValue={vehicles[0]?.id ?? ""}
+            options={vehicleSelectOptions}
+            placeholder={orderMessages.filters.vehicleLabel}
+            searchPlaceholder={orderMessages.filters.vehicleLabel}
+            className={inputClass}
+          />
           <input name="renterName" placeholder={orderMessages.placeholders.renterName} className={inputClass} />
           <input name="renterPhone" placeholder={orderMessages.placeholders.phone} className={inputClass} />
-          <select name="status" defaultValue="booked" className={inputClass}>
-            {orderStatusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <input name="pickupDatetime" type="datetime-local" className={inputClass} />
-          <input name="returnDatetime" type="datetime-local" className={inputClass} />
+          <SearchableSelect
+            name="status"
+            defaultValue="booked"
+            options={statusSelectOptions}
+            placeholder={orderMessages.filters.statusLabel}
+            searchPlaceholder={orderMessages.filters.statusLabel}
+            className={inputClass}
+          />
+          <DateTimeField name="pickupDatetime" className="min-w-0 xl:col-span-2" />
+          <DateTimeField name="returnDatetime" className="min-w-0 xl:col-span-2" />
           <input
             name="totalPrice"
             type="number"
@@ -467,46 +490,40 @@ export default async function OrdersPage({
                   <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
                     {orderMessages.filters.statusLabel}
                   </span>
-                  <select name="status" defaultValue={statusFilter} className={cn(filterFieldClass, "w-full")}>
-                    <option value="">{orderMessages.filters.allStatuses}</option>
-                    {orderStatusOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <SearchableSelect
+                    name="status"
+                    defaultValue={statusFilter}
+                    options={[{ value: "", label: orderMessages.filters.allStatuses }, ...statusSelectOptions]}
+                    placeholder={orderMessages.filters.allStatuses}
+                    searchPlaceholder={orderMessages.filters.statusLabel}
+                    className={cn(filterFieldClass, "w-full")}
+                  />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
                     {orderMessages.filters.sourceLabel}
                   </span>
-                  <select name="source" defaultValue={sourceFilter} className={cn(filterFieldClass, "w-full")}>
-                    <option value="">{orderMessages.filters.allSources}</option>
-                    {ORDER_SOURCES.map((source) => (
-                      <option key={source} value={source}>
-                        {getStatusLabel(source, locale)}
-                      </option>
-                    ))}
-                  </select>
+                  <SearchableSelect
+                    name="source"
+                    defaultValue={sourceFilter}
+                    options={sourceSelectOptions}
+                    placeholder={orderMessages.filters.allSources}
+                    searchPlaceholder={orderMessages.filters.sourceLabel}
+                    className={cn(filterFieldClass, "w-full")}
+                  />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
                     {orderMessages.filters.vehicleLabel}
                   </span>
-                  <select
+                  <SearchableSelect
                     name="vehicleId"
                     defaultValue={vehicleFilter}
+                    options={[{ value: "", label: orderMessages.filters.allVehicles }, ...vehicleSelectOptions]}
+                    placeholder={orderMessages.filters.allVehicles}
+                    searchPlaceholder={orderMessages.filters.vehicleLabel}
                     className={cn(filterFieldClass, "w-full")}
-                  >
-                    <option value="">{orderMessages.filters.allVehicles}</option>
-                    {vehicles.map((vehicle) => (
-                      <option key={vehicle.id} value={vehicle.id}>
-                        {vehicle.plateNumber
-                          ? `${vehicle.plateNumber} · ${vehicle.nickname}`
-                          : vehicle.nickname}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
@@ -647,17 +664,14 @@ export default async function OrdersPage({
                 <div className="mt-3 flex flex-col gap-2">
                   <form action={updateOrderStatusAction} className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <input type="hidden" name="id" value={order.id} />
-                    <select
+                    <SearchableSelect
                       name="status"
                       defaultValue={order.status}
-                      className="h-9 rounded-full border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 text-[12px] text-[color:var(--ink)]"
-                    >
-                      {orderStatusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      options={statusSelectOptions}
+                      placeholder={orderMessages.filters.statusLabel}
+                      searchPlaceholder={orderMessages.filters.statusLabel}
+                      className="h-9 rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 text-[12px] text-[color:var(--ink)]"
+                    />
                     <button className={subtleButtonClass}>{orderMessages.updateStatus}</button>
                   </form>
 
@@ -679,37 +693,37 @@ export default async function OrdersPage({
                   </summary>
                   <form action={saveOfflineOrderAction} className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                     <input type="hidden" name="id" value={order.id} />
-                    <select name="vehicleId" defaultValue={order.vehicleId} className={inputClass}>
-                      {vehicles.map((vehicle) => (
-                        <option key={vehicle.id} value={vehicle.id}>
-                          {vehicle.nickname}
-                        </option>
-                      ))}
-                    </select>
+                    <SearchableSelect
+                      name="vehicleId"
+                      defaultValue={order.vehicleId}
+                      options={vehicleSelectOptions}
+                      placeholder={orderMessages.filters.vehicleLabel}
+                      searchPlaceholder={orderMessages.filters.vehicleLabel}
+                      className={inputClass}
+                    />
                     <input name="renterName" defaultValue={order.renterName} className={inputClass} />
                     <input
                       name="renterPhone"
                       defaultValue={order.renterPhone ?? ""}
                       className={inputClass}
                     />
-                    <select name="status" defaultValue={order.status} className={inputClass}>
-                      {orderStatusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      name="pickupDatetime"
-                      type="datetime-local"
-                      defaultValue={new Date(order.pickupDatetime).toISOString().slice(0, 16)}
+                    <SearchableSelect
+                      name="status"
+                      defaultValue={order.status}
+                      options={statusSelectOptions}
+                      placeholder={orderMessages.filters.statusLabel}
+                      searchPlaceholder={orderMessages.filters.statusLabel}
                       className={inputClass}
                     />
-                    <input
+                    <DateTimeField
+                      name="pickupDatetime"
+                      defaultValue={formatDateTimeLocalInput(order.pickupDatetime)}
+                      className="min-w-0 xl:col-span-2"
+                    />
+                    <DateTimeField
                       name="returnDatetime"
-                      type="datetime-local"
-                      defaultValue={new Date(order.returnDatetime).toISOString().slice(0, 16)}
-                      className={inputClass}
+                      defaultValue={formatDateTimeLocalInput(order.returnDatetime)}
+                      className="min-w-0 xl:col-span-2"
                     />
                     <input
                       name="totalPrice"

@@ -1,4 +1,5 @@
 import { deleteVehicleAction, saveVehicleAction } from "@/app/actions";
+import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { VehicleAttachments } from "@/components/vehicle-attachments";
 import { requireCurrentWorkspace } from "@/lib/auth";
@@ -28,6 +29,15 @@ export default async function VehiclesPage({
 
   const vehicleMessages = messages.vehicles;
   const vehicleStatusOptions = getVehicleStatusOptions(locale);
+  const statusLabel = locale === "zh" ? "状态" : "Status";
+  const ownerSelectOptions = [
+    { value: "", label: vehicleMessages.placeholders.unassignedOwner },
+    ...owners.map((owner) => ({ value: owner.id, label: owner.name })),
+  ];
+  const vehicleStatusSelectOptions = vehicleStatusOptions.map((option) => ({
+    value: option.value,
+    label: option.label,
+  }));
   const vehicleQuery = (params.q ?? "").trim();
   const normalizedVehicleQuery = vehicleQuery.toLowerCase();
   const filteredVehicles = normalizedVehicleQuery
@@ -122,25 +132,21 @@ export default async function VehiclesPage({
             placeholder={vehicleMessages.placeholders.ownerCommissionRate}
             className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
           />
-          <select name="ownerId" className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-            <option value="">{vehicleMessages.placeholders.unassignedOwner}</option>
-            {owners.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.name}
-              </option>
-            ))}
-          </select>
-          <select
+          <SearchableSelect
+            name="ownerId"
+            options={ownerSelectOptions}
+            placeholder={vehicleMessages.placeholders.unassignedOwner}
+            searchPlaceholder={vehicleMessages.placeholders.unassignedOwner}
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+          />
+          <SearchableSelect
             name="status"
             defaultValue="available"
+            options={vehicleStatusSelectOptions}
+            placeholder={statusLabel}
+            searchPlaceholder={statusLabel}
             className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-          >
-            {vehicleStatusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
           <input
             name="turoListingName"
             placeholder={vehicleMessages.placeholders.turoListingName}
@@ -286,29 +292,22 @@ export default async function VehiclesPage({
                   placeholder={vehicleMessages.placeholders.ownerCommissionRate}
                   className="rounded-md border border-slate-200 bg-white px-3 py-2"
                 />
-                <select
+                <SearchableSelect
                   name="ownerId"
                   defaultValue={vehicle.ownerId ?? ""}
+                  options={ownerSelectOptions}
+                  placeholder={vehicleMessages.placeholders.unassignedOwner}
+                  searchPlaceholder={vehicleMessages.placeholders.unassignedOwner}
                   className="rounded-md border border-slate-200 bg-white px-3 py-2"
-                >
-                  <option value="">{vehicleMessages.placeholders.unassignedOwner}</option>
-                  {owners.map((owner) => (
-                    <option key={owner.id} value={owner.id}>
-                      {owner.name}
-                    </option>
-                  ))}
-                </select>
-                <select
+                />
+                <SearchableSelect
                   name="status"
                   defaultValue={vehicle.status}
+                  options={vehicleStatusSelectOptions}
+                  placeholder={statusLabel}
+                  searchPlaceholder={statusLabel}
                   className="rounded-md border border-slate-200 bg-white px-3 py-2"
-                >
-                  {vehicleStatusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                />
                 <input
                   name="turoListingName"
                   defaultValue={vehicle.turoListingName ?? ""}

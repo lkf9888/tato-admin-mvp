@@ -6,23 +6,92 @@ export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
 
+function padDatePart(value: number) {
+  return value.toString().padStart(2, "0");
+}
+
+function toDate(value: Date | string) {
+  return value instanceof Date ? value : new Date(value);
+}
+
 export function formatDateTime(value: Date | string, locale: Locale = "en") {
-  return new Intl.DateTimeFormat(getLocaleTag(locale), {
-    month: locale === "zh" ? "numeric" : "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: locale !== "zh",
-  }).format(new Date(value));
+  const date = toDate(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${formatDate(date, locale)} ${formatTime(date)}`;
 }
 
 export function formatDate(value: Date | string, locale: Locale = "en") {
-  return new Intl.DateTimeFormat(getLocaleTag(locale), {
-    month: locale === "zh" ? "numeric" : "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
+  const date = toDate(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${date.getFullYear()}/${padDatePart(date.getMonth() + 1)}/${padDatePart(date.getDate())}`;
+}
+
+export function formatTime(value: Date | string) {
+  const date = toDate(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`;
+}
+
+export function formatDateTimeLocalInput(value: Date | string) {
+  const date = toDate(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}T${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`;
+}
+
+export function formatDateInputDisplay(value: Date | string) {
+  return formatDate(value);
+}
+
+export function formatTimeInputDisplay(value: Date | string) {
+  return formatTime(value);
+}
+
+export function parseDateInputDisplay(value: string) {
+  const match = /^\s*(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s*$/.exec(value);
+  if (!match) return null;
+
+  const [, rawYear, rawMonth, rawDay] = match;
+  const year = Number(rawYear);
+  const month = Number(rawMonth);
+  const day = Number(rawDay);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+export function parseTimeInputDisplay(value: string) {
+  const match = /^\s*(\d{1,2}):(\d{2})\s*$/.exec(value);
+  if (!match) return null;
+
+  const [, rawHour, rawMinute] = match;
+  const hour = Number(rawHour);
+  const minute = Number(rawMinute);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
+  return { hour, minute };
+}
+
+export function parseDateTimeInputParts(dateValue: string, timeValue: string) {
+  const date = parseDateInputDisplay(dateValue);
+  const time = parseTimeInputDisplay(timeValue);
+  if (!date || !time) return null;
+
+  date.setHours(time.hour, time.minute, 0, 0);
+  return date;
+}
+
+export function composeDateTimeLocalInput(dateValue: string, timeValue: string) {
+  const date = parseDateTimeInputParts(dateValue, timeValue);
+  return date ? formatDateTimeLocalInput(date) : "";
 }
 
 export function formatCurrency(value?: number | null, locale: Locale = "en") {

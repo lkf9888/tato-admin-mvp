@@ -7,6 +7,7 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { roundCurrencyAmount } from "@/lib/utils";
 
 type Params = Promise<{ orderId: string }>;
 
@@ -132,8 +133,8 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
         renterPhone: parsed.renterPhone ?? null,
         pickupDatetime,
         returnDatetime,
-        totalPrice: parsed.totalPrice ?? null,
-        depositAmount: parsed.depositAmount ?? null,
+        totalPrice: roundCurrencyAmount(parsed.totalPrice),
+        depositAmount: roundCurrencyAmount(parsed.depositAmount),
         status: parsed.status,
         pickupLocation: parsed.pickupLocation ?? null,
         returnLocation: parsed.returnLocation ?? null,

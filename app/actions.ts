@@ -35,6 +35,7 @@ import {
   recordFailedAttempt,
   resetAttempts,
 } from "@/lib/rate-limit";
+import { roundCurrencyAmount } from "@/lib/utils";
 import { createWorkspaceForRegistration } from "@/lib/workspaces";
 
 // Brute-force protection. Limits are deliberately permissive enough
@@ -835,11 +836,16 @@ export async function deleteOwnerAction(formData: FormData) {
   const id = formData.get("id")?.toString();
   if (!id) return;
 
-  const vehicleCount = await prisma.vehicle.count({
-    where: { ownerId: id, workspaceId: workspace.id },
-  });
+  const [vehicleCount, ledgerCount] = await Promise.all([
+    prisma.vehicle.count({
+      where: { ownerId: id, workspaceId: workspace.id },
+    }),
+    prisma.ownerLedgerItem.count({
+      where: { ownerId: id, workspaceId: workspace.id },
+    }),
+  ]);
 
-  if (vehicleCount > 0) {
+  if (vehicleCount > 0 || ledgerCount > 0) {
     redirect("/owners?error=owner-has-vehicles");
   }
 
@@ -1078,8 +1084,8 @@ export async function saveOfflineOrderAction(formData: FormData) {
     renterPhone: parsed.renterPhone,
     pickupDatetime: new Date(parsed.pickupDatetime),
     returnDatetime: new Date(parsed.returnDatetime),
-    totalPrice: parsed.totalPrice,
-    depositAmount: parsed.depositAmount,
+    totalPrice: roundCurrencyAmount(parsed.totalPrice),
+    depositAmount: roundCurrencyAmount(parsed.depositAmount),
     status: parsed.status,
     pickupLocation: parsed.pickupLocation,
     returnLocation: parsed.returnLocation,

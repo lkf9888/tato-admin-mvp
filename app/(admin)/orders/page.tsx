@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import {
   cn,
   formatCurrency,
+  formatCurrencyInputValue,
   formatDateTime,
   formatDateTimeLocalInput,
   getDisplayOrderNote,
@@ -729,14 +730,14 @@ export default async function OrdersPage({
                       name="totalPrice"
                       type="number"
                       step="0.01"
-                      defaultValue={order.totalPrice ?? ""}
+                      defaultValue={formatCurrencyInputValue(order.totalPrice)}
                       className={inputClass}
                     />
                     <input
                       name="depositAmount"
                       type="number"
                       step="0.01"
-                      defaultValue={order.depositAmount ?? ""}
+                      defaultValue={formatCurrencyInputValue(order.depositAmount)}
                       className={inputClass}
                     />
                     <input

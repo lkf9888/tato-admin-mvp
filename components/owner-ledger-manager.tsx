@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { SearchableSelect } from "@/components/searchable-select";
@@ -38,6 +38,14 @@ type LedgerItem = {
   note: string | null;
   isAuto: boolean;
   createdAt: string;
+  receipts?: {
+    id: string;
+    url: string;
+    filename: string | null;
+    contentType: string | null;
+    size: number | null;
+    uploadedAt: string;
+  }[];
   vehicle: {
     id: string;
     plateNumber: string;
@@ -67,7 +75,7 @@ const STATEMENT_KINDS = new Set<OwnerLedgerKind>([
 ]);
 
 function copy(locale: Locale) {
-  return locale === "zh"
+  return locale !== "en"
     ? {
         currentBalance: "当前应结余额",
         tatoOwesOwner: "TATO 应付给车主",
@@ -93,6 +101,10 @@ function copy(locale: Locale) {
         auto: "自动",
         edit: "修改",
         delete: "删除",
+        receipts: "凭证",
+        uploadReceipts: "上传凭证",
+        receiptFileCount: (count: number) => `${count} 个文件待上传`,
+        receiptUploadFailed: "账目已保存，但凭证上传失败，请重新打开账目补传。",
         confirmDelete: "确定删除这条账目吗？",
         save: "保存",
         saving: "保存中...",
@@ -141,6 +153,10 @@ function copy(locale: Locale) {
         auto: "Auto",
         edit: "Edit",
         delete: "Delete",
+        receipts: "Receipts",
+        uploadReceipts: "Upload receipts",
+        receiptFileCount: (count: number) => `${count} file(s) ready`,
+        receiptUploadFailed: "The ledger item was saved, but receipt upload failed. Reopen it to retry.",
         confirmDelete: "Delete this ledger item?",
         save: "Save",
         saving: "Saving...",
@@ -182,6 +198,7 @@ export function OwnerLedgerManager({
   vehicles,
   items,
   ownerSelectBasePath = "/owners",
+  ownerSelectRoute = "query",
 }: {
   locale: Locale;
   owners: OwnerOption[];
@@ -189,10 +206,11 @@ export function OwnerLedgerManager({
   vehicles: VehicleOption[];
   items: LedgerItem[];
   ownerSelectBasePath?: string;
+  ownerSelectRoute?: "query" | "ledger";
 }) {
   const labels = copy(locale);
   const ownerSelectOptions = owners.map((owner) => ({ value: owner.id, label: owner.name }));
-  const ownerLabel = locale === "zh" ? "车主" : "Owner";
+  const ownerLabel = locale !== "en" ? "车主" : "Owner";
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -297,7 +315,13 @@ export function OwnerLedgerManager({
             <form>
               <SearchableSelect
                 value={selectedOwner.id}
-                onChange={(value) => router.push(`${ownerSelectBasePath}?ownerId=${value}`)}
+                onChange={(value) =>
+                  router.push(
+                    ownerSelectRoute === "ledger"
+                      ? `/owners/${value}/ledger`
+                      : `${ownerSelectBasePath}?ownerId=${value}`,
+                  )
+                }
                 options={ownerSelectOptions}
                 placeholder={ownerLabel}
                 searchPlaceholder={ownerLabel}
@@ -520,6 +544,21 @@ function LedgerTable({
                 {item.note ? (
                   <p className="mt-1 whitespace-pre-wrap text-[13px] text-[var(--ink-soft)]">{item.note}</p>
                 ) : null}
+                {item.receipts?.length ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {item.receipts.map((receipt, index) => (
+                      <a
+                        key={receipt.id}
+                        href={receipt.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md border border-[var(--line)] bg-white px-2 py-1 text-[11px] font-semibold text-[var(--ink)]"
+                      >
+                        {labels.receipts} {index + 1}
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
               </td>
               <td className="whitespace-nowrap px-3 py-3 text-right font-semibold text-emerald-700">
                 {item.amount > 0 ? formatCurrency(item.amount, locale) : ""}
@@ -582,6 +621,8 @@ function LedgerModal({
   );
   const [vehicleId, setVehicleId] = useState(initialItem?.vehicleId ?? "");
   const [note, setNote] = useState(initialItem?.note ?? "");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const kindOptions = [
@@ -641,14 +682,31 @@ function LedgerModal({
         }),
       },
     );
-    setSaving(false);
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
+      setSaving(false);
       setError(payload.error || "Save failed");
       return;
     }
 
+    const payload = await response.json().catch(() => ({}));
+    const savedItemId = isEdit ? initialItem!.id : payload.item?.id;
+    if (savedItemId && receiptFiles.length > 0) {
+      const formData = new FormData();
+      receiptFiles.forEach((file) => formData.append("files", file));
+      const receiptResponse = await fetch(
+        `/api/owners/${ownerId}/ledger/${savedItemId}/receipts`,
+        { method: "POST", body: formData },
+      );
+      if (!receiptResponse.ok) {
+        setSaving(false);
+        setError(labels.receiptUploadFailed);
+        return;
+      }
+    }
+
+    setSaving(false);
     onSaved();
   }
 
@@ -747,6 +805,58 @@ function LedgerModal({
               className="rounded-md border border-[var(--line)] bg-white px-3 py-2"
             />
           </label>
+
+          {kind === OwnerLedgerKind.EXPENSE_REIMBURSEMENT ? (
+            <div className="grid gap-2 text-sm font-medium">
+              {labels.receipts}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  const files = event.target.files ? Array.from(event.target.files) : [];
+                  setReceiptFiles((current) => [...current, ...files]);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+              />
+              <div className="rounded-lg border border-dashed border-[var(--line)] bg-slate-50 px-3 py-3">
+                <button
+                  type="button"
+                  className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[12px] font-semibold"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={saving}
+                >
+                  {labels.uploadReceipts}
+                </button>
+                {receiptFiles.length > 0 ? (
+                  <div className="mt-2 space-y-1 text-xs text-[var(--ink-soft)]">
+                    <p>{labels.receiptFileCount(receiptFiles.length)}</p>
+                    {receiptFiles.map((file, index) => (
+                      <div
+                        key={`${file.name}-${file.size}-${index}`}
+                        className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1"
+                      >
+                        <span className="min-w-0 truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          className="shrink-0 text-rose-600"
+                          onClick={() =>
+                            setReceiptFiles((current) =>
+                              current.filter((_, itemIndex) => itemIndex !== index),
+                            )
+                          }
+                        >
+                          x
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <button

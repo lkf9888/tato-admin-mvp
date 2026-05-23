@@ -7,6 +7,7 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { roundCurrencyAmount } from "@/lib/utils";
 
 const manualOrderSchema = z.object({
   vehicleId: z.string().min(1),
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
         renterPhone: cleanOptional(parsed.renterPhone),
         pickupDatetime,
         returnDatetime,
-        totalPrice: parsed.totalPrice,
+        totalPrice: roundCurrencyAmount(parsed.totalPrice),
         createdBy: user.name,
       },
     });
@@ -186,7 +187,7 @@ export async function PATCH(request: Request) {
         renterPhone: cleanOptional(parsed.renterPhone),
         pickupDatetime,
         returnDatetime,
-        totalPrice: parsed.totalPrice,
+        totalPrice: roundCurrencyAmount(parsed.totalPrice),
       },
     });
 

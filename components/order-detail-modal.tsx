@@ -11,6 +11,8 @@ import { getOrderStatusOptions, getStatusLabel, type Locale } from "@/lib/i18n";
 import {
   cn,
   formatCurrency,
+  formatCurrencyInputText,
+  formatCurrencyInputValue,
   formatDateInputDisplay,
   formatDateTime,
   formatTimeInputDisplay,
@@ -80,8 +82,8 @@ function buildDraft(order: EditableOrder): OrderDraft {
     pickupTime: formatTimeInputDisplay(order.pickupDatetime),
     returnDate: formatDateInputDisplay(order.returnDatetime),
     returnTime: formatTimeInputDisplay(order.returnDatetime),
-    totalPrice: order.totalPrice != null ? String(order.totalPrice) : "",
-    depositAmount: order.depositAmount != null ? String(order.depositAmount) : "",
+    totalPrice: formatCurrencyInputValue(order.totalPrice),
+    depositAmount: formatCurrencyInputValue(order.depositAmount),
     pickupLocation: order.pickupLocation ?? "",
     returnLocation: order.returnLocation ?? "",
     paymentMethod: order.paymentMethod ?? "",
@@ -495,8 +497,9 @@ export function OrderDetailModal({
                 type="number"
                 step="0.01"
                 min="0"
-                value={readOnly ? currentOrder.totalPrice ?? "" : draft.totalPrice}
+                value={readOnly ? formatCurrencyInputValue(currentOrder.totalPrice) : draft.totalPrice}
                 onChange={(event) => updateDraft({ totalPrice: event.target.value })}
+                onBlur={(event) => updateDraft({ totalPrice: formatCurrencyInputText(event.target.value) })}
                 readOnly={readOnly}
                 className={inputClass}
               />
@@ -508,8 +511,9 @@ export function OrderDetailModal({
                 type="number"
                 step="0.01"
                 min="0"
-                value={readOnly ? currentOrder.depositAmount ?? "" : draft.depositAmount}
+                value={readOnly ? formatCurrencyInputValue(currentOrder.depositAmount) : draft.depositAmount}
                 onChange={(event) => updateDraft({ depositAmount: event.target.value })}
+                onBlur={(event) => updateDraft({ depositAmount: formatCurrencyInputText(event.target.value) })}
                 readOnly={readOnly}
                 className={inputClass}
               />

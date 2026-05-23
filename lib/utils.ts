@@ -95,12 +95,31 @@ export function composeDateTimeLocalInput(dateValue: string, timeValue: string) 
 }
 
 export function formatCurrency(value?: number | null, locale: Locale = "en") {
-  if (value == null || Number.isNaN(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return "—";
   return new Intl.NumberFormat(getLocaleTag(locale), {
     style: "currency",
     currency: "CAD",
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+export function roundCurrencyAmount(value?: number | null) {
+  if (value == null || !Number.isFinite(value)) return null;
+  return Number(`${Math.round(Number(`${value}e2`))}e-2`);
+}
+
+export function formatCurrencyInputValue(value?: number | null) {
+  const rounded = roundCurrencyAmount(value);
+  return rounded == null ? "" : rounded.toFixed(2);
+}
+
+export function formatCurrencyInputText(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return "";
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? formatCurrencyInputValue(parsed) : value;
 }
 
 export function maskPhone(value?: string | null) {

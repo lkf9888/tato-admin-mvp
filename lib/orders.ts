@@ -3,7 +3,13 @@ import { parse } from "date-fns";
 
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { prisma } from "@/lib/prisma";
-import { getNetEarningFromFinancials, normalizeText, parseNumberValue, safeString } from "@/lib/utils";
+import {
+  getNetEarningFromFinancials,
+  normalizeText,
+  parseNumberValue,
+  roundCurrencyAmount,
+  safeString,
+} from "@/lib/utils";
 
 export type CsvFieldMapping = {
   vehicleLabel?: string;
@@ -940,7 +946,7 @@ export async function importTuroOrders(input: {
         renterPhone: importedRenterPhone || existing?.renterPhone || null,
         pickupDatetime,
         returnDatetime,
-        totalPrice: importedTotalPrice ?? existing?.totalPrice ?? null,
+        totalPrice: roundCurrencyAmount(importedTotalPrice ?? existing?.totalPrice ?? null),
         status,
         createdBy: input.actor,
         pickupLocation: importedPickupLocation || existing?.pickupLocation || null,

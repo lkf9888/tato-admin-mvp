@@ -8,6 +8,13 @@ import { prisma } from "@/lib/prisma";
 
 type Params = Promise<{ ownerId: string; itemId: string }>;
 
+function revalidateOwnerLedgerSurfaces(ownerId: string) {
+  revalidatePath("/owners");
+  revalidatePath("/owner-statements");
+  revalidatePath(`/owners/${ownerId}`);
+  revalidatePath(`/owners/${ownerId}/ledger`);
+}
+
 async function requireItem(ownerId: string, itemId: string) {
   const user = await getCurrentAdminUser();
   if (!user?.workspaceId) return { error: "Unauthorized" as const, status: 401 as const };
@@ -103,8 +110,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     metadata: { ownerId: context.item.ownerId, kind: updated.kind, amount: updated.amount },
   });
 
-  revalidatePath("/owners");
-  revalidatePath("/owner-statements");
+  revalidateOwnerLedgerSurfaces(context.item.ownerId);
   return NextResponse.json({ item: updated });
 }
 
@@ -126,7 +132,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
     metadata: { ownerId: context.item.ownerId, kind: context.item.kind, amount: context.item.amount },
   });
 
-  revalidatePath("/owners");
-  revalidatePath("/owner-statements");
+  revalidateOwnerLedgerSurfaces(context.item.ownerId);
   return NextResponse.json({ ok: true });
 }

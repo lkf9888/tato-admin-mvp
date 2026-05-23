@@ -10,6 +10,8 @@ import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-bu
 import { getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
 import {
   cn,
+  formatCurrencyInputText,
+  formatCurrencyInputValue,
   formatDate,
   formatDateInputDisplay,
   formatTime as formatTime24,
@@ -311,7 +313,7 @@ function buildOrderTimelineSearchText(order: CalendarOrder, locale: Locale) {
     order.source,
     getStatusLabel(order.source, locale),
     getStatusLabel(order.status, locale),
-    order.totalPrice != null ? String(order.totalPrice) : null,
+    formatCurrencyInputValue(order.totalPrice),
   ]
     .filter(Boolean)
     .join(" ")
@@ -1317,6 +1319,12 @@ export function CalendarView({
                   value={orderDraft.totalPrice}
                   onChange={(event) =>
                     setOrderDraft((current) => ({ ...current, totalPrice: event.target.value }))
+                  }
+                  onBlur={(event) =>
+                    setOrderDraft((current) => ({
+                      ...current,
+                      totalPrice: formatCurrencyInputText(event.target.value),
+                    }))
                   }
                   className="rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none"
                 />

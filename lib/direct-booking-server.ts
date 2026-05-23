@@ -6,6 +6,7 @@ import { dateOnlyToUtcMidday, hasVehicleBookingConflict } from "@/lib/direct-boo
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { getStripeClient } from "@/lib/stripe";
+import { roundCurrencyAmount } from "@/lib/utils";
 
 type DirectBookingMetadata = {
   vehicleId?: string;
@@ -143,7 +144,7 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
   }
 
   const totalPrice =
-    typeof session.amount_total === "number" ? session.amount_total / 100 : null;
+    typeof session.amount_total === "number" ? roundCurrencyAmount(session.amount_total / 100) : null;
   const depositAmount = metadata.depositAmount ? Number(metadata.depositAmount) : null;
 
   const order = await prisma.order.create({
@@ -157,7 +158,9 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       pickupDatetime: dateOnlyToUtcMidday(pickupDate),
       returnDatetime: dateOnlyToUtcMidday(returnDate),
       totalPrice,
-      depositAmount: depositAmount && !Number.isNaN(depositAmount) ? depositAmount : null,
+      depositAmount: roundCurrencyAmount(
+        depositAmount && !Number.isNaN(depositAmount) ? depositAmount : null,
+      ),
       status: "booked",
       createdBy: "direct-booking",
       sourceMetadata: JSON.stringify({

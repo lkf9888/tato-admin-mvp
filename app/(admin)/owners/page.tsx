@@ -1,445 +1,216 @@
-import { createShareLinkAction, deleteOwnerAction, saveOwnerAction } from "@/app/actions";
-import { DateTimeField } from "@/components/date-time-field";
-import { DeleteShareLinkButton } from "@/components/delete-share-link-button";
-import { OwnerLedgerManager } from "@/components/owner-ledger-manager";
-import { OwnerVehicleAssignmentForm } from "@/components/owner-vehicle-assignment-form";
-import { SearchableSelect } from "@/components/searchable-select";
-import { StatusBadge } from "@/components/status-badge";
+import Link from "next/link";
+
+import { OwnersSearchInput } from "@/components/owners-search-input";
+import { QuickVehicleReimbursementButton } from "@/components/quick-vehicle-reimbursement-button";
 import { requireCurrentWorkspace } from "@/lib/auth";
-import { getShareVisibilityOptions } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
-import { formatDateTime } from "@/lib/utils";
+
+type SearchParams = Promise<{ q?: string; error?: string }>;
+
+function vehicleLabel(vehicle: {
+  plateNumber: string;
+  nickname: string;
+  brand: string;
+  model: string;
+  year: number;
+}) {
+  return `${vehicle.plateNumber} · ${vehicle.nickname || `${vehicle.brand} ${vehicle.model} ${vehicle.year}`}`;
+}
+
+function copy(locale: string) {
+  return locale === "zh" || locale === "zh-Hant"
+    ? {
+        title: "车主分成",
+        subtitle: "管理车主、共享他们的对账单、对账佣金和报销。",
+        searchPlaceholder: "搜索车主、联系方式、备注、车辆...",
+        addButton: "+ 新建车主",
+        noSearchResults: "没有找到匹配的车主。",
+        emptyTitle: "还没有车主。",
+        emptyCta: "新建车主",
+        vehicleCount: (count: number) => `${count} 台车`,
+        shareEnabled: "已开启共享链接",
+        deleteError: "该车主名下还有车辆，请先重新分配车辆后再删除。",
+      }
+    : {
+        title: "Owner revenue share",
+        subtitle: "Manage owners, shared statements, commission ledger, and reimbursements.",
+        searchPlaceholder: "Search owner, contact, notes, vehicle...",
+        addButton: "+ New owner",
+        noSearchResults: "No owners match this search.",
+        emptyTitle: "No owners yet.",
+        emptyCta: "New owner",
+        vehicleCount: (count: number) => `${count} vehicle${count === 1 ? "" : "s"}`,
+        shareEnabled: "Share link enabled",
+        deleteError: "Owners with assigned vehicles need those vehicles reassigned first.",
+      };
+}
 
 export default async function OwnersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; ownerId?: string }>;
+  searchParams: SearchParams;
 }) {
   const workspace = await requireCurrentWorkspace();
-  const [{ locale, messages }, owners, allVehicles, shareLinks, params] = await Promise.all([
-    getI18n(),
+  const [{ locale }, params] = await Promise.all([getI18n(), searchParams]);
+  const labels = copy(locale);
+  const q = params.q?.trim() ?? "";
+  const searchWhere = q
+    ? {
+        OR: [
+          { name: { contains: q } },
+          { phone: { contains: q } },
+          { email: { contains: q } },
+          { companyName: { contains: q } },
+          { notes: { contains: q } },
+          {
+            vehicles: {
+              some: {
+                OR: [
+                  { plateNumber: { contains: q } },
+                  { nickname: { contains: q } },
+                  { brand: { contains: q } },
+                  { model: { contains: q } },
+                  { vin: { contains: q } },
+                  { turoListingName: { contains: q } },
+                  { turoVehicleCode: { contains: q } },
+                ],
+              },
+            },
+          },
+        ],
+      }
+    : {};
+
+  const [owners, reimbursableVehicles] = await Promise.all([
     prisma.owner.findMany({
-      where: { workspaceId: workspace.id },
+      where: { workspaceId: workspace.id, ...searchWhere },
+      orderBy: { createdAt: "asc" },
       include: {
-        vehicles: { orderBy: [{ plateNumber: "asc" }, { nickname: "asc" }] },
-        shareLinks: { orderBy: { createdAt: "desc" } },
+        _count: { select: { vehicles: true } },
+        shareLinks: {
+          where: { isActive: true },
+          select: { id: true },
+          take: 1,
+        },
+        vehicles: {
+          orderBy: [{ plateNumber: "asc" }, { nickname: "asc" }],
+          select: {
+            id: true,
+            plateNumber: true,
+            nickname: true,
+            brand: true,
+            model: true,
+            year: true,
+          },
+        },
       },
-      orderBy: { createdAt: "desc" },
     }),
     prisma.vehicle.findMany({
-      where: { workspaceId: workspace.id },
-      include: { owner: true },
+      where: {
+        workspaceId: workspace.id,
+        ownerId: { not: null },
+      },
       orderBy: [{ plateNumber: "asc" }, { nickname: "asc" }],
+      select: {
+        id: true,
+        ownerId: true,
+        plateNumber: true,
+        nickname: true,
+        brand: true,
+        model: true,
+        year: true,
+        vin: true,
+        turoListingName: true,
+        turoVehicleCode: true,
+        owner: { select: { id: true, name: true } },
+      },
     }),
-    prisma.shareLink.findMany({
-      where: { workspaceId: workspace.id },
-      include: { owner: true },
-      orderBy: { createdAt: "desc" },
-    }),
-    searchParams,
   ]);
 
-  const ownerMessages = messages.owners;
-  const shareLinkMessages = messages.shareLinks;
-  const shareVisibilityOptions = getShareVisibilityOptions(locale);
-  const ownerSelectOptions = owners.map((owner) => ({ value: owner.id, label: owner.name }));
-  const shareVisibilitySelectOptions = shareVisibilityOptions.map((option) => ({
-    value: option.value,
-    label: option.label,
-  }));
-  const visibilityLabel = locale === "zh" ? "可见范围" : "Visibility";
-  const selectedOwner = owners.find((owner) => owner.id === params.ownerId) ?? owners[0] ?? null;
-  const ledgerItems = selectedOwner
-    ? await prisma.ownerLedgerItem.findMany({
-        where: {
-          workspaceId: workspace.id,
-          ownerId: selectedOwner.id,
-        },
-        orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
-        include: {
-          vehicle: {
-            select: {
-              id: true,
-              plateNumber: true,
-              nickname: true,
-              brand: true,
-              model: true,
-              year: true,
-            },
-          },
-          order: {
-            select: {
-              id: true,
-              renterName: true,
-              pickupDatetime: true,
-              returnDatetime: true,
-            },
-          },
-        },
-      })
-    : [];
-  const revenueShareCopy =
-    locale === "zh"
-      ? {
-          kicker: "车主分成",
-          title: "车主分成与 monthly statement",
-          description:
-            "车主资料、绑定车辆、共享链接和分成流水账已经合并在同一个页面。账目可手动新增、修改、删除，也可以按订单重新同步。",
-          empty: "还没有车主。请先新增车主，再绑定车辆并同步分成账目。",
-        }
-      : {
-          kicker: "Owner revenue share",
-          title: "Owner ledger and monthly statement",
-          description:
-            "Owner profiles, vehicle assignment, share links, and editable revenue ledgers now live in one HostHub-style workflow.",
-          empty: "No owners yet. Create an owner, assign vehicles, then resync the ledger.",
-        };
-
   return (
-    <div className="space-y-2.5">
-      {params.error ? (
-        <div className="rounded-lg bg-amber-50 px-4 py-3 text-[12px] text-amber-700">
-          {ownerMessages.deleteError}
+    <div className="max-w-5xl p-3 sm:p-6">
+      <div className="mb-4 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">{labels.title}</h1>
+          <p className="text-sm text-neutral-500">{labels.subtitle}</p>
+        </div>
+        <div className="grid grid-cols-1 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
+          <QuickVehicleReimbursementButton
+            locale={locale}
+            vehicles={reimbursableVehicles
+              .filter((vehicle) => vehicle.ownerId && vehicle.owner)
+              .map((vehicle) => ({
+                id: vehicle.id,
+                ownerId: vehicle.ownerId!,
+                ownerName: vehicle.owner!.name,
+                label: `${vehicleLabel(vehicle)} · ${vehicle.owner!.name}`,
+                searchText: [
+                  vehicle.plateNumber,
+                  vehicle.nickname,
+                  vehicle.brand,
+                  vehicle.model,
+                  vehicle.year,
+                  vehicle.vin,
+                  vehicle.turoListingName,
+                  vehicle.turoVehicleCode,
+                  vehicle.owner!.name,
+                ]
+                  .filter(Boolean)
+                  .join(" "),
+              }))}
+          />
+          <Link href="/owners/new" className="btn-primary">
+            {labels.addButton}
+          </Link>
+        </div>
+      </div>
+
+      {params.error === "owner-has-vehicles" ? (
+        <div className="mb-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          {labels.deleteError}
         </div>
       ) : null}
 
-      {/* Same `<details>` collapse pattern as Orders / Vehicles —
-       * the create form is rarely used per visit, so it shouldn't
-       * occupy half the page height on a phone. */}
-      <details className="group overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-sm">
-        <summary className="tap-press flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 sm:px-4 sm:py-3.5">
-          <p className="text-[9px] uppercase tracking-[0.22em] text-slate-500 sm:text-[10px] sm:tracking-[0.24em]">
-            {ownerMessages.createKicker}
-          </p>
-          <span
-            aria-hidden
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition group-open:rotate-45 group-open:bg-slate-950 group-open:text-white"
-          >
-            <span className="text-lg leading-none">+</span>
-          </span>
-        </summary>
-        <form action={saveOwnerAction} className="grid gap-2 border-t border-slate-200 px-3 py-3 text-[12px] sm:gap-2.5 sm:px-4 sm:py-3.5 md:grid-cols-2 xl:grid-cols-4">
-          <input
-            name="name"
-            placeholder={ownerMessages.placeholders.name}
-            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-          />
-          <input
-            name="phone"
-            placeholder={ownerMessages.placeholders.phone}
-            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-          />
-          <input
-            name="email"
-            placeholder={ownerMessages.placeholders.email}
-            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-          />
-          <input
-            name="companyName"
-            placeholder={ownerMessages.placeholders.company}
-            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-          />
-          <input
-            name="notes"
-            placeholder={ownerMessages.placeholders.notes}
-            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 xl:col-span-4"
-          />
-          <button className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white xl:col-span-1">
-            {ownerMessages.addOwner}
-          </button>
-        </form>
-      </details>
+      <div className="mb-3 max-w-md sm:mb-4">
+        <OwnersSearchInput initialValue={q} placeholder={labels.searchPlaceholder} />
+      </div>
 
-      <section className="grid gap-2.5 sm:gap-3 xl:grid-cols-2 2xl:grid-cols-3">
-        {owners.map((owner) => {
-          const activeShareLinks = owner.shareLinks.filter((shareLink) => shareLink.isActive);
-
-          return (
-            <article key={owner.id} className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-3.5">
-            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-              <div className="min-w-0">
-                <h3 className="font-serif text-[0.95rem] font-semibold leading-tight text-slate-950 sm:text-[1.05rem] lg:text-[1.1rem]">{owner.name}</h3>
-                <p className="mt-1 text-[11px] leading-snug text-slate-500 sm:text-[12px]">
-                  {owner.email || ownerMessages.noEmail} · {owner.phone || ownerMessages.noPhone}
-                </p>
-                <p className="mt-0.5 text-[11px] leading-snug text-slate-500 sm:text-[12px]">
-                  {owner.companyName || ownerMessages.personalOwner} ·{" "}
-                  {ownerMessages.vehicleCount(owner.vehicles.length)}
-                </p>
-              </div>
-              <div className="self-start rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                {ownerMessages.activeLinks(
-                  owner.shareLinks.filter((shareLink) => shareLink.isActive).length,
-                )}
-              </div>
-            </div>
-
-            <details className="mt-3 rounded-lg bg-slate-50 px-3 py-2.5">
-              <summary className="cursor-pointer text-[12px] font-medium text-slate-700">
-                {ownerMessages.editOwner}
-              </summary>
-              <form action={saveOwnerAction} className="mt-3 grid gap-2 text-[12px] md:grid-cols-2">
-                <input type="hidden" name="id" value={owner.id} />
-                <input
-                  name="name"
-                  defaultValue={owner.name}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-                <input
-                  name="phone"
-                  defaultValue={owner.phone ?? ""}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-                <input
-                  name="email"
-                  defaultValue={owner.email ?? ""}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-                <input
-                  name="companyName"
-                  defaultValue={owner.companyName ?? ""}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
-                />
-                <input
-                  name="notes"
-                  defaultValue={owner.notes ?? ""}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2 md:col-span-2"
-                />
-                <button className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white md:col-span-2">
-                  {ownerMessages.saveChanges}
-                </button>
-              </form>
-
-              <div className="mt-4 border-t border-slate-200 pt-4">
-                <div className="flex flex-col gap-1">
-                  <p className="text-[12px] font-semibold text-slate-800">
-                    {ownerMessages.vehicleAssignmentTitle}
-                  </p>
-                  <p className="text-[11px] leading-4 text-slate-500">
-                    {ownerMessages.vehicleAssignmentHint}
-                  </p>
-                </div>
-
-                <OwnerVehicleAssignmentForm
-                  ownerId={owner.id}
-                  locale={locale}
-                  vehicles={allVehicles.map((vehicle) => ({
-                    id: vehicle.id,
-                    plateNumber: vehicle.plateNumber,
-                    nickname: vehicle.nickname,
-                    brand: vehicle.brand,
-                    model: vehicle.model,
-                    year: vehicle.year,
-                    vin: vehicle.vin,
-                    turoListingName: vehicle.turoListingName,
-                    turoVehicleCode: vehicle.turoVehicleCode,
-                    ownerId: vehicle.ownerId,
-                    ownerName: vehicle.owner?.name ?? null,
-                  }))}
-                  messages={{
-                    noVehicles: ownerMessages.noVehicles,
-                    searchPlaceholder: ownerMessages.vehicleSearchPlaceholder,
-                    noSearchResults: ownerMessages.vehicleNoSearchResults,
-                    saveVehicleAssignments: ownerMessages.saveVehicleAssignments,
-                  }}
-                />
-              </div>
-
-              <div className="mt-4 border-t border-slate-200 pt-4">
-                <div className="flex flex-col gap-1">
-                  <p className="text-[12px] font-semibold text-slate-800">
-                    {ownerMessages.shareLinkTitle}
-                  </p>
-                  <p className="text-[11px] leading-4 text-slate-500">
-                    {ownerMessages.shareLinkHint}
-                  </p>
-                </div>
-
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                  {activeShareLinks.length > 0 ? (
-                    activeShareLinks.map((shareLink) => (
-                      <a
-                        key={shareLink.id}
-                        href={`/share/${shareLink.token}`}
-                        className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700"
-                      >
-                        {ownerMessages.openShareLink}
-                      </a>
-                    ))
-                  ) : (
-                    <p className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] text-slate-500">
-                      {ownerMessages.noShareLinks}
-                    </p>
-                  )}
-                </div>
-
-                <form action={createShareLinkAction} className="mt-2.5">
-                  <input type="hidden" name="ownerId" value={owner.id} />
-                  <input type="hidden" name="visibility" value="standard" />
-                  <button className="rounded-md border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700">
-                    {ownerMessages.createShareLink}
-                  </button>
-                </form>
-              </div>
-            </details>
-
-            <div className="mt-3 text-[12px] text-slate-500">
-              {ownerMessages.vehiclesPrefix}:{" "}
-              {owner.vehicles.map((vehicle) => vehicle.nickname).join(", ") || ownerMessages.noVehicles}
-            </div>
-
-            <form action={deleteOwnerAction} className="mt-3">
-              <input type="hidden" name="id" value={owner.id} />
-              <button className="text-[12px] font-medium text-rose-600">
-                {ownerMessages.deleteOwner}
-              </button>
-            </form>
-          </article>
-          );
-        })}
-      </section>
-
-      <section className="space-y-2.5">
-        <div className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
-            {shareLinkMessages.createKicker}
-          </p>
-          <form action="/api/share-links/create" method="post" className="mt-3 grid gap-2 text-[12px] md:grid-cols-2 xl:grid-cols-4">
-            <SearchableSelect
-              name="ownerId"
-              defaultValue={owners[0]?.id ?? ""}
-              options={ownerSelectOptions}
-              placeholder={ownerMessages.placeholders.name}
-              searchPlaceholder={ownerMessages.placeholders.name}
-              className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-            />
-            <SearchableSelect
-              name="visibility"
-              defaultValue="standard"
-              options={shareVisibilitySelectOptions}
-              placeholder={visibilityLabel}
-              searchPlaceholder={visibilityLabel}
-              className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-            />
-            <input
-              name="password"
-              placeholder={shareLinkMessages.optionalPassword}
-              className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
-            />
-            <DateTimeField name="expiresAt" className="min-w-0 xl:col-span-1" />
-            <button className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white xl:col-span-1">
-              {shareLinkMessages.generateLink}
-            </button>
-          </form>
+      {owners.length === 0 && q ? (
+        <div className="card p-10 text-center text-neutral-500">{labels.noSearchResults}</div>
+      ) : owners.length === 0 ? (
+        <div className="card p-10 text-center">
+          <p className="mb-3 text-neutral-600">{labels.emptyTitle}</p>
+          <Link href="/owners/new" className="btn-primary">
+            {labels.emptyCta}
+          </Link>
         </div>
-
-        {shareLinks.length > 0 ? (
-          <div className="grid gap-2.5 xl:grid-cols-2 2xl:grid-cols-3">
-            {shareLinks.map((shareLink) => (
-              <article key={shareLink.id} className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-3.5">
-                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <h3 className="font-serif text-[0.95rem] font-semibold text-slate-950 sm:text-[1.05rem]">{shareLink.owner.name}</h3>
-                    <p className="mt-1 break-all text-[11px] text-slate-500">
-                      {shareLinkMessages.tokenPrefix}: {shareLink.token}
-                    </p>
-                    <p className="mt-0.5 break-all text-[11px] text-slate-500">
-                      {shareLinkMessages.urlPrefix}: /share/{shareLink.token} ·{" "}
-                      {shareLinkMessages.createdAt(formatDateTime(shareLink.createdAt, locale))}
-                    </p>
-                    <p className="mt-0.5 break-words text-[11px] text-slate-500">
-                      {shareLink.passwordHash
-                        ? shareLinkMessages.passwordProtected
-                        : shareLinkMessages.noPassword}{" "}
-                      ·{" "}
-                      {shareLink.expiresAt
-                        ? shareLinkMessages.expiresAt(formatDateTime(shareLink.expiresAt, locale))
-                        : shareLinkMessages.noExpiry}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    <StatusBadge value={shareLink.visibility} locale={locale} />
-                    <StatusBadge value={shareLink.isActive ? "available" : "inactive"} locale={locale} />
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-col gap-2 md:flex-row">
-                  <a
-                    href={`/share/${shareLink.token}`}
-                    className="rounded-md border border-slate-200 px-3 py-2 text-[12px] font-medium text-slate-700"
-                  >
-                    {shareLinkMessages.openSharePage}
-                  </a>
-                  {shareLink.isActive ? (
-                    <form action="/api/share-links/revoke" method="post">
-                      <input type="hidden" name="id" value={shareLink.id} />
-                      <button className="rounded-md border border-rose-200 px-3 py-2 text-[12px] font-medium text-rose-600">
-                        {shareLinkMessages.revokeLink}
-                      </button>
-                    </form>
-                  ) : null}
-                  <DeleteShareLinkButton
-                    id={shareLink.id}
-                    deleteLabel={shareLinkMessages.deleteLink}
-                    confirmTitle={shareLinkMessages.deleteLinkConfirmTitle}
-                    confirmDescription={shareLinkMessages.deleteLinkConfirmDescription}
-                    confirmYesLabel={shareLinkMessages.confirmYes}
-                    confirmNoLabel={shareLinkMessages.confirmNo}
-                  />
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : null}
-      </section>
-
-      <section className="rounded-lg border border-[var(--line)] bg-white/90 p-3 shadow-sm sm:p-4">
-        <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
-          {revenueShareCopy.kicker}
-        </p>
-        <h2 className="mt-1 font-serif text-[1.1rem] font-semibold text-[var(--ink)] sm:text-[1.3rem]">
-          {revenueShareCopy.title}
-        </h2>
-        <p className="mt-1.5 max-w-4xl text-[12px] leading-5 text-[var(--ink-soft)]">
-          {revenueShareCopy.description}
-        </p>
-      </section>
-
-      {selectedOwner ? (
-        <OwnerLedgerManager
-          locale={locale}
-          owners={owners.map((owner) => ({ id: owner.id, name: owner.name }))}
-          selectedOwner={{ id: selectedOwner.id, name: selectedOwner.name }}
-          vehicles={selectedOwner.vehicles.map((vehicle) => ({
-            id: vehicle.id,
-            label: `${vehicle.plateNumber} · ${vehicle.nickname}`,
-          }))}
-          items={ledgerItems.map((item) => ({
-            id: item.id,
-            ownerId: item.ownerId,
-            vehicleId: item.vehicleId,
-            orderId: item.orderId,
-            kind: item.kind,
-            amount: item.amount,
-            occurredAt: item.occurredAt.toISOString(),
-            note: item.note,
-            isAuto: item.isAuto,
-            createdAt: item.createdAt.toISOString(),
-            vehicle: item.vehicle,
-            order: item.order
-              ? {
-                  id: item.order.id,
-                  renterName: item.order.renterName,
-                  pickupDatetime: item.order.pickupDatetime.toISOString(),
-                  returnDatetime: item.order.returnDatetime.toISOString(),
-                }
-              : null,
-          }))}
-        />
       ) : (
-        <div className="rounded-lg border border-dashed border-[var(--line)] bg-white/80 px-4 py-6 text-[12px] text-[var(--ink-soft)]">
-          {revenueShareCopy.empty}
+        <div className="space-y-2">
+          {owners.map((owner) => (
+            <Link
+              key={owner.id}
+              href={`/owners/${owner.id}`}
+              className="card block px-3 py-2.5 transition-shadow hover:shadow-sm"
+            >
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{owner.name}</div>
+                  <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-neutral-500">
+                    {owner.email ? <span>{owner.email}</span> : null}
+                    {owner.phone ? <span>{owner.phone}</span> : null}
+                    {owner.companyName ? <span>{owner.companyName}</span> : null}
+                  </div>
+                </div>
+                <div className="shrink-0 text-left text-xs text-neutral-500 sm:text-right">
+                  {labels.vehicleCount(owner._count.vehicles)}
+                  {owner.shareLinks.length > 0 ? (
+                    <div className="mt-0.5 text-emerald-600">{labels.shareEnabled}</div>
+                  ) : null}
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </div>

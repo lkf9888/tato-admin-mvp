@@ -87,6 +87,7 @@ model Workspace {
   shareLinks           ShareLink[]
   activityLogs         ActivityLog[]
   ownerLedgerItems     OwnerLedgerItem[]
+  ownerLedgerReceipts  OwnerLedgerReceipt[]
   orderAttachments     OrderAttachment[]
   staffMembers         StaffMember[]
   staffTasks           StaffTask[]
@@ -236,27 +237,51 @@ model TuroSyncConfig {
 }
 
 model OwnerLedgerItem {
-  workspaceId String?
-  id          String          @id @default(cuid())
-  ownerId     String
-  vehicleId   String?
-  orderId     String?
-  kind        OwnerLedgerKind
-  amount      Float
-  occurredAt  DateTime
-  note        String?
-  isAuto      Boolean         @default(false)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  workspace   Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  owner       Owner           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  vehicle     Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  order       Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  workspaceId        String?
+  id                 String               @id @default(cuid())
+  ownerId            String
+  vehicleId          String?
+  orderId            String?
+  kind               OwnerLedgerKind
+  amount             Float
+  occurredAt         DateTime
+  note               String?
+  receiptUrl         String?
+  receiptPathname    String?
+  receiptFilename    String?
+  receiptContentType String?
+  receipts           OwnerLedgerReceipt[]
+  isAuto             Boolean              @default(false)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  workspace          Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  owner              Owner                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  vehicle            Vehicle?             @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  order              Order?               @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
   @@index([ownerId, occurredAt])
   @@index([vehicleId, occurredAt])
   @@index([orderId])
+}
+
+model OwnerLedgerReceipt {
+  workspaceId String?
+  id          String          @id @default(cuid())
+  itemId      String
+  url         String?
+  pathname    String
+  filename    String?
+  contentType String?
+  size        Int?
+  uploadedAt  DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  workspace   Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  item        OwnerLedgerItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([itemId])
 }
 
 model OrderAttachment {

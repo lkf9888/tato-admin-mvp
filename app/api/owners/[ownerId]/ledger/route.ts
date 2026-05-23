@@ -14,6 +14,13 @@ const MANUAL_KINDS = new Set<OwnerLedgerKind>([
 
 type Params = Promise<{ ownerId: string }>;
 
+function revalidateOwnerLedgerSurfaces(ownerId: string) {
+  revalidatePath("/owners");
+  revalidatePath("/owner-statements");
+  revalidatePath(`/owners/${ownerId}`);
+  revalidatePath(`/owners/${ownerId}/ledger`);
+}
+
 async function requireOwner(ownerId: string) {
   const user = await getCurrentAdminUser();
   if (!user?.workspaceId) return { error: "Unauthorized" as const, status: 401 as const };
@@ -87,7 +94,6 @@ export async function POST(request: NextRequest, { params }: { params: Params })
     metadata: { ownerId: context.owner.id, kind, amount: item.amount },
   });
 
-  revalidatePath("/owners");
-  revalidatePath("/owner-statements");
+  revalidateOwnerLedgerSurfaces(context.owner.id);
   return NextResponse.json({ item });
 }

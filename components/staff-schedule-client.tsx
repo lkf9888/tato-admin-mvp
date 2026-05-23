@@ -276,7 +276,6 @@ export function StaffScheduleClient({
   const activeStaff = staff.filter((member) => member.isActive);
   const activeTasks = tasks.filter((task) => task.status !== "done" && task.status !== "cancelled");
   const completedTasks = tasks.filter((task) => task.status === "done" || task.status === "cancelled");
-  const overdueTasks = activeTasks.filter((task) => isTaskOverdue(task.dueDatetime));
   const unassignedTasks = activeTasks.filter((task) => !task.staffId);
 
   const tasksByStaff = useMemo(() => {
@@ -382,12 +381,6 @@ export function StaffScheduleClient({
         </div>
       </section>
 
-      <section className="grid gap-2 sm:grid-cols-3">
-        <Metric label={c.activeTasks} value={activeTasks.length} />
-        <Metric label={c.overdue} value={overdueTasks.length} warn={overdueTasks.length > 0} />
-        <Metric label={c.completed} value={completedTasks.length} />
-      </section>
-
       <p className="text-xs text-neutral-500">{c.dragHint}</p>
 
       {notice ? (
@@ -399,7 +392,7 @@ export function StaffScheduleClient({
       {activeStaff.length === 0 ? (
         <section className="card p-10 text-center text-sm text-neutral-500">{c.noStaff}</section>
       ) : (
-        <section className="grid gap-3 xl:grid-cols-2">
+        <section className="grid gap-2.5 xl:grid-cols-2">
           {activeStaff.map((member) => (
             <article
               key={member.id}
@@ -417,31 +410,31 @@ export function StaffScheduleClient({
                 dragOverTarget === member.id ? "border-neutral-900 bg-neutral-50" : "",
               )}
             >
-              <div className="flex items-start justify-between gap-3 border-b border-neutral-200 px-4 py-3">
+              <div className="flex flex-col gap-2 border-b border-neutral-200 px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: member.color }} />
                     <h2 className="truncate text-base font-semibold">{member.name}</h2>
                   </div>
-                  <p className="mt-1 truncate text-xs text-neutral-500">
+                  <p className="mt-0.5 truncate text-xs text-neutral-500">
                     {[member.role, member.phone, member.email].filter(Boolean).join(" · ") || c.staff}
                   </p>
                 </div>
-                <div className="flex shrink-0 gap-1">
-                  <button className="btn-secondary px-2 py-1 text-xs" onClick={() => setTaskModal({ kind: "new", staffId: member.id })}>
-                    <Plus className="h-3.5 w-3.5" />
+                <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
+                  <button className="btn-secondary min-h-10 px-3 py-2 text-sm" onClick={() => setTaskModal({ kind: "new", staffId: member.id })}>
+                    <Plus className="h-4 w-4" />
                     {c.addTask}
                   </button>
-                  <button className="btn-secondary px-2 py-1 text-xs" onClick={() => setStaffModal(member)}>
-                    <Pencil className="h-3.5 w-3.5" />
+                  <button className="btn-secondary min-h-10 px-3 py-2 text-sm" onClick={() => setStaffModal(member)}>
+                    <Pencil className="h-4 w-4" />
                     {c.edit}
                   </button>
-                  <button className="btn-danger px-2 py-1 text-xs" onClick={() => deactivateStaff(member)}>
-                    <Trash2 className="h-3.5 w-3.5" />
+                  <button className="btn-danger min-h-10 min-w-10 px-2 py-2 text-sm" onClick={() => deactivateStaff(member)}>
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
-              <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-600">
+              <div className="border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs text-neutral-600">
                 <span className="font-medium text-neutral-900">{c.pinned}: </span>
                 {member.pinnedMessage || c.noPinned}
               </div>
@@ -469,7 +462,7 @@ export function StaffScheduleClient({
         </section>
       )}
 
-      <section className="grid gap-3 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <section className="grid gap-2.5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <article
           onDragOver={(event) => {
             event.preventDefault();
@@ -485,7 +478,7 @@ export function StaffScheduleClient({
             dragOverTarget === "unassigned" ? "border-neutral-900 bg-neutral-50" : "",
           )}
         >
-          <div className="border-b border-neutral-200 px-4 py-3">
+          <div className="border-b border-neutral-200 px-3 py-2.5">
             <h2 className="text-base font-semibold">{c.unassigned}</h2>
             <p className="text-xs text-neutral-500">{c.unassignedHint}</p>
           </div>
@@ -510,7 +503,7 @@ export function StaffScheduleClient({
           />
         </article>
         <article className="card overflow-hidden">
-          <div className="border-b border-neutral-200 px-4 py-3">
+          <div className="border-b border-neutral-200 px-3 py-2.5">
             <h2 className="text-base font-semibold">{c.history}</h2>
           </div>
           <TaskList
@@ -565,17 +558,6 @@ export function StaffScheduleClient({
   );
 }
 
-function Metric({ label, value, warn = false }: { label: string; value: number; warn?: boolean }) {
-  return (
-    <div className="card px-4 py-3">
-      <p className="text-xs text-neutral-500">{label}</p>
-      <p className={cn("mt-1 text-2xl font-semibold", warn ? "text-red-700" : "text-neutral-950")}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function TaskList({
   tasks,
   locale,
@@ -598,7 +580,7 @@ function TaskList({
   onCancel: (task: StaffTask) => void;
 }) {
   if (tasks.length === 0) {
-    return <div className="px-4 py-6 text-sm text-neutral-500">{copy.noTasks}</div>;
+    return <div className="px-3 py-4 text-sm text-neutral-500">{copy.noTasks}</div>;
   }
 
   return (
@@ -614,15 +596,15 @@ function TaskList({
           }}
           onDragEnd={onDragEnd}
           className={cn(
-            "px-4 py-3 transition",
+            "px-3 py-2 transition",
             task.status !== "done" && task.status !== "cancelled" ? "cursor-grab active:cursor-grabbing" : "",
             dragTaskId === task.id ? "bg-neutral-50 opacity-60" : "",
           )}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+          <div className="flex items-start justify-between gap-2.5">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-2">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
                   {task.attachments.length > 0 ? (
                     <span className="badge bg-neutral-100 text-neutral-600">
@@ -630,13 +612,13 @@ function TaskList({
                       {task.attachments.length}
                     </span>
                   ) : null}
+                  <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-950">{task.title}</h3>
                 </div>
-                <h3 className="mt-1 truncate text-sm font-semibold text-neutral-950">{task.title}</h3>
-                <p className="mt-1 text-xs text-neutral-500">
+                <p className="mt-0.5 text-xs leading-4 text-neutral-500">
                   {formatTaskDue(task.dueDatetime, locale, copy.noDue)}
                   {task.timeWindow ? ` · ${task.timeWindow}` : ""}
                 </p>
-                <p className="mt-1 truncate text-xs text-neutral-500">
+                <p className="mt-0.5 truncate text-xs leading-4 text-neutral-500">
                   {[
                     task.staffLabel ? `${copy.staff}: ${task.staffLabel}` : null,
                     getTaskVehicleLabel(task),
@@ -645,21 +627,21 @@ function TaskList({
                     .filter(Boolean)
                     .join(" · ") || copy.none}
                 </p>
-                {task.details ? <p className="mt-1 text-xs text-neutral-600">{task.details}</p> : null}
+                {task.details ? <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-neutral-600">{task.details}</p> : null}
               </div>
               <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
             </div>
-            <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
-              <button className="btn-secondary px-2 py-1 text-xs" onClick={() => onEdit(task)}>
-                <Pencil className="h-3.5 w-3.5" />
+            <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
+              <button className="btn-secondary min-h-10 min-w-10 px-2 py-2 text-sm" onClick={() => onEdit(task)}>
+                <Pencil className="h-4 w-4" />
               </button>
-              <button className="btn-secondary px-2 py-1 text-xs" onClick={() => onComplete(task)}>
-                {task.status === "done" ? <Circle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              <button className="btn-secondary min-h-10 px-3 py-2 text-sm" onClick={() => onComplete(task)}>
+                {task.status === "done" ? <Circle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                 {task.status === "done" ? copy.reopen : copy.complete}
               </button>
               {task.status !== "cancelled" ? (
-                <button className="btn-danger px-2 py-1 text-xs" onClick={() => onCancel(task)}>
-                  <Trash2 className="h-3.5 w-3.5" />
+                <button className="btn-danger min-h-10 min-w-10 px-2 py-2 text-sm" onClick={() => onCancel(task)}>
+                  <Trash2 className="h-4 w-4" />
                 </button>
               ) : null}
             </div>
@@ -1252,18 +1234,6 @@ function formatTaskDue(value: string | null, locale: Locale, fallback: string) {
     month: "short",
     day: "numeric",
   }).format(date);
-}
-
-function isTaskOverdue(value: string | null) {
-  if (!value) return false;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  return dueDay.getTime() < today.getTime();
 }
 
 function formatFileSize(size: number | null) {

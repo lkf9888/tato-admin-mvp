@@ -421,16 +421,16 @@ export function StaffScheduleClient({
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
-                  <button className="btn-secondary min-h-10 px-3 py-2 text-sm" onClick={() => setTaskModal({ kind: "new", staffId: member.id })}>
-                    <Plus className="h-4 w-4" />
+                  <button className="btn-secondary min-h-8 px-2.5 py-1.5 text-xs" onClick={() => setTaskModal({ kind: "new", staffId: member.id })}>
+                    <Plus className="h-3.5 w-3.5" />
                     {c.addTask}
                   </button>
-                  <button className="btn-secondary min-h-10 px-3 py-2 text-sm" onClick={() => setStaffModal(member)}>
-                    <Pencil className="h-4 w-4" />
+                  <button className="btn-secondary min-h-8 border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 hover:bg-amber-100" onClick={() => setStaffModal(member)}>
+                    <Pencil className="h-3.5 w-3.5" />
                     {c.edit}
                   </button>
-                  <button className="btn-danger min-h-10 min-w-10 px-2 py-2 text-sm" onClick={() => deactivateStaff(member)}>
-                    <Trash2 className="h-4 w-4" />
+                  <button className="btn-danger min-h-8 min-w-8 px-1.5 py-1.5 text-xs" onClick={() => deactivateStaff(member)}>
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
@@ -632,16 +632,16 @@ function TaskList({
               <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
             </div>
             <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
-              <button className="btn-secondary min-h-10 min-w-10 px-2 py-2 text-sm" onClick={() => onEdit(task)}>
-                <Pencil className="h-4 w-4" />
+              <button className="btn-secondary min-h-8 min-w-8 border-amber-300 bg-amber-50 px-1.5 py-1.5 text-xs text-amber-800 hover:bg-amber-100" onClick={() => onEdit(task)}>
+                <Pencil className="h-3.5 w-3.5" />
               </button>
-              <button className="btn-secondary min-h-10 px-3 py-2 text-sm" onClick={() => onComplete(task)}>
-                {task.status === "done" ? <Circle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+              <button className="btn-secondary min-h-8 border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-800 hover:bg-emerald-100" onClick={() => onComplete(task)}>
+                {task.status === "done" ? <Circle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                 {task.status === "done" ? copy.reopen : copy.complete}
               </button>
               {task.status !== "cancelled" ? (
-                <button className="btn-danger min-h-10 min-w-10 px-2 py-2 text-sm" onClick={() => onCancel(task)}>
-                  <Trash2 className="h-4 w-4" />
+                <button className="btn-danger min-h-8 min-w-8 px-1.5 py-1.5 text-xs" onClick={() => onCancel(task)}>
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               ) : null}
             </div>

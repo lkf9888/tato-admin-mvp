@@ -74,6 +74,7 @@ const vehicleSchema = z.object({
   purchasePrice: z.coerce.number().nonnegative().optional(),
   ownerCommissionRate: z.coerce.number().min(0).max(100).optional(),
   cleaningFee: z.coerce.number().nonnegative().optional(),
+  pickupPassword: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -891,6 +892,7 @@ export async function saveVehicleAction(formData: FormData) {
     purchasePrice: cleanOptional(formData.get("purchasePrice")),
     ownerCommissionRate: cleanOptional(formData.get("ownerCommissionRate")),
     cleaningFee: cleanOptional(formData.get("cleaningFee")),
+    pickupPassword: cleanOptional(formData.get("pickupPassword")),
     notes: cleanOptional(formData.get("notes")),
   });
 

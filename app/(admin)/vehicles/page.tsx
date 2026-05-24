@@ -6,6 +6,7 @@ import { requireCurrentWorkspace } from "@/lib/auth";
 import { getVehicleStatusOptions } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import type { ReactNode } from "react";
 
 export default async function VehiclesPage({
   searchParams,
@@ -38,7 +39,7 @@ export default async function VehiclesPage({
     value: option.value,
     label: option.label,
   }));
-  const compactEditFieldClass = "min-h-9 rounded-md border border-slate-200 bg-white px-2.5 py-1.5";
+  const compactEditFieldClass = "min-h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5";
   const vehicleQuery = (params.q ?? "").trim();
   const normalizedVehicleQuery = vehicleQuery.toLowerCase();
   const filteredVehicles = normalizedVehicleQuery
@@ -139,6 +140,11 @@ export default async function VehiclesPage({
             min="0"
             step="0.01"
             placeholder={vehicleMessages.placeholders.cleaningFee}
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+          />
+          <input
+            name="pickupPassword"
+            placeholder={vehicleMessages.placeholders.pickupPassword}
             className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
           />
           <SearchableSelect
@@ -253,99 +259,131 @@ export default async function VehiclesPage({
               </summary>
               <form action={saveVehicleAction} className="mt-3 grid gap-2 text-[12px] md:grid-cols-3">
                 <input type="hidden" name="id" value={vehicle.id} />
-                <input
-                  name="plateNumber"
-                  defaultValue={vehicle.plateNumber}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="nickname"
-                  defaultValue={vehicle.nickname}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="brand"
-                  defaultValue={vehicle.brand}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="model"
-                  defaultValue={vehicle.model}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="year"
-                  type="number"
-                  defaultValue={vehicle.year}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="vin"
-                  defaultValue={vehicle.vin ?? ""}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="purchasePrice"
-                  type="number"
-                  step="0.01"
-                  defaultValue={vehicle.purchasePrice ?? ""}
-                  placeholder={vehicleMessages.placeholders.purchasePrice}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="ownerCommissionRate"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  defaultValue={
-                    vehicle.ownerCommissionRate == null
-                      ? ""
-                      : (vehicle.ownerCommissionRate * 100).toFixed(2)
-                  }
-                  placeholder={vehicleMessages.placeholders.ownerCommissionRate}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="cleaningFee"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  defaultValue={vehicle.cleaningFee ?? ""}
-                  placeholder={vehicleMessages.placeholders.cleaningFee}
-                  className={compactEditFieldClass}
-                />
-                <SearchableSelect
-                  name="ownerId"
-                  defaultValue={vehicle.ownerId ?? ""}
-                  options={ownerSelectOptions}
-                  placeholder={vehicleMessages.placeholders.unassignedOwner}
-                  searchPlaceholder={vehicleMessages.placeholders.unassignedOwner}
-                  className={compactEditFieldClass}
-                />
-                <SearchableSelect
-                  name="status"
-                  defaultValue={vehicle.status}
-                  options={vehicleStatusSelectOptions}
-                  placeholder={statusLabel}
-                  searchPlaceholder={statusLabel}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="turoListingName"
-                  defaultValue={vehicle.turoListingName ?? ""}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="turoVehicleCode"
-                  defaultValue={vehicle.turoVehicleCode ?? ""}
-                  className={compactEditFieldClass}
-                />
-                <input
-                  name="notes"
-                  defaultValue={vehicle.notes ?? ""}
-                  className={compactEditFieldClass}
-                />
+                <VehicleEditField label={vehicleMessages.placeholders.plateNumber}>
+                  <input
+                    name="plateNumber"
+                    defaultValue={vehicle.plateNumber}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.nickname}>
+                  <input
+                    name="nickname"
+                    defaultValue={vehicle.nickname}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.brand}>
+                  <input
+                    name="brand"
+                    defaultValue={vehicle.brand}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.model}>
+                  <input
+                    name="model"
+                    defaultValue={vehicle.model}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.year}>
+                  <input
+                    name="year"
+                    type="number"
+                    defaultValue={vehicle.year}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.vin}>
+                  <input
+                    name="vin"
+                    defaultValue={vehicle.vin ?? ""}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.purchasePrice}>
+                  <input
+                    name="purchasePrice"
+                    type="number"
+                    step="0.01"
+                    defaultValue={vehicle.purchasePrice ?? ""}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.ownerCommissionRate}>
+                  <input
+                    name="ownerCommissionRate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    defaultValue={
+                      vehicle.ownerCommissionRate == null
+                        ? ""
+                        : (vehicle.ownerCommissionRate * 100).toFixed(2)
+                    }
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.cleaningFee}>
+                  <input
+                    name="cleaningFee"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    defaultValue={vehicle.cleaningFee ?? ""}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.pickupPassword}>
+                  <input
+                    name="pickupPassword"
+                    defaultValue={vehicle.pickupPassword ?? ""}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.unassignedOwner}>
+                  <SearchableSelect
+                    name="ownerId"
+                    defaultValue={vehicle.ownerId ?? ""}
+                    options={ownerSelectOptions}
+                    placeholder={vehicleMessages.placeholders.unassignedOwner}
+                    searchPlaceholder={vehicleMessages.placeholders.unassignedOwner}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={statusLabel}>
+                  <SearchableSelect
+                    name="status"
+                    defaultValue={vehicle.status}
+                    options={vehicleStatusSelectOptions}
+                    placeholder={statusLabel}
+                    searchPlaceholder={statusLabel}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.turoListingName}>
+                  <input
+                    name="turoListingName"
+                    defaultValue={vehicle.turoListingName ?? ""}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.turoVehicleCode}>
+                  <input
+                    name="turoVehicleCode"
+                    defaultValue={vehicle.turoVehicleCode ?? ""}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.notes}>
+                  <input
+                    name="notes"
+                    defaultValue={vehicle.notes ?? ""}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
                 <div className="flex gap-3 md:col-span-3">
                   <button className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white">
                     {vehicleMessages.saveChanges}
@@ -367,5 +405,22 @@ export default async function VehiclesPage({
         ))}
       </section>
     </div>
+  );
+}
+
+function VehicleEditField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1 block truncate text-[10px] font-semibold leading-4 text-slate-500">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }

@@ -146,6 +146,7 @@ model Vehicle {
   purchasePrice        Float?
   ownerCommissionRate  Float?
   cleaningFee          Float?
+  pickupPassword       String?
   directBookingEnabled Boolean           @default(false)
   bookingDailyRate     Float?
   bookingInsuranceFee  Float?

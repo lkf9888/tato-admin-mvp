@@ -7,9 +7,10 @@ import {
   ImagePlus,
   Pencil,
   RotateCcw,
-  Trash2,
   Upload,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
@@ -147,6 +148,7 @@ export function StaffShareClient({
   const labels = copy(activeLocale);
   const [tasks, setTasks] = useState(initialTasks.map(normalizeTask));
   const [editingTask, setEditingTask] = useState<StaffShareTask | null>(null);
+  const [previewImage, setPreviewImage] = useState<StaffShareAttachment | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const activeTasks = useMemo(
     () =>
@@ -235,20 +237,6 @@ export function StaffShareClient({
     await patchTask(task, { unassign: true });
   }
 
-  async function deleteTask(task: StaffShareTask) {
-    if (!window.confirm(labels.confirmDelete)) return;
-    const response = await fetch(`/api/staff-share/${token}/tasks/${task.id}`, {
-      method: "DELETE",
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.task) {
-      setNotice(labels.failed);
-      return;
-    }
-    upsertTask(normalizeTask(payload.task));
-    setNotice(labels.saved);
-  }
-
   return (
     <main className="min-h-screen bg-neutral-100 text-neutral-950">
       <header className="sticky top-0 z-20 border-b border-neutral-800 bg-neutral-950 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] text-white">
@@ -286,16 +274,6 @@ export function StaffShareClient({
               {staff.pinnedMessage}
             </div>
           ) : null}
-          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-md bg-white/10 px-3 py-2">
-              <p className="text-neutral-400">{labels.active}</p>
-              <p className="text-xl font-semibold">{activeTasks.length}</p>
-            </div>
-            <div className="rounded-md bg-white/10 px-3 py-2">
-              <p className="text-neutral-400">{labels.history}</p>
-              <p className="text-xl font-semibold">{historyTasks.length}</p>
-            </div>
-          </div>
         </div>
       </header>
 
@@ -306,43 +284,43 @@ export function StaffShareClient({
           </div>
         ) : null}
 
-        <TaskSection title={labels.active} empty={labels.noTasks}>
-          {activeTaskGroups.map((group) => (
-            <TaskDateGroup key={group.key} label={group.label}>
-              {group.tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  labels={labels}
-                  locale={activeLocale}
-                  task={task}
-                  onEdit={setEditingTask}
-                  onComplete={toggleComplete}
-                  onUnassign={unassignTask}
-                  onDelete={deleteTask}
-                />
-              ))}
-            </TaskDateGroup>
-          ))}
-        </TaskSection>
+        {activeTaskGroups.length === 0 && historyTaskGroups.length === 0 ? (
+          <div className="rounded-md bg-white px-4 py-6 text-sm text-neutral-500">{labels.noTasks}</div>
+        ) : null}
 
-        <TaskSection title={labels.history} empty={labels.noTasks}>
-          {historyTaskGroups.map((group) => (
-            <TaskDateGroup key={group.key} label={group.label}>
-              {group.tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  labels={labels}
-                  locale={activeLocale}
-                  task={task}
-                  onEdit={setEditingTask}
-                  onComplete={toggleComplete}
-                  onUnassign={unassignTask}
-                  onDelete={deleteTask}
-                />
-              ))}
-            </TaskDateGroup>
-          ))}
-        </TaskSection>
+        {activeTaskGroups.map((group) => (
+          <TaskDateGroup key={`active-${group.key}`} label={group.label}>
+            {group.tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                labels={labels}
+                locale={activeLocale}
+                task={task}
+                onEdit={setEditingTask}
+                onComplete={toggleComplete}
+                onUnassign={unassignTask}
+                onPreviewImage={setPreviewImage}
+              />
+            ))}
+          </TaskDateGroup>
+        ))}
+
+        {historyTaskGroups.map((group) => (
+          <TaskDateGroup key={`history-${group.key}`} label={group.label}>
+            {group.tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                labels={labels}
+                locale={activeLocale}
+                task={task}
+                onEdit={setEditingTask}
+                onComplete={toggleComplete}
+                onUnassign={unassignTask}
+                onPreviewImage={setPreviewImage}
+              />
+            ))}
+          </TaskDateGroup>
+        ))}
       </div>
 
       {editingTask ? (
@@ -357,27 +335,17 @@ export function StaffShareClient({
             setNotice(labels.saved);
           }}
           onFailed={() => setNotice(labels.failed)}
+          onPreviewImage={setPreviewImage}
+        />
+      ) : null}
+      {previewImage ? (
+        <ImagePreviewModal
+          labels={labels}
+          attachment={previewImage}
+          onClose={() => setPreviewImage(null)}
         />
       ) : null}
     </main>
-  );
-}
-
-function TaskSection({
-  title,
-  empty,
-  children,
-}: {
-  title: string;
-  empty: string;
-  children: React.ReactNode;
-}) {
-  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
-  return (
-    <section className="space-y-2">
-      <h2 className="px-1 text-sm font-semibold text-neutral-600">{title}</h2>
-      {hasChildren ? children : <div className="rounded-md bg-white px-4 py-6 text-sm text-neutral-500">{empty}</div>}
-    </section>
   );
 }
 
@@ -403,7 +371,7 @@ function TaskCard({
   onEdit,
   onComplete,
   onUnassign,
-  onDelete,
+  onPreviewImage,
 }: {
   labels: ReturnType<typeof copy>;
   locale: Locale;
@@ -411,7 +379,7 @@ function TaskCard({
   onEdit: (task: StaffShareTask) => void;
   onComplete: (task: StaffShareTask) => void;
   onUnassign: (task: StaffShareTask) => void;
-  onDelete: (task: StaffShareTask) => void;
+  onPreviewImage: (attachment: StaffShareAttachment) => void;
 }) {
   const closed = task.status === "done" || task.status === "cancelled";
   const cancelled = task.status === "cancelled";
@@ -435,10 +403,10 @@ function TaskCard({
               {task.details}
             </p>
           ) : null}
-          <AttachmentStrip attachments={task.attachments} labels={labels} />
+          <AttachmentStrip attachments={task.attachments} labels={labels} onPreview={onPreviewImage} />
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-4 gap-1.5">
+      <div className="mt-3 grid grid-cols-3 gap-1.5">
         {!closed ? (
           <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-neutral-300 bg-neutral-50 text-neutral-700" onClick={() => onUnassign(task)}>
             <RotateCcw className="h-4 w-4" />
@@ -452,12 +420,6 @@ function TaskCard({
               <span className="text-center">{labels.edit}</span>
             </button>
           </>
-        ) : null}
-        {task.status !== "cancelled" ? (
-          <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-red-200 bg-red-50 text-red-700" onClick={() => onDelete(task)}>
-            <Trash2 className="h-4 w-4" />
-            <span className="text-center">{labels.delete}</span>
-          </button>
         ) : null}
         {!cancelled ? (
           <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-emerald-300 bg-emerald-50 text-emerald-800" onClick={() => onComplete(task)}>
@@ -477,6 +439,7 @@ function EditTaskModal({
   onClose,
   onSaved,
   onFailed,
+  onPreviewImage,
 }: {
   labels: ReturnType<typeof copy>;
   token: string;
@@ -484,6 +447,7 @@ function EditTaskModal({
   onClose: () => void;
   onSaved: (task: StaffShareTask) => void;
   onFailed: () => void;
+  onPreviewImage: (attachment: StaffShareAttachment) => void;
 }) {
   const [title, setTitle] = useState(task.title);
   const [date, setDate] = useState(task.dueDatetime ? toLocalDateInput(task.dueDatetime) : "");
@@ -587,6 +551,7 @@ function EditTaskModal({
               onRemovePending={(index) =>
                 setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))
               }
+              onPreview={onPreviewImage}
             />
           </div>
         </div>
@@ -608,19 +573,26 @@ function PhotoGrid({
   attachments,
   pendingFiles,
   onRemovePending,
+  onPreview,
 }: {
   labels: ReturnType<typeof copy>;
   attachments: StaffShareAttachment[];
   pendingFiles: File[];
   onRemovePending: (index: number) => void;
+  onPreview: (attachment: StaffShareAttachment) => void;
 }) {
   if (attachments.length === 0 && pendingFiles.length === 0) return null;
   return (
     <div className="mt-3 grid grid-cols-4 gap-2">
       {attachments.map((attachment) => (
-        <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="aspect-square overflow-hidden rounded border border-neutral-200 bg-neutral-100">
+        <button
+          key={attachment.id}
+          type="button"
+          onClick={() => onPreview(attachment)}
+          className="aspect-square overflow-hidden rounded border border-neutral-200 bg-neutral-100"
+        >
           <img src={attachment.url} alt={attachment.filename || labels.photos} className="h-full w-full object-cover" />
-        </a>
+        </button>
       ))}
       {pendingFiles.map((file, index) => (
         <div key={`${file.name}-${index}`} className="relative aspect-square rounded border border-dashed border-neutral-300 bg-neutral-50 p-1">
@@ -642,18 +614,89 @@ function PhotoGrid({
 function AttachmentStrip({
   attachments,
   labels,
+  onPreview,
 }: {
   attachments: StaffShareAttachment[];
   labels: ReturnType<typeof copy>;
+  onPreview: (attachment: StaffShareAttachment) => void;
 }) {
   if (attachments.length === 0) return null;
   return (
     <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
       {attachments.map((attachment) => (
-        <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="h-16 w-16 shrink-0 overflow-hidden rounded border border-neutral-200 bg-neutral-100">
+        <button
+          key={attachment.id}
+          type="button"
+          onClick={() => onPreview(attachment)}
+          className="h-16 w-16 shrink-0 overflow-hidden rounded border border-neutral-200 bg-neutral-100"
+        >
           <img src={attachment.url} alt={attachment.filename || labels.photos} className="h-full w-full object-cover" />
-        </a>
+        </button>
       ))}
+    </div>
+  );
+}
+
+function ImagePreviewModal({
+  labels,
+  attachment,
+  onClose,
+}: {
+  labels: ReturnType<typeof copy>;
+  attachment: StaffShareAttachment;
+  onClose: () => void;
+}) {
+  const [scale, setScale] = useState(1);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-black/90 text-white">
+      <div className="flex items-center justify-between gap-3 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <p className="min-w-0 truncate text-sm font-medium">{attachment.filename || labels.photos}</p>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            className="flex h-9 min-w-9 items-center justify-center rounded-md border border-white/20 bg-white/10 px-2 text-sm"
+            onClick={() => setScale((current) => Math.max(0.5, Number((current - 0.25).toFixed(2))))}
+          >
+            <ZoomOut className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="h-9 rounded-md border border-white/20 bg-white/10 px-2 text-xs font-semibold"
+            onClick={() => setScale(1)}
+          >
+            {Math.round(scale * 100)}%
+          </button>
+          <button
+            type="button"
+            className="flex h-9 min-w-9 items-center justify-center rounded-md border border-white/20 bg-white/10 px-2 text-sm"
+            onClick={() => setScale((current) => Math.min(4, Number((current + 0.25).toFixed(2))))}
+          >
+            <ZoomIn className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="flex h-9 min-w-9 items-center justify-center rounded-md border border-white/20 bg-white/10 px-2 text-sm"
+            onClick={onClose}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+      <div
+        className="flex-1 overflow-auto px-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+        onClick={onClose}
+      >
+        <div className="flex min-h-full items-center justify-center">
+          <img
+            src={attachment.url}
+            alt={attachment.filename || labels.photos}
+            className="max-h-[82vh] max-w-full object-contain transition-transform"
+            style={{ transform: `scale(${scale})` }}
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      </div>
     </div>
   );
 }

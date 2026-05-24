@@ -73,6 +73,7 @@ const vehicleSchema = z.object({
   turoVehicleCode: z.string().optional(),
   purchasePrice: z.coerce.number().nonnegative().optional(),
   ownerCommissionRate: z.coerce.number().min(0).max(100).optional(),
+  cleaningFee: z.coerce.number().nonnegative().optional(),
   notes: z.string().optional(),
 });
 
@@ -889,14 +890,16 @@ export async function saveVehicleAction(formData: FormData) {
     turoVehicleCode: cleanOptional(formData.get("turoVehicleCode")),
     purchasePrice: cleanOptional(formData.get("purchasePrice")),
     ownerCommissionRate: cleanOptional(formData.get("ownerCommissionRate")),
+    cleaningFee: cleanOptional(formData.get("cleaningFee")),
     notes: cleanOptional(formData.get("notes")),
   });
 
-  const { id, ownerCommissionRate, ...vehicleData } = parsed;
+  const { id, ownerCommissionRate, cleaningFee, ...vehicleData } = parsed;
   const normalizedVehicleData = {
     ...vehicleData,
     ownerCommissionRate:
       ownerCommissionRate == null ? null : +(ownerCommissionRate / 100).toFixed(4),
+    cleaningFee: roundCurrencyAmount(cleaningFee),
   };
 
   const existingVehicle = id

@@ -38,6 +38,7 @@ export default async function VehiclesPage({
     value: option.value,
     label: option.label,
   }));
+  const compactEditFieldClass = "min-h-9 rounded-md border border-slate-200 bg-white px-2.5 py-1.5";
   const vehicleQuery = (params.q ?? "").trim();
   const normalizedVehicleQuery = vehicleQuery.toLowerCase();
   const filteredVehicles = normalizedVehicleQuery
@@ -132,6 +133,14 @@ export default async function VehiclesPage({
             placeholder={vehicleMessages.placeholders.ownerCommissionRate}
             className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
           />
+          <input
+            name="cleaningFee"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder={vehicleMessages.placeholders.cleaningFee}
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+          />
           <SearchableSelect
             name="ownerId"
             options={ownerSelectOptions}
@@ -224,6 +233,11 @@ export default async function VehiclesPage({
                     {vehicleMessages.commissionPrefix}: {(vehicle.ownerCommissionRate * 100).toFixed(2)}%
                   </p>
                 ) : null}
+                {vehicle.cleaningFee != null && vehicle.cleaningFee > 0 ? (
+                  <p className="mt-0.5 text-[11px] leading-snug text-slate-500 sm:text-[12px]">
+                    {vehicleMessages.placeholders.cleaningFee}: CA${vehicle.cleaningFee.toFixed(2)}
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-1">
                 <StatusBadge value={vehicle.status} locale={locale} />
@@ -237,38 +251,38 @@ export default async function VehiclesPage({
               <summary className="cursor-pointer text-[12px] font-medium text-slate-700">
                 {vehicleMessages.editVehicle}
               </summary>
-              <form action={saveVehicleAction} className="mt-3 grid gap-2 text-[12px] md:grid-cols-2">
+              <form action={saveVehicleAction} className="mt-3 grid gap-2 text-[12px] md:grid-cols-3">
                 <input type="hidden" name="id" value={vehicle.id} />
                 <input
                   name="plateNumber"
                   defaultValue={vehicle.plateNumber}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
                 <input
                   name="nickname"
                   defaultValue={vehicle.nickname}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
                 <input
                   name="brand"
                   defaultValue={vehicle.brand}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
                 <input
                   name="model"
                   defaultValue={vehicle.model}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
                 <input
                   name="year"
                   type="number"
                   defaultValue={vehicle.year}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
                 <input
                   name="vin"
                   defaultValue={vehicle.vin ?? ""}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
                 <input
                   name="purchasePrice"
@@ -276,7 +290,7 @@ export default async function VehiclesPage({
                   step="0.01"
                   defaultValue={vehicle.purchasePrice ?? ""}
                   placeholder={vehicleMessages.placeholders.purchasePrice}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
                 <input
                   name="ownerCommissionRate"
@@ -290,7 +304,16 @@ export default async function VehiclesPage({
                       : (vehicle.ownerCommissionRate * 100).toFixed(2)
                   }
                   placeholder={vehicleMessages.placeholders.ownerCommissionRate}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
+                />
+                <input
+                  name="cleaningFee"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  defaultValue={vehicle.cleaningFee ?? ""}
+                  placeholder={vehicleMessages.placeholders.cleaningFee}
+                  className={compactEditFieldClass}
                 />
                 <SearchableSelect
                   name="ownerId"
@@ -298,7 +321,7 @@ export default async function VehiclesPage({
                   options={ownerSelectOptions}
                   placeholder={vehicleMessages.placeholders.unassignedOwner}
                   searchPlaceholder={vehicleMessages.placeholders.unassignedOwner}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
                 <SearchableSelect
                   name="status"
@@ -306,24 +329,24 @@ export default async function VehiclesPage({
                   options={vehicleStatusSelectOptions}
                   placeholder={statusLabel}
                   searchPlaceholder={statusLabel}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
                 <input
                   name="turoListingName"
                   defaultValue={vehicle.turoListingName ?? ""}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2 md:col-span-2"
+                  className={compactEditFieldClass}
                 />
                 <input
                   name="turoVehicleCode"
                   defaultValue={vehicle.turoVehicleCode ?? ""}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
                 <input
                   name="notes"
                   defaultValue={vehicle.notes ?? ""}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                  className={compactEditFieldClass}
                 />
-                <div className="flex gap-3 md:col-span-2">
+                <div className="flex gap-3 md:col-span-3">
                   <button className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white">
                     {vehicleMessages.saveChanges}
                   </button>

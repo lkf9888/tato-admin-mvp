@@ -11,6 +11,7 @@ import { cn, formatCurrency, formatCurrencyInputText, formatDate } from "@/lib/u
 const OwnerLedgerKind = {
   OWNER_NET_EARNING: "OWNER_NET_EARNING",
   MANAGER_COMMISSION: "MANAGER_COMMISSION",
+  CLEANING_FEE: "CLEANING_FEE",
   EXPENSE_REIMBURSEMENT: "EXPENSE_REIMBURSEMENT",
   MANUAL_ADJUSTMENT: "MANUAL_ADJUSTMENT",
   SETTLEMENT_PAYMENT: "SETTLEMENT_PAYMENT",
@@ -123,6 +124,7 @@ function copy(locale: Locale) {
         kindLabels: {
           OWNER_NET_EARNING: "车主净收益",
           MANAGER_COMMISSION: "TATO 佣金",
+          CLEANING_FEE: "洗车费",
           EXPENSE_REIMBURSEMENT: "报销",
           MANUAL_ADJUSTMENT: "手动调整",
           SETTLEMENT_PAYMENT: "Payment",
@@ -179,6 +181,7 @@ function copy(locale: Locale) {
         kindLabels: {
           OWNER_NET_EARNING: "Owner net earning",
           MANAGER_COMMISSION: "TATO commission",
+          CLEANING_FEE: "Cleaning fee",
           EXPENSE_REIMBURSEMENT: "Reimbursement",
           MANUAL_ADJUSTMENT: "Adjustment",
           SETTLEMENT_PAYMENT: "Payment",

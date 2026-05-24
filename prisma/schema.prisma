@@ -50,6 +50,7 @@ enum WorkspaceBillingStatus {
 enum OwnerLedgerKind {
   OWNER_NET_EARNING
   MANAGER_COMMISSION
+  CLEANING_FEE
   EXPENSE_REIMBURSEMENT
   MANUAL_ADJUSTMENT
   SETTLEMENT_PAYMENT
@@ -144,6 +145,7 @@ model Vehicle {
   turoVehicleCode      String?
   purchasePrice        Float?
   ownerCommissionRate  Float?
+  cleaningFee          Float?
   directBookingEnabled Boolean           @default(false)
   bookingDailyRate     Float?
   bookingInsuranceFee  Float?

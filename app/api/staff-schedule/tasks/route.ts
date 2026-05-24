@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { notifyStaffTaskAssignment } from "@/lib/staff-task-notifications";
 
 const taskSchema = z.object({
   staffId: z.string().optional().or(z.literal("")),
@@ -130,6 +131,10 @@ export async function POST(request: NextRequest) {
     entityId: task.id,
     metadata: { title: task.title, staffId: task.staffId, vehicleId: task.vehicleId },
   });
+
+  if (task.staffId) {
+    await notifyStaffTaskAssignment(task, new URL(request.url).origin);
+  }
 
   return NextResponse.json({ task });
 }

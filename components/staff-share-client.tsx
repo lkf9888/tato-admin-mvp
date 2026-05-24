@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -69,6 +69,7 @@ function copy(locale: Locale) {
         noTasks: "暂无任务",
         today: "今天",
         tomorrow: "明天",
+        dayAfterTomorrow: "后天",
         overdue: "逾期",
         noDue: "无到期",
         complete: "完成",
@@ -92,6 +93,7 @@ function copy(locale: Locale) {
         failed: "操作失败，请稍后再试。",
         vehicle: "车辆",
         order: "订单",
+        language: "语言",
       }
     : {
         kicker: "My tasks",
@@ -101,6 +103,7 @@ function copy(locale: Locale) {
         noTasks: "No tasks",
         today: "Today",
         tomorrow: "Tomorrow",
+        dayAfterTomorrow: "Day after tomorrow",
         overdue: "Overdue",
         noDue: "No due date",
         complete: "Complete",
@@ -125,6 +128,7 @@ function copy(locale: Locale) {
         failed: "Something went wrong. Please try again.",
         vehicle: "Vehicle",
         order: "Order",
+        language: "Language",
       };
 }
 
@@ -139,7 +143,8 @@ export function StaffShareClient({
   staff: ShareStaff;
   initialTasks: StaffShareTask[];
 }) {
-  const labels = copy(locale);
+  const [activeLocale, setActiveLocale] = useState<Locale>("en");
+  const labels = copy(activeLocale);
   const [tasks, setTasks] = useState(initialTasks.map(normalizeTask));
   const [editingTask, setEditingTask] = useState<StaffShareTask | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -157,6 +162,30 @@ export function StaffShareClient({
         .sort(sortTasks),
     [tasks],
   );
+  const activeTaskGroups = useMemo(
+    () => groupTasksByDate(activeTasks, activeLocale, labels),
+    [activeLocale, activeTasks, labels],
+  );
+  const historyTaskGroups = useMemo(
+    () => groupTasksByDate(historyTasks, activeLocale, labels),
+    [activeLocale, historyTasks, labels],
+  );
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("tato-staff-share-locale");
+    if (saved === "zh" || saved === "en") {
+      setActiveLocale(saved);
+      return;
+    }
+
+    const browserLanguage = window.navigator.language.toLowerCase();
+    setActiveLocale(browserLanguage.startsWith("zh") ? "zh" : "en");
+  }, []);
+
+  function chooseLocale(nextLocale: Locale) {
+    setActiveLocale(nextLocale);
+    window.localStorage.setItem("tato-staff-share-locale", nextLocale);
+  }
 
   function upsertTask(task: StaffShareTask) {
     setTasks((current) => {
@@ -224,7 +253,27 @@ export function StaffShareClient({
     <main className="min-h-screen bg-neutral-100 text-neutral-950">
       <header className="sticky top-0 z-20 border-b border-neutral-800 bg-neutral-950 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] text-white">
         <div className="mx-auto max-w-2xl">
-          <p className="text-xs font-semibold text-neutral-400">{labels.kicker}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold text-neutral-400">{labels.kicker}</p>
+            <div className="flex shrink-0 overflow-hidden rounded-md border border-white/15 bg-white/5 p-0.5" aria-label={labels.language}>
+              <button
+                type="button"
+                className={`min-h-7 px-2 text-xs font-semibold ${activeLocale === "en" ? "bg-white text-neutral-950" : "text-neutral-300"}`}
+                aria-pressed={activeLocale === "en"}
+                onClick={() => chooseLocale("en")}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                className={`min-h-7 px-2 text-xs font-semibold ${activeLocale === "zh" ? "bg-white text-neutral-950" : "text-neutral-300"}`}
+                aria-pressed={activeLocale === "zh"}
+                onClick={() => chooseLocale("zh")}
+              >
+                中文
+              </button>
+            </div>
+          </div>
           <div className="mt-2 flex items-start gap-3">
             <span className="mt-1 h-3 w-3 rounded-full" style={{ backgroundColor: staff.color }} />
             <div className="min-w-0">
@@ -258,32 +307,40 @@ export function StaffShareClient({
         ) : null}
 
         <TaskSection title={labels.active} empty={labels.noTasks}>
-          {activeTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              labels={labels}
-              locale={locale}
-              task={task}
-              onEdit={setEditingTask}
-              onComplete={toggleComplete}
-              onUnassign={unassignTask}
-              onDelete={deleteTask}
-            />
+          {activeTaskGroups.map((group) => (
+            <TaskDateGroup key={group.key} label={group.label}>
+              {group.tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  labels={labels}
+                  locale={activeLocale}
+                  task={task}
+                  onEdit={setEditingTask}
+                  onComplete={toggleComplete}
+                  onUnassign={unassignTask}
+                  onDelete={deleteTask}
+                />
+              ))}
+            </TaskDateGroup>
           ))}
         </TaskSection>
 
         <TaskSection title={labels.history} empty={labels.noTasks}>
-          {historyTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              labels={labels}
-              locale={locale}
-              task={task}
-              onEdit={setEditingTask}
-              onComplete={toggleComplete}
-              onUnassign={unassignTask}
-              onDelete={deleteTask}
-            />
+          {historyTaskGroups.map((group) => (
+            <TaskDateGroup key={group.key} label={group.label}>
+              {group.tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  labels={labels}
+                  locale={activeLocale}
+                  task={task}
+                  onEdit={setEditingTask}
+                  onComplete={toggleComplete}
+                  onUnassign={unassignTask}
+                  onDelete={deleteTask}
+                />
+              ))}
+            </TaskDateGroup>
           ))}
         </TaskSection>
       </div>
@@ -321,6 +378,21 @@ function TaskSection({
       <h2 className="px-1 text-sm font-semibold text-neutral-600">{title}</h2>
       {hasChildren ? children : <div className="rounded-md bg-white px-4 py-6 text-sm text-neutral-500">{empty}</div>}
     </section>
+  );
+}
+
+function TaskDateGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <h3 className="px-1 text-xs font-semibold text-neutral-500">{label}</h3>
+      {children}
+    </div>
   );
 }
 
@@ -366,29 +438,31 @@ function TaskCard({
           <AttachmentStrip attachments={task.attachments} labels={labels} />
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-4 gap-1.5">
+        {!closed ? (
+          <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-neutral-300 bg-neutral-50 text-neutral-700" onClick={() => onUnassign(task)}>
+            <RotateCcw className="h-4 w-4" />
+            <span className="text-center">{labels.unassign}</span>
+          </button>
+        ) : null}
         {!cancelled ? (
           <>
-            <button className="mobile-action border-amber-300 bg-amber-50 text-amber-800" onClick={() => onEdit(task)}>
+            <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-amber-300 bg-amber-50 text-amber-800" onClick={() => onEdit(task)}>
               <Pencil className="h-4 w-4" />
-              {labels.edit}
-            </button>
-            <button className="mobile-action border-emerald-300 bg-emerald-50 text-emerald-800" onClick={() => onComplete(task)}>
-              {task.status === "done" ? <Circle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-              {task.status === "done" ? labels.reopen : labels.complete}
+              <span className="text-center">{labels.edit}</span>
             </button>
           </>
         ) : null}
-        {!closed ? (
-          <button className="mobile-action border-neutral-300 bg-neutral-50 text-neutral-700" onClick={() => onUnassign(task)}>
-            <RotateCcw className="h-4 w-4" />
-            {labels.unassign}
+        {task.status !== "cancelled" ? (
+          <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-red-200 bg-red-50 text-red-700" onClick={() => onDelete(task)}>
+            <Trash2 className="h-4 w-4" />
+            <span className="text-center">{labels.delete}</span>
           </button>
         ) : null}
-        {task.status !== "cancelled" ? (
-          <button className="mobile-action border-red-200 bg-red-50 text-red-700" onClick={() => onDelete(task)}>
-            <Trash2 className="h-4 w-4" />
-            {labels.delete}
+        {!cancelled ? (
+          <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-emerald-300 bg-emerald-50 text-emerald-800" onClick={() => onComplete(task)}>
+            {task.status === "done" ? <Circle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+            <span className="text-center">{task.status === "done" ? labels.reopen : labels.complete}</span>
           </button>
         ) : null}
       </div>
@@ -625,6 +699,54 @@ function sortTasks(left: StaffShareTask, right: StaffShareTask) {
   return left.title.localeCompare(right.title);
 }
 
+function groupTasksByDate(
+  tasks: StaffShareTask[],
+  locale: Locale,
+  labels: ReturnType<typeof copy>,
+) {
+  const groups = new Map<string, { key: string; label: string; tasks: StaffShareTask[]; order: number }>();
+
+  for (const task of tasks) {
+    const groupKey = task.dueDatetime ? localDateKey(new Date(task.dueDatetime)) : "no-due";
+    const order = task.dueDatetime ? new Date(task.dueDatetime).getTime() : Number.MAX_SAFE_INTEGER;
+    const existing = groups.get(groupKey);
+    if (existing) {
+      existing.tasks.push(task);
+      continue;
+    }
+
+    groups.set(groupKey, {
+      key: groupKey,
+      label: formatTaskGroupLabel(task.dueDatetime, locale, labels),
+      tasks: [task],
+      order,
+    });
+  }
+
+  return Array.from(groups.values()).sort((left, right) => left.order - right.order);
+}
+
+function localDateKey(date: Date) {
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function formatTaskGroupLabel(
+  value: string | null,
+  locale: Locale,
+  labels: ReturnType<typeof copy>,
+) {
+  if (!value) return labels.noDue;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return labels.noDue;
+  const dayOffset = getTaskDueDayOffset(value);
+  if (dayOffset === 0) return labels.today;
+  if (dayOffset === 1) return labels.tomorrow;
+  if (dayOffset === 2) return labels.dayAfterTomorrow;
+  if (locale === "zh") return `${date.getMonth() + 1}/${date.getDate()}`;
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+}
+
 function getTaskDueDayOffset(value: string | null) {
   if (!value) return null;
   const date = new Date(value);
@@ -643,10 +765,12 @@ function formatTaskDue(value: string | null, locale: Locale, fallback: string) {
   if (locale === "zh") {
     if (dayOffset === 0) return "今天";
     if (dayOffset === 1) return "明天";
+    if (dayOffset === 2) return "后天";
     return `${date.getMonth() + 1}/${date.getDate()}`;
   }
   if (dayOffset === 0) return "Today";
   if (dayOffset === 1) return "Tomorrow";
+  if (dayOffset === 2) return "Day after tomorrow";
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
 }
 

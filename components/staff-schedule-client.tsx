@@ -92,7 +92,21 @@ type OrderOption = {
   renterName: string;
   pickupDatetime: string;
   returnDatetime: string;
+  vehicleId: string;
   vehicleLabel: string;
+};
+
+type OrderEventKind = "pickup" | "return";
+
+type OrderEvent = {
+  id: string;
+  orderId: string;
+  vehicleId: string;
+  kind: OrderEventKind;
+  category: string;
+  renterName: string;
+  vehicleLabel: string;
+  datetime: string;
 };
 
 const defaultStaffForm = {
@@ -134,16 +148,23 @@ function getStaffScheduleCopy(locale: Locale) {
         completed: "已完成",
         unassigned: "未分配",
         unassignedHint: "还没有指定员工的任务会先停在这里。",
+        upcomingOrders: "近期取还车订单",
+        upcomingOrdersHint: "显示今天和未来 3 天的取车、还车。拖到员工卡片，或输入员工姓名分配。",
+        noUpcomingOrders: "未来 3 天没有取车或还车订单。",
+        pickup: "取车",
+        returnCar: "还车",
+        assignStaff: "输入员工分配",
+        orderTaskExists: "这个订单动作已经有未完成任务，已移动到新的员工名下。",
         history: "已完成 / 已取消",
         noStaff: "还没有员工。先新增员工，再分配任务。",
         noTasks: "暂无任务",
         todayBadge: "今天",
         tomorrowBadge: "明天",
+        dayAfterTomorrow: "后天",
         showHistory: "展开",
         hideHistory: "折叠",
         historyCount: (count: number) => `${count} 条记录`,
         copyShareLink: "复制链接",
-        openShareLink: "打开链接",
         shareCopied: "员工任务链接已复制。",
         shareUnavailable: "链接还没有生成，请刷新页面后再试。",
         pinned: "员工备注",
@@ -208,16 +229,23 @@ function getStaffScheduleCopy(locale: Locale) {
         completed: "Completed",
         unassigned: "Unassigned",
         unassignedHint: "Tasks without a staff owner wait here.",
+        upcomingOrders: "Upcoming pickups / returns",
+        upcomingOrdersHint: "Today and the next 3 days. Drag to a staff card, or type a staff name to assign.",
+        noUpcomingOrders: "No pickups or returns in the next 3 days.",
+        pickup: "Pickup",
+        returnCar: "Return",
+        assignStaff: "Type staff to assign",
+        orderTaskExists: "This order action already had an open task, so it was moved to the selected staff member.",
         history: "Completed / cancelled",
         noStaff: "No staff yet. Add staff, then assign work.",
         noTasks: "No tasks",
         todayBadge: "Today",
         tomorrowBadge: "Tomorrow",
+        dayAfterTomorrow: "Day after tomorrow",
         showHistory: "Expand",
         hideHistory: "Collapse",
         historyCount: (count: number) => `${count} record${count === 1 ? "" : "s"}`,
         copyShareLink: "Copy link",
-        openShareLink: "Open link",
         shareCopied: "Staff task link copied.",
         shareUnavailable: "The link is not ready yet. Refresh and try again.",
         pinned: "Pinned note",
@@ -278,12 +306,14 @@ export function StaffScheduleClient({
   initialTasks,
   vehicles,
   orders,
+  upcomingOrders,
 }: {
   locale: Locale;
   initialStaff: StaffMember[];
   initialTasks: StaffTask[];
   vehicles: VehicleOption[];
   orders: OrderOption[];
+  upcomingOrders: OrderOption[];
 }) {
   const c = getStaffScheduleCopy(locale);
   const [staff, setStaff] = useState(initialStaff);
@@ -292,6 +322,7 @@ export function StaffScheduleClient({
   const [staffModal, setStaffModal] = useState<StaffMember | "new" | null>(null);
   const [taskModal, setTaskModal] = useState<TaskModalState>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
+  const [dragOrderEvent, setDragOrderEvent] = useState<OrderEvent | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   const [dragStaffId, setDragStaffId] = useState<string | null>(null);
@@ -302,6 +333,10 @@ export function StaffScheduleClient({
   const activeTasks = tasks.filter((task) => task.status !== "done" && task.status !== "cancelled");
   const completedTasks = tasks.filter((task) => task.status === "done" || task.status === "cancelled");
   const unassignedTasks = activeTasks.filter((task) => !task.staffId);
+  const upcomingOrderEvents = useMemo(
+    () => buildUpcomingOrderEvents(upcomingOrders),
+    [upcomingOrders],
+  );
 
   const tasksByStaff = useMemo(() => {
     const map = new Map<string, StaffTask[]>();
@@ -430,6 +465,60 @@ export function StaffScheduleClient({
     setDragOverTaskId(null);
   }
 
+  async function createTaskFromOrderEvent(orderEvent: OrderEvent, staffId: string | null) {
+    const existingTask = activeTasks.find(
+      (task) =>
+        task.orderId === orderEvent.orderId &&
+        task.category === orderEvent.category &&
+        task.status !== "done" &&
+        task.status !== "cancelled",
+    );
+
+    if (existingTask) {
+      await moveTaskToPosition(existingTask.id, staffId);
+      setNotice(c.orderTaskExists);
+      return;
+    }
+
+    const staffMember = staffId ? activeStaff.find((member) => member.id === staffId) : null;
+    const targetSortOrder =
+      (activeTasks.filter((task) => (task.staffId ?? null) === (staffId ?? null)).length + 1) * 1000;
+    const response = await fetch("/api/staff-schedule/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        staffId: staffId ?? "",
+        staffLabel: "",
+        vehicleId: orderEvent.vehicleId,
+        vehicleLabel: "",
+        orderId: orderEvent.orderId,
+        orderLabel: "",
+        title: buildOrderEventTaskTitle(orderEvent, c),
+        details: `${orderEvent.vehicleLabel} · ${orderEvent.renterName}`,
+        dueDatetime: toLocalDateInput(orderEvent.datetime),
+        timeWindow: formatOrderEventTime(orderEvent.datetime, locale),
+        category: orderEvent.category,
+        sortOrder: targetSortOrder,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.task) {
+      setNotice(c.failed);
+      return;
+    }
+
+    upsertTask(normalizeTask(payload.task));
+    setNotice(
+      staffMember ? `${c.created} · ${staffMember.name}` : c.created,
+    );
+  }
+
+  function handleOrderEventDrop(staffId: string | null) {
+    if (!dragOrderEvent) return;
+    void createTaskFromOrderEvent(dragOrderEvent, staffId);
+    clearDragState();
+  }
+
   async function reorderStaff(draggedId: string, targetId: string) {
     if (draggedId === targetId) return;
 
@@ -466,6 +555,7 @@ export function StaffScheduleClient({
 
   function clearDragState() {
     setDragTaskId(null);
+    setDragOrderEvent(null);
     setDragOverTarget(null);
     setDragOverTaskId(null);
     setDragStaffId(null);
@@ -513,8 +603,8 @@ export function StaffScheduleClient({
           <p className="mt-1 max-w-3xl text-sm text-neutral-500">{c.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className="btn-secondary min-h-7 px-2 py-1 text-[11px]" onClick={() => setStaffModal("new")}>
-            <UserPlus className="h-3 w-3" />
+          <button className="btn-secondary min-h-11 px-4 py-2 text-sm" onClick={() => setStaffModal("new")}>
+            <UserPlus className="h-4 w-4" />
             {c.addStaff}
           </button>
         </div>
@@ -527,6 +617,20 @@ export function StaffScheduleClient({
           {notice}
         </div>
       ) : null}
+
+      <UpcomingOrderPanel
+        copy={c}
+        locale={locale}
+        orderEvents={upcomingOrderEvents}
+        staff={activeStaff}
+        onDragStart={(orderEvent) => {
+          setDragOrderEvent(orderEvent);
+          setDragTaskId(null);
+          setDragStaffId(null);
+        }}
+        onDragEnd={clearDragState}
+        onAssign={(orderEvent, staffId) => createTaskFromOrderEvent(orderEvent, staffId)}
+      />
 
       {activeStaff.length === 0 ? (
         <section className="card p-10 text-center text-sm text-neutral-500">{c.noStaff}</section>
@@ -549,6 +653,10 @@ export function StaffScheduleClient({
               }}
               onDrop={(event) => {
                 event.preventDefault();
+                if (dragOrderEvent) {
+                  handleOrderEventDrop(member.id);
+                  return;
+                }
                 if (dragStaffId) {
                   void reorderStaff(dragStaffId, member.id);
                   clearDragState();
@@ -597,9 +705,6 @@ export function StaffScheduleClient({
                       <button className="btn-secondary min-h-7 px-2 py-1 text-[11px]" onClick={() => copyStaffShareLink(member)}>
                         {c.copyShareLink}
                       </button>
-                      <a className="btn-secondary min-h-7 px-2 py-1 text-[11px]" href={staffShareHref(member)} target="_blank" rel="noreferrer">
-                        {c.openShareLink}
-                      </a>
                     </>
                   ) : null}
                   <button className="btn-secondary min-h-7 border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-800 hover:bg-amber-100" onClick={() => setStaffModal(member)}>
@@ -656,6 +761,10 @@ export function StaffScheduleClient({
           onDrop={(event) => {
             if (dragStaffId) return;
             event.preventDefault();
+            if (dragOrderEvent) {
+              handleOrderEventDrop(null);
+              return;
+            }
             handleTaskDrop(null);
           }}
           className={cn(
@@ -759,6 +868,158 @@ export function StaffScheduleClient({
           }}
         />
       ) : null}
+    </div>
+  );
+}
+
+function UpcomingOrderPanel({
+  copy,
+  locale,
+  orderEvents,
+  staff,
+  onDragStart,
+  onDragEnd,
+  onAssign,
+}: {
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+  locale: Locale;
+  orderEvents: OrderEvent[];
+  staff: StaffMember[];
+  onDragStart: (orderEvent: OrderEvent) => void;
+  onDragEnd: () => void;
+  onAssign: (orderEvent: OrderEvent, staffId: string) => void;
+}) {
+  const groups = groupOrderEventsByDay(orderEvents, locale, copy);
+
+  return (
+    <section className="card overflow-hidden">
+      <div className="border-b border-neutral-200 px-3 py-2.5">
+        <h2 className="text-base font-semibold">{copy.upcomingOrders}</h2>
+        <p className="text-xs text-neutral-500">{copy.upcomingOrdersHint}</p>
+      </div>
+      {orderEvents.length === 0 ? (
+        <div className="px-3 py-4 text-sm text-neutral-500">{copy.noUpcomingOrders}</div>
+      ) : (
+        <div className="grid gap-px bg-neutral-200 sm:grid-cols-2 xl:grid-cols-4">
+          {groups.map((group) => (
+            <div key={group.key} className="min-w-0 bg-white">
+              <div className="border-b border-neutral-100 px-3 py-2 text-xs font-semibold text-neutral-600">
+                {group.label}
+              </div>
+              <div className="space-y-2 p-2">
+                {group.events.length > 0 ? (
+                  group.events.map((orderEvent) => (
+                    <OrderEventCard
+                      key={orderEvent.id}
+                      copy={copy}
+                      locale={locale}
+                      orderEvent={orderEvent}
+                      staff={staff}
+                      onDragStart={onDragStart}
+                      onDragEnd={onDragEnd}
+                      onAssign={onAssign}
+                    />
+                  ))
+                ) : (
+                  <div className="px-2 py-4 text-xs text-neutral-400">{copy.noTasks}</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function OrderEventCard({
+  copy,
+  locale,
+  orderEvent,
+  staff,
+  onDragStart,
+  onDragEnd,
+  onAssign,
+}: {
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+  locale: Locale;
+  orderEvent: OrderEvent;
+  staff: StaffMember[];
+  onDragStart: (orderEvent: OrderEvent) => void;
+  onDragEnd: () => void;
+  onAssign: (orderEvent: OrderEvent, staffId: string) => void;
+}) {
+  return (
+    <article
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = "copy";
+        event.dataTransfer.setData("text/plain", `order:${orderEvent.id}`);
+        onDragStart(orderEvent);
+      }}
+      onDragEnd={onDragEnd}
+      className="cursor-grab border border-neutral-200 bg-neutral-50 p-2 active:cursor-grabbing"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span
+          className={cn(
+            "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-4",
+            orderEvent.kind === "pickup"
+              ? "bg-blue-100 text-blue-800"
+              : "bg-emerald-100 text-emerald-800",
+          )}
+        >
+          {orderEvent.kind === "pickup" ? copy.pickup : copy.returnCar}
+        </span>
+        <span className="text-[11px] font-semibold text-neutral-600">
+          {formatOrderEventTime(orderEvent.datetime, locale)}
+        </span>
+      </div>
+      <p className="mt-1 truncate text-xs font-semibold text-neutral-950">{orderEvent.vehicleLabel}</p>
+      <p className="truncate text-xs text-neutral-500">{orderEvent.renterName}</p>
+      <OrderAssignInput
+        copy={copy}
+        staff={staff}
+        onAssign={(staffId) => onAssign(orderEvent, staffId)}
+      />
+    </article>
+  );
+}
+
+function OrderAssignInput({
+  copy,
+  staff,
+  onAssign,
+}: {
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+  staff: StaffMember[];
+  onAssign: (staffId: string) => void;
+}) {
+  const [value, setValue] = useState("");
+  const [listId] = useState(() => `order-assign-${Math.random().toString(36).slice(2)}`);
+  const options = useMemo(() => staff.map((member) => ({ id: member.id, label: member.name })), [staff]);
+
+  return (
+    <div className="mt-2">
+      <input
+        className="input h-8 px-2 py-1 text-xs"
+        list={listId}
+        value={value}
+        placeholder={copy.assignStaff}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          setValue(nextValue);
+          const match = findComboMatch(options, nextValue);
+          if (!match) return;
+          onAssign(match.id);
+          setValue("");
+        }}
+      />
+      <datalist id={listId}>
+        {options.map((option) => (
+          <option key={option.id} value={option.label} />
+        ))}
+      </datalist>
     </div>
   );
 }
@@ -1410,6 +1671,110 @@ function TaskAttachmentStrip({
       ) : null}
     </div>
   );
+}
+
+function buildUpcomingOrderEvents(orders: OrderOption[]) {
+  return orders
+    .flatMap<OrderEvent>((order) => [
+      {
+        id: `${order.id}-pickup`,
+        orderId: order.id,
+        vehicleId: order.vehicleId,
+        kind: "pickup",
+        category: "order_pickup",
+        renterName: order.renterName,
+        vehicleLabel: order.vehicleLabel,
+        datetime: order.pickupDatetime,
+      },
+      {
+        id: `${order.id}-return`,
+        orderId: order.id,
+        vehicleId: order.vehicleId,
+        kind: "return",
+        category: "order_return",
+        renterName: order.renterName,
+        vehicleLabel: order.vehicleLabel,
+        datetime: order.returnDatetime,
+      },
+    ])
+    .filter((orderEvent) => {
+      const offset = getLocalDayOffset(orderEvent.datetime);
+      return offset >= 0 && offset <= 3;
+    })
+    .sort((left, right) => new Date(left.datetime).getTime() - new Date(right.datetime).getTime());
+}
+
+function groupOrderEventsByDay(
+  orderEvents: OrderEvent[],
+  locale: Locale,
+  copy: ReturnType<typeof getStaffScheduleCopy>,
+) {
+  const groups = Array.from({ length: 4 }, (_, offset) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    date.setHours(0, 0, 0, 0);
+    return {
+      key: localDayKey(date),
+      label: formatRelativeDayLabel(offset, date.toISOString(), locale, copy),
+      events: [] as OrderEvent[],
+    };
+  });
+  const groupMap = new Map(groups.map((group) => [group.key, group]));
+
+  for (const orderEvent of orderEvents) {
+    const group = groupMap.get(localDayKey(new Date(orderEvent.datetime)));
+    if (group) group.events.push(orderEvent);
+  }
+
+  return groups;
+}
+
+function localDayKey(date: Date) {
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function getLocalDayOffset(value: string | null) {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
+function formatRelativeDayLabel(
+  offset: number,
+  value: string,
+  locale: Locale,
+  copy: ReturnType<typeof getStaffScheduleCopy>,
+) {
+  if (offset === 0) return copy.todayBadge;
+  if (offset === 1) return copy.tomorrowBadge;
+  if (offset === 2) return copy.dayAfterTomorrow;
+
+  const date = new Date(value);
+  if (locale === "zh") return `${date.getMonth() + 1}/${date.getDate()}`;
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+}
+
+function formatOrderEventTime(value: string, locale: Locale) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function buildOrderEventTaskTitle(
+  orderEvent: OrderEvent,
+  copy: ReturnType<typeof getStaffScheduleCopy>,
+) {
+  const action = orderEvent.kind === "pickup" ? copy.pickup : copy.returnCar;
+  return `${action} · ${orderEvent.vehicleLabel} · ${orderEvent.renterName}`;
 }
 
 function normalizeComboText(value: string) {

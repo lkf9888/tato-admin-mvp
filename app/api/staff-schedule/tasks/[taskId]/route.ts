@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { notifyStaffTaskAssignment } from "@/lib/staff-task-notifications";
 
 type Params = Promise<{ taskId: string }>;
 
@@ -122,6 +123,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   }
 
   const nextStatus = parsed.status ?? existing.status;
+  const shouldNotifyAssignment = Boolean(staffId && staffId !== existing.staffId);
   const completedAt =
     nextStatus === StaffTaskStatus.done
       ? existing.completedAt ?? new Date()
@@ -160,6 +162,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     entityId: task.id,
     metadata: { title: task.title, status: task.status },
   });
+
+  if (shouldNotifyAssignment) {
+    await notifyStaffTaskAssignment(task, new URL(request.url).origin);
+  }
 
   return NextResponse.json({ task });
 }

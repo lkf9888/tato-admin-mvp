@@ -6,7 +6,15 @@ import { ensureStaffShareTokens } from "@/lib/staff-share";
 
 export default async function StaffSchedulePage() {
   const workspace = await requireCurrentWorkspace();
-  const [{ locale }, staff, tasks, vehicles, orders] = await Promise.all([
+  const now = new Date();
+  const orderWindowStart = new Date(now);
+  orderWindowStart.setDate(orderWindowStart.getDate() - 1);
+  orderWindowStart.setHours(0, 0, 0, 0);
+  const orderWindowEnd = new Date(now);
+  orderWindowEnd.setDate(orderWindowEnd.getDate() + 5);
+  orderWindowEnd.setHours(23, 59, 59, 999);
+
+  const [{ locale }, staff, tasks, vehicles, orders, upcomingOrders] = await Promise.all([
     getI18n(),
     prisma.staffMember.findMany({
       where: { workspaceId: workspace.id },
@@ -43,6 +51,27 @@ export default async function StaffSchedulePage() {
         renterName: true,
         pickupDatetime: true,
         returnDatetime: true,
+        vehicleId: true,
+        vehicle: { select: { plateNumber: true, nickname: true } },
+      },
+    }),
+    prisma.order.findMany({
+      where: {
+        workspaceId: workspace.id,
+        isArchived: false,
+        status: { not: "cancelled" },
+        OR: [
+          { pickupDatetime: { gte: orderWindowStart, lte: orderWindowEnd } },
+          { returnDatetime: { gte: orderWindowStart, lte: orderWindowEnd } },
+        ],
+      },
+      orderBy: [{ pickupDatetime: "asc" }, { returnDatetime: "asc" }],
+      select: {
+        id: true,
+        renterName: true,
+        pickupDatetime: true,
+        returnDatetime: true,
+        vehicleId: true,
         vehicle: { select: { plateNumber: true, nickname: true } },
       },
     }),
@@ -120,6 +149,15 @@ export default async function StaffSchedulePage() {
         renterName: order.renterName,
         pickupDatetime: order.pickupDatetime.toISOString(),
         returnDatetime: order.returnDatetime.toISOString(),
+        vehicleId: order.vehicleId,
+        vehicleLabel: `${order.vehicle.plateNumber} · ${order.vehicle.nickname}`,
+      }))}
+      upcomingOrders={upcomingOrders.map((order) => ({
+        id: order.id,
+        renterName: order.renterName,
+        pickupDatetime: order.pickupDatetime.toISOString(),
+        returnDatetime: order.returnDatetime.toISOString(),
+        vehicleId: order.vehicleId,
         vehicleLabel: `${order.vehicle.plateNumber} · ${order.vehicle.nickname}`,
       }))}
     />

@@ -134,6 +134,7 @@ function getStaffScheduleCopy(locale: Locale) {
         history: "已完成 / 已取消",
         noStaff: "还没有员工。先新增员工，再分配任务。",
         noTasks: "暂无任务",
+        todayBadge: "今天",
         pinned: "员工备注",
         noPinned: "暂无固定备注",
         edit: "编辑",
@@ -199,6 +200,7 @@ function getStaffScheduleCopy(locale: Locale) {
         history: "Completed / cancelled",
         noStaff: "No staff yet. Add staff, then assign work.",
         noTasks: "No tasks",
+        todayBadge: "Today",
         pinned: "Pinned note",
         noPinned: "No pinned note",
         edit: "Edit",
@@ -605,6 +607,11 @@ function TaskList({
             <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
+                  {task.status !== "done" && task.status !== "cancelled" && isTaskDueToday(task.dueDatetime) ? (
+                    <span className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
+                      {copy.todayBadge}
+                    </span>
+                  ) : null}
                   <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
                   {task.attachments.length > 0 ? (
                     <span className="badge bg-neutral-100 text-neutral-600">
@@ -1234,6 +1241,20 @@ function formatTaskDue(value: string | null, locale: Locale, fallback: string) {
     month: "short",
     day: "numeric",
   }).format(date);
+}
+
+function isTaskDueToday(value: string | null) {
+  if (!value) return false;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const now = new Date();
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
 }
 
 function formatFileSize(size: number | null) {

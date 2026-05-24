@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -76,6 +76,7 @@ function copy(locale: Locale) {
         complete: "完成",
         reopen: "重开",
         edit: "编辑",
+        delivery: "送车",
         delete: "删除",
         unassign: "放回未分配",
         confirmDelete: "确定删除这个任务吗？",
@@ -110,6 +111,7 @@ function copy(locale: Locale) {
         complete: "Complete",
         reopen: "Reopen",
         edit: "Edit",
+        delivery: "Delivery",
         delete: "Delete",
         unassign: "Move to unassigned",
         confirmDelete: "Delete this task?",
@@ -237,6 +239,32 @@ export function StaffShareClient({
     await patchTask(task, { unassign: true });
   }
 
+  async function uploadTaskPhotos(task: StaffShareTask, files: File[]) {
+    const photoFiles = files.filter(isPhotoFile);
+    if (photoFiles.length === 0) return;
+
+    const formData = new FormData();
+    photoFiles.forEach((file) => formData.append("files", file));
+
+    const response = await fetch(`/api/staff-share/${token}/tasks/${task.id}/attachments`, {
+      method: "POST",
+      body: formData,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(payload.attachments)) {
+      setNotice(labels.failed);
+      return;
+    }
+
+    const uploaded = payload.attachments.map((attachment: StaffShareAttachment) => normalizeAttachment(attachment));
+    setTasks((current) =>
+      current.map((item) =>
+        item.id === task.id ? normalizeTask({ ...item, attachments: [...item.attachments, ...uploaded] }) : item,
+      ),
+    );
+    setNotice(labels.saved);
+  }
+
   return (
     <main className="min-h-screen bg-neutral-100 text-neutral-950">
       <header className="sticky top-0 z-20 border-b border-neutral-800 bg-neutral-950 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] text-white">
@@ -299,6 +327,7 @@ export function StaffShareClient({
                 onEdit={setEditingTask}
                 onComplete={toggleComplete}
                 onUnassign={unassignTask}
+                onUploadPhotos={uploadTaskPhotos}
                 onPreviewImage={setPreviewImage}
               />
             ))}
@@ -316,6 +345,7 @@ export function StaffShareClient({
                 onEdit={setEditingTask}
                 onComplete={toggleComplete}
                 onUnassign={unassignTask}
+                onUploadPhotos={uploadTaskPhotos}
                 onPreviewImage={setPreviewImage}
               />
             ))}
@@ -371,6 +401,7 @@ function TaskCard({
   onEdit,
   onComplete,
   onUnassign,
+  onUploadPhotos,
   onPreviewImage,
 }: {
   labels: ReturnType<typeof copy>;
@@ -379,8 +410,10 @@ function TaskCard({
   onEdit: (task: StaffShareTask) => void;
   onComplete: (task: StaffShareTask) => void;
   onUnassign: (task: StaffShareTask) => void;
+  onUploadPhotos: (task: StaffShareTask, files: File[]) => void;
   onPreviewImage: (attachment: StaffShareAttachment) => void;
 }) {
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const closed = task.status === "done" || task.status === "cancelled";
   const cancelled = task.status === "cancelled";
   return (
@@ -389,7 +422,9 @@ function TaskCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <DueBadge labels={labels} task={task} />
-            <h3 className="min-w-0 flex-1 break-words text-base font-semibold leading-snug">{task.title}</h3>
+            <h3 className="min-w-0 flex-1 break-words text-base font-semibold leading-snug">
+              {getDisplayTaskTitle(task, labels)}
+            </h3>
           </div>
           <p className="mt-1 text-sm text-neutral-500">
             {formatTaskDue(task.dueDatetime, locale, labels.noDue)}
@@ -406,7 +441,7 @@ function TaskCard({
           <AttachmentStrip attachments={task.attachments} labels={labels} onPreview={onPreviewImage} />
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-1.5">
+      <div className="mt-3 grid grid-cols-4 gap-1.5">
         {!closed ? (
           <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-neutral-300 bg-neutral-50 text-neutral-700" onClick={() => onUnassign(task)}>
             <RotateCcw className="h-4 w-4" />
@@ -419,6 +454,25 @@ function TaskCard({
               <Pencil className="h-4 w-4" />
               <span className="text-center">{labels.edit}</span>
             </button>
+          </>
+        ) : null}
+        {!cancelled ? (
+          <>
+            <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-sky-300 bg-sky-50 text-sky-800" onClick={() => uploadInputRef.current?.click()}>
+              <Upload className="h-4 w-4" />
+              <span className="text-center">{labels.uploadPhotos}</span>
+            </button>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                onUploadPhotos(task, Array.from(event.target.files ?? []));
+                event.target.value = "";
+              }}
+            />
           </>
         ) : null}
         {!cancelled ? (
@@ -831,6 +885,11 @@ function getVehicleLabel(labels: ReturnType<typeof copy>, task: StaffShareTask) 
 function getOrderLabel(labels: ReturnType<typeof copy>, task: StaffShareTask) {
   if (task.order) return `${labels.order}: ${task.order.renterName}`;
   return task.orderLabel ? `${labels.order}: ${task.orderLabel}` : null;
+}
+
+function getDisplayTaskTitle(task: StaffShareTask, labels: ReturnType<typeof copy>) {
+  if (task.category !== "order_pickup") return task.title;
+  return task.title.replace(/^(取车|Pickup|Delivery)(\s*·\s*)/i, `${labels.delivery}$2`);
 }
 
 function isPhotoFile(file: File) {

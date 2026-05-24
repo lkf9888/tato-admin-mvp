@@ -94,6 +94,8 @@ type OrderOption = {
   renterName: string;
   pickupDatetime: string;
   returnDatetime: string;
+  pickupLocation: string | null;
+  returnLocation: string | null;
   vehicleId: string;
   vehicleLabel: string;
 };
@@ -109,6 +111,7 @@ type OrderEvent = {
   renterName: string;
   vehicleLabel: string;
   datetime: string;
+  location: string | null;
 };
 
 const defaultStaffForm = {
@@ -150,14 +153,27 @@ function getStaffScheduleCopy(locale: Locale) {
         completed: "已完成",
         unassigned: "未分配",
         unassignedHint: "还没有指定员工的任务会先停在这里。",
-        upcomingOrders: "近期取还车订单",
-        upcomingOrdersHint: "显示今天和未来 3 天的取车、还车。拖到员工卡片，或输入员工姓名分配。",
-        noUpcomingOrders: "未来 3 天没有取车或还车订单。",
-        pickup: "取车",
+        upcomingOrders: "近期送还车订单",
+        upcomingOrdersHint: "显示今天和未来 3 天的送车、还车。拖到员工卡片，或输入员工姓名分配。",
+        noUpcomingOrders: "未来 3 天没有送车或还车订单。",
+        pickup: "送车",
         returnCar: "还车",
+        deliveryAddress: "送车地址",
+        returnAddress: "还车地址",
         assignStaff: "输入员工分配",
         orderTaskExists: "这个订单动作已经有未完成任务，已移动到新的员工名下。",
         history: "已完成 / 已取消",
+        historySearch: "搜索已完成任务",
+        historySearchPlaceholder: "搜索任务标题、说明、车辆、订单...",
+        previousPage: "上一页",
+        nextPage: "下一页",
+        pageStatus: (current: number, total: number) => `第 ${current} / ${total} 页`,
+        viewArchivedStaff: "查看过去员工",
+        hideArchivedStaff: "隐藏过去员工",
+        archivedStaffTitle: "过去员工",
+        archivedStaffHint: "已 Archive 的员工和他们保留的历史任务。",
+        noArchivedStaff: "暂无过去员工",
+        archived: "Archived",
         noStaff: "还没有员工。先新增员工，再分配任务。",
         noTasks: "暂无任务",
         todayBadge: "今天",
@@ -176,6 +192,7 @@ function getStaffScheduleCopy(locale: Locale) {
         reopen: "重开",
         cancel: "取消",
         deleteStaff: "停用这个员工？现有任务会保留。",
+        archiveStaff: "Archive",
         deleteTask: "取消这个任务？",
         save: "保存",
         close: "关闭",
@@ -231,14 +248,27 @@ function getStaffScheduleCopy(locale: Locale) {
         completed: "Completed",
         unassigned: "Unassigned",
         unassignedHint: "Tasks without a staff owner wait here.",
-        upcomingOrders: "Upcoming pickups / returns",
+        upcomingOrders: "Upcoming deliveries / returns",
         upcomingOrdersHint: "Today and the next 3 days. Drag to a staff card, or type a staff name to assign.",
-        noUpcomingOrders: "No pickups or returns in the next 3 days.",
-        pickup: "Pickup",
+        noUpcomingOrders: "No deliveries or returns in the next 3 days.",
+        pickup: "Delivery",
         returnCar: "Return",
+        deliveryAddress: "Delivery address",
+        returnAddress: "Return address",
         assignStaff: "Type staff to assign",
         orderTaskExists: "This order action already had an open task, so it was moved to the selected staff member.",
         history: "Completed / cancelled",
+        historySearch: "Search completed tasks",
+        historySearchPlaceholder: "Search title, details, vehicle, order...",
+        previousPage: "Previous",
+        nextPage: "Next",
+        pageStatus: (current: number, total: number) => `Page ${current} / ${total}`,
+        viewArchivedStaff: "Archived staff",
+        hideArchivedStaff: "Hide archived staff",
+        archivedStaffTitle: "Archived staff",
+        archivedStaffHint: "Archived staff and their retained task history.",
+        noArchivedStaff: "No archived staff",
+        archived: "Archived",
         noStaff: "No staff yet. Add staff, then assign work.",
         noTasks: "No tasks",
         todayBadge: "Today",
@@ -257,6 +287,7 @@ function getStaffScheduleCopy(locale: Locale) {
         reopen: "Reopen",
         cancel: "Cancel",
         deleteStaff: "Deactivate this staff member? Existing tasks stay visible.",
+        archiveStaff: "Archive",
         deleteTask: "Cancel this task?",
         save: "Save",
         close: "Close",
@@ -330,15 +361,52 @@ export function StaffScheduleClient({
   const [dragStaffId, setDragStaffId] = useState<string | null>(null);
   const [dragOverStaffId, setDragOverStaffId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [showArchivedStaff, setShowArchivedStaff] = useState(false);
   const [upcomingOrdersCollapsed, setUpcomingOrdersCollapsed] = useState(false);
 
-  const activeStaff = staff.filter((member) => member.isActive).sort(sortStaffMembers);
-  const activeTasks = tasks.filter((task) => task.status !== "done" && task.status !== "cancelled");
-  const completedTasks = tasks.filter((task) => task.status === "done" || task.status === "cancelled");
+  const activeStaff = useMemo(() => staff.filter((member) => member.isActive).sort(sortStaffMembers), [staff]);
+  const archivedStaff = useMemo(() => staff.filter((member) => !member.isActive).sort(sortStaffMembers), [staff]);
+  const activeTasks = useMemo(
+    () => tasks.filter((task) => task.status !== "done" && task.status !== "cancelled"),
+    [tasks],
+  );
+  const completedTasks = useMemo(
+    () => tasks.filter((task) => task.status === "done" || task.status === "cancelled"),
+    [tasks],
+  );
   const unassignedTasks = activeTasks.filter((task) => !task.staffId);
+  const assignedOrderEventKeys = useMemo(
+    () =>
+      new Set(
+        tasks
+          .filter((task) => task.status !== "cancelled" && task.orderId && task.category)
+          .map((task) => buildOrderEventKey(task.orderId!, task.category!)),
+      ),
+    [tasks],
+  );
   const upcomingOrderEvents = useMemo(
-    () => buildUpcomingOrderEvents(upcomingOrders),
-    [upcomingOrders],
+    () =>
+      buildUpcomingOrderEvents(upcomingOrders).filter(
+        (orderEvent) => !assignedOrderEventKeys.has(buildOrderEventKey(orderEvent.orderId, orderEvent.category)),
+      ),
+    [assignedOrderEventKeys, upcomingOrders],
+  );
+  const visibleCompletedTasks = useMemo(
+    () => completedTasks.filter((task) => taskMatchesSearch(task, historySearch)),
+    [completedTasks, historySearch],
+  );
+  const historyPageSize = 10;
+  const historyPageCount = Math.max(1, Math.ceil(visibleCompletedTasks.length / historyPageSize));
+  const normalizedHistoryPage = Math.min(historyPage, historyPageCount);
+  const pagedCompletedTasks = useMemo(
+    () =>
+      visibleCompletedTasks
+        .slice()
+        .sort(sortTasks)
+        .slice((normalizedHistoryPage - 1) * historyPageSize, normalizedHistoryPage * historyPageSize),
+    [normalizedHistoryPage, visibleCompletedTasks],
   );
 
   const tasksByStaff = useMemo(() => {
@@ -351,6 +419,16 @@ export function StaffScheduleClient({
     for (const list of map.values()) list.sort(sortTasks);
     return map;
   }, [activeStaff, activeTasks]);
+  const tasksByArchivedStaff = useMemo(() => {
+    const map = new Map<string, StaffTask[]>();
+    for (const member of archivedStaff) map.set(member.id, []);
+    for (const task of tasks) {
+      if (!task.staffId || !map.has(task.staffId)) continue;
+      map.get(task.staffId)!.push(task);
+    }
+    for (const list of map.values()) list.sort(sortTasks);
+    return map;
+  }, [archivedStaff, tasks]);
 
   function upsertStaff(next: StaffMember) {
     setStaff((current) => {
@@ -497,7 +575,7 @@ export function StaffScheduleClient({
         orderId: orderEvent.orderId,
         orderLabel: "",
         title: buildOrderEventTaskTitle(orderEvent, c),
-        details: `${orderEvent.vehicleLabel} · ${orderEvent.renterName}`,
+        details: buildOrderEventTaskDetails(orderEvent, c),
         dueDatetime: toLocalDateInput(orderEvent.datetime),
         timeWindow: formatOrderEventTime(orderEvent.datetime, locale),
         category: orderEvent.category,
@@ -586,17 +664,6 @@ export function StaffScheduleClient({
     await quickStatus(task, "cancelled");
   }
 
-  async function deactivateStaff(member: StaffMember) {
-    if (!window.confirm(c.deleteStaff)) return;
-    const response = await fetch(`/api/staff-schedule/staff/${member.id}`, { method: "DELETE" });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.staff) {
-      setNotice(c.failed);
-      return;
-    }
-    upsertStaff(normalizeStaff(payload.staff));
-  }
-
   return (
     <div className="mx-auto max-w-7xl space-y-4">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -606,6 +673,9 @@ export function StaffScheduleClient({
           <p className="mt-1 max-w-3xl text-sm text-neutral-500">{c.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button className="btn-secondary min-h-11 px-4 py-2 text-sm" onClick={() => setShowArchivedStaff((open) => !open)}>
+            {showArchivedStaff ? c.hideArchivedStaff : c.viewArchivedStaff}
+          </button>
           <button className="btn-secondary min-h-11 px-4 py-2 text-sm" onClick={() => setStaffModal("new")}>
             <UserPlus className="h-4 w-4" />
             {c.addStaff}
@@ -681,9 +751,10 @@ export function StaffScheduleClient({
               className={cn(
                 "card overflow-hidden transition",
                 dragOverTarget === member.id || dragOverStaffId === member.id
-                  ? "border-neutral-900 bg-neutral-50"
+                  ? "border-neutral-900"
                   : "",
               )}
+              style={{ backgroundColor: colorWithAlpha(member.color, 0.5) }}
             >
               <div className="flex flex-col gap-2 border-b border-neutral-200 px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
@@ -725,12 +796,9 @@ export function StaffScheduleClient({
                     <Pencil className="h-3 w-3" />
                     {c.edit}
                   </button>
-                  <button className="btn-danger min-h-7 min-w-7 px-1 py-1 text-[11px]" onClick={() => deactivateStaff(member)}>
-                    <Trash2 className="h-3 w-3" />
-                  </button>
                 </div>
               </div>
-              <div className="border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs text-neutral-600">
+              <div className="border-b border-neutral-200 bg-white/35 px-3 py-1.5 text-xs text-neutral-700">
                 <span className="font-medium text-neutral-900">{c.pinned}: </span>
                 {member.pinnedMessage || c.noPinned}
               </div>
@@ -763,6 +831,15 @@ export function StaffScheduleClient({
           ))}
             </section>
           )}
+
+          {showArchivedStaff ? (
+            <ArchivedStaffPanel
+              copy={c}
+              locale={locale}
+              members={archivedStaff}
+              tasksByStaff={tasksByArchivedStaff}
+            />
+          ) : null}
 
           <section className="grid gap-2.5 2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <article
@@ -834,17 +911,55 @@ export function StaffScheduleClient({
             </span>
           </button>
           {historyOpen ? (
-            <TaskList
-              tasks={completedTasks.sort(sortTasks).slice(0, 30)}
-              locale={locale}
-              copy={c}
-              dragTaskId={dragTaskId}
-              onDragStart={setDragTaskId}
-              onDragEnd={clearDragState}
-              onEdit={setTaskModal}
-              onComplete={(task) => quickStatus(task, "todo")}
-              onCancel={cancelTask}
-            />
+            <>
+              <div className="border-b border-neutral-200 px-3 py-2">
+                <label className="block">
+                  <span className="sr-only">{c.historySearch}</span>
+                  <input
+                    className="input h-8 px-2 py-1 text-xs"
+                    type="search"
+                    value={historySearch}
+                    placeholder={c.historySearchPlaceholder}
+                    onChange={(event) => {
+                      setHistorySearch(event.target.value);
+                      setHistoryPage(1);
+                    }}
+                  />
+                </label>
+              </div>
+              <TaskList
+                tasks={pagedCompletedTasks}
+                locale={locale}
+                copy={c}
+                dragTaskId={dragTaskId}
+                onDragStart={setDragTaskId}
+                onDragEnd={clearDragState}
+                onEdit={setTaskModal}
+                onComplete={(task) => quickStatus(task, "todo")}
+                onCancel={cancelTask}
+              />
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-3 py-2">
+                <button
+                  type="button"
+                  className="btn-secondary min-h-8 px-2 py-1 text-[11px]"
+                  disabled={normalizedHistoryPage <= 1}
+                  onClick={() => setHistoryPage((page) => Math.max(1, page - 1))}
+                >
+                  {c.previousPage}
+                </button>
+                <span className="text-xs font-medium text-neutral-500">
+                  {c.pageStatus(normalizedHistoryPage, historyPageCount)}
+                </span>
+                <button
+                  type="button"
+                  className="btn-secondary min-h-8 px-2 py-1 text-[11px]"
+                  disabled={normalizedHistoryPage >= historyPageCount}
+                  onClick={() => setHistoryPage((page) => Math.min(historyPageCount, page + 1))}
+                >
+                  {c.nextPage}
+                </button>
+              </div>
+            </>
           ) : (
             <div className="px-3 py-4 text-sm text-neutral-500">{c.historyCount(completedTasks.length)}</div>
           )}
@@ -860,6 +975,11 @@ export function StaffScheduleClient({
           staff={staffModal === "new" ? null : staffModal}
           onClose={() => setStaffModal(null)}
           onSaved={(member) => {
+            upsertStaff(normalizeStaff(member));
+            setNotice(c.created);
+            setStaffModal(null);
+          }}
+          onArchived={(member) => {
             upsertStaff(normalizeStaff(member));
             setNotice(c.created);
             setStaffModal(null);
@@ -1032,6 +1152,11 @@ function OrderEventCard({
           <p className="mt-0.5 truncate text-[11px] font-semibold leading-4 text-neutral-950">
             {orderEvent.vehicleLabel} · {orderEvent.renterName}
           </p>
+          {orderEvent.location ? (
+            <p className="mt-0.5 truncate text-[10px] leading-3 text-neutral-500">
+              {getOrderEventAddressLabel(orderEvent, copy)}: {orderEvent.location}
+            </p>
+          ) : null}
         </div>
         <OrderAssignInput
           copy={copy}
@@ -1115,93 +1240,249 @@ function TaskList({
   return (
     <div className="divide-y divide-neutral-200">
       {tasks.map((task) => (
-        <div
+        <TaskListItem
           key={task.id}
-          draggable={task.status !== "done" && task.status !== "cancelled"}
-          onDragStart={(event) => {
-            event.dataTransfer.effectAllowed = "move";
-            event.dataTransfer.setData("text/plain", task.id);
-            onDragStart(task.id);
-          }}
+          task={task}
+          locale={locale}
+          copy={copy}
+          dragTaskId={dragTaskId}
+          dragOverTaskId={dragOverTaskId}
+          onDragStart={onDragStart}
           onDragEnd={onDragEnd}
-          onDragOver={(event) => {
-            if (!dragTaskId || dragTaskId === task.id || !onDropOnTask) return;
-            event.preventDefault();
-            event.stopPropagation();
-            onDragOverTask?.(task.id);
-          }}
-          onDragLeave={() => {
-            onDragOverTask?.(null);
-          }}
-          onDrop={(event) => {
-            if (!dragTaskId || dragTaskId === task.id || !onDropOnTask) return;
-            event.preventDefault();
-            event.stopPropagation();
-            onDropOnTask(task.id);
-          }}
-          className={cn(
-            "px-3 py-2 transition",
-            task.status !== "done" && task.status !== "cancelled" ? "cursor-grab active:cursor-grabbing" : "",
-            dragTaskId === task.id ? "bg-neutral-50 opacity-60" : "",
-            dragOverTaskId === task.id ? "bg-amber-50" : "",
-          )}
-        >
-          <div className="flex items-start justify-between gap-2.5">
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-2">
-                  {task.status !== "done" && task.status !== "cancelled" && isTaskDueToday(task.dueDatetime) ? (
-                    <span className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
-                      {copy.todayBadge}
-                    </span>
-                  ) : task.status !== "done" && task.status !== "cancelled" && isTaskDueTomorrow(task.dueDatetime) ? (
-                    <span className="shrink-0 rounded bg-amber-300 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-amber-950">
-                      {copy.tomorrowBadge}
-                    </span>
-                  ) : null}
-                  <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
-                  {task.attachments.length > 0 ? (
-                    <span className="badge bg-neutral-100 text-neutral-600">
-                      <ImagePlus className="h-3 w-3" />
-                      {task.attachments.length}
-                    </span>
-                  ) : null}
-                  <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-950">{task.title}</h3>
-                </div>
-                <p className="mt-0.5 text-xs leading-4 text-neutral-500">
-                  {formatTaskDue(task.dueDatetime, locale, copy.noDue)}
-                  {task.timeWindow ? ` · ${task.timeWindow}` : ""}
-                </p>
-                <p className="mt-0.5 truncate text-xs leading-4 text-neutral-500">
-                  {[
-                    task.staffLabel ? `${copy.staff}: ${task.staffLabel}` : null,
-                    getTaskVehicleLabel(task),
-                    getTaskOrderLabel(task),
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || copy.none}
-                </p>
-                {task.details ? <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-neutral-600">{task.details}</p> : null}
-              </div>
-              <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
-            </div>
-            <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
-              <button className="btn-secondary min-h-7 min-w-7 border-amber-300 bg-amber-50 px-1 py-1 text-[11px] text-amber-800 hover:bg-amber-100" onClick={() => onEdit(task)}>
-                <Pencil className="h-3 w-3" />
-              </button>
-              <button className="btn-secondary min-h-7 border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800 hover:bg-emerald-100" onClick={() => onComplete(task)}>
-                {task.status === "done" ? <Circle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
-                {task.status === "done" ? copy.reopen : copy.complete}
-              </button>
-              {task.status !== "cancelled" ? (
-                <button className="btn-danger min-h-7 min-w-7 px-1 py-1 text-[11px]" onClick={() => onCancel(task)}>
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
+          onDragOverTask={onDragOverTask}
+          onDropOnTask={onDropOnTask}
+          onEdit={onEdit}
+          onComplete={onComplete}
+          onCancel={onCancel}
+        />
       ))}
+    </div>
+  );
+}
+
+function TaskListItem({
+  task,
+  locale,
+  copy,
+  dragTaskId,
+  dragOverTaskId,
+  onDragStart,
+  onDragEnd,
+  onDragOverTask,
+  onDropOnTask,
+  onEdit,
+  onComplete,
+  onCancel,
+}: {
+  task: StaffTask;
+  locale: Locale;
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+  dragTaskId: string | null;
+  dragOverTaskId?: string | null;
+  onDragStart: (taskId: string) => void;
+  onDragEnd: () => void;
+  onDragOverTask?: (taskId: string | null) => void;
+  onDropOnTask?: (targetTaskId: string) => void;
+  onEdit: (task: StaffTask) => void;
+  onComplete: (task: StaffTask) => void;
+  onCancel: (task: StaffTask) => void;
+}) {
+  const contextText = getTaskContextText(task, copy);
+  const detailsText = getTaskDetailsText(task);
+
+  return (
+    <div
+      draggable={task.status !== "done" && task.status !== "cancelled"}
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", task.id);
+        onDragStart(task.id);
+      }}
+      onDragEnd={onDragEnd}
+      onDragOver={(event) => {
+        if (!dragTaskId || dragTaskId === task.id || !onDropOnTask) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onDragOverTask?.(task.id);
+      }}
+      onDragLeave={() => {
+        onDragOverTask?.(null);
+      }}
+      onDrop={(event) => {
+        if (!dragTaskId || dragTaskId === task.id || !onDropOnTask) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onDropOnTask(task.id);
+      }}
+      className={cn(
+        "px-3 py-2 transition",
+        task.status !== "done" && task.status !== "cancelled" ? "cursor-grab active:cursor-grabbing" : "",
+        dragTaskId === task.id ? "bg-neutral-50 opacity-60" : "",
+        dragOverTaskId === task.id ? "bg-amber-50" : "",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              {task.status !== "done" && task.status !== "cancelled" && isTaskDueToday(task.dueDatetime) ? (
+                <span className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
+                  {copy.todayBadge}
+                </span>
+              ) : task.status !== "done" && task.status !== "cancelled" && isTaskDueTomorrow(task.dueDatetime) ? (
+                <span className="shrink-0 rounded bg-amber-300 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-amber-950">
+                  {copy.tomorrowBadge}
+                </span>
+              ) : null}
+              <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
+              {task.attachments.length > 0 ? (
+                <span className="badge bg-neutral-100 text-neutral-600">
+                  <ImagePlus className="h-3 w-3" />
+                  {task.attachments.length}
+                </span>
+              ) : null}
+              <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-950">
+                {getDisplayTaskTitle(task, copy)}
+              </h3>
+            </div>
+            <p className="mt-0.5 text-xs leading-4 text-neutral-500">
+              {formatTaskDue(task.dueDatetime, locale, copy.noDue)}
+              {task.timeWindow ? ` · ${task.timeWindow}` : ""}
+            </p>
+            {contextText ? (
+              <p className="mt-0.5 truncate text-xs leading-4 text-neutral-500">{contextText}</p>
+            ) : null}
+            {detailsText ? (
+              <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-neutral-600">{detailsText}</p>
+            ) : null}
+          </div>
+          <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
+        </div>
+        <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
+          <button className="btn-secondary min-h-7 min-w-7 border-amber-300 bg-amber-50 px-1 py-1 text-[11px] text-amber-800 hover:bg-amber-100" onClick={() => onEdit(task)}>
+            <Pencil className="h-3 w-3" />
+          </button>
+          <button className="btn-secondary min-h-7 border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800 hover:bg-emerald-100" onClick={() => onComplete(task)}>
+            {task.status === "done" ? <Circle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+            {task.status === "done" ? copy.reopen : copy.complete}
+          </button>
+          {task.status !== "cancelled" ? (
+            <button className="btn-danger min-h-7 min-w-7 px-1 py-1 text-[11px]" onClick={() => onCancel(task)}>
+              <Trash2 className="h-3 w-3" />
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArchivedStaffPanel({
+  copy,
+  locale,
+  members,
+  tasksByStaff,
+}: {
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+  locale: Locale;
+  members: StaffMember[];
+  tasksByStaff: Map<string, StaffTask[]>;
+}) {
+  return (
+    <section className="card overflow-hidden">
+      <div className="border-b border-neutral-200 px-3 py-2.5">
+        <h2 className="text-base font-semibold">{copy.archivedStaffTitle}</h2>
+        <p className="text-xs text-neutral-500">{copy.archivedStaffHint}</p>
+      </div>
+      {members.length === 0 ? (
+        <div className="px-3 py-4 text-sm text-neutral-500">{copy.noArchivedStaff}</div>
+      ) : (
+        <div className="divide-y divide-neutral-200">
+          {members.map((member) => (
+            <article key={member.id} className="px-3 py-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: member.color }} />
+                    <h3 className="truncate text-sm font-semibold text-neutral-950">{member.name}</h3>
+                    <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-600">
+                      {copy.archived}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-neutral-500">
+                    {[member.role, member.phone, member.email].filter(Boolean).join(" · ") || copy.staff}
+                  </p>
+                </div>
+                <span className="text-xs text-neutral-500">
+                  {copy.historyCount(tasksByStaff.get(member.id)?.length ?? 0)}
+                </span>
+              </div>
+              <ArchivedTaskList
+                copy={copy}
+                locale={locale}
+                tasks={tasksByStaff.get(member.id) ?? []}
+              />
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ArchivedTaskList({
+  copy,
+  locale,
+  tasks,
+}: {
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+  locale: Locale;
+  tasks: StaffTask[];
+}) {
+  if (tasks.length === 0) {
+    return <div className="mt-2 text-sm text-neutral-500">{copy.noTasks}</div>;
+  }
+
+  return (
+    <div className="mt-2 divide-y divide-neutral-100 border-t border-neutral-100">
+      {tasks.map((task) => (
+        <ArchivedTaskRow key={task.id} copy={copy} locale={locale} task={task} />
+      ))}
+    </div>
+  );
+}
+
+function ArchivedTaskRow({
+  copy,
+  locale,
+  task,
+}: {
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+  locale: Locale;
+  task: StaffTask;
+}) {
+  const contextText = getTaskContextText(task, copy);
+  const detailsText = getTaskDetailsText(task);
+
+  return (
+    <div className="py-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-600">
+              {copy.statusLabels[task.status]}
+            </span>
+            <p className="truncate text-sm font-semibold text-neutral-900">{getDisplayTaskTitle(task, copy)}</p>
+          </div>
+          <p className="mt-0.5 text-xs leading-4 text-neutral-500">
+            {formatTaskDue(task.dueDatetime, locale, copy.noDue)}
+            {task.timeWindow ? ` · ${task.timeWindow}` : ""}
+          </p>
+          {contextText ? <p className="mt-0.5 truncate text-xs leading-4 text-neutral-500">{contextText}</p> : null}
+          {detailsText ? <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-neutral-600">{detailsText}</p> : null}
+        </div>
+        <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
+      </div>
     </div>
   );
 }
@@ -1211,12 +1492,14 @@ function StaffModal({
   staff,
   onClose,
   onSaved,
+  onArchived,
 }: {
   locale: Locale;
   copy: ReturnType<typeof getStaffScheduleCopy>;
   staff: StaffMember | null;
   onClose: () => void;
   onSaved: (staff: StaffMember) => void;
+  onArchived: (staff: StaffMember) => void;
 }) {
   const [form, setForm] = useState(staff ? staffToForm(staff) : defaultStaffForm);
   const [error, setError] = useState<string | null>(null);
@@ -1238,6 +1521,20 @@ function StaffModal({
       return;
     }
     onSaved(payload.staff);
+  }
+
+  async function archiveStaff() {
+    if (!staff || !window.confirm(copy.deleteStaff)) return;
+    setSaving(true);
+    setError(null);
+    const response = await fetch(`/api/staff-schedule/staff/${staff.id}`, { method: "DELETE" });
+    const payload = await response.json().catch(() => ({}));
+    setSaving(false);
+    if (!response.ok || !payload.staff) {
+      setError(copy.failed);
+      return;
+    }
+    onArchived(payload.staff);
   }
 
   return (
@@ -1269,7 +1566,16 @@ function StaffModal({
           <textarea className="input min-h-24" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
         </Field>
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        <button className="btn-primary w-full" disabled={saving}>{copy.save}</button>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+          {staff ? (
+            <button type="button" className="btn-danger min-h-10 px-3 py-2 text-sm" disabled={saving} onClick={archiveStaff}>
+              {copy.archiveStaff}
+            </button>
+          ) : (
+            <span />
+          )}
+          <button className="btn-primary min-h-10 px-4 py-2 text-sm" disabled={saving}>{copy.save}</button>
+        </div>
       </form>
     </Modal>
   );
@@ -1742,6 +2048,7 @@ function buildUpcomingOrderEvents(orders: OrderOption[]) {
         renterName: order.renterName,
         vehicleLabel: order.vehicleLabel,
         datetime: order.pickupDatetime,
+        location: order.pickupLocation,
       },
       {
         id: `${order.id}-return`,
@@ -1752,6 +2059,7 @@ function buildUpcomingOrderEvents(orders: OrderOption[]) {
         renterName: order.renterName,
         vehicleLabel: order.vehicleLabel,
         datetime: order.returnDatetime,
+        location: order.returnLocation,
       },
     ])
     .filter((orderEvent) => {
@@ -1807,13 +2115,101 @@ function formatRelativeDayLabel(
   locale: Locale,
   copy: ReturnType<typeof getStaffScheduleCopy>,
 ) {
-  if (offset === 0) return copy.todayBadge;
-  if (offset === 1) return copy.tomorrowBadge;
-  if (offset === 2) return copy.dayAfterTomorrow;
-
   const date = new Date(value);
-  if (locale === "zh") return `${date.getMonth() + 1}/${date.getDate()}`;
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+  const dateLabel = locale === "zh"
+    ? `${date.getMonth() + 1}/${date.getDate()}`
+    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+
+  if (offset === 0) return `${copy.todayBadge} ${dateLabel}`;
+  if (offset === 1) return `${copy.tomorrowBadge} ${dateLabel}`;
+  if (offset === 2) return `${copy.dayAfterTomorrow} ${dateLabel}`;
+
+  return dateLabel;
+}
+
+function buildOrderEventKey(orderId: string, category: string) {
+  return `${orderId}:${category}`;
+}
+
+function getOrderEventAddressLabel(
+  orderEvent: Pick<OrderEvent, "kind">,
+  copy: ReturnType<typeof getStaffScheduleCopy>,
+) {
+  return orderEvent.kind === "pickup" ? copy.deliveryAddress : copy.returnAddress;
+}
+
+function buildOrderEventTaskDetails(
+  orderEvent: OrderEvent,
+  copy: ReturnType<typeof getStaffScheduleCopy>,
+) {
+  const location = orderEvent.location?.trim();
+  if (!location) return "";
+  return `${getOrderEventAddressLabel(orderEvent, copy)}: ${location}`;
+}
+
+function colorWithAlpha(color: string, alpha: number) {
+  const fallback = `rgba(255, 255, 255, ${alpha})`;
+  const trimmed = color.trim();
+  if (!trimmed) return fallback;
+
+  const hex = trimmed.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i)?.[1];
+  if (hex) {
+    const expanded =
+      hex.length === 3
+        ? hex
+            .split("")
+            .map((part) => part + part)
+            .join("")
+        : hex;
+    const value = Number.parseInt(expanded, 16);
+    const red = (value >> 16) & 255;
+    const green = (value >> 8) & 255;
+    const blue = value & 255;
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  }
+
+  const rgb = trimmed.match(/^rgba?\(([^)]+)\)$/i);
+  if (rgb) {
+    const [red, green, blue] = rgb[1].split(",").map((part) => Number(part.trim()));
+    if ([red, green, blue].every((part) => Number.isFinite(part))) {
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    }
+  }
+
+  return `color-mix(in srgb, ${trimmed} ${Math.round(alpha * 100)}%, transparent)`;
+}
+
+function isOrderEventTask(task: StaffTask) {
+  return task.category === "order_pickup" || task.category === "order_return";
+}
+
+function getTaskContextText(task: StaffTask, copy: ReturnType<typeof getStaffScheduleCopy>) {
+  if (isOrderEventTask(task)) return "";
+
+  return (
+    [
+      task.staffLabel ? `${copy.staff}: ${task.staffLabel}` : null,
+      getTaskVehicleLabel(task),
+      getTaskOrderLabel(task),
+    ]
+      .filter(Boolean)
+      .join(" · ") || copy.none
+  );
+}
+
+function getTaskDetailsText(task: StaffTask) {
+  const details = task.details?.trim();
+  if (!details) return "";
+
+  const duplicateContext = [getTaskVehicleLabel(task), getTaskOrderLabel(task)].filter(Boolean).join(" · ");
+  if (duplicateContext && details === duplicateContext) return "";
+
+  return details;
+}
+
+function getDisplayTaskTitle(task: StaffTask, copy: ReturnType<typeof getStaffScheduleCopy>) {
+  if (task.category !== "order_pickup") return task.title;
+  return task.title.replace(/^(取车|Pickup|Delivery)(\s*·\s*)/i, `${copy.pickup}$2`);
 }
 
 function formatOrderEventTime(value: string, locale: Locale) {
@@ -1867,6 +2263,25 @@ function getTaskVehicleLabel(task: StaffTask) {
 function getTaskOrderLabel(task: StaffTask) {
   if (task.order) return task.order.renterName;
   return task.orderLabel;
+}
+
+function taskMatchesSearch(task: StaffTask, search: string) {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) return true;
+
+  return [
+    task.title,
+    task.details,
+    task.staffLabel,
+    task.vehicleLabel,
+    task.orderLabel,
+    task.vehicle?.plateNumber,
+    task.vehicle?.nickname,
+    task.order?.renterName,
+    task.timeWindow,
+  ]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(normalizedSearch));
 }
 
 function formatTaskDue(value: string | null, locale: Locale, fallback: string) {

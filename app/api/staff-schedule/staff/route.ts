@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { createAvailableStaffShareToken } from "@/lib/staff-share";
 
 const staffSchema = z.object({
   name: z.string().trim().min(2),
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
       pinnedMessage: nullable(parsed.pinnedMessage),
       isActive: parsed.isActive ?? true,
       sortOrder: parsed.sortOrder ?? (currentMaxSortOrder._max.sortOrder ?? 0) + 1000,
+      shareToken: await createAvailableStaffShareToken(),
     },
   });
 

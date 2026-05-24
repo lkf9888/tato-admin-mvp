@@ -151,6 +151,18 @@
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
   }
+
+  .mobile-action {
+    @apply flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold;
+  }
+
+  .share-label {
+    @apply mb-1 block text-xs font-semibold text-neutral-600;
+  }
+
+  .share-input {
+    @apply w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base outline-none focus:border-neutral-900;
+  }
 }
 
 /* Buttons should match the compact squared-off navigation shape. Keep

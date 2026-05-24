@@ -2,6 +2,7 @@ import { StaffScheduleClient } from "@/components/staff-schedule-client";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import { ensureStaffShareTokens } from "@/lib/staff-share";
 
 export default async function StaffSchedulePage() {
   const workspace = await requireCurrentWorkspace();
@@ -46,11 +47,12 @@ export default async function StaffSchedulePage() {
       },
     }),
   ]);
+  const staffWithShareTokens = await ensureStaffShareTokens(staff);
 
   return (
     <StaffScheduleClient
       locale={locale}
-      initialStaff={staff.map((member) => ({
+      initialStaff={staffWithShareTokens.map((member) => ({
         id: member.id,
         name: member.name,
         phone: member.phone,
@@ -61,6 +63,7 @@ export default async function StaffSchedulePage() {
         pinnedMessage: member.pinnedMessage,
         isActive: member.isActive,
         sortOrder: member.sortOrder,
+        shareToken: member.shareToken,
       }))}
       initialTasks={tasks.map((task) => ({
         id: task.id,
@@ -91,6 +94,7 @@ export default async function StaffSchedulePage() {
               pinnedMessage: task.staff.pinnedMessage,
               isActive: task.staff.isActive,
               sortOrder: task.staff.sortOrder,
+              shareToken: task.staff.shareToken,
             }
           : null,
         vehicle: task.vehicle,

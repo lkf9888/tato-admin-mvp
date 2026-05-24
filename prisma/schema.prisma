@@ -324,6 +324,7 @@ model StaffMember {
   pinnedMessage String?
   isActive      Boolean     @default(true)
   sortOrder     Int         @default(0)
+  shareToken    String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   workspace     Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -331,6 +332,7 @@ model StaffMember {
 
   @@index([workspaceId, isActive])
   @@index([workspaceId, isActive, sortOrder])
+  @@index([shareToken])
 }
 
 model StaffTask {

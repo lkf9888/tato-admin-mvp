@@ -30,6 +30,7 @@ type StaffMember = {
   pinnedMessage: string | null;
   isActive: boolean;
   sortOrder: number;
+  shareToken: string | null;
 };
 
 type StaffTask = {
@@ -141,6 +142,10 @@ function getStaffScheduleCopy(locale: Locale) {
         showHistory: "展开",
         hideHistory: "折叠",
         historyCount: (count: number) => `${count} 条记录`,
+        copyShareLink: "复制链接",
+        openShareLink: "打开链接",
+        shareCopied: "员工任务链接已复制。",
+        shareUnavailable: "链接还没有生成，请刷新页面后再试。",
         pinned: "员工备注",
         noPinned: "暂无固定备注",
         edit: "编辑",
@@ -211,6 +216,10 @@ function getStaffScheduleCopy(locale: Locale) {
         showHistory: "Expand",
         hideHistory: "Collapse",
         historyCount: (count: number) => `${count} record${count === 1 ? "" : "s"}`,
+        copyShareLink: "Copy link",
+        openShareLink: "Open link",
+        shareCopied: "Staff task link copied.",
+        shareUnavailable: "The link is not ready yet. Refresh and try again.",
         pinned: "Pinned note",
         noPinned: "No pinned note",
         edit: "Edit",
@@ -463,6 +472,22 @@ export function StaffScheduleClient({
     setDragOverStaffId(null);
   }
 
+  function staffShareHref(member: StaffMember) {
+    return member.shareToken ? `/staff-share/${member.shareToken}` : "";
+  }
+
+  async function copyStaffShareLink(member: StaffMember) {
+    const href = staffShareHref(member);
+    if (!href) {
+      setNotice(c.shareUnavailable);
+      return;
+    }
+
+    const url = `${window.location.origin}${href}`;
+    await navigator.clipboard.writeText(url);
+    setNotice(c.shareCopied);
+  }
+
   async function cancelTask(task: StaffTask) {
     if (!window.confirm(c.deleteTask)) return;
     await quickStatus(task, "cancelled");
@@ -488,13 +513,9 @@ export function StaffScheduleClient({
           <p className="mt-1 max-w-3xl text-sm text-neutral-500">{c.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className="btn-secondary" onClick={() => setStaffModal("new")}>
-            <UserPlus className="h-4 w-4" />
+          <button className="btn-secondary min-h-7 px-2 py-1 text-[11px]" onClick={() => setStaffModal("new")}>
+            <UserPlus className="h-3 w-3" />
             {c.addStaff}
-          </button>
-          <button className="btn-primary" onClick={() => setTaskModal({ kind: "new" })}>
-            <Plus className="h-4 w-4" />
-            {c.addTask}
           </button>
         </div>
       </section>
@@ -567,16 +588,26 @@ export function StaffScheduleClient({
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
-                  <button className="btn-secondary min-h-8 px-2.5 py-1.5 text-xs" onClick={() => setTaskModal({ kind: "new", staffId: member.id })}>
-                    <Plus className="h-3.5 w-3.5" />
+                  <button className="btn-secondary min-h-7 px-2 py-1 text-[11px]" onClick={() => setTaskModal({ kind: "new", staffId: member.id })}>
+                    <Plus className="h-3 w-3" />
                     {c.addTask}
                   </button>
-                  <button className="btn-secondary min-h-8 border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 hover:bg-amber-100" onClick={() => setStaffModal(member)}>
-                    <Pencil className="h-3.5 w-3.5" />
+                  {member.shareToken ? (
+                    <>
+                      <button className="btn-secondary min-h-7 px-2 py-1 text-[11px]" onClick={() => copyStaffShareLink(member)}>
+                        {c.copyShareLink}
+                      </button>
+                      <a className="btn-secondary min-h-7 px-2 py-1 text-[11px]" href={staffShareHref(member)} target="_blank" rel="noreferrer">
+                        {c.openShareLink}
+                      </a>
+                    </>
+                  ) : null}
+                  <button className="btn-secondary min-h-7 border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-800 hover:bg-amber-100" onClick={() => setStaffModal(member)}>
+                    <Pencil className="h-3 w-3" />
                     {c.edit}
                   </button>
-                  <button className="btn-danger min-h-8 min-w-8 px-1.5 py-1.5 text-xs" onClick={() => deactivateStaff(member)}>
-                    <Trash2 className="h-3.5 w-3.5" />
+                  <button className="btn-danger min-h-7 min-w-7 px-1 py-1 text-[11px]" onClick={() => deactivateStaff(member)}>
+                    <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
               </div>
@@ -632,9 +663,15 @@ export function StaffScheduleClient({
             dragOverTarget === "unassigned" ? "border-neutral-900 bg-neutral-50" : "",
           )}
         >
-          <div className="border-b border-neutral-200 px-3 py-2.5">
-            <h2 className="text-base font-semibold">{c.unassigned}</h2>
-            <p className="text-xs text-neutral-500">{c.unassignedHint}</p>
+          <div className="flex items-start justify-between gap-3 border-b border-neutral-200 px-3 py-2.5">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold">{c.unassigned}</h2>
+              <p className="text-xs text-neutral-500">{c.unassignedHint}</p>
+            </div>
+            <button className="btn-primary min-h-7 shrink-0 px-2 py-1 text-[11px]" onClick={() => setTaskModal({ kind: "new" })}>
+              <Plus className="h-3 w-3" />
+              {c.addTask}
+            </button>
           </div>
           {dragOverTarget === "unassigned" ? (
             <div className="border-b border-neutral-200 bg-neutral-950 px-4 py-2 text-xs font-medium text-white">
@@ -831,16 +868,16 @@ function TaskList({
               <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
             </div>
             <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
-              <button className="btn-secondary min-h-8 min-w-8 border-amber-300 bg-amber-50 px-1.5 py-1.5 text-xs text-amber-800 hover:bg-amber-100" onClick={() => onEdit(task)}>
-                <Pencil className="h-3.5 w-3.5" />
+              <button className="btn-secondary min-h-7 min-w-7 border-amber-300 bg-amber-50 px-1 py-1 text-[11px] text-amber-800 hover:bg-amber-100" onClick={() => onEdit(task)}>
+                <Pencil className="h-3 w-3" />
               </button>
-              <button className="btn-secondary min-h-8 border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-800 hover:bg-emerald-100" onClick={() => onComplete(task)}>
-                {task.status === "done" ? <Circle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              <button className="btn-secondary min-h-7 border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800 hover:bg-emerald-100" onClick={() => onComplete(task)}>
+                {task.status === "done" ? <Circle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
                 {task.status === "done" ? copy.reopen : copy.complete}
               </button>
               {task.status !== "cancelled" ? (
-                <button className="btn-danger min-h-8 min-w-8 px-1.5 py-1.5 text-xs" onClick={() => onCancel(task)}>
-                  <Trash2 className="h-3.5 w-3.5" />
+                <button className="btn-danger min-h-7 min-w-7 px-1 py-1 text-[11px]" onClick={() => onCancel(task)}>
+                  <Trash2 className="h-3 w-3" />
                 </button>
               ) : null}
             </div>

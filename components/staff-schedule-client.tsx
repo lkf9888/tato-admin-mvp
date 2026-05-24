@@ -193,7 +193,9 @@ function getStaffScheduleCopy(locale: Locale) {
         cancel: "取消",
         deleteStaff: "停用这个员工？现有任务会保留。",
         archiveStaff: "Archive",
-        deleteTask: "取消这个任务？",
+        deleteTask: "删除这个任务？删除后不会进入已完成/已取消区。",
+        permanentDelete: "彻底删除",
+        permanentDeleteTask: "彻底删除这个历史任务？此操作不能撤销。",
         save: "保存",
         close: "关闭",
         dragHint: "拖拽任务到员工卡片即可分配",
@@ -288,7 +290,9 @@ function getStaffScheduleCopy(locale: Locale) {
         cancel: "Cancel",
         deleteStaff: "Deactivate this staff member? Existing tasks stay visible.",
         archiveStaff: "Archive",
-        deleteTask: "Cancel this task?",
+        deleteTask: "Delete this task? It will not be shown in completed / cancelled.",
+        permanentDelete: "Delete permanently",
+        permanentDeleteTask: "Permanently delete this history task? This cannot be undone.",
         save: "Save",
         close: "Close",
         dragHint: "Drag a task card onto a staff card to assign it",
@@ -373,7 +377,7 @@ export function StaffScheduleClient({
     [tasks],
   );
   const completedTasks = useMemo(
-    () => tasks.filter((task) => task.status === "done" || task.status === "cancelled"),
+    () => tasks.filter((task) => task.status === "done"),
     [tasks],
   );
   const unassignedTasks = activeTasks.filter((task) => !task.staffId);
@@ -659,9 +663,15 @@ export function StaffScheduleClient({
     setNotice(c.shareCopied);
   }
 
-  async function cancelTask(task: StaffTask) {
-    if (!window.confirm(c.deleteTask)) return;
-    await quickStatus(task, "cancelled");
+  async function deleteTask(task: StaffTask, permanent = false) {
+    if (!window.confirm(permanent ? c.permanentDeleteTask : c.deleteTask)) return;
+    const response = await fetch(`/api/staff-schedule/tasks/${task.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      setNotice(c.failed);
+      return;
+    }
+    setTasks((current) => current.filter((item) => item.id !== task.id));
+    setNotice(c.created);
   }
 
   return (
@@ -825,7 +835,7 @@ export function StaffScheduleClient({
                 }}
                 onEdit={setTaskModal}
                 onComplete={(task) => quickStatus(task, task.status === "done" ? "todo" : "done")}
-                onCancel={cancelTask}
+                onCancel={(task) => deleteTask(task)}
               />
             </article>
           ))}
@@ -896,7 +906,7 @@ export function StaffScheduleClient({
             }}
             onEdit={setTaskModal}
             onComplete={(task) => quickStatus(task, "done")}
-            onCancel={cancelTask}
+            onCancel={(task) => deleteTask(task)}
           />
         </article>
         <article className="card overflow-hidden">
@@ -936,7 +946,9 @@ export function StaffScheduleClient({
                 onDragEnd={clearDragState}
                 onEdit={setTaskModal}
                 onComplete={(task) => quickStatus(task, "todo")}
-                onCancel={cancelTask}
+                onCancel={(task) => deleteTask(task, true)}
+                showCompleteAction={false}
+                deleteLabel={c.permanentDelete}
               />
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-3 py-2">
                 <button
@@ -1219,6 +1231,8 @@ function TaskList({
   onEdit,
   onComplete,
   onCancel,
+  showCompleteAction = true,
+  deleteLabel,
 }: {
   tasks: StaffTask[];
   locale: Locale;
@@ -1232,6 +1246,8 @@ function TaskList({
   onEdit: (task: StaffTask) => void;
   onComplete: (task: StaffTask) => void;
   onCancel: (task: StaffTask) => void;
+  showCompleteAction?: boolean;
+  deleteLabel?: string;
 }) {
   if (tasks.length === 0) {
     return <div className="px-3 py-4 text-sm text-neutral-500">{copy.noTasks}</div>;
@@ -1254,6 +1270,8 @@ function TaskList({
           onEdit={onEdit}
           onComplete={onComplete}
           onCancel={onCancel}
+          showCompleteAction={showCompleteAction}
+          deleteLabel={deleteLabel}
         />
       ))}
     </div>
@@ -1273,6 +1291,8 @@ function TaskListItem({
   onEdit,
   onComplete,
   onCancel,
+  showCompleteAction,
+  deleteLabel,
 }: {
   task: StaffTask;
   locale: Locale;
@@ -1286,6 +1306,8 @@ function TaskListItem({
   onEdit: (task: StaffTask) => void;
   onComplete: (task: StaffTask) => void;
   onCancel: (task: StaffTask) => void;
+  showCompleteAction: boolean;
+  deleteLabel?: string;
 }) {
   const contextText = getTaskContextText(task, copy);
   const detailsText = getTaskDetailsText(task);
@@ -1362,15 +1384,16 @@ function TaskListItem({
           <button className="btn-secondary min-h-7 min-w-7 border-amber-300 bg-amber-50 px-1 py-1 text-[11px] text-amber-800 hover:bg-amber-100" onClick={() => onEdit(task)}>
             <Pencil className="h-3 w-3" />
           </button>
-          <button className="btn-secondary min-h-7 border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800 hover:bg-emerald-100" onClick={() => onComplete(task)}>
-            {task.status === "done" ? <Circle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
-            {task.status === "done" ? copy.reopen : copy.complete}
-          </button>
-          {task.status !== "cancelled" ? (
-            <button className="btn-danger min-h-7 min-w-7 px-1 py-1 text-[11px]" onClick={() => onCancel(task)}>
-              <Trash2 className="h-3 w-3" />
+          {showCompleteAction ? (
+            <button className="btn-secondary min-h-7 border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800 hover:bg-emerald-100" onClick={() => onComplete(task)}>
+              {task.status === "done" ? <Circle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+              {task.status === "done" ? copy.reopen : copy.complete}
             </button>
           ) : null}
+          <button className="btn-danger min-h-7 min-w-7 px-1 py-1 text-[11px]" onClick={() => onCancel(task)}>
+            <Trash2 className="h-3 w-3" />
+            {deleteLabel ? <span>{deleteLabel}</span> : null}
+          </button>
         </div>
       </div>
     </div>

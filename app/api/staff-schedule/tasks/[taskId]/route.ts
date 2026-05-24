@@ -178,20 +178,18 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
     return NextResponse.json({ error: "TASK_NOT_FOUND" }, { status: 404 });
   }
 
-  const task = await prisma.staffTask.update({
+  await prisma.staffTask.delete({
     where: { id: existing.id },
-    data: { status: StaffTaskStatus.cancelled },
-    include: taskInclude,
   });
 
   await logActivity({
     workspaceId: workspace.id,
     actor: user.name,
-    action: "staff_task_cancelled",
+    action: "staff_task_deleted",
     entityType: "StaffTask",
-    entityId: task.id,
-    metadata: { title: task.title },
+    entityId: existing.id,
+    metadata: { title: existing.title, status: existing.status },
   });
 
-  return NextResponse.json({ task });
+  return NextResponse.json({ deletedId: existing.id });
 }

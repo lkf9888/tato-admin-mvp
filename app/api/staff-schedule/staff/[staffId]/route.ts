@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 type Params = Promise<{ staffId: string }>;
 
 const staffSchema = z.object({
-  name: z.string().trim().min(2),
+  name: z.string().trim().min(2).optional(),
   phone: z.string().trim().optional().or(z.literal("")),
   email: z.string().trim().email().optional().or(z.literal("")),
   role: z.string().trim().optional().or(z.literal("")),
@@ -16,6 +16,7 @@ const staffSchema = z.object({
   notes: z.string().trim().optional().or(z.literal("")),
   pinnedMessage: z.string().trim().optional().or(z.literal("")),
   isActive: z.boolean().optional(),
+  sortOrder: z.coerce.number().int().optional(),
 });
 
 function nullable(value?: string) {
@@ -41,14 +42,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   const staff = await prisma.staffMember.update({
     where: { id: existing.id },
     data: {
-      name: parsed.name,
-      phone: nullable(parsed.phone),
-      email: nullable(parsed.email),
-      role: nullable(parsed.role),
-      color: nullable(parsed.color) ?? existing.color,
-      notes: nullable(parsed.notes),
-      pinnedMessage: nullable(parsed.pinnedMessage),
+      name: parsed.name ?? existing.name,
+      phone: parsed.phone === undefined ? existing.phone : nullable(parsed.phone),
+      email: parsed.email === undefined ? existing.email : nullable(parsed.email),
+      role: parsed.role === undefined ? existing.role : nullable(parsed.role),
+      color: parsed.color === undefined ? existing.color : nullable(parsed.color) ?? existing.color,
+      notes: parsed.notes === undefined ? existing.notes : nullable(parsed.notes),
+      pinnedMessage:
+        parsed.pinnedMessage === undefined
+          ? existing.pinnedMessage
+          : nullable(parsed.pinnedMessage),
       isActive: parsed.isActive ?? existing.isActive,
+      sortOrder: parsed.sortOrder ?? existing.sortOrder,
     },
   });
 

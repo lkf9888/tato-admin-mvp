@@ -9,7 +9,7 @@ export default async function StaffSchedulePage() {
     getI18n(),
     prisma.staffMember.findMany({
       where: { workspaceId: workspace.id },
-      orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
+      orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
     }),
     prisma.staffTask.findMany({
       where: { workspaceId: workspace.id },
@@ -60,6 +60,7 @@ export default async function StaffSchedulePage() {
         notes: member.notes,
         pinnedMessage: member.pinnedMessage,
         isActive: member.isActive,
+        sortOrder: member.sortOrder,
       }))}
       initialTasks={tasks.map((task) => ({
         id: task.id,
@@ -76,6 +77,7 @@ export default async function StaffSchedulePage() {
         status: task.status,
         priority: task.priority,
         category: task.category,
+        sortOrder: task.sortOrder,
         completedAt: task.completedAt ? task.completedAt.toISOString() : null,
         staff: task.staff
           ? {
@@ -88,6 +90,7 @@ export default async function StaffSchedulePage() {
               notes: task.staff.notes,
               pinnedMessage: task.staff.pinnedMessage,
               isActive: task.staff.isActive,
+              sortOrder: task.staff.sortOrder,
             }
           : null,
         vehicle: task.vehicle,

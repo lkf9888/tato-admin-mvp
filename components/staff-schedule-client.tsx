@@ -29,6 +29,7 @@ type StaffMember = {
   notes: string | null;
   pinnedMessage: string | null;
   isActive: boolean;
+  sortOrder: number;
 };
 
 type StaffTask = {
@@ -46,6 +47,7 @@ type StaffTask = {
   status: StaffStatus;
   priority: StaffPriority;
   category: string | null;
+  sortOrder: number;
   completedAt: string | null;
   staff: StaffMember | null;
   vehicle: { id: string; plateNumber: string; nickname: string } | null;
@@ -135,6 +137,10 @@ function getStaffScheduleCopy(locale: Locale) {
         noStaff: "还没有员工。先新增员工，再分配任务。",
         noTasks: "暂无任务",
         todayBadge: "今天",
+        tomorrowBadge: "明天",
+        showHistory: "展开",
+        hideHistory: "折叠",
+        historyCount: (count: number) => `${count} 条记录`,
         pinned: "员工备注",
         noPinned: "暂无固定备注",
         edit: "编辑",
@@ -201,6 +207,10 @@ function getStaffScheduleCopy(locale: Locale) {
         noStaff: "No staff yet. Add staff, then assign work.",
         noTasks: "No tasks",
         todayBadge: "Today",
+        tomorrowBadge: "Tomorrow",
+        showHistory: "Expand",
+        hideHistory: "Collapse",
+        historyCount: (count: number) => `${count} record${count === 1 ? "" : "s"}`,
         pinned: "Pinned note",
         noPinned: "No pinned note",
         edit: "Edit",
@@ -274,8 +284,12 @@ export function StaffScheduleClient({
   const [taskModal, setTaskModal] = useState<TaskModalState>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
+  const [dragStaffId, setDragStaffId] = useState<string | null>(null);
+  const [dragOverStaffId, setDragOverStaffId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
-  const activeStaff = staff.filter((member) => member.isActive);
+  const activeStaff = staff.filter((member) => member.isActive).sort(sortStaffMembers);
   const activeTasks = tasks.filter((task) => task.status !== "done" && task.status !== "cancelled");
   const completedTasks = tasks.filter((task) => task.status === "done" || task.status === "cancelled");
   const unassignedTasks = activeTasks.filter((task) => !task.staffId);
@@ -325,26 +339,128 @@ export function StaffScheduleClient({
     upsertTask(normalizeTask(payload.task));
   }
 
-  async function assignTaskToStaff(taskId: string, staffId: string | null) {
-    const response = await fetch(`/api/staff-schedule/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ staffId: staffId ?? "", staffLabel: "" }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.task) {
+  async function persistTaskOrder(updates: Map<string, Partial<StaffTask>>, movedTaskId: string, staffId: string | null) {
+    const responses = await Promise.all(
+      Array.from(updates.entries()).map(([taskId, update]) => {
+        const body: Record<string, string | number> = { sortOrder: update.sortOrder ?? 0 };
+        if (taskId === movedTaskId) {
+          body.staffId = staffId ?? "";
+          body.staffLabel = "";
+        }
+        return fetch(`/api/staff-schedule/tasks/${taskId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      }),
+    );
+
+    if (responses.some((response) => !response.ok)) {
       setNotice(c.failed);
       return;
     }
-    upsertTask(normalizeTask(payload.task));
     setNotice(c.created);
+  }
+
+  async function moveTaskToPosition(taskId: string, staffId: string | null, targetTaskId: string | null = null) {
+    const movingTask = tasks.find((task) => task.id === taskId);
+    if (!movingTask || movingTask.id === targetTaskId) return;
+
+    const sourceStaffId = movingTask.staffId ?? null;
+    const targetStaffId = staffId ?? null;
+    const assignedStaff = targetStaffId
+      ? activeStaff.find((member) => member.id === targetStaffId) ?? null
+      : null;
+    const sameGroup = sourceStaffId === targetStaffId;
+    const targetGroup = activeTasks
+      .filter((task) => task.id !== taskId && (task.staffId ?? null) === targetStaffId)
+      .sort(sortTasks);
+    const targetIndex = targetTaskId
+      ? targetGroup.findIndex((task) => task.id === targetTaskId)
+      : -1;
+    const nextMovingTask: StaffTask = {
+      ...movingTask,
+      staffId: targetStaffId,
+      staffLabel: null,
+      staff: assignedStaff,
+    };
+    const nextTargetGroup = [...targetGroup];
+    nextTargetGroup.splice(targetIndex >= 0 ? targetIndex : nextTargetGroup.length, 0, nextMovingTask);
+
+    const updates = new Map<string, Partial<StaffTask>>();
+    nextTargetGroup.forEach((task, index) => {
+      updates.set(task.id, {
+        sortOrder: (index + 1) * 1000,
+        ...(task.id === taskId ? { staffId: targetStaffId, staffLabel: null, staff: assignedStaff } : {}),
+      });
+    });
+
+    if (!sameGroup) {
+      activeTasks
+        .filter((task) => task.id !== taskId && (task.staffId ?? null) === sourceStaffId)
+        .sort(sortTasks)
+        .forEach((task, index) => {
+          updates.set(task.id, { sortOrder: (index + 1) * 1000 });
+        });
+    }
+
+    setTasks((current) =>
+      current.map((task) => {
+        const update = updates.get(task.id);
+        return update ? { ...task, ...update } : task;
+      }),
+    );
+    await persistTaskOrder(updates, taskId, targetStaffId);
   }
 
   function handleTaskDrop(staffId: string | null) {
     if (!dragTaskId) return;
-    void assignTaskToStaff(dragTaskId, staffId);
+    void moveTaskToPosition(dragTaskId, staffId);
     setDragTaskId(null);
     setDragOverTarget(null);
+    setDragOverTaskId(null);
+  }
+
+  async function reorderStaff(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+
+    const fromIndex = activeStaff.findIndex((member) => member.id === draggedId);
+    const toIndex = activeStaff.findIndex((member) => member.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const ordered = [...activeStaff];
+    const [moved] = ordered.splice(fromIndex, 1);
+    ordered.splice(toIndex, 0, moved);
+    const updates = new Map(
+      ordered.map((member, index) => [member.id, { ...member, sortOrder: (index + 1) * 1000 }]),
+    );
+
+    setStaff((current) =>
+      current.map((member) => {
+        const update = updates.get(member.id);
+        return update ? { ...member, sortOrder: update.sortOrder } : member;
+      }),
+    );
+
+    const responses = await Promise.all(
+      ordered.map((member) =>
+        fetch(`/api/staff-schedule/staff/${member.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sortOrder: updates.get(member.id)?.sortOrder ?? member.sortOrder }),
+        }),
+      ),
+    );
+
+    setNotice(responses.some((response) => !response.ok) ? c.failed : c.created);
+  }
+
+  function clearDragState() {
+    setDragTaskId(null);
+    setDragOverTarget(null);
+    setDragOverTaskId(null);
+    setDragStaffId(null);
+    setDragOverStaffId(null);
   }
 
   async function cancelTask(task: StaffTask) {
@@ -360,7 +476,7 @@ export function StaffScheduleClient({
       setNotice(c.failed);
       return;
     }
-    upsertStaff(payload.staff);
+    upsertStaff(normalizeStaff(payload.staff));
   }
 
   return (
@@ -400,21 +516,49 @@ export function StaffScheduleClient({
               key={member.id}
               onDragOver={(event) => {
                 event.preventDefault();
+                if (dragStaffId) {
+                  setDragOverStaffId(member.id);
+                  return;
+                }
                 setDragOverTarget(member.id);
               }}
-              onDragLeave={() => setDragOverTarget((current) => (current === member.id ? null : current))}
+              onDragLeave={() => {
+                setDragOverTarget((current) => (current === member.id ? null : current));
+                setDragOverStaffId((current) => (current === member.id ? null : current));
+              }}
               onDrop={(event) => {
                 event.preventDefault();
+                if (dragStaffId) {
+                  void reorderStaff(dragStaffId, member.id);
+                  clearDragState();
+                  return;
+                }
                 handleTaskDrop(member.id);
               }}
               className={cn(
                 "card overflow-hidden transition",
-                dragOverTarget === member.id ? "border-neutral-900 bg-neutral-50" : "",
+                dragOverTarget === member.id || dragOverStaffId === member.id
+                  ? "border-neutral-900 bg-neutral-50"
+                  : "",
               )}
             >
               <div className="flex flex-col gap-2 border-b border-neutral-200 px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
+                    <span
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", `staff:${member.id}`);
+                        setDragStaffId(member.id);
+                        setDragTaskId(null);
+                      }}
+                      onDragEnd={clearDragState}
+                      className="cursor-grab text-neutral-300 active:cursor-grabbing"
+                      aria-label={c.staff}
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </span>
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: member.color }} />
                     <h2 className="truncate text-base font-semibold">{member.name}</h2>
                   </div>
@@ -452,8 +596,14 @@ export function StaffScheduleClient({
                 dragTaskId={dragTaskId}
                 onDragStart={setDragTaskId}
                 onDragEnd={() => {
-                  setDragTaskId(null);
-                  setDragOverTarget(null);
+                  clearDragState();
+                }}
+                dragOverTaskId={dragOverTaskId}
+                onDragOverTask={setDragOverTaskId}
+                onDropOnTask={(targetTaskId) => {
+                  if (!dragTaskId) return;
+                  void moveTaskToPosition(dragTaskId, member.id, targetTaskId);
+                  clearDragState();
                 }}
                 onEdit={setTaskModal}
                 onComplete={(task) => quickStatus(task, task.status === "done" ? "todo" : "done")}
@@ -467,11 +617,13 @@ export function StaffScheduleClient({
       <section className="grid gap-2.5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <article
           onDragOver={(event) => {
+            if (dragStaffId) return;
             event.preventDefault();
             setDragOverTarget("unassigned");
           }}
           onDragLeave={() => setDragOverTarget((current) => (current === "unassigned" ? null : current))}
           onDrop={(event) => {
+            if (dragStaffId) return;
             event.preventDefault();
             handleTaskDrop(null);
           }}
@@ -496,8 +648,14 @@ export function StaffScheduleClient({
             dragTaskId={dragTaskId}
             onDragStart={setDragTaskId}
             onDragEnd={() => {
-              setDragTaskId(null);
-              setDragOverTarget(null);
+              clearDragState();
+            }}
+            dragOverTaskId={dragOverTaskId}
+            onDragOverTask={setDragOverTaskId}
+            onDropOnTask={(targetTaskId) => {
+              if (!dragTaskId) return;
+              void moveTaskToPosition(dragTaskId, null, targetTaskId);
+              clearDragState();
             }}
             onEdit={setTaskModal}
             onComplete={(task) => quickStatus(task, "done")}
@@ -505,23 +663,31 @@ export function StaffScheduleClient({
           />
         </article>
         <article className="card overflow-hidden">
-          <div className="border-b border-neutral-200 px-3 py-2.5">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-3 border-b border-neutral-200 px-3 py-2.5 text-left"
+            onClick={() => setHistoryOpen((open) => !open)}
+          >
             <h2 className="text-base font-semibold">{c.history}</h2>
-          </div>
-          <TaskList
-            tasks={completedTasks.sort(sortTasks).slice(0, 30)}
-            locale={locale}
-            copy={c}
-            dragTaskId={dragTaskId}
-            onDragStart={setDragTaskId}
-            onDragEnd={() => {
-              setDragTaskId(null);
-              setDragOverTarget(null);
-            }}
-            onEdit={setTaskModal}
-            onComplete={(task) => quickStatus(task, "todo")}
-            onCancel={cancelTask}
-          />
+            <span className="text-xs font-medium text-neutral-500">
+              {historyOpen ? c.hideHistory : c.showHistory} · {c.historyCount(completedTasks.length)}
+            </span>
+          </button>
+          {historyOpen ? (
+            <TaskList
+              tasks={completedTasks.sort(sortTasks).slice(0, 30)}
+              locale={locale}
+              copy={c}
+              dragTaskId={dragTaskId}
+              onDragStart={setDragTaskId}
+              onDragEnd={clearDragState}
+              onEdit={setTaskModal}
+              onComplete={(task) => quickStatus(task, "todo")}
+              onCancel={cancelTask}
+            />
+          ) : (
+            <div className="px-3 py-4 text-sm text-neutral-500">{c.historyCount(completedTasks.length)}</div>
+          )}
         </article>
       </section>
 
@@ -532,7 +698,7 @@ export function StaffScheduleClient({
           staff={staffModal === "new" ? null : staffModal}
           onClose={() => setStaffModal(null)}
           onSaved={(member) => {
-            upsertStaff(member);
+            upsertStaff(normalizeStaff(member));
             setNotice(c.created);
             setStaffModal(null);
           }}
@@ -565,8 +731,11 @@ function TaskList({
   locale,
   copy,
   dragTaskId,
+  dragOverTaskId,
   onDragStart,
   onDragEnd,
+  onDragOverTask,
+  onDropOnTask,
   onEdit,
   onComplete,
   onCancel,
@@ -575,8 +744,11 @@ function TaskList({
   locale: Locale;
   copy: ReturnType<typeof getStaffScheduleCopy>;
   dragTaskId: string | null;
+  dragOverTaskId?: string | null;
   onDragStart: (taskId: string) => void;
   onDragEnd: () => void;
+  onDragOverTask?: (taskId: string | null) => void;
+  onDropOnTask?: (targetTaskId: string) => void;
   onEdit: (task: StaffTask) => void;
   onComplete: (task: StaffTask) => void;
   onCancel: (task: StaffTask) => void;
@@ -597,10 +769,26 @@ function TaskList({
             onDragStart(task.id);
           }}
           onDragEnd={onDragEnd}
+          onDragOver={(event) => {
+            if (!dragTaskId || dragTaskId === task.id || !onDropOnTask) return;
+            event.preventDefault();
+            event.stopPropagation();
+            onDragOverTask?.(task.id);
+          }}
+          onDragLeave={() => {
+            onDragOverTask?.(null);
+          }}
+          onDrop={(event) => {
+            if (!dragTaskId || dragTaskId === task.id || !onDropOnTask) return;
+            event.preventDefault();
+            event.stopPropagation();
+            onDropOnTask(task.id);
+          }}
           className={cn(
             "px-3 py-2 transition",
             task.status !== "done" && task.status !== "cancelled" ? "cursor-grab active:cursor-grabbing" : "",
             dragTaskId === task.id ? "bg-neutral-50 opacity-60" : "",
+            dragOverTaskId === task.id ? "bg-amber-50" : "",
           )}
         >
           <div className="flex items-start justify-between gap-2.5">
@@ -610,6 +798,10 @@ function TaskList({
                   {task.status !== "done" && task.status !== "cancelled" && isTaskDueToday(task.dueDatetime) ? (
                     <span className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
                       {copy.todayBadge}
+                    </span>
+                  ) : task.status !== "done" && task.status !== "cancelled" && isTaskDueTomorrow(task.dueDatetime) ? (
+                    <span className="shrink-0 rounded bg-amber-300 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-amber-950">
+                      {copy.tomorrowBadge}
                     </span>
                   ) : null}
                   <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
@@ -1224,10 +1416,7 @@ function formatTaskDue(value: string | null, locale: Locale, fallback: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return fallback;
 
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const dayOffset = Math.round((dueDay.getTime() - today.getTime()) / 86400000);
+  const dayOffset = getTaskDueDayOffset(value);
 
   if (locale === "zh") {
     if (dayOffset === 0) return "今天";
@@ -1243,18 +1432,24 @@ function formatTaskDue(value: string | null, locale: Locale, fallback: string) {
   }).format(date);
 }
 
-function isTaskDueToday(value: string | null) {
-  if (!value) return false;
+function getTaskDueDayOffset(value: string | null) {
+  if (!value) return null;
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
+  if (Number.isNaN(date.getTime())) return null;
 
   const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.round((dueDay.getTime() - today.getTime()) / 86400000);
+}
+
+function isTaskDueToday(value: string | null) {
+  return getTaskDueDayOffset(value) === 0;
+}
+
+function isTaskDueTomorrow(value: string | null) {
+  return getTaskDueDayOffset(value) === 1;
 }
 
 function formatFileSize(size: number | null) {
@@ -1266,6 +1461,7 @@ function formatFileSize(size: number | null) {
 function normalizeTask(raw: StaffTask): StaffTask {
   return {
     ...raw,
+    sortOrder: raw.sortOrder ?? 0,
     dueDatetime: raw.dueDatetime ? new Date(raw.dueDatetime).toISOString() : null,
     completedAt: raw.completedAt ? new Date(raw.completedAt).toISOString() : null,
     attachments: (raw.attachments ?? []).map((attachment) => normalizeTaskAttachment(raw.id, attachment)),
@@ -1279,11 +1475,25 @@ function normalizeTask(raw: StaffTask): StaffTask {
   };
 }
 
+function normalizeStaff(raw: StaffMember): StaffMember {
+  return {
+    ...raw,
+    sortOrder: raw.sortOrder ?? 0,
+  };
+}
+
 function sortTasks(left: StaffTask, right: StaffTask) {
+  if (left.sortOrder > 0 && right.sortOrder > 0 && left.sortOrder !== right.sortOrder) {
+    return left.sortOrder - right.sortOrder;
+  }
   const leftTime = left.dueDatetime ? new Date(left.dueDatetime).getTime() : Number.MAX_SAFE_INTEGER;
   const rightTime = right.dueDatetime ? new Date(right.dueDatetime).getTime() : Number.MAX_SAFE_INTEGER;
   if (leftTime !== rightTime) return leftTime - rightTime;
   return left.title.localeCompare(right.title);
+}
+
+function sortStaffMembers(left: StaffMember, right: StaffMember) {
+  return (left.sortOrder ?? 0) - (right.sortOrder ?? 0);
 }
 
 function staffToForm(staff: StaffMember) {

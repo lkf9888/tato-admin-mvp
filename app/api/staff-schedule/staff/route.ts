@@ -14,6 +14,7 @@ const staffSchema = z.object({
   notes: z.string().trim().optional().or(z.literal("")),
   pinnedMessage: z.string().trim().optional().or(z.literal("")),
   isActive: z.boolean().optional(),
+  sortOrder: z.coerce.number().int().optional(),
 });
 
 function nullable(value?: string) {
@@ -24,6 +25,10 @@ function nullable(value?: string) {
 export async function POST(request: NextRequest) {
   const { workspace, user } = await requireCurrentAdminContext();
   const parsed = staffSchema.parse(await request.json());
+  const currentMaxSortOrder = await prisma.staffMember.aggregate({
+    where: { workspaceId: workspace.id },
+    _max: { sortOrder: true },
+  });
 
   const staff = await prisma.staffMember.create({
     data: {
@@ -36,6 +41,7 @@ export async function POST(request: NextRequest) {
       notes: nullable(parsed.notes),
       pinnedMessage: nullable(parsed.pinnedMessage),
       isActive: parsed.isActive ?? true,
+      sortOrder: parsed.sortOrder ?? (currentMaxSortOrder._max.sortOrder ?? 0) + 1000,
     },
   });
 

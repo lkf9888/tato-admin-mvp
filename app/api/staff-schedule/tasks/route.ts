@@ -20,6 +20,7 @@ const taskSchema = z.object({
   status: z.nativeEnum(StaffTaskStatus).optional(),
   priority: z.nativeEnum(StaffTaskPriority).optional(),
   category: z.string().trim().optional().or(z.literal("")),
+  sortOrder: z.coerce.number().int().optional(),
 });
 
 function nullable(value?: string) {
@@ -116,6 +117,7 @@ export async function POST(request: NextRequest) {
       status: parsed.status ?? StaffTaskStatus.todo,
       priority: parsed.priority ?? StaffTaskPriority.normal,
       category: nullable(parsed.category),
+      sortOrder: parsed.sortOrder ?? 0,
     },
     include: taskInclude,
   });

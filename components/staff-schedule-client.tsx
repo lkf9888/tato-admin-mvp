@@ -98,6 +98,7 @@ type OrderOption = {
   returnLocation: string | null;
   vehicleId: string;
   vehicleLabel: string;
+  pickupPassword: string | null;
 };
 
 type OrderEventKind = "pickup" | "return";
@@ -112,6 +113,7 @@ type OrderEvent = {
   vehicleLabel: string;
   datetime: string;
   location: string | null;
+  pickupPassword: string | null;
 };
 
 const defaultStaffForm = {
@@ -154,13 +156,14 @@ function getStaffScheduleCopy(locale: Locale) {
         unassigned: "未分配",
         unassignedHint: "还没有指定员工的任务会先停在这里。",
         upcomingOrders: "近期送还车订单",
-        upcomingOrdersHint: "显示今天和未来 3 天的送车、还车。拖到员工卡片，或输入员工姓名分配。",
+        upcomingOrdersHint: "显示今天和未来 3 天的送车、还车。拖到员工卡片，或下拉选择员工分配。",
         noUpcomingOrders: "未来 3 天没有送车或还车订单。",
         pickup: "送车",
         returnCar: "还车",
         deliveryAddress: "送车地址",
         returnAddress: "还车地址",
-        assignStaff: "输入员工分配",
+        pickupPassword: "取车密码",
+        assignStaff: "选择员工",
         orderTaskExists: "这个订单动作已经有未完成任务，已移动到新的员工名下。",
         history: "已完成 / 已取消",
         historySearch: "搜索已完成任务",
@@ -251,13 +254,14 @@ function getStaffScheduleCopy(locale: Locale) {
         unassigned: "Unassigned",
         unassignedHint: "Tasks without a staff owner wait here.",
         upcomingOrders: "Upcoming deliveries / returns",
-        upcomingOrdersHint: "Today and the next 3 days. Drag to a staff card, or type a staff name to assign.",
+        upcomingOrdersHint: "Today and the next 3 days. Drag to a staff card, or choose a staff member to assign.",
         noUpcomingOrders: "No deliveries or returns in the next 3 days.",
         pickup: "Delivery",
         returnCar: "Return",
         deliveryAddress: "Delivery address",
         returnAddress: "Return address",
-        assignStaff: "Type staff to assign",
+        pickupPassword: "Pickup password",
+        assignStaff: "Choose staff",
         orderTaskExists: "This order action already had an open task, so it was moved to the selected staff member.",
         history: "Completed / cancelled",
         historySearch: "Search completed tasks",
@@ -1189,31 +1193,27 @@ function OrderAssignInput({
   staff: StaffMember[];
   onAssign: (staffId: string) => void;
 }) {
-  const [value, setValue] = useState("");
-  const [listId] = useState(() => `order-assign-${Math.random().toString(36).slice(2)}`);
-  const options = useMemo(() => staff.map((member) => ({ id: member.id, label: member.name })), [staff]);
-
   return (
     <div className="w-[7.25rem] shrink-0">
-      <input
+      <select
         className="input h-7 px-1.5 py-1 text-[11px]"
-        list={listId}
-        value={value}
-        placeholder={copy.assignStaff}
+        defaultValue=""
+        disabled={staff.length === 0}
+        aria-label={copy.assignStaff}
         onChange={(event) => {
-          const nextValue = event.target.value;
-          setValue(nextValue);
-          const match = findComboMatch(options, nextValue);
-          if (!match) return;
-          onAssign(match.id);
-          setValue("");
+          const staffId = event.target.value;
+          if (!staffId) return;
+          onAssign(staffId);
+          event.currentTarget.value = "";
         }}
-      />
-      <datalist id={listId}>
-        {options.map((option) => (
-          <option key={option.id} value={option.label} />
+      >
+        <option value="">{copy.assignStaff}</option>
+        {staff.map((member) => (
+          <option key={member.id} value={member.id}>
+            {member.name}
+          </option>
         ))}
-      </datalist>
+      </select>
     </div>
   );
 }
@@ -2072,6 +2072,7 @@ function buildUpcomingOrderEvents(orders: OrderOption[]) {
         vehicleLabel: order.vehicleLabel,
         datetime: order.pickupDatetime,
         location: order.pickupLocation,
+        pickupPassword: order.pickupPassword,
       },
       {
         id: `${order.id}-return`,
@@ -2083,6 +2084,7 @@ function buildUpcomingOrderEvents(orders: OrderOption[]) {
         vehicleLabel: order.vehicleLabel,
         datetime: order.returnDatetime,
         location: order.returnLocation,
+        pickupPassword: order.pickupPassword,
       },
     ])
     .filter((orderEvent) => {
@@ -2165,9 +2167,14 @@ function buildOrderEventTaskDetails(
   orderEvent: OrderEvent,
   copy: ReturnType<typeof getStaffScheduleCopy>,
 ) {
+  const lines: string[] = [];
   const location = orderEvent.location?.trim();
-  if (!location) return "";
-  return `${getOrderEventAddressLabel(orderEvent, copy)}: ${location}`;
+  if (location) lines.push(`${getOrderEventAddressLabel(orderEvent, copy)}: ${location}`);
+
+  const pickupPassword = orderEvent.pickupPassword?.trim();
+  if (pickupPassword) lines.push(`${copy.pickupPassword}: ${pickupPassword}`);
+
+  return lines.join("\n");
 }
 
 function colorWithAlpha(color: string, alpha: number) {

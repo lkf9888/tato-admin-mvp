@@ -46,6 +46,8 @@ export type EmailAttachment = {
 };
 
 type SendInput = {
+  /** Optional sender override. Keep this on a verified Resend domain. */
+  from?: string;
   to: string;
   subject: string;
   text: string;
@@ -76,6 +78,7 @@ async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: strin
   }
 
   const timeoutMs = input.timeoutMs ?? 15_000;
+  const from = input.from?.trim() || config.from;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -87,7 +90,7 @@ async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: strin
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: config.from,
+        from,
         to: [input.to],
         subject: input.subject,
         text: input.text,
@@ -105,7 +108,7 @@ async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: strin
       const body = await res.text().catch(() => "");
       // eslint-disable-next-line no-console
       console.error(
-        `[email] Resend API error :: status=${res.status} :: to=${input.to} :: from=${config.from} :: body=${body.slice(0, 500)}`,
+        `[email] Resend API error :: status=${res.status} :: to=${input.to} :: from=${from} :: body=${body.slice(0, 500)}`,
       );
       return { ok: false, reason: `resend_${res.status}` };
     }
@@ -126,7 +129,7 @@ async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: strin
         : "send_failed";
     // eslint-disable-next-line no-console
     console.error(
-      `[email] send failed :: to=${input.to} :: from=${config.from} :: reason=${reason}`,
+      `[email] send failed :: to=${input.to} :: from=${from} :: reason=${reason}`,
     );
     return { ok: false, reason };
   }
@@ -424,6 +427,7 @@ export async function sendStaffTaskAssignmentEmail(input: {
   `;
 
   return sendMail({
+    from: process.env.STAFF_TASK_EMAIL_FROM?.trim() || undefined,
     to: input.to,
     subject,
     text,

@@ -200,6 +200,9 @@ SESSION_SECRET=replace-with-a-long-random-secret
 ADMIN_EMAIL=admin@local.test
 ADMIN_PASSWORD=admin123
 NEXT_PUBLIC_APP_URL=https://your-app.up.railway.app
+RESEND_API_KEY=re_xxx
+RESEND_FROM="TATO <no-reply@tatocar.co>"
+STAFF_TASK_EMAIL_FROM="TATO Tasks <tasks@tatocar.co>"
 TATO_UPLOAD_DIR=
 STRIPE_SECRET_KEY=
 STRIPE_LISTING_PRICE_ID=
@@ -218,6 +221,28 @@ BILLING_BYPASS_ADMIN_PASSWORD=replace-with-a-strong-password
 如果需要，可以先参考：
 
 - `.env.railway.example`
+
+#### 4.1 配置 TATO 域名员工任务邮件
+
+员工任务邮件通过 Resend HTTPS API 发送，不依赖 SMTP 端口。创建任务或把任务分配给已有邮箱的员工时，系统会自动发送任务提醒。
+
+推荐配置：
+
+```env
+RESEND_API_KEY=re_xxx
+RESEND_FROM="TATO <no-reply@tatocar.co>"
+STAFF_TASK_EMAIL_FROM="TATO Tasks <tasks@tatocar.co>"
+NEXT_PUBLIC_APP_URL=https://tatocar.co
+```
+
+设置步骤：
+
+1. 在 Resend 添加并验证 `tatocar.co`。Resend 会给出 SPF 和 DKIM DNS 记录，按它给出的值添加到域名 DNS。
+2. DNS 验证通过后，在 Resend 创建 API key。
+3. 在 Railway 服务的 Variables 里添加上面的 `RESEND_API_KEY`、`RESEND_FROM`、`STAFF_TASK_EMAIL_FROM` 和正式站点地址 `NEXT_PUBLIC_APP_URL`。
+4. Railway Variables 修改后要部署一次，让运行中的服务拿到新环境变量。
+
+`STAFF_TASK_EMAIL_FROM` 只影响线下员工排班任务通知；如果不设置，任务通知会使用 `RESEND_FROM`。
 
 如果你要启用 Stripe 订阅计费，还需要：
 
@@ -346,6 +371,9 @@ DATABASE_URL=file:/app/data/tato-prod.db
 SESSION_SECRET=replace-with-a-long-random-secret
 ADMIN_EMAIL=admin@local.test
 ADMIN_PASSWORD=admin123
+RESEND_API_KEY=re_xxx
+RESEND_FROM="TATO <no-reply@tatocar.co>"
+STAFF_TASK_EMAIL_FROM="TATO Tasks <tasks@tatocar.co>"
 ```
 
 ### 5. 启动公网服务

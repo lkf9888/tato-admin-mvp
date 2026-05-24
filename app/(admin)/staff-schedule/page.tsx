@@ -54,7 +54,7 @@ export default async function StaffSchedulePage() {
         pickupLocation: true,
         returnLocation: true,
         vehicleId: true,
-        vehicle: { select: { plateNumber: true, nickname: true } },
+        vehicle: { select: { plateNumber: true, nickname: true, pickupPassword: true } },
       },
     }),
     prisma.order.findMany({
@@ -76,7 +76,7 @@ export default async function StaffSchedulePage() {
         pickupLocation: true,
         returnLocation: true,
         vehicleId: true,
-        vehicle: { select: { plateNumber: true, nickname: true } },
+        vehicle: { select: { plateNumber: true, nickname: true, pickupPassword: true } },
       },
     }),
   ]);
@@ -157,6 +157,7 @@ export default async function StaffSchedulePage() {
         returnLocation: order.returnLocation,
         vehicleId: order.vehicleId,
         vehicleLabel: `${order.vehicle.plateNumber} · ${order.vehicle.nickname}`,
+        pickupPassword: order.vehicle.pickupPassword,
       }))}
       upcomingOrders={upcomingOrders.map((order) => ({
         id: order.id,
@@ -167,6 +168,7 @@ export default async function StaffSchedulePage() {
         returnLocation: order.returnLocation,
         vehicleId: order.vehicleId,
         vehicleLabel: `${order.vehicle.plateNumber} · ${order.vehicle.nickname}`,
+        pickupPassword: order.vehicle.pickupPassword,
       }))}
     />
   );

@@ -135,6 +135,13 @@ async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: strin
   }
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function buildVerificationCopy(code: string, locale: Locale) {
   if (locale === "zh") {
     return {
@@ -361,6 +368,7 @@ export async function sendStaffTaskAssignmentEmail(input: {
   to: string;
   staffName: string;
   taskTitle: string;
+  action?: "created" | "updated" | "deleted" | "removed";
   dueLabel?: string | null;
   timeWindow?: string | null;
   vehicleLabel?: string | null;
@@ -368,7 +376,39 @@ export async function sendStaffTaskAssignmentEmail(input: {
   details?: string | null;
   taskUrl?: string | null;
 }): Promise<{ ok: boolean; reason?: string }> {
-  const subject = `TATO 新任务：${input.taskTitle}`;
+  const action = input.action ?? "created";
+  const actionCopy = {
+    created: {
+      subject: "TATO 新任务",
+      heading: "新的员工任务",
+      intro: `${input.staffName}，你有一个新的任务需要处理。`,
+      textIntro: `${input.staffName}，你有一个新的 TATO 任务。`,
+      footer: "请在员工任务链接里查看、编辑或完成任务。",
+    },
+    updated: {
+      subject: "TATO 任务更新",
+      heading: "员工任务已更新",
+      intro: `${input.staffName}，你的任务内容已更新。`,
+      textIntro: `${input.staffName}，你的 TATO 任务已更新。`,
+      footer: "请在员工任务链接里查看最新任务内容。",
+    },
+    deleted: {
+      subject: "TATO 任务删除",
+      heading: "员工任务已删除",
+      intro: `${input.staffName}，这个任务已由 admin 删除。`,
+      textIntro: `${input.staffName}，你的 TATO 任务已由 admin 删除。`,
+      footer: "这个任务已经不需要处理。",
+    },
+    removed: {
+      subject: "TATO 任务移除",
+      heading: "员工任务已移除",
+      intro: `${input.staffName}，这个任务已从你的列表移除。`,
+      textIntro: `${input.staffName}，这个 TATO 任务已从你的列表移除。`,
+      footer: "这个任务现在不需要你处理。",
+    },
+  }[action];
+
+  const subject = `${actionCopy.subject}：${input.taskTitle}`;
   const contextLines = [
     input.dueLabel ? `到期：${input.dueLabel}` : null,
     input.timeWindow ? `时间段：${input.timeWindow}` : null,
@@ -378,31 +418,25 @@ export async function sendStaffTaskAssignmentEmail(input: {
   ].filter(Boolean) as string[];
 
   const text = [
-    `${input.staffName}，你有一个新的 TATO 任务。`,
+    actionCopy.textIntro,
     "",
     input.taskTitle,
     ...contextLines,
     input.details ? "" : null,
     input.details ? input.details : null,
     "",
-    "请在员工任务链接里查看、编辑或完成任务。",
+    actionCopy.footer,
   ]
     .filter((line): line is string => line !== null)
     .join("\n");
 
-  const escape = (value: string) =>
-    value
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 28px 24px; color: #111318;">
       <p style="font-size: 11px; letter-spacing: 0.34em; text-transform: uppercase; color: #6b6f78; margin: 0 0 8px;">TATO</p>
-      <h1 style="font-size: 22px; font-weight: 650; margin: 0 0 8px;">新的员工任务</h1>
-      <p style="font-size: 14px; color: #4b5563; margin: 0 0 18px;">${escape(input.staffName)}，你有一个新的任务需要处理。</p>
+      <h1 style="font-size: 22px; font-weight: 650; margin: 0 0 8px;">${actionCopy.heading}</h1>
+      <p style="font-size: 14px; color: #4b5563; margin: 0 0 18px;">${escapeHtml(actionCopy.intro)}</p>
       <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px; background: #ffffff;">
-        <h2 style="font-size: 18px; line-height: 1.35; margin: 0 0 12px;">${escape(input.taskTitle)}</h2>
+        <h2 style="font-size: 18px; line-height: 1.35; margin: 0 0 12px;">${escapeHtml(input.taskTitle)}</h2>
         ${
           contextLines.length > 0
             ? `<table style="border-collapse: collapse; width: 100%; font-size: 13px; color: #374151;">${contextLines
@@ -410,16 +444,104 @@ export async function sendStaffTaskAssignmentEmail(input: {
                   const [key, ...rest] = line.split("：");
                   const value = rest.join("：");
                   const renderedValue = value.startsWith("http")
-                    ? `<a href="${escape(value)}" style="color: #111827;">${escape(value)}</a>`
-                    : escape(value);
-                  return `<tr><td style="padding: 4px 12px 4px 0; color: #6b7280; white-space: nowrap;">${escape(key)}</td><td style="padding: 4px 0; word-break: break-word;">${renderedValue}</td></tr>`;
+                    ? `<a href="${escapeHtml(value)}" style="color: #111827;">${escapeHtml(value)}</a>`
+                    : escapeHtml(value);
+                  return `<tr><td style="padding: 4px 12px 4px 0; color: #6b7280; white-space: nowrap;">${escapeHtml(key)}</td><td style="padding: 4px 0; word-break: break-word;">${renderedValue}</td></tr>`;
                 })
                 .join("")}</table>`
             : ""
         }
         ${
           input.details
-            ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f3f4f6; white-space: pre-wrap; font-size: 13px; line-height: 20px; color: #374151;">${escape(input.details)}</div>`
+            ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f3f4f6; white-space: pre-wrap; font-size: 13px; line-height: 20px; color: #374151;">${escapeHtml(input.details)}</div>`
+            : ""
+        }
+      </div>
+    </div>
+  `;
+
+  return sendMail({
+    from: process.env.STAFF_TASK_EMAIL_FROM?.trim() || undefined,
+    to: input.to,
+    subject,
+    text,
+    html,
+  });
+}
+
+export async function sendStaffTaskAdminNotificationEmail(input: {
+  to: string;
+  staffName: string;
+  staffEmail?: string | null;
+  taskTitle: string;
+  action: "completed" | "updated" | "unassigned" | "cancelled";
+  dueLabel?: string | null;
+  timeWindow?: string | null;
+  vehicleLabel?: string | null;
+  orderLabel?: string | null;
+  details?: string | null;
+  adminUrl?: string | null;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const actionCopy = {
+    completed: {
+      label: "完成了任务",
+      heading: "员工完成了任务",
+    },
+    updated: {
+      label: "修改了任务",
+      heading: "员工修改了任务",
+    },
+    unassigned: {
+      label: "放回未分配",
+      heading: "员工将任务放回未分配",
+    },
+    cancelled: {
+      label: "取消了任务",
+      heading: "员工取消了任务",
+    },
+  }[input.action];
+
+  const subject = `TATO 员工任务通知：${input.staffName} ${actionCopy.label}`;
+  const contextLines = [
+    `员工：${input.staffEmail ? `${input.staffName} <${input.staffEmail}>` : input.staffName}`,
+    input.dueLabel ? `到期：${input.dueLabel}` : null,
+    input.timeWindow ? `时间段：${input.timeWindow}` : null,
+    input.vehicleLabel ? `车辆：${input.vehicleLabel}` : null,
+    input.orderLabel ? `订单：${input.orderLabel}` : null,
+    input.adminUrl ? `打开排班：${input.adminUrl}` : null,
+  ].filter(Boolean) as string[];
+
+  const text = [
+    `${input.staffName} ${actionCopy.label}。`,
+    "",
+    input.taskTitle,
+    ...contextLines,
+    input.details ? "" : null,
+    input.details ? input.details : null,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 28px 24px; color: #111318;">
+      <p style="font-size: 11px; letter-spacing: 0.34em; text-transform: uppercase; color: #6b6f78; margin: 0 0 8px;">TATO admin</p>
+      <h1 style="font-size: 22px; font-weight: 650; margin: 0 0 8px;">${escapeHtml(actionCopy.heading)}</h1>
+      <p style="font-size: 14px; color: #4b5563; margin: 0 0 18px;">${escapeHtml(input.staffName)} ${escapeHtml(actionCopy.label)}。</p>
+      <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px; background: #ffffff;">
+        <h2 style="font-size: 18px; line-height: 1.35; margin: 0 0 12px;">${escapeHtml(input.taskTitle)}</h2>
+        <table style="border-collapse: collapse; width: 100%; font-size: 13px; color: #374151;">${contextLines
+          .map((line) => {
+            const [key, ...rest] = line.split("：");
+            const value = rest.join("：");
+            const renderedValue = value.startsWith("http")
+              ? `<a href="${escapeHtml(value)}" style="color: #111827;">${escapeHtml(value)}</a>`
+              : escapeHtml(value);
+            return `<tr><td style="padding: 4px 12px 4px 0; color: #6b7280; white-space: nowrap;">${escapeHtml(key)}</td><td style="padding: 4px 0; word-break: break-word;">${renderedValue}</td></tr>`;
+          })
+          .join("")}</table>
+        ${
+          input.details
+            ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f3f4f6; white-space: pre-wrap; font-size: 13px; line-height: 20px; color: #374151;">${escapeHtml(input.details)}</div>`
             : ""
         }
       </div>

@@ -45,20 +45,25 @@ export function getDirectBookingQuote(input: {
   bookingDailyRate: number;
   bookingInsuranceFee?: number | null;
   bookingDepositAmount?: number | null;
+  bookingTaxRate?: number | null;
   includeInsurance?: boolean;
 }) {
   const days = getDirectBookingDays(input.pickupDate, input.returnDate);
   const baseAmount = days * input.bookingDailyRate;
   const insuranceFeePerDay = input.includeInsurance ? input.bookingInsuranceFee ?? 0 : 0;
   const insuranceAmount = days * insuranceFeePerDay;
+  const taxableAmount = baseAmount + insuranceAmount;
+  const taxRate = Math.max(0, input.bookingTaxRate ?? 0);
+  const taxAmount = Math.round(taxableAmount * (taxRate / 100) * 100) / 100;
   const depositAmount = input.bookingDepositAmount ?? 0;
 
   return {
     days,
     baseAmount,
     insuranceAmount,
+    taxAmount,
     depositAmount,
-    totalAmount: baseAmount + insuranceAmount + depositAmount,
+    totalAmount: baseAmount + insuranceAmount + taxAmount + depositAmount,
   };
 }
 

@@ -224,6 +224,34 @@ export default async function DirectBookingPage() {
                       className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px] font-medium tabular-nums text-[color:var(--ink)]"
                     />
                   </label>
+                  <label className="block min-w-0">
+                    <span className="mb-1 block text-[11px] font-medium text-[color:var(--ink)]">
+                      {directMessages.taxNameLabel}
+                    </span>
+                    <input
+                      name="bookingTaxName"
+                      defaultValue={vehicle.bookingTaxName ?? ""}
+                      placeholder="GST / PST / HST"
+                      className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px] font-medium text-[color:var(--ink)]"
+                    />
+                  </label>
+
+                  <label className="block min-w-0">
+                    <span className="mb-1 block text-[11px] font-medium text-[color:var(--ink)]">
+                      {directMessages.taxRateLabel}
+                    </span>
+                    <input
+                      name="bookingTaxRate"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.001"
+                      inputMode="decimal"
+                      defaultValue={vehicle.bookingTaxRate ?? ""}
+                      placeholder="0"
+                      className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px] font-medium tabular-nums text-[color:var(--ink)]"
+                    />
+                  </label>
                 </div>
 
                 <label className="block">

@@ -147,44 +147,44 @@ function BookingDatePicker({
 
   return (
     <div className="relative" ref={rootRef}>
-      <span className="mb-2 block text-sm font-medium text-white">{label}</span>
+      <span className="mb-2 block text-sm font-medium text-slate-900">{label}</span>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen((current) => !current)}
         className={cn(
-          "flex w-full items-center justify-between rounded-md border border-white/10 bg-white/6 px-4 py-3 text-left text-sm text-white transition",
-          disabled ? "cursor-not-allowed opacity-50" : "hover:border-white/20",
+          "flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-950 transition",
+          disabled ? "cursor-not-allowed opacity-50" : "hover:border-slate-400",
         )}
       >
-        <span className={cn(value ? "text-white" : "text-white/46")}>
+        <span className={cn(value ? "text-slate-950" : "text-slate-400")}>
           {value ? formatDisplayDate(value, locale) : placeholder}
         </span>
-        <CalendarDays className="h-4 w-4 text-white/54" />
+        <CalendarDays className="h-4 w-4 text-slate-500" />
       </button>
-      <p className="mt-2 text-xs leading-5 text-white/48">{hint}</p>
+      <p className="mt-2 text-xs leading-5 text-slate-500">{hint}</p>
 
       {isOpen ? (
-        <div className="absolute left-0 z-30 mt-3 w-[19rem] rounded-lg border border-white/10 bg-[#0f131b] p-4 shadow-[0_30px_70px_-30px_rgba(0,0,0,0.85)]">
+        <div className="absolute left-0 z-30 mt-3 w-[19rem] rounded-lg border border-slate-200 bg-white p-4 shadow-[0_30px_70px_-40px_rgba(15,23,42,0.55)]">
           <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
               onClick={() => setVisibleMonth((current) => addUtcDays(startOfUtcMonth(current), -1))}
-              className="rounded-md border border-white/10 p-2 text-white/70 transition hover:border-white/20 hover:text-white"
+              className="rounded-md border border-slate-200 p-2 text-slate-600 transition hover:border-slate-400 hover:text-slate-950"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <p className="text-sm font-medium text-white">{formatMonthLabel(visibleMonth, locale)}</p>
+            <p className="text-sm font-medium text-slate-950">{formatMonthLabel(visibleMonth, locale)}</p>
             <button
               type="button"
               onClick={() => setVisibleMonth((current) => addUtcDays(startOfUtcMonth(current), 35))}
-              className="rounded-md border border-white/10 p-2 text-white/70 transition hover:border-white/20 hover:text-white"
+              className="rounded-md border border-slate-200 p-2 text-slate-600 transition hover:border-slate-400 hover:text-slate-950"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-[0.18em] text-white/38">
+          <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-[0.18em] text-slate-400">
             {weekdayLabels.map((weekday) => (
               <span key={weekday} className="py-1">
                 {weekday}
@@ -211,11 +211,11 @@ function BookingDatePicker({
                   className={cn(
                     "h-10 rounded-md text-sm transition",
                     isSelected
-                      ? "bg-[#593cfb] text-white shadow-[0_16px_30px_-18px_rgba(89,60,251,0.95)]"
-                      : "text-white/88",
-                    isOutsideMonth && !isSelected ? "text-white/28" : "",
-                    !isDisabled && !isSelected ? "hover:bg-white/8" : "",
-                    isDisabled ? "cursor-not-allowed text-white/18 line-through opacity-60" : "",
+                      ? "bg-slate-950 text-white shadow-[0_16px_30px_-18px_rgba(15,23,42,0.75)]"
+                      : "text-slate-800",
+                    isOutsideMonth && !isSelected ? "text-slate-300" : "",
+                    !isDisabled && !isSelected ? "hover:bg-slate-100" : "",
+                    isDisabled ? "cursor-not-allowed text-slate-300 line-through opacity-60" : "",
                   )}
                 >
                   {day.getUTCDate()}
@@ -235,6 +235,8 @@ export function PublicBookingPanel({
   bookingDailyRate,
   bookingInsuranceFee,
   bookingDepositAmount,
+  bookingTaxName,
+  bookingTaxRate,
   blockedDateWindows,
   stripeReady,
   hostPayoutsReady,
@@ -247,6 +249,8 @@ export function PublicBookingPanel({
   bookingDailyRate: number;
   bookingInsuranceFee: number;
   bookingDepositAmount: number;
+  bookingTaxName: string | null;
+  bookingTaxRate: number;
   blockedDateWindows: DateOnlyBookingWindow[];
   stripeReady: boolean;
   hostPayoutsReady: boolean;
@@ -354,12 +358,14 @@ export function PublicBookingPanel({
         bookingDailyRate,
         bookingInsuranceFee,
         bookingDepositAmount,
+        bookingTaxRate,
         includeInsurance,
       }),
     [
       bookingDailyRate,
       bookingDepositAmount,
       bookingInsuranceFee,
+      bookingTaxRate,
       includeInsurance,
       pickupDate,
       returnDate,
@@ -426,26 +432,26 @@ export function PublicBookingPanel({
   }
 
   return (
-    <div className="rounded-lg border border-white/10 bg-[#10141d] p-5 text-white shadow-[0_35px_80px_-50px_rgba(5,8,14,0.95)] sm:p-6">
-      <p className="text-[11px] uppercase tracking-[0.32em] text-white/48">
+    <div className="rounded-lg border border-slate-200 bg-white p-5 text-slate-950 shadow-[0_30px_80px_-55px_rgba(15,23,42,0.65)] sm:p-6">
+      <p className="text-[11px] uppercase tracking-[0.32em] text-slate-500">
         {reserveMessages.bookingPanelTitle}
       </p>
-      <p className="mt-3 max-w-lg text-sm leading-6 text-white/68">{reserveMessages.bookingPanelCopy}</p>
+      <p className="mt-3 max-w-lg text-sm leading-6 text-slate-600">{reserveMessages.bookingPanelCopy}</p>
 
       {checkoutState === "success" ? (
-        <div className="mt-5 rounded-lg border border-emerald-300/18 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+        <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           {reserveMessages.successNotice}
         </div>
       ) : null}
 
       {checkoutState === "cancelled" ? (
-        <div className="mt-5 rounded-lg border border-amber-300/18 bg-amber-400/10 px-4 py-3 text-sm text-amber-50">
+        <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {reserveMessages.cancelledNotice}
         </div>
       ) : null}
 
       {checkoutState === "error" ? (
-        <div className="mt-5 rounded-lg border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+        <div className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {reserveMessages.errorNotice}
         </div>
       ) : null}
@@ -474,60 +480,60 @@ export function PublicBookingPanel({
         />
       </div>
 
-      <div className="mt-3 rounded-md border border-white/8 bg-white/[0.03] px-4 py-3 text-xs leading-5 text-white/54">
+      <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
         {reserveMessages.calendarHint}
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-white">{reserveMessages.renterName}</span>
+          <span className="mb-2 block text-sm font-medium text-slate-900">{reserveMessages.renterName}</span>
           <input
             value={renterName}
             onChange={(event) => setRenterName(event.target.value)}
-            className="w-full rounded-md border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
+            className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
           />
         </label>
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-white">{reserveMessages.renterEmail}</span>
+          <span className="mb-2 block text-sm font-medium text-slate-900">{reserveMessages.renterEmail}</span>
           <input
             type="email"
             value={renterEmail}
             onChange={(event) => setRenterEmail(event.target.value)}
-            className="w-full rounded-md border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
+            className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
           />
         </label>
       </div>
 
       <label className="mt-4 block">
-        <span className="mb-2 block text-sm font-medium text-white">{reserveMessages.renterPhone}</span>
+        <span className="mb-2 block text-sm font-medium text-slate-900">{reserveMessages.renterPhone}</span>
         <input
           value={renterPhone}
           onChange={(event) => setRenterPhone(event.target.value)}
-          className="w-full rounded-md border border-white/10 bg-white/6 px-4 py-3 text-sm text-white"
+          className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
         />
       </label>
 
-      <label className="mt-5 flex items-start gap-3 rounded-md border border-white/8 bg-white/[0.04] px-4 py-4">
+      <label className="mt-5 flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-4">
         <input
           type="checkbox"
           checked={includeInsurance}
           onChange={(event) => setIncludeInsurance(event.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-white/20"
+          className="mt-1 h-4 w-4 rounded border-slate-300"
         />
         <span className="block">
-          <span className="block text-sm font-medium text-white">{reserveMessages.insuranceToggle}</span>
-          <span className="mt-1 block text-xs leading-5 text-white/58">
+          <span className="block text-sm font-medium text-slate-900">{reserveMessages.insuranceToggle}</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">
             {reserveMessages.insuranceToggleHint}
           </span>
         </span>
       </label>
 
-      <div className="mt-5 rounded-lg border border-white/8 bg-white/[0.04] p-4">
-        <div className="flex items-center justify-between text-sm text-white/62">
+      <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center justify-between text-sm text-slate-600">
           <span>{reserveMessages.quoteDays(quote.days)}</span>
           <span>{formatCurrency(bookingDailyRate, locale)}</span>
         </div>
-        <div className="mt-4 space-y-3 text-sm text-white/72">
+        <div className="mt-4 space-y-3 text-sm text-slate-700">
           <div className="flex items-center justify-between">
             <span>{reserveMessages.quoteBase}</span>
             <span>{formatCurrency(quote.baseAmount, locale)}</span>
@@ -536,29 +542,37 @@ export function PublicBookingPanel({
             <span>{reserveMessages.quoteInsurance}</span>
             <span>{includeInsurance ? formatCurrency(quote.insuranceAmount, locale) : "—"}</span>
           </div>
+          {quote.taxAmount > 0 ? (
+            <div className="flex items-center justify-between">
+              <span>
+                {bookingTaxName?.trim() || reserveMessages.quoteTax} ({bookingTaxRate.toFixed(3)}%)
+              </span>
+              <span>{formatCurrency(quote.taxAmount, locale)}</span>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between">
             <span>{reserveMessages.quoteDeposit}</span>
             <span>{formatCurrency(quote.depositAmount, locale)}</span>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
-          <span className="text-sm font-medium text-white">{reserveMessages.quoteTotal}</span>
-          <span className="text-[1.6rem] font-semibold text-white">
+        <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
+          <span className="text-sm font-medium text-slate-950">{reserveMessages.quoteTotal}</span>
+          <span className="text-[1.6rem] font-semibold text-slate-950">
             {formatCurrency(quote.totalAmount, locale)}
           </span>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between rounded-md border border-white/8 bg-white/[0.04] px-4 py-3">
+      <div className="mt-4 flex items-center justify-between rounded-md border border-slate-200 bg-white px-4 py-3">
         <div>
-          <p className="text-sm font-medium text-white">
+          <p className="text-sm font-medium text-slate-950">
             {!stripeReady
               ? reserveMessages.stripeMissing
               : !hostPayoutsReady
                 ? reserveMessages.hostPayoutsMissing
                 : reserveMessages.stripeReady}
           </p>
-          <p className="mt-1 text-xs text-white/56">
+          <p className="mt-1 text-xs text-slate-500">
             {!hostPayoutsReady && stripeReady
               ? reserveMessages.hostPayoutsHint
               : reserveMessages.checkoutHelp}
@@ -567,7 +581,7 @@ export function PublicBookingPanel({
       </div>
 
       {error ? (
-        <div className="mt-4 rounded-lg border border-rose-300/18 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+        <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {error}
         </div>
       ) : null}
@@ -575,8 +589,7 @@ export function PublicBookingPanel({
       <button
         onClick={startCheckout}
         disabled={!stripeReady || !hostPayoutsReady || isPending}
-        className="mt-5 w-full rounded-md bg-[#593cfb] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(89,60,251,0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
-        style={{ backgroundColor: "#593cfb", color: "#ffffff" }}
+        className="mt-5 w-full rounded-md bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(15,23,42,0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isPending ? reserveMessages.checkoutLoading : reserveMessages.checkoutAction}
       </button>

@@ -20,6 +20,9 @@ type DirectBookingMetadata = {
   includeInsurance?: string;
   bookedDays?: string;
   depositAmount?: string;
+  taxName?: string;
+  taxRate?: string;
+  taxAmount?: string;
 };
 
 function readMetadata(raw: Stripe.Metadata | null | undefined): DirectBookingMetadata {
@@ -173,6 +176,9 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
         renterEmail: renterEmail ?? null,
         includeInsurance: metadata.includeInsurance === "true",
         bookedDays: metadata.bookedDays ? Number(metadata.bookedDays) : null,
+        taxName: metadata.taxName || null,
+        taxRate: metadata.taxRate ? Number(metadata.taxRate) : null,
+        taxAmount: metadata.taxAmount ? Number(metadata.taxAmount) : null,
       }),
     },
   });

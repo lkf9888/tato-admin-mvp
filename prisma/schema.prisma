@@ -151,6 +151,8 @@ model Vehicle {
   bookingDailyRate     Float?
   bookingInsuranceFee  Float?
   bookingDepositAmount Float?
+  bookingTaxName       String?
+  bookingTaxRate       Float?
   bookingIntro         String?
   notes                String?
   createdAt            DateTime          @default(now())

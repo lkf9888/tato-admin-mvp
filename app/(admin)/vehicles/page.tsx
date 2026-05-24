@@ -54,6 +54,7 @@ export default async function VehiclesPage({
           vehicle.turoListingName,
           vehicle.turoVehicleCode,
           vehicle.owner?.name,
+          vehicle.bookingTaxName,
           vehicle.notes,
         ]
           .filter(Boolean)
@@ -145,6 +146,20 @@ export default async function VehiclesPage({
           <input
             name="pickupPassword"
             placeholder={vehicleMessages.placeholders.pickupPassword}
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+          />
+          <input
+            name="bookingTaxName"
+            placeholder={vehicleMessages.placeholders.bookingTaxName}
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+          />
+          <input
+            name="bookingTaxRate"
+            type="number"
+            min="0"
+            max="100"
+            step="0.001"
+            placeholder={vehicleMessages.placeholders.bookingTaxRate}
             className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
           />
           <SearchableSelect
@@ -244,6 +259,12 @@ export default async function VehiclesPage({
                     {vehicleMessages.placeholders.cleaningFee}: CA${vehicle.cleaningFee.toFixed(2)}
                   </p>
                 ) : null}
+                {vehicle.bookingTaxRate != null && vehicle.bookingTaxRate > 0 ? (
+                  <p className="mt-0.5 text-[11px] leading-snug text-slate-500 sm:text-[12px]">
+                    {vehicleMessages.placeholders.bookingTaxName}:{" "}
+                    {vehicle.bookingTaxName?.trim() || "Tax"} · {vehicle.bookingTaxRate.toFixed(3)}%
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-1">
                 <StatusBadge value={vehicle.status} locale={locale} />
@@ -340,6 +361,24 @@ export default async function VehiclesPage({
                   <input
                     name="pickupPassword"
                     defaultValue={vehicle.pickupPassword ?? ""}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.bookingTaxName}>
+                  <input
+                    name="bookingTaxName"
+                    defaultValue={vehicle.bookingTaxName ?? ""}
+                    className={compactEditFieldClass}
+                  />
+                </VehicleEditField>
+                <VehicleEditField label={vehicleMessages.placeholders.bookingTaxRate}>
+                  <input
+                    name="bookingTaxRate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.001"
+                    defaultValue={vehicle.bookingTaxRate ?? ""}
                     className={compactEditFieldClass}
                   />
                 </VehicleEditField>

@@ -1,9 +1,14 @@
+import { OrderAttachmentKind } from "@prisma/client";
+
+import { CompactLanguageSwitcher } from "@/components/language-switcher";
 import { PublicBookingPanel } from "@/components/public-booking-panel";
+import { VehiclePhotoCarousel } from "@/components/vehicle-photo-carousel";
 import { getBlockedBookingWindows, getDateOnlyBookingWindows } from "@/lib/direct-booking";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
+import { isImageAttachment } from "@/lib/uploads";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 function addDays(value: Date, amount: number) {
@@ -45,6 +50,15 @@ export default async function ReserveVehiclePage({
           pickupDatetime: "asc",
         },
       },
+      attachments: {
+        where: {
+          isArchived: false,
+          kind: OrderAttachmentKind.photo,
+        },
+        orderBy: {
+          uploadedAt: "asc",
+        },
+      },
     },
   });
 
@@ -68,6 +82,13 @@ export default async function ReserveVehiclePage({
 
   const blockedWindows = getBlockedBookingWindows(vehicle.orders, 6);
   const blockedDateWindows = getDateOnlyBookingWindows(vehicle.orders);
+  const vehiclePhotos = vehicle.attachments
+    .filter((attachment) => isImageAttachment(attachment.contentType, attachment.filename))
+    .map((attachment) => ({
+      id: attachment.id,
+      src: `/api/direct-booking/vehicles/${vehicle.id}/attachments/file?attachmentId=${attachment.id}`,
+      alt: attachment.filename || vehicle.nickname,
+    }));
   const stripeReady = Boolean(getStripeSecretKey());
   const connectSnapshot = vehicle.workspaceId
     ? await getWorkspaceConnectSnapshot(vehicle.workspaceId)
@@ -84,63 +105,78 @@ export default async function ReserveVehiclePage({
       : "idle";
 
   return (
-    <main className="min-h-screen bg-[var(--page)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[90rem] space-y-6">
-        <section className="overflow-hidden rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.92)] shadow-[0_30px_90px_rgba(17,19,24,0.08)] lg:grid lg:grid-cols-[1.08fr_0.92fr]">
-          <div className="relative overflow-hidden bg-[#111318] px-7 py-8 text-white sm:px-10 sm:py-10">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(255,127,102,0.22),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(53,110,88,0.28),transparent_30%),linear-gradient(180deg,#171a20_0%,#12141a_58%,#090b12_100%)]" />
-            <div className="relative">
-              <p className="text-[11px] uppercase tracking-[0.42em] text-white/58">
-                {reserveMessages.heroKicker}
-              </p>
-              <h1 className="mt-5 max-w-4xl font-serif text-[3.5rem] leading-[0.96] tracking-[-0.06em] sm:text-[4.4rem]">
+    <main className="min-h-screen bg-[var(--page)] px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[92rem] space-y-5">
+        <header className="flex flex-col gap-4 rounded-lg border border-[var(--line)] bg-white/90 px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-slate-950 text-xl font-semibold text-white">
+              T
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-[0.32em] text-slate-500">TATO</p>
+              <h1 className="truncate text-2xl font-semibold text-slate-950 sm:text-3xl">
                 {vehicle.nickname}
               </h1>
-              <p className="mt-3 text-sm uppercase tracking-[0.24em] text-white/56">
-                {vehicle.plateNumber} · {vehicle.brand} {vehicle.model} {vehicle.year}
+            </div>
+          </div>
+          <CompactLanguageSwitcher locale={locale} />
+        </header>
+
+        <section className="grid gap-5 lg:grid-cols-[minmax(0,1.12fr)_minmax(24rem,0.88fr)]">
+          <div className="space-y-5">
+            <VehiclePhotoCarousel
+              photos={vehiclePhotos}
+              fallbackLabel={vehicle.nickname}
+            />
+
+            <section className="rounded-lg border border-[var(--line)] bg-white/90 p-5 shadow-sm">
+              <p className="text-[11px] uppercase tracking-[0.32em] text-slate-500">
+                {reserveMessages.heroKicker}
               </p>
-              <p className="mt-8 max-w-2xl text-[15px] leading-7 text-white/76">
+              <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">
+                {vehicle.plateNumber} · {vehicle.brand} {vehicle.model} {vehicle.year}
+              </h2>
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
                 {vehicle.bookingIntro?.trim() || reserveMessages.introFallback}
               </p>
 
-              <div className="mt-10 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/52">
+              <div className="mt-6 grid gap-3 sm:grid-cols-4">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
                     {reserveMessages.rateLabel}
                   </p>
-                  <p className="mt-3 text-[1.8rem] font-semibold text-white">
+                  <p className="mt-3 text-2xl font-semibold text-slate-950">
                     {formatCurrency(vehicle.bookingDailyRate, locale)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/52">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
                     {reserveMessages.insuranceLabel}
                   </p>
-                  <p className="mt-3 text-[1.8rem] font-semibold text-white">
+                  <p className="mt-3 text-2xl font-semibold text-slate-950">
                     {formatCurrency(vehicle.bookingInsuranceFee, locale)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/52">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
                     {reserveMessages.depositLabel}
                   </p>
-                  <p className="mt-3 text-[1.8rem] font-semibold text-white">
+                  <p className="mt-3 text-2xl font-semibold text-slate-950">
                     {formatCurrency(vehicle.bookingDepositAmount, locale)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                    {reserveMessages.ownerLabel}
+                  </p>
+                  <p className="mt-3 truncate text-lg font-semibold text-slate-950">
+                    {vehicle.owner?.name ?? "TATO"}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.04] p-4 backdrop-blur sm:max-w-sm">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-white/52">
-                  {reserveMessages.ownerLabel}
-                </p>
-                <p className="mt-3 text-lg font-semibold text-white">
-                  {vehicle.owner?.name ?? "TATO"}
-                </p>
-              </div>
-
-              <div className="mt-10">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-white/48">
+              <div className="mt-6 border-t border-slate-200 pt-5">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
                   {reserveMessages.blockedDates}
                 </p>
                 {blockedWindows.length > 0 ? (
@@ -148,26 +184,31 @@ export default async function ReserveVehiclePage({
                     {blockedWindows.map((window) => (
                       <span
                         key={`${window.pickupDatetime.toISOString()}-${window.returnDatetime.toISOString()}`}
-                        className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-2 text-xs text-white/72"
+                        className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600"
                       >
-                        {formatDate(window.pickupDatetime, locale)} - {formatDate(window.returnDatetime, locale)}
+                        {formatDate(window.pickupDatetime, locale)} -{" "}
+                        {formatDate(window.returnDatetime, locale)}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-white/64">{reserveMessages.blockedDatesEmpty}</p>
+                  <p className="mt-3 text-sm text-slate-500">
+                    {reserveMessages.blockedDatesEmpty}
+                  </p>
                 )}
               </div>
-            </div>
+            </section>
           </div>
 
-          <div className="bg-[rgba(255,255,255,0.68)] p-5 sm:p-7 lg:p-8">
+          <div>
             <PublicBookingPanel
               locale={locale}
               vehicleId={vehicle.id}
               bookingDailyRate={vehicle.bookingDailyRate ?? 0}
               bookingInsuranceFee={vehicle.bookingInsuranceFee ?? 0}
               bookingDepositAmount={vehicle.bookingDepositAmount ?? 0}
+              bookingTaxName={vehicle.bookingTaxName}
+              bookingTaxRate={vehicle.bookingTaxRate ?? 0}
               blockedDateWindows={blockedDateWindows}
               stripeReady={stripeReady}
               hostPayoutsReady={hostPayoutsReady}

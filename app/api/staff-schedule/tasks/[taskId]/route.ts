@@ -5,7 +5,10 @@ import { z } from "zod";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
-import { notifyStaffTaskAssignment } from "@/lib/staff-task-notifications";
+import {
+  notifyStaffTaskAssignment,
+  notifyStaffTaskChange,
+} from "@/lib/staff-task-notifications";
 
 type Params = Promise<{ taskId: string }>;
 
@@ -102,6 +105,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   }
 
   const parsed = taskSchema.parse(await request.json());
+  const existingForNotification = existing.staffId
+    ? await prisma.staffTask.findFirst({
+        where: { id: existing.id, workspaceId: workspace.id },
+        include: taskInclude,
+      })
+    : null;
   const staffId = parsed.staffId === undefined ? existing.staffId : nullable(parsed.staffId);
   const vehicleId = parsed.vehicleId === undefined ? existing.vehicleId : nullable(parsed.vehicleId);
   const orderId = parsed.orderId === undefined ? existing.orderId : nullable(parsed.orderId);
@@ -122,8 +131,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     return NextResponse.json({ error: refError }, { status: 400 });
   }
 
+  const hasNotifiableTaskChange = [
+    "staffId",
+    "vehicleId",
+    "orderId",
+    "staffLabel",
+    "vehicleLabel",
+    "orderLabel",
+    "title",
+    "details",
+    "dueDatetime",
+    "timeWindow",
+    "status",
+    "priority",
+    "category",
+  ].some((key) => key in parsed);
   const nextStatus = parsed.status ?? existing.status;
   const shouldNotifyAssignment = Boolean(staffId && staffId !== existing.staffId);
+  const shouldNotifyExistingStaff = Boolean(
+    staffId && staffId === existing.staffId && hasNotifiableTaskChange,
+  );
+  const shouldNotifyRemovedStaff = Boolean(
+    parsed.staffId !== undefined &&
+      existingForNotification?.staffId &&
+      staffId !== existing.staffId,
+  );
   const completedAt =
     nextStatus === StaffTaskStatus.done
       ? existing.completedAt ?? new Date()
@@ -163,8 +195,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     metadata: { title: task.title, status: task.status },
   });
 
+  if (shouldNotifyRemovedStaff && existingForNotification) {
+    await notifyStaffTaskChange(existingForNotification, "removed", new URL(request.url).origin);
+  }
+
   if (shouldNotifyAssignment) {
     await notifyStaffTaskAssignment(task, new URL(request.url).origin);
+  } else if (shouldNotifyExistingStaff) {
+    await notifyStaffTaskChange(task, "updated", new URL(request.url).origin);
   }
 
   return NextResponse.json({ task });
@@ -178,6 +216,13 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
     return NextResponse.json({ error: "TASK_NOT_FOUND" }, { status: 404 });
   }
 
+  const existingForNotification = existing.staffId
+    ? await prisma.staffTask.findFirst({
+        where: { id: existing.id, workspaceId: workspace.id },
+        include: taskInclude,
+      })
+    : null;
+
   await prisma.staffTask.delete({
     where: { id: existing.id },
   });
@@ -190,6 +235,10 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
     entityId: existing.id,
     metadata: { title: existing.title, status: existing.status },
   });
+
+  if (existingForNotification?.staffId) {
+    await notifyStaffTaskChange(existingForNotification, "deleted", new URL(_request.url).origin);
+  }
 
   return NextResponse.json({ deletedId: existing.id });
 }

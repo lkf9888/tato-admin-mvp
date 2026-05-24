@@ -75,6 +75,8 @@ const vehicleSchema = z.object({
   ownerCommissionRate: z.coerce.number().min(0).max(100).optional(),
   cleaningFee: z.coerce.number().nonnegative().optional(),
   pickupPassword: z.string().optional(),
+  bookingTaxName: z.string().optional(),
+  bookingTaxRate: z.coerce.number().min(0).max(100).optional(),
   notes: z.string().optional(),
 });
 
@@ -893,15 +895,18 @@ export async function saveVehicleAction(formData: FormData) {
     ownerCommissionRate: cleanOptional(formData.get("ownerCommissionRate")),
     cleaningFee: cleanOptional(formData.get("cleaningFee")),
     pickupPassword: cleanOptional(formData.get("pickupPassword")),
+    bookingTaxName: cleanOptional(formData.get("bookingTaxName")),
+    bookingTaxRate: cleanOptional(formData.get("bookingTaxRate")),
     notes: cleanOptional(formData.get("notes")),
   });
 
-  const { id, ownerCommissionRate, cleaningFee, ...vehicleData } = parsed;
+  const { id, ownerCommissionRate, cleaningFee, bookingTaxRate, ...vehicleData } = parsed;
   const normalizedVehicleData = {
     ...vehicleData,
     ownerCommissionRate:
       ownerCommissionRate == null ? null : +(ownerCommissionRate / 100).toFixed(4),
     cleaningFee: roundCurrencyAmount(cleaningFee),
+    bookingTaxRate: bookingTaxRate == null ? null : +bookingTaxRate.toFixed(3),
   };
 
   const existingVehicle = id
@@ -979,6 +984,8 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
   const rawDailyRate = cleanOptional(formData.get("bookingDailyRate"));
   const rawInsuranceFee = cleanOptional(formData.get("bookingInsuranceFee"));
   const rawDepositAmount = cleanOptional(formData.get("bookingDepositAmount"));
+  const bookingTaxName = cleanOptional(formData.get("bookingTaxName"));
+  const rawTaxRate = cleanOptional(formData.get("bookingTaxRate"));
   const bookingIntro = cleanOptional(formData.get("bookingIntro"));
 
   const bookingDailyRate =
@@ -987,6 +994,8 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
     rawInsuranceFee == null ? null : z.coerce.number().nonnegative().parse(rawInsuranceFee);
   const bookingDepositAmount =
     rawDepositAmount == null ? null : z.coerce.number().nonnegative().parse(rawDepositAmount);
+  const bookingTaxRate =
+    rawTaxRate == null ? null : z.coerce.number().min(0).max(100).parse(rawTaxRate);
 
   const existingVehicle = await prisma.vehicle.findFirst({
     where: { id, workspaceId: workspace.id },
@@ -1000,6 +1009,8 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
       bookingDailyRate,
       bookingInsuranceFee,
       bookingDepositAmount,
+      bookingTaxName,
+      bookingTaxRate: bookingTaxRate == null ? null : +bookingTaxRate.toFixed(3),
       bookingIntro,
     },
   });
@@ -1016,6 +1027,8 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
       bookingDailyRate,
       bookingInsuranceFee,
       bookingDepositAmount,
+      bookingTaxName,
+      bookingTaxRate,
     },
   });
 

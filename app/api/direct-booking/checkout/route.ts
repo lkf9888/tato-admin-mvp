@@ -87,6 +87,7 @@ export async function POST(request: Request) {
       bookingDailyRate: vehicle.bookingDailyRate ?? 0,
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
+      bookingTaxRate: vehicle.bookingTaxRate ?? 0,
       includeInsurance: parsed.includeInsurance,
     });
 
@@ -135,6 +136,9 @@ export async function POST(request: Request) {
         includeInsurance: parsed.includeInsurance ? "true" : "false",
         bookedDays: String(quote.days),
         depositAmount: String(quote.depositAmount),
+        taxName: vehicle.bookingTaxName?.trim() || "",
+        taxRate: String(vehicle.bookingTaxRate ?? 0),
+        taxAmount: String(quote.taxAmount),
         connectAccountId: connectSnapshot.accountId!,
         applicationFeeAmount: String(applicationFeeAmount),
       },
@@ -160,6 +164,21 @@ export async function POST(request: Request) {
                   product_data: {
                     name: `${vehicle.nickname} insurance`,
                     description: "Daily protection fee",
+                  },
+                },
+              },
+            ]
+          : []),
+        ...(quote.taxAmount > 0
+          ? [
+              {
+                quantity: 1,
+                price_data: {
+                  currency: "cad",
+                  unit_amount: Math.round(quote.taxAmount * 100),
+                  product_data: {
+                    name: `${vehicle.bookingTaxName?.trim() || "Tax"} (${(vehicle.bookingTaxRate ?? 0).toFixed(3)}%)`,
+                    description: "Tax on rental and insurance",
                   },
                 },
               },

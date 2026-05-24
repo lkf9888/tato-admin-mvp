@@ -6,6 +6,7 @@ import { z } from "zod";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { findSharedStaffTask, serializeStaffShareTask, staffShareTaskInclude } from "@/lib/staff-share";
+import { notifyAdminsOfStaffTaskAction } from "@/lib/staff-task-notifications";
 
 type Params = Promise<{ token: string; taskId: string }>;
 
@@ -93,6 +94,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     metadata: { title: task.title, status: task.status, staffId: context.staff.id },
   });
 
+  await notifyAdminsOfStaffTaskAction({
+    workspaceId: context.staff.workspaceId,
+    staffName: context.staff.name,
+    staffEmail: context.staff.email,
+    task,
+    action: parsed.unassign
+      ? "unassigned"
+      : nextStatus === StaffTaskStatus.done && context.task.status !== StaffTaskStatus.done
+        ? "completed"
+        : "updated",
+    origin: new URL(request.url).origin,
+  });
+
   revalidateStaffShare(token);
   return NextResponse.json({
     task: parsed.unassign ? null : serializeStaffShareTask(token, task),
@@ -123,6 +137,15 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
     entityType: "StaffTask",
     entityId: task.id,
     metadata: { title: task.title, staffId: context.staff.id },
+  });
+
+  await notifyAdminsOfStaffTaskAction({
+    workspaceId: context.staff.workspaceId,
+    staffName: context.staff.name,
+    staffEmail: context.staff.email,
+    task,
+    action: "cancelled",
+    origin: new URL(_request.url).origin,
   });
 
   revalidateStaffShare(token);

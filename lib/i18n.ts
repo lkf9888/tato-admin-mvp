@@ -14,6 +14,7 @@
  */
 import { convertMessagesScToTc, convertScToTc } from "@/lib/sc-to-tc";
 
+import { accountSettingsMessages } from "@/lib/i18n/messages/account-settings";
 import { authMessages } from "@/lib/i18n/messages/auth";
 import { billingMessages } from "@/lib/i18n/messages/billing";
 import { calendarMessages } from "@/lib/i18n/messages/calendar";
@@ -118,6 +119,10 @@ const activityLabelsBase = {
     direct_booking_vehicle_missing: "Direct booking vehicle missing",
     direct_booking_workspace_missing: "Direct booking workspace missing",
     direct_booking_conflict_refunded: "Direct booking conflict refunded",
+    account_profile_updated: "Account profile updated",
+    account_email_updated: "Account email updated",
+    account_password_updated: "Account password updated",
+    stripe_connect_account_updated: "Stripe payout binding updated",
   },
   zh: {
     user_registered: "已注册用户",
@@ -157,6 +162,10 @@ const activityLabelsBase = {
     direct_booking_vehicle_missing: "在线预订车辆缺失",
     direct_booking_workspace_missing: "在线预订工作台缺失",
     direct_booking_conflict_refunded: "在线预订冲突已退款",
+    account_profile_updated: "已更新账户资料",
+    account_email_updated: "已更新账户邮箱",
+    account_password_updated: "已更新账户密码",
+    stripe_connect_account_updated: "已更新 Stripe 收款绑定",
   },
 } as const;
 
@@ -209,6 +218,8 @@ export const ACTIVITY_ENTITY_TYPES = [
   "ImportBatch",
   "ShareLink",
   "Feedback",
+  "Workspace",
+  "WorkspaceBilling",
 ] as const;
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
 
@@ -284,6 +295,7 @@ export function getCsvFieldOptions(locale: Locale) {
 const messages = {
   en: {
     ...shellMessages.en,
+    ...accountSettingsMessages.en,
     ...contactMessages.en,
     ...authMessages.en,
     ...dashboardMessages.en,
@@ -297,6 +309,7 @@ const messages = {
   },
   zh: {
     ...shellMessages.zh,
+    ...accountSettingsMessages.zh,
     ...contactMessages.zh,
     ...authMessages.zh,
     ...dashboardMessages.zh,

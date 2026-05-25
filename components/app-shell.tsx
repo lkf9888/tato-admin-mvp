@@ -79,6 +79,7 @@ export function AppShell({
       items: [
         { href: "/billing", label: messages.shell.nav.billing, icon: "$" },
         { href: "/payouts", label: messages.shell.nav.payouts, icon: "↗" },
+        { href: "/account-settings", label: messages.shell.nav.accountSettings, icon: "⚙" },
       ],
     },
   ];

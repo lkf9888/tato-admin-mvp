@@ -75,26 +75,27 @@ enum StaffTaskPriority {
 }
 
 model Workspace {
-  id                   String                @id @default(cuid())
-  name                 String
-  slug                 String                @unique
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  users                User[]
-  owners               Owner[]
-  vehicles             Vehicle[]
-  orders               Order[]
-  importBatches        ImportBatch[]
-  shareLinks           ShareLink[]
-  activityLogs         ActivityLog[]
-  ownerLedgerItems     OwnerLedgerItem[]
-  ownerLedgerReceipts  OwnerLedgerReceipt[]
-  orderAttachments     OrderAttachment[]
-  staffMembers         StaffMember[]
-  staffTasks           StaffTask[]
-  staffTaskAttachments StaffTaskAttachment[]
-  turoSyncConfig       TuroSyncConfig?
-  billing              WorkspaceBilling?
+  id                     String                  @id @default(cuid())
+  name                   String
+  slug                   String                  @unique
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  users                  User[]
+  owners                 Owner[]
+  vehicles               Vehicle[]
+  orders                 Order[]
+  importBatches          ImportBatch[]
+  shareLinks             ShareLink[]
+  activityLogs           ActivityLog[]
+  ownerLedgerItems       OwnerLedgerItem[]
+  ownerLedgerReceipts    OwnerLedgerReceipt[]
+  orderAttachments       OrderAttachment[]
+  staffMembers           StaffMember[]
+  staffTasks             StaffTask[]
+  staffTaskAttachments   StaffTaskAttachment[]
+  directBookingDocuments DirectBookingDocument[]
+  turoSyncConfig         TuroSyncConfig?
+  billing                WorkspaceBilling?
 }
 
 model User {
@@ -131,73 +132,75 @@ model Owner {
 }
 
 model Vehicle {
-  workspaceId          String?
-  id                   String            @id @default(cuid())
-  ownerId              String?
-  plateNumber          String            @unique
-  nickname             String
-  brand                String
-  model                String
-  year                 Int
-  vin                  String?
-  status               VehicleStatus     @default(available)
-  turoListingName      String?
-  turoVehicleCode      String?
-  purchasePrice        Float?
-  ownerCommissionRate  Float?
-  cleaningFee          Float?
-  pickupPassword       String?
-  directBookingEnabled Boolean           @default(false)
-  bookingDailyRate     Float?
-  bookingInsuranceFee  Float?
-  bookingDepositAmount Float?
-  bookingTaxName       String?
-  bookingTaxRate       Float?
-  bookingIntro         String?
-  notes                String?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  workspace            Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  owner                Owner?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  orders               Order[]
-  ownerLedgerItems     OwnerLedgerItem[]
-  attachments          OrderAttachment[]
-  staffTasks           StaffTask[]
+  workspaceId            String?
+  id                     String                  @id @default(cuid())
+  ownerId                String?
+  plateNumber            String                  @unique
+  nickname               String
+  brand                  String
+  model                  String
+  year                   Int
+  vin                    String?
+  status                 VehicleStatus           @default(available)
+  turoListingName        String?
+  turoVehicleCode        String?
+  purchasePrice          Float?
+  ownerCommissionRate    Float?
+  cleaningFee            Float?
+  pickupPassword         String?
+  directBookingEnabled   Boolean                 @default(false)
+  bookingDailyRate       Float?
+  bookingInsuranceFee    Float?
+  bookingDepositAmount   Float?
+  bookingTaxName         String?
+  bookingTaxRate         Float?
+  bookingIntro           String?
+  notes                  String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  workspace              Workspace?              @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  owner                  Owner?                  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  orders                 Order[]
+  ownerLedgerItems       OwnerLedgerItem[]
+  attachments            OrderAttachment[]
+  staffTasks             StaffTask[]
+  directBookingDocuments DirectBookingDocument[]
 
   @@index([workspaceId])
 }
 
 model Order {
-  workspaceId      String?
-  id               String            @id @default(cuid())
-  vehicleId        String
-  importBatchId    String?
-  source           OrderSource
-  externalOrderId  String?
-  renterName       String
-  renterPhone      String?
-  pickupDatetime   DateTime
-  returnDatetime   DateTime
-  totalPrice       Float?
-  depositAmount    Float?
-  status           OrderStatus       @default(booked)
-  pickupLocation   String?
-  returnLocation   String?
-  paymentMethod    String?
-  contractNumber   String?
-  notes            String?
-  sourceMetadata   String?
-  createdBy        String
-  isArchived       Boolean           @default(false)
-  hasConflict      Boolean           @default(false)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  workspace        Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  importBatch      ImportBatch?      @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
-  vehicle          Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  ownerLedgerItems OwnerLedgerItem[]
-  attachments      OrderAttachment[]
-  staffTasks       StaffTask[]
+  workspaceId            String?
+  id                     String                  @id @default(cuid())
+  vehicleId              String
+  importBatchId          String?
+  source                 OrderSource
+  externalOrderId        String?
+  renterName             String
+  renterPhone            String?
+  pickupDatetime         DateTime
+  returnDatetime         DateTime
+  totalPrice             Float?
+  depositAmount          Float?
+  status                 OrderStatus             @default(booked)
+  pickupLocation         String?
+  returnLocation         String?
+  paymentMethod          String?
+  contractNumber         String?
+  notes                  String?
+  sourceMetadata         String?
+  createdBy              String
+  isArchived             Boolean                 @default(false)
+  hasConflict            Boolean                 @default(false)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  workspace              Workspace?              @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  importBatch            ImportBatch?            @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  vehicle                Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  ownerLedgerItems       OwnerLedgerItem[]
+  attachments            OrderAttachment[]
+  staffTasks             StaffTask[]
+  directBookingDocuments DirectBookingDocument[]
 
   @@index([workspaceId])
   @@index([workspaceId, isArchived])
@@ -313,6 +316,31 @@ model OrderAttachment {
   @@index([vehicleId, kind])
   @@index([isArchived])
   @@index([uploadedAt])
+}
+
+model DirectBookingDocument {
+  workspaceId       String?
+  id                String     @id @default(cuid())
+  vehicleId         String
+  orderId           String?
+  checkoutSessionId String?
+  draftId           String
+  kind              String
+  pathname          String
+  filename          String?
+  contentType       String?
+  size              Int?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  workspace         Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  vehicle           Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  order             Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([vehicleId])
+  @@index([orderId])
+  @@index([checkoutSessionId])
+  @@index([draftId])
 }
 
 model StaffMember {

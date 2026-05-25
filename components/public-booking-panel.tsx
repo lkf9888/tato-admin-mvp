@@ -28,6 +28,7 @@ type StoredBookingState = {
   renterEmail: string;
   renterPhone: string;
   includeInsurance: boolean;
+  agreementAccepted: boolean;
 };
 
 type BookingDatePickerProps = {
@@ -273,6 +274,9 @@ export function PublicBookingPanel({
   const [renterEmail, setRenterEmail] = useState("");
   const [renterPhone, setRenterPhone] = useState("");
   const [includeInsurance, setIncludeInsurance] = useState(bookingInsuranceFee > 0);
+  const [licenseFront, setLicenseFront] = useState<File | null>(null);
+  const [licenseBack, setLicenseBack] = useState<File | null>(null);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -312,6 +316,7 @@ export function PublicBookingPanel({
       setRenterEmail(parsed.renterEmail || "");
       setRenterPhone(parsed.renterPhone || "");
       setIncludeInsurance(Boolean(parsed.includeInsurance));
+      setAgreementAccepted(Boolean(parsed.agreementAccepted));
     } catch {
       window.sessionStorage.removeItem(storageKey);
     }
@@ -345,10 +350,20 @@ export function PublicBookingPanel({
       renterEmail,
       renterPhone,
       includeInsurance,
+      agreementAccepted,
     };
 
     window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
-  }, [includeInsurance, pickupDate, renterEmail, renterName, renterPhone, returnDate, storageKey]);
+  }, [
+    agreementAccepted,
+    includeInsurance,
+    pickupDate,
+    renterEmail,
+    renterName,
+    renterPhone,
+    returnDate,
+    storageKey,
+  ]);
 
   const quote = useMemo(
     () =>
@@ -404,21 +419,32 @@ export function PublicBookingPanel({
       return;
     }
 
+    if (!licenseFront || !licenseBack) {
+      setError(reserveMessages.licenseMissingError);
+      return;
+    }
+
+    if (!agreementAccepted) {
+      setError(reserveMessages.agreementMissingError);
+      return;
+    }
+
     startTransition(async () => {
+      const formData = new FormData();
+      formData.set("vehicleId", vehicleId);
+      formData.set("pickupDate", pickupDate);
+      formData.set("returnDate", returnDate);
+      formData.set("renterName", renterName);
+      formData.set("renterEmail", renterEmail);
+      formData.set("renterPhone", renterPhone);
+      formData.set("includeInsurance", includeInsurance ? "true" : "false");
+      formData.set("agreementAccepted", agreementAccepted ? "true" : "false");
+      formData.set("licenseFront", licenseFront);
+      formData.set("licenseBack", licenseBack);
+
       const response = await fetch("/api/direct-booking/checkout", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          vehicleId,
-          pickupDate,
-          returnDate,
-          renterName,
-          renterEmail,
-          renterPhone,
-          includeInsurance,
-        }),
+        body: formData,
       });
 
       const payload = (await response.json()) as { error?: string; url?: string };
@@ -513,6 +539,52 @@ export function PublicBookingPanel({
         />
       </label>
 
+      <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4">
+        <p className="text-sm font-semibold text-slate-950">{reserveMessages.licenseUploadTitle}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{reserveMessages.licenseUploadCopy}</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-slate-900">
+              {reserveMessages.licenseFrontLabel}
+            </span>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              onChange={(event) => {
+                setError("");
+                setLicenseFront(event.target.files?.[0] ?? null);
+              }}
+              className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+            />
+            {licenseFront ? (
+              <span className="mt-1 block truncate text-xs text-slate-500">
+                {licenseFront.name}
+              </span>
+            ) : null}
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-slate-900">
+              {reserveMessages.licenseBackLabel}
+            </span>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              onChange={(event) => {
+                setError("");
+                setLicenseBack(event.target.files?.[0] ?? null);
+              }}
+              className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+            />
+            {licenseBack ? (
+              <span className="mt-1 block truncate text-xs text-slate-500">
+                {licenseBack.name}
+              </span>
+            ) : null}
+          </label>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-slate-500">{reserveMessages.licenseUploadHint}</p>
+      </div>
+
       <label className="mt-5 flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-4">
         <input
           type="checkbox"
@@ -561,6 +633,33 @@ export function PublicBookingPanel({
             {formatCurrency(quote.totalAmount, locale)}
           </span>
         </div>
+      </div>
+
+      <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4">
+        <p className="text-sm font-semibold text-slate-950">{reserveMessages.agreementTitle}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{reserveMessages.agreementIntro}</p>
+        <div className="mt-3 max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-slate-50">
+          {reserveMessages.agreementSections.map((section) => (
+            <div key={section.title} className="grid gap-2 border-b border-slate-200 px-3 py-3 last:border-b-0 sm:grid-cols-[8rem_1fr]">
+              <p className="text-xs font-semibold leading-5 text-slate-800">{section.title}</p>
+              <p className="text-xs leading-5 text-slate-600">{section.copy}</p>
+            </div>
+          ))}
+        </div>
+        <label className="mt-3 flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+          <input
+            type="checkbox"
+            checked={agreementAccepted}
+            onChange={(event) => {
+              setError("");
+              setAgreementAccepted(event.target.checked);
+            }}
+            className="mt-1 h-4 w-4 rounded border-slate-300"
+          />
+          <span className="text-sm leading-6 text-slate-700">
+            {reserveMessages.agreementCheckbox}
+          </span>
+        </label>
       </div>
 
       <div className="mt-4 flex items-center justify-between rounded-md border border-slate-200 bg-white px-4 py-3">

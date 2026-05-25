@@ -1,5 +1,6 @@
 import "server-only";
 
+import { OrderAttachmentKind } from "@prisma/client";
 import type Stripe from "stripe";
 
 import { dateOnlyToUtcMidday, hasVehicleBookingConflict } from "@/lib/direct-booking";
@@ -23,6 +24,8 @@ type DirectBookingMetadata = {
   taxName?: string;
   taxRate?: string;
   taxAmount?: string;
+  licenseDraftId?: string;
+  agreementAccepted?: string;
 };
 
 function readMetadata(raw: Stripe.Metadata | null | undefined): DirectBookingMetadata {
@@ -179,9 +182,39 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
         taxName: metadata.taxName || null,
         taxRate: metadata.taxRate ? Number(metadata.taxRate) : null,
         taxAmount: metadata.taxAmount ? Number(metadata.taxAmount) : null,
+        licenseDraftId: metadata.licenseDraftId || null,
+        agreementAccepted: metadata.agreementAccepted === "true",
       }),
     },
   });
+
+  const licenseDocuments = await prisma.directBookingDocument.findMany({
+    where: { checkoutSessionId: session.id },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (licenseDocuments.length > 0) {
+    await prisma.orderAttachment.createMany({
+      data: licenseDocuments.map((document) => ({
+        workspaceId: vehicle.workspaceId,
+        orderId: order.id,
+        vehicleId,
+        kind: OrderAttachmentKind.document,
+        pathname: document.pathname,
+        filename:
+          document.kind === "driver_license_front"
+            ? `driver-license-front-${document.filename ?? "upload"}`
+            : `driver-license-back-${document.filename ?? "upload"}`,
+        contentType: document.contentType,
+        size: document.size,
+      })),
+    });
+
+    await prisma.directBookingDocument.updateMany({
+      where: { checkoutSessionId: session.id },
+      data: { orderId: order.id },
+    });
+  }
 
   await reconcileVehicleConflicts(vehicleId);
 

@@ -17,6 +17,8 @@ import type { Locale } from "@/lib/i18n";
 
 type StaffTaskStatus = "todo" | "in_progress" | "done" | "cancelled";
 
+const HISTORY_PAGE_SIZE = 10;
+
 export type StaffShareTask = {
   id: string;
   staffId: string | null;
@@ -67,6 +69,12 @@ function copy(locale: Locale) {
         subtitle: "只显示分配给你的任务",
         active: "待处理",
         history: "已完成 / 已取消",
+        historySummary: (count: number) => `已完成 / 已取消 · ${count} 条`,
+        showHistory: "展开",
+        hideHistory: "收起",
+        previousPage: "上一页",
+        nextPage: "下一页",
+        pageStatus: (page: number, total: number) => `${page} / ${total}`,
         noTasks: "暂无任务",
         today: "今天",
         tomorrow: "明天",
@@ -102,6 +110,12 @@ function copy(locale: Locale) {
         subtitle: "Only tasks assigned to you are shown",
         active: "Open",
         history: "Done / cancelled",
+        historySummary: (count: number) => `Done / cancelled · ${count}`,
+        showHistory: "Show",
+        hideHistory: "Hide",
+        previousPage: "Previous",
+        nextPage: "Next",
+        pageStatus: (page: number, total: number) => `${page} / ${total}`,
         noTasks: "No tasks",
         today: "Today",
         tomorrow: "Tomorrow",
@@ -163,17 +177,28 @@ export function StaffShareClient({
     () =>
       tasks
         .filter((task) => task.status === "done" || task.status === "cancelled")
-        .sort(sortTasks),
+        .sort(sortHistoryTasks),
     [tasks],
   );
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyPageCount = Math.max(1, Math.ceil(historyTasks.length / HISTORY_PAGE_SIZE));
+  const pagedHistoryTasks = useMemo(() => {
+    const startIndex = (historyPage - 1) * HISTORY_PAGE_SIZE;
+    return historyTasks.slice(startIndex, startIndex + HISTORY_PAGE_SIZE);
+  }, [historyPage, historyTasks]);
   const activeTaskGroups = useMemo(
     () => groupTasksByDate(activeTasks, activeLocale, labels),
     [activeLocale, activeTasks, labels],
   );
   const historyTaskGroups = useMemo(
-    () => groupTasksByDate(historyTasks, activeLocale, labels),
-    [activeLocale, historyTasks, labels],
+    () => groupTasksByDate(pagedHistoryTasks, activeLocale, labels, "desc"),
+    [activeLocale, labels, pagedHistoryTasks],
   );
+
+  useEffect(() => {
+    setHistoryPage((current) => Math.min(current, historyPageCount));
+  }, [historyPageCount]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("tato-staff-share-locale");
@@ -312,7 +337,7 @@ export function StaffShareClient({
           </div>
         ) : null}
 
-        {activeTaskGroups.length === 0 && historyTaskGroups.length === 0 ? (
+        {activeTaskGroups.length === 0 && historyTasks.length === 0 ? (
           <div className="rounded-md bg-white px-4 py-6 text-sm text-neutral-500">{labels.noTasks}</div>
         ) : null}
 
@@ -334,23 +359,76 @@ export function StaffShareClient({
           </TaskDateGroup>
         ))}
 
-        {historyTaskGroups.map((group) => (
-          <TaskDateGroup key={`history-${group.key}`} label={group.label}>
-            {group.tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                labels={labels}
-                locale={activeLocale}
-                task={task}
-                onEdit={setEditingTask}
-                onComplete={toggleComplete}
-                onUnassign={unassignTask}
-                onUploadPhotos={uploadTaskPhotos}
-                onPreviewImage={setPreviewImage}
-              />
-            ))}
-          </TaskDateGroup>
-        ))}
+        {historyTasks.length > 0 ? (
+          <section className="rounded-md border border-neutral-200 bg-white shadow-sm">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
+              onClick={() => setHistoryOpen((current) => !current)}
+              aria-expanded={historyOpen}
+            >
+              <span>
+                <span className="block text-sm font-semibold text-neutral-900">
+                  {labels.historySummary(historyTasks.length)}
+                </span>
+                {!historyOpen ? (
+                  <span className="mt-0.5 block text-xs text-neutral-500">
+                    {labels.showHistory}
+                  </span>
+                ) : null}
+              </span>
+              <span className="rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-700">
+                {historyOpen ? labels.hideHistory : labels.showHistory}
+              </span>
+            </button>
+
+            {historyOpen ? (
+              <div className="space-y-3 border-t border-neutral-200 bg-neutral-50/70 px-2 py-3">
+                {historyTaskGroups.map((group) => (
+                  <TaskDateGroup key={`history-${group.key}`} label={group.label}>
+                    {group.tasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        labels={labels}
+                        locale={activeLocale}
+                        task={task}
+                        onEdit={setEditingTask}
+                        onComplete={toggleComplete}
+                        onUnassign={unassignTask}
+                        onUploadPhotos={uploadTaskPhotos}
+                        onPreviewImage={setPreviewImage}
+                      />
+                    ))}
+                  </TaskDateGroup>
+                ))}
+
+                {historyPageCount > 1 ? (
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-neutral-200 bg-white px-2 py-2">
+                    <button
+                      type="button"
+                      className="min-h-9 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 disabled:opacity-40"
+                      disabled={historyPage <= 1}
+                      onClick={() => setHistoryPage((current) => Math.max(1, current - 1))}
+                    >
+                      {labels.previousPage}
+                    </button>
+                    <span className="text-xs font-semibold text-neutral-500">
+                      {labels.pageStatus(historyPage, historyPageCount)}
+                    </span>
+                    <button
+                      type="button"
+                      className="min-h-9 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 disabled:opacity-40"
+                      disabled={historyPage >= historyPageCount}
+                      onClick={() => setHistoryPage((current) => Math.min(historyPageCount, current + 1))}
+                    >
+                      {labels.nextPage}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </div>
 
       {editingTask ? (
@@ -796,10 +874,25 @@ function sortTasks(left: StaffShareTask, right: StaffShareTask) {
   return left.title.localeCompare(right.title);
 }
 
+function sortHistoryTasks(left: StaffShareTask, right: StaffShareTask) {
+  const leftTime = getHistorySortTime(left);
+  const rightTime = getHistorySortTime(right);
+  if (leftTime !== rightTime) return rightTime - leftTime;
+  return left.title.localeCompare(right.title);
+}
+
+function getHistorySortTime(task: StaffShareTask) {
+  const value = task.completedAt ?? task.dueDatetime;
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
 function groupTasksByDate(
   tasks: StaffShareTask[],
   locale: Locale,
   labels: ReturnType<typeof copy>,
+  direction: "asc" | "desc" = "asc",
 ) {
   const groups = new Map<string, { key: string; label: string; tasks: StaffShareTask[]; order: number }>();
 
@@ -820,7 +913,9 @@ function groupTasksByDate(
     });
   }
 
-  return Array.from(groups.values()).sort((left, right) => left.order - right.order);
+  return Array.from(groups.values()).sort((left, right) =>
+    direction === "desc" ? right.order - left.order : left.order - right.order,
+  );
 }
 
 function localDateKey(date: Date) {

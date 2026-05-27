@@ -112,6 +112,7 @@ export async function findSharedStaff(token: string) {
       email: true,
       phone: true,
       color: true,
+      miniProgramCode: true,
       pinnedMessage: true,
       shareToken: true,
     },

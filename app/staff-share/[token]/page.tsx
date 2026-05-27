@@ -39,6 +39,7 @@ export default async function StaffSharePage({
         name: staff.name,
         role: staff.role,
         color: staff.color,
+        miniProgramCode: staff.miniProgramCode,
         pinnedMessage: staff.pinnedMessage,
       }}
       initialTasks={tasks.map((task) => serializeStaffShareTask(token, task))}

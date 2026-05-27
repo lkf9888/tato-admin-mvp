@@ -9,6 +9,22 @@
       </view>
       <button class="text-button" bindtap="logout">退出</button>
     </view>
+    <view class="staff-info-panel" wx:if="{{staff && (staff.miniProgramCode || staff.pinnedMessage)}}">
+      <view class="staff-info-header" bindtap="toggleStaffInfo">
+        <view>Code / 员工备注</view>
+        <view>{{staffInfoOpen ? '折叠' : '展开'}}</view>
+      </view>
+      <view class="staff-info-body" wx:if="{{staffInfoOpen}}">
+        <view wx:if="{{staff.miniProgramCode}}">
+          <text class="staff-info-label">小程序 Code: </text>
+          <text class="staff-code">{{staff.miniProgramCode}}</text>
+        </view>
+        <view>
+          <text class="staff-info-label">员工备注: </text>
+          <text>{{staff.pinnedMessage || '暂无员工备注'}}</text>
+        </view>
+      </view>
+    </view>
     <view class="summary-row">
       <view class="summary-card">
         <view class="summary-label">待处理</view>

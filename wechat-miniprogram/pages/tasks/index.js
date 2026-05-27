@@ -114,6 +114,7 @@ Page({
     activeCount: 0,
     historyCount: 0,
     historyOpen: false,
+    staffInfoOpen: false,
     historyPage: 1,
     historyPageCount: 1,
     templateId: "",
@@ -180,6 +181,10 @@ Page({
     this.setData({ historyOpen: !this.data.historyOpen }, () => {
       this.refreshView(this.data.tasks);
     });
+  },
+
+  toggleStaffInfo() {
+    this.setData({ staffInfoOpen: !this.data.staffInfoOpen });
   },
 
   previousHistoryPage() {

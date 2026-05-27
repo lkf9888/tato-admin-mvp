@@ -59,6 +59,7 @@ type ShareStaff = {
   name: string;
   role: string | null;
   color: string;
+  miniProgramCode: string | null;
   pinnedMessage: string | null;
 };
 
@@ -104,6 +105,10 @@ function copy(locale: Locale) {
         vehicle: "车辆",
         order: "订单",
         language: "语言",
+        staffInfo: "Code / 员工备注",
+        miniProgramCode: "小程序 Code",
+        pinned: "员工备注",
+        noPinned: "暂无员工备注",
       }
     : {
         kicker: "My tasks",
@@ -146,6 +151,10 @@ function copy(locale: Locale) {
         vehicle: "Vehicle",
         order: "Order",
         language: "Language",
+        staffInfo: "Code / staff note",
+        miniProgramCode: "Mini Program Code",
+        pinned: "Staff note",
+        noPinned: "No staff note",
       };
 }
 
@@ -166,6 +175,7 @@ export function StaffShareClient({
   const [editingTask, setEditingTask] = useState<StaffShareTask | null>(null);
   const [previewImage, setPreviewImage] = useState<StaffShareAttachment | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [staffInfoOpen, setStaffInfoOpen] = useState(false);
   const activeTasks = useMemo(
     () =>
       tasks
@@ -322,9 +332,33 @@ export function StaffShareClient({
               <p className="text-sm text-neutral-300">{staff.role || labels.subtitle}</p>
             </div>
           </div>
-          {staff.pinnedMessage ? (
-            <div className="mt-3 rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm text-neutral-100">
-              {staff.pinnedMessage}
+          {staff.miniProgramCode || staff.pinnedMessage ? (
+            <div className="mt-3 overflow-hidden rounded-md border border-white/10 bg-white/10 text-sm text-neutral-100">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
+                onClick={() => setStaffInfoOpen((open) => !open)}
+                aria-expanded={staffInfoOpen}
+              >
+                <span className="font-semibold">{labels.staffInfo}</span>
+                <span className="text-xs font-semibold text-neutral-300">
+                  {staffInfoOpen ? labels.hideHistory : labels.showHistory}
+                </span>
+              </button>
+              {staffInfoOpen ? (
+                <div className="space-y-1 border-t border-white/10 px-3 py-2 text-xs leading-5 text-neutral-200">
+                  {staff.miniProgramCode ? (
+                    <p>
+                      <span className="font-semibold text-white">{labels.miniProgramCode}: </span>
+                      <span className="font-mono tracking-[0.18em] text-white">{staff.miniProgramCode}</span>
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="font-semibold text-white">{labels.pinned}: </span>
+                    {staff.pinnedMessage || labels.noPinned}
+                  </p>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

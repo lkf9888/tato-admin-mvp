@@ -191,13 +191,12 @@ function getStaffScheduleCopy(locale: Locale) {
         copyShareLink: "复制链接",
         shareCopied: "员工任务链接已复制。",
         miniProgramCode: "小程序 Code",
-        copyMiniProgramCode: "复制 Code",
-        miniProgramCodeCopied: "小程序 Code 已复制。",
         wechatBound: "已绑定微信",
         wechatNotBound: "未绑定微信",
         wechatNotifyOn: "微信提醒已开启",
         wechatNotifyOff: "微信提醒未开启",
         shareUnavailable: "链接还没有生成，请刷新页面后再试。",
+        staffInfo: "Code / 员工备注",
         pinned: "员工备注",
         noPinned: "暂无固定备注",
         edit: "编辑",
@@ -296,13 +295,12 @@ function getStaffScheduleCopy(locale: Locale) {
         copyShareLink: "Copy link",
         shareCopied: "Staff task link copied.",
         miniProgramCode: "Mini Program Code",
-        copyMiniProgramCode: "Copy Code",
-        miniProgramCodeCopied: "Mini Program Code copied.",
         wechatBound: "WeChat bound",
         wechatNotBound: "WeChat not bound",
         wechatNotifyOn: "WeChat alerts on",
         wechatNotifyOff: "WeChat alerts off",
         shareUnavailable: "The link is not ready yet. Refresh and try again.",
+        staffInfo: "Code / staff note",
         pinned: "Pinned note",
         noPinned: "No pinned note",
         edit: "Edit",
@@ -390,6 +388,7 @@ export function StaffScheduleClient({
   const [historyPage, setHistoryPage] = useState(1);
   const [showArchivedStaff, setShowArchivedStaff] = useState(false);
   const [upcomingOrdersCollapsed, setUpcomingOrdersCollapsed] = useState(false);
+  const [openStaffInfoIds, setOpenStaffInfoIds] = useState<Set<string>>(() => new Set());
 
   const activeStaff = useMemo(() => staff.filter((member) => member.isActive).sort(sortStaffMembers), [staff]);
   const archivedStaff = useMemo(() => staff.filter((member) => !member.isActive).sort(sortStaffMembers), [staff]);
@@ -684,14 +683,13 @@ export function StaffScheduleClient({
     setNotice(c.shareCopied);
   }
 
-  async function copyStaffMiniProgramCode(member: StaffMember) {
-    if (!member.miniProgramCode) {
-      setNotice(c.shareUnavailable);
-      return;
-    }
-
-    await navigator.clipboard.writeText(member.miniProgramCode);
-    setNotice(c.miniProgramCodeCopied);
+  function toggleStaffInfo(memberId: string) {
+    setOpenStaffInfoIds((current) => {
+      const next = new Set(current);
+      if (next.has(memberId)) next.delete(memberId);
+      else next.add(memberId);
+      return next;
+    });
   }
 
   async function deleteTask(task: StaffTask, permanent = false) {
@@ -815,7 +813,16 @@ export function StaffScheduleClient({
                       <GripVertical className="h-4 w-4" />
                     </span>
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: member.color }} />
-                    <h2 className="truncate text-base font-semibold">{member.name}</h2>
+                    <h2 className="min-w-0 truncate text-base font-semibold">{member.name}</h2>
+                    <button
+                      type="button"
+                      className="btn-secondary h-6 w-6 shrink-0 border-amber-300 bg-amber-50 p-0 text-amber-800 hover:bg-amber-100"
+                      onClick={() => setStaffModal(member)}
+                      aria-label={c.edit}
+                      title={c.edit}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
                   </div>
                   <p className="mt-0.5 truncate text-xs text-neutral-500">
                     {[member.role, member.phone, member.email].filter(Boolean).join(" · ") || c.staff}
@@ -833,30 +840,38 @@ export function StaffScheduleClient({
                       </button>
                     </>
                   ) : null}
-                  {member.miniProgramCode ? (
-                    <button className="btn-secondary min-h-7 px-2 py-1 text-[11px]" onClick={() => copyStaffMiniProgramCode(member)}>
-                      {c.copyMiniProgramCode}
-                    </button>
-                  ) : null}
-                  <button className="btn-secondary min-h-7 border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-800 hover:bg-amber-100" onClick={() => setStaffModal(member)}>
-                    <Pencil className="h-3 w-3" />
-                    {c.edit}
-                  </button>
                 </div>
               </div>
-              {member.miniProgramCode ? (
-                <div className="border-b border-neutral-200 bg-white/45 px-3 py-1.5 text-[11px] text-neutral-600">
-                  <span className="font-semibold text-neutral-900">{c.miniProgramCode}: </span>
-                  <span className="font-mono tracking-[0.18em] text-neutral-950">{member.miniProgramCode}</span>
-                  <span className="mx-1.5 text-neutral-300">·</span>
-                  <span>{member.wechatOpenId ? c.wechatBound : c.wechatNotBound}</span>
-                  <span className="mx-1.5 text-neutral-300">·</span>
-                  <span>{member.wechatNotificationEnabled ? c.wechatNotifyOn : c.wechatNotifyOff}</span>
-                </div>
-              ) : null}
-              <div className="border-b border-neutral-200 bg-white/35 px-3 py-1.5 text-xs text-neutral-700">
-                <span className="font-medium text-neutral-900">{c.pinned}: </span>
-                {member.pinnedMessage || c.noPinned}
+              <div className="border-b border-neutral-200 bg-white/35">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-xs font-semibold text-neutral-800"
+                  onClick={() => toggleStaffInfo(member.id)}
+                  aria-expanded={openStaffInfoIds.has(member.id)}
+                >
+                  <span>{c.staffInfo}</span>
+                  <span className="text-[11px] font-medium text-neutral-500">
+                    {openStaffInfoIds.has(member.id) ? c.hideHistory : c.showHistory}
+                  </span>
+                </button>
+                {openStaffInfoIds.has(member.id) ? (
+                  <div className="space-y-1 border-t border-neutral-200 bg-white/45 px-3 py-2 text-[11px] leading-5 text-neutral-600">
+                    {member.miniProgramCode ? (
+                      <p>
+                        <span className="font-semibold text-neutral-900">{c.miniProgramCode}: </span>
+                        <span className="font-mono tracking-[0.18em] text-neutral-950">{member.miniProgramCode}</span>
+                        <span className="mx-1.5 text-neutral-300">·</span>
+                        <span>{member.wechatOpenId ? c.wechatBound : c.wechatNotBound}</span>
+                        <span className="mx-1.5 text-neutral-300">·</span>
+                        <span>{member.wechatNotificationEnabled ? c.wechatNotifyOn : c.wechatNotifyOff}</span>
+                      </p>
+                    ) : null}
+                    <p>
+                      <span className="font-semibold text-neutral-900">{c.pinned}: </span>
+                      {member.pinnedMessage || c.noPinned}
+                    </p>
+                  </div>
+                ) : null}
               </div>
               {dragOverTarget === member.id ? (
                 <div className="border-b border-neutral-200 bg-neutral-950 px-4 py-2 text-xs font-medium text-white">
@@ -1632,14 +1647,9 @@ function StaffModal({
         </Field>
         {staff?.miniProgramCode ? (
           <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold text-neutral-500">{copy.miniProgramCode}</p>
-                <p className="font-mono text-base font-semibold tracking-[0.22em] text-neutral-950">{staff.miniProgramCode}</p>
-              </div>
-              <button type="button" className="btn-secondary min-h-8 px-2 py-1 text-[11px]" onClick={() => void navigator.clipboard.writeText(staff.miniProgramCode ?? "")}>
-                {copy.copyMiniProgramCode}
-              </button>
+            <div>
+              <p className="text-xs font-semibold text-neutral-500">{copy.miniProgramCode}</p>
+              <p className="font-mono text-base font-semibold tracking-[0.22em] text-neutral-950">{staff.miniProgramCode}</p>
             </div>
             <p className="mt-1 text-xs text-neutral-500">
               {staff.wechatOpenId ? copy.wechatBound : copy.wechatNotBound} ·{" "}

@@ -1,0 +1,15 @@
+{
+  "description": "TATO staff task mini program",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "latest",
+  "appid": "wx-your-app-id",
+  "projectname": "tato-staff-tasks",
+  "condition": {}
+}

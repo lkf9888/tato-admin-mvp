@@ -5,8 +5,10 @@ import {
   sendStaffTaskAssignmentEmail,
 } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { sendStaffTaskWeChatMessage } from "@/lib/staff-mini-program";
 
 type StaffTaskNotificationRecord = {
+  id?: string;
   title: string;
   details: string | null;
   dueDatetime: Date | null;
@@ -18,6 +20,8 @@ type StaffTaskNotificationRecord = {
     name: string;
     email: string | null;
     shareToken: string | null;
+    wechatOpenId?: string | null;
+    wechatNotificationEnabled?: boolean | null;
   } | null;
   vehicle: {
     plateNumber: string;
@@ -51,7 +55,7 @@ export async function notifyStaffTaskChange(
   action: "created" | "updated" | "deleted" | "removed",
   origin?: string,
 ) {
-  if (!task.staff?.email) return;
+  if (!task.staff) return;
 
   const taskUrl =
     action === "deleted" || action === "removed"
@@ -60,19 +64,37 @@ export async function notifyStaffTaskChange(
         ? `${getBaseUrl(origin)}/staff-share/${task.staff.shareToken}`
         : null;
 
-  await sendStaffTaskAssignmentEmail({
-    to: task.staff.email,
-    staffName: task.staff.name,
+  const vehicleLabel = task.vehicle
+    ? `${task.vehicle.plateNumber} · ${task.vehicle.nickname}`
+    : task.vehicleLabel;
+  const orderLabel = task.order ? task.order.renterName : task.orderLabel;
+
+  if (task.staff.email) {
+    await sendStaffTaskAssignmentEmail({
+      to: task.staff.email,
+      staffName: task.staff.name,
+      taskTitle: task.title,
+      action,
+      dueLabel: formatDueDate(task.dueDatetime),
+      timeWindow: task.timeWindow,
+      vehicleLabel,
+      orderLabel,
+      details: task.details,
+      taskUrl,
+    });
+  }
+
+  await sendStaffTaskWeChatMessage({
+    openId: task.staff.wechatOpenId,
+    notificationEnabled: task.staff.wechatNotificationEnabled,
+    taskId: task.id,
     taskTitle: task.title,
     action,
-    dueLabel: formatDueDate(task.dueDatetime),
+    dueDatetime: task.dueDatetime,
     timeWindow: task.timeWindow,
-    vehicleLabel: task.vehicle
-      ? `${task.vehicle.plateNumber} · ${task.vehicle.nickname}`
-      : task.vehicleLabel,
-    orderLabel: task.order ? task.order.renterName : task.orderLabel,
+    vehicleLabel,
+    orderLabel,
     details: task.details,
-    taskUrl,
   });
 }
 

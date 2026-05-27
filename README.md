@@ -421,3 +421,32 @@ docker compose -f docker-compose.public.yml up -d --build
 
 - 这套方式非常适合当前 MVP 和少量内部用户
 - 如果后面要多人高频同时使用，建议下一步把 SQLite 升级到 PostgreSQL
+
+## 微信小程序员工任务端
+
+本仓库包含一个可用微信开发者工具打开的小程序项目：`wechat-miniprogram/`。
+
+上线前需要在 Railway Variables 配置：
+
+```env
+WECHAT_MINIPROGRAM_APP_ID=wx_xxx
+WECHAT_MINIPROGRAM_APP_SECRET=xxx
+WECHAT_TASK_TEMPLATE_ID=xxx
+WECHAT_MINIPROGRAM_STATE=formal
+```
+
+微信公众平台里还需要设置：
+
+- 在「开发管理」把 `https://tatocar.co` 加到 request、uploadFile 和 downloadFile 合法域名。
+- 在「订阅消息」添加一个任务通知模板，默认字段建议为：`thing1=任务名称`、`time2=到期时间`、`thing3=车辆信息`、`phrase4=任务状态`、`thing5=备注`。
+- 如果实际模板字段不同，可在 Railway 加 `WECHAT_TASK_MESSAGE_FIELDS` 覆盖，例如：
+
+```env
+WECHAT_TASK_MESSAGE_FIELDS={"title":"thing1","due":"time2","vehicle":"thing3","action":"phrase4","details":"thing5"}
+```
+
+员工使用流程：
+
+1. Admin 在线下员工排班里复制员工的「小程序 Code」。
+2. 员工第一次打开小程序输入 Code，系统会把该 Code 绑定到当前微信 openid。
+3. 员工在小程序里点击「开启新任务微信提醒」后，后续 admin 分配或修改任务时会尝试发送微信订阅消息。

@@ -344,26 +344,33 @@ model DirectBookingDocument {
 }
 
 model StaffMember {
-  workspaceId   String?
-  id            String      @id @default(cuid())
-  name          String
-  phone         String?
-  email         String?
-  role          String?
-  color         String      @default("#3456df")
-  notes         String?
-  pinnedMessage String?
-  isActive      Boolean     @default(true)
-  sortOrder     Int         @default(0)
-  shareToken    String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  workspace     Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tasks         StaffTask[]
+  workspaceId               String?
+  id                        String      @id @default(cuid())
+  name                      String
+  phone                     String?
+  email                     String?
+  role                      String?
+  color                     String      @default("#3456df")
+  notes                     String?
+  pinnedMessage             String?
+  isActive                  Boolean     @default(true)
+  sortOrder                 Int         @default(0)
+  shareToken                String?
+  miniProgramCode           String?     @unique
+  wechatOpenId              String?     @unique
+  wechatNotificationEnabled Boolean     @default(false)
+  wechatSubscribedAt        DateTime?
+  wechatBoundAt             DateTime?
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
+  workspace                 Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks                     StaffTask[]
 
   @@index([workspaceId, isActive])
   @@index([workspaceId, isActive, sortOrder])
   @@index([shareToken])
+  @@index([miniProgramCode])
+  @@index([wechatOpenId])
 }
 
 model StaffTask {

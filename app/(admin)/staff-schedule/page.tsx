@@ -3,6 +3,7 @@ import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { ensureStaffShareTokens } from "@/lib/staff-share";
+import { ensureStaffMiniProgramCodes } from "@/lib/staff-mini-program";
 
 export default async function StaffSchedulePage() {
   const workspace = await requireCurrentWorkspace();
@@ -81,11 +82,12 @@ export default async function StaffSchedulePage() {
     }),
   ]);
   const staffWithShareTokens = await ensureStaffShareTokens(staff);
+  const staffWithMiniProgramCodes = await ensureStaffMiniProgramCodes(staffWithShareTokens);
 
   return (
     <StaffScheduleClient
       locale={locale}
-      initialStaff={staffWithShareTokens.map((member) => ({
+      initialStaff={staffWithMiniProgramCodes.map((member) => ({
         id: member.id,
         name: member.name,
         phone: member.phone,
@@ -97,6 +99,9 @@ export default async function StaffSchedulePage() {
         isActive: member.isActive,
         sortOrder: member.sortOrder,
         shareToken: member.shareToken,
+        miniProgramCode: member.miniProgramCode,
+        wechatOpenId: member.wechatOpenId,
+        wechatNotificationEnabled: member.wechatNotificationEnabled,
       }))}
       initialTasks={tasks.map((task) => ({
         id: task.id,
@@ -128,6 +133,9 @@ export default async function StaffSchedulePage() {
               isActive: task.staff.isActive,
               sortOrder: task.staff.sortOrder,
               shareToken: task.staff.shareToken,
+              miniProgramCode: task.staff.miniProgramCode,
+              wechatOpenId: task.staff.wechatOpenId,
+              wechatNotificationEnabled: task.staff.wechatNotificationEnabled,
             }
           : null,
         vehicle: task.vehicle,

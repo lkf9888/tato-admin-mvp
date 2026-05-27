@@ -1,0 +1,90 @@
+.login-page {
+  padding: 56rpx 32rpx;
+  background: #f4f4f5;
+}
+
+.brand-block {
+  display: flex;
+  gap: 24rpx;
+  align-items: flex-start;
+  margin-bottom: 48rpx;
+}
+
+.brand-mark {
+  width: 88rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111111;
+  color: #ffffff;
+  border-radius: 8rpx;
+  font-size: 42rpx;
+  font-weight: 700;
+}
+
+.eyebrow {
+  color: #71717a;
+  font-size: 24rpx;
+  font-weight: 700;
+  letter-spacing: 6rpx;
+}
+
+.title {
+  margin-top: 4rpx;
+  font-size: 52rpx;
+  line-height: 1.1;
+  font-weight: 800;
+  color: #111111;
+}
+
+.subtitle {
+  margin-top: 12rpx;
+  color: #52525b;
+  font-size: 28rpx;
+  line-height: 1.45;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1rpx solid #e4e4e7;
+  border-radius: 12rpx;
+  padding: 28rpx;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.05);
+}
+
+.field-label {
+  color: #52525b;
+  font-size: 24rpx;
+  font-weight: 700;
+  margin-bottom: 12rpx;
+}
+
+.code-input {
+  height: 104rpx;
+  border: 1rpx solid #d4d4d8;
+  border-radius: 8rpx;
+  padding: 0 24rpx;
+  font-size: 36rpx;
+  font-weight: 700;
+  letter-spacing: 8rpx;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.primary-button {
+  margin-top: 24rpx;
+  height: 96rpx;
+  background: #111111;
+  color: #ffffff;
+  border-radius: 8rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.hint {
+  margin-top: 18rpx;
+  color: #71717a;
+  font-size: 24rpx;
+  line-height: 1.5;
+}

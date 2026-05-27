@@ -1,0 +1,13 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/tasks/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "TATO Tasks",
+    "navigationBarBackgroundColor": "#111111",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f4f4f5"
+  },
+  "sitemapLocation": "sitemap.json"
+}

@@ -1,0 +1,18 @@
+page {
+  background: #f4f4f5;
+  color: #111111;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+}
+
+button {
+  border-radius: 6px;
+}
+
+.page {
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.safe-bottom {
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+}

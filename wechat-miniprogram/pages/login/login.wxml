@@ -1,0 +1,27 @@
+<view class="page login-page safe-bottom">
+  <view class="brand-block">
+    <view class="brand-mark">T</view>
+    <view>
+      <view class="eyebrow">TATO</view>
+      <view class="title">员工任务</view>
+      <view class="subtitle">输入 Admin 给你的 Code，绑定微信后查看自己的任务。</view>
+    </view>
+  </view>
+
+  <view class="panel">
+    <view class="field-label">员工 Code</view>
+    <input
+      class="code-input"
+      value="{{staffCode}}"
+      maxlength="12"
+      placeholder="例如 8K3JX2PQ"
+      bindinput="onCodeInput"
+      confirm-type="done"
+      bindconfirm="submit"
+    />
+    <button class="primary-button" loading="{{loading}}" disabled="{{loading || !staffCode}}" bindtap="submit">
+      进入任务
+    </button>
+    <view class="hint">第一次登录会把这个 Code 绑定到当前微信。之后打开小程序会自动进入任务页。</view>
+  </view>
+</view>

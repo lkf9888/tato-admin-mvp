@@ -1,0 +1,120 @@
+<view class="page tasks-page safe-bottom">
+  <view class="topbar">
+    <view class="staff-row" wx:if="{{staff}}">
+      <view class="staff-dot" style="background-color: {{staff.color}}"></view>
+      <view class="staff-copy">
+        <view class="kicker">我的任务</view>
+        <view class="staff-name">{{staff.name}}</view>
+        <view class="staff-role">{{staff.role || '员工'}}</view>
+      </view>
+      <button class="text-button" bindtap="logout">退出</button>
+    </view>
+    <view class="summary-row">
+      <view class="summary-card">
+        <view class="summary-label">待处理</view>
+        <view class="summary-value">{{activeCount}}</view>
+      </view>
+      <view class="summary-card">
+        <view class="summary-label">过去任务</view>
+        <view class="summary-value">{{historyCount}}</view>
+      </view>
+    </view>
+    <button class="notify-button {{notificationEnabled ? 'is-on' : ''}}" bindtap="enableNotifications">
+      {{notificationEnabled ? '微信提醒已开启' : '开启新任务微信提醒'}}
+    </button>
+  </view>
+
+  <view class="loading" wx:if="{{loading}}">加载中...</view>
+
+  <view wx:if="{{!loading}}">
+    <view class="section-title">待处理</view>
+    <view wx:if="{{activeGroups.length === 0}}" class="empty-card">暂无任务</view>
+    <block wx:for="{{activeGroups}}" wx:key="key">
+      <view class="date-label">{{item.label}}</view>
+      <block wx:for="{{item.tasks}}" wx:key="id" wx:for-item="task">
+        <view class="task-card">
+          <view class="task-title">{{task.title}}</view>
+          <view class="task-meta">{{task.dueLabel}}{{task.timeWindow ? ' · ' + task.timeWindow : ''}}</view>
+          <view class="task-meta" wx:if="{{task.contextLabel}}">{{task.contextLabel}}</view>
+          <view class="task-detail" wx:if="{{task.details}}">{{task.details}}</view>
+          <scroll-view scroll-x class="photo-strip" wx:if="{{task.attachments.length > 0}}">
+            <image
+              wx:for="{{task.attachments}}"
+              wx:key="id"
+              wx:for-item="photo"
+              class="thumb"
+              src="{{photo.url}}"
+              mode="aspectFill"
+              data-task-id="{{task.id}}"
+              data-url="{{photo.url}}"
+              bindtap="previewImage"
+            />
+          </scroll-view>
+          <view class="action-grid">
+            <button class="action-button neutral" data-id="{{task.id}}" bindtap="unassignTask">放回未分配</button>
+            <button class="action-button amber" data-id="{{task.id}}" bindtap="editTask">编辑</button>
+            <button class="action-button blue" data-id="{{task.id}}" bindtap="uploadPhoto">上传图片</button>
+            <button class="action-button green" data-id="{{task.id}}" bindtap="completeTask">完成</button>
+          </view>
+        </view>
+      </block>
+    </block>
+
+    <view class="history-panel">
+      <view class="history-header" bindtap="toggleHistory">
+        <view>
+          <view class="history-title">已完成 / 已取消</view>
+          <view class="history-count">{{historyCount}} 条记录</view>
+        </view>
+        <view class="history-toggle">{{historyOpen ? '折叠' : '展开'}}</view>
+      </view>
+
+      <view wx:if="{{historyOpen}}" class="history-body">
+        <block wx:for="{{historyGroups}}" wx:key="key">
+          <view class="date-label">{{item.label}}</view>
+          <block wx:for="{{item.tasks}}" wx:key="id" wx:for-item="task">
+            <view class="history-task">
+              <view class="task-title small">{{task.title}}</view>
+              <view class="task-meta">{{task.dueLabel}}{{task.timeWindow ? ' · ' + task.timeWindow : ''}}</view>
+              <view class="task-detail" wx:if="{{task.details}}">{{task.details}}</view>
+            </view>
+          </block>
+        </block>
+        <view class="pager" wx:if="{{historyPageCount > 1}}">
+          <button class="pager-button" disabled="{{historyPage <= 1}}" bindtap="previousHistoryPage">上一页</button>
+          <view class="pager-status">{{historyPage}} / {{historyPageCount}}</view>
+          <button class="pager-button" disabled="{{historyPage >= historyPageCount}}" bindtap="nextHistoryPage">下一页</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="modal-mask" wx:if="{{editingTask}}">
+    <view class="edit-sheet">
+      <view class="sheet-header">
+        <view class="sheet-title">编辑任务</view>
+        <button class="icon-button" bindtap="closeEdit">×</button>
+      </view>
+      <view class="form-label">任务标题</view>
+      <input class="form-input" value="{{editForm.title}}" data-field="title" bindinput="onEditInput" />
+      <view class="form-row">
+        <view class="form-col">
+          <view class="form-label">日期</view>
+          <picker mode="date" value="{{editForm.dueDate}}" bindchange="onEditDateChange">
+            <view class="form-input picker-value">{{editForm.dueDate || '选择日期'}}</view>
+          </picker>
+        </view>
+        <view class="form-col">
+          <view class="form-label">时间段</view>
+          <input class="form-input" value="{{editForm.timeWindow}}" data-field="timeWindow" bindinput="onEditInput" />
+        </view>
+      </view>
+      <view class="form-label">任务说明</view>
+      <textarea class="form-textarea" value="{{editForm.details}}" data-field="details" bindinput="onEditInput" />
+      <view class="sheet-actions">
+        <button class="cancel-button" bindtap="closeEdit">取消</button>
+        <button class="save-button" loading="{{saving}}" disabled="{{saving}}" bindtap="saveEdit">保存</button>
+      </view>
+    </view>
+  </view>
+</view>

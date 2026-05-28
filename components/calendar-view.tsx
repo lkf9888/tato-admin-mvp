@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { type EditableOrder, OrderDetailModal } from "@/components/order-detail-modal";
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
+import { VehicleEditDialog, type VehicleEditDialogVehicle } from "@/components/vehicle-edit-dialog";
 import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-button";
 import { getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
 import {
@@ -28,6 +29,7 @@ type VehicleTimelineOption = {
   secondaryLabel?: string | null;
   ownerId?: string | null;
   ownerName?: string | null;
+  editVehicle?: VehicleEditDialogVehicle;
 };
 
 type TimelineBar = {
@@ -1149,9 +1151,23 @@ export function CalendarView({
                       )}
                       style={{ height: rowHeight }}
                     >
-                      <p className="truncate text-[12px] font-semibold leading-tight text-[color:var(--ink)]">
-                        {highlightText(vehicle.plateNumber || vehicle.label, vehicleFilterQuery)}
-                      </p>
+                      {!readOnly && vehicle.editVehicle ? (
+                        <VehicleEditDialog
+                          locale={locale}
+                          vehicle={vehicle.editVehicle}
+                          owners={ownerOptions}
+                          trigger={
+                            <span className="truncate">
+                              {highlightText(vehicle.plateNumber || vehicle.label, vehicleFilterQuery)}
+                            </span>
+                          }
+                          triggerClassName="inline-flex max-w-full items-center rounded px-0 text-left text-[12px] font-semibold leading-tight text-[color:var(--ink)] underline-offset-2 transition hover:text-[var(--accent)] hover:underline"
+                        />
+                      ) : (
+                        <p className="truncate text-[12px] font-semibold leading-tight text-[color:var(--ink)]">
+                          {highlightText(vehicle.plateNumber || vehicle.label, vehicleFilterQuery)}
+                        </p>
+                      )}
                       <p className="mt-0.5 truncate text-[10.5px] leading-tight text-[color:var(--ink-soft)]">
                         {highlightText(vehicle.secondaryLabel || vehicle.label, vehicleFilterQuery)}
                         {" · "}

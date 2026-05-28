@@ -239,3 +239,19 @@ a[class*="rounded-2xl"],
     opacity: 0.85;
   }
 }
+
+.staff-schedule-surface button:not(:disabled):not(.staff-modal-backdrop) {
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out,
+    filter 90ms ease-out,
+    background-color 120ms ease-out,
+    border-color 120ms ease-out;
+  will-change: transform;
+}
+
+.staff-schedule-surface button:not(:disabled):not(.staff-modal-backdrop):active {
+  transform: translateY(1px) scale(0.93);
+  filter: brightness(0.94);
+  box-shadow: inset 0 2px 8px rgba(17, 24, 39, 0.16);
+}

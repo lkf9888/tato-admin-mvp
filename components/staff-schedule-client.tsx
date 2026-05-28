@@ -704,7 +704,7 @@ export function StaffScheduleClient({
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="staff-schedule-surface mx-auto max-w-7xl space-y-4">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold text-neutral-400">{c.kicker}</p>
@@ -1404,7 +1404,12 @@ function TaskListItem({
         <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
-              {task.status !== "done" && task.status !== "cancelled" && isTaskDueToday(task.dueDatetime) ? (
+              <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
+              {task.status !== "done" && task.status !== "cancelled" && isTaskOverdue(task.dueDatetime) ? (
+                <span className="shrink-0 rounded bg-red-700 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
+                  Due
+                </span>
+              ) : task.status !== "done" && task.status !== "cancelled" && isTaskDueToday(task.dueDatetime) ? (
                 <span className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
                   {copy.todayBadge}
                 </span>
@@ -1413,7 +1418,6 @@ function TaskListItem({
                   {copy.tomorrowBadge}
                 </span>
               ) : null}
-              <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
               {task.attachments.length > 0 ? (
                 <span className="badge bg-neutral-100 text-neutral-600">
                   <ImagePlus className="h-3 w-3" />
@@ -1965,7 +1969,7 @@ function TaskModal({
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button className="absolute inset-0 bg-black/40" onClick={onClose} aria-label="Close" />
+      <button className="staff-modal-backdrop absolute inset-0 bg-black/40" onClick={onClose} aria-label="Close" />
       <div className="relative max-h-[88vh] w-[min(42rem,calc(100vw-2rem))] overflow-y-auto rounded-lg bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <h2 className="text-base font-semibold">{title}</h2>
@@ -2425,6 +2429,11 @@ function isTaskDueTomorrow(value: string | null) {
   return getTaskDueDayOffset(value) === 1;
 }
 
+function isTaskOverdue(value: string | null) {
+  const offset = getTaskDueDayOffset(value);
+  return offset != null && offset < 0;
+}
+
 function formatFileSize(size: number | null) {
   if (!size) return "";
   if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
@@ -2490,6 +2499,7 @@ function taskFormWithInitialStaff(initialStaffId: string | undefined, staffOptio
 
   return {
     ...defaultTaskForm,
+    dueDatetime: toLocalDateInput(new Date().toISOString()),
     staffId: staffOption?.id ?? "",
     staffInput: staffOption?.label ?? "",
     staffLabel: "",

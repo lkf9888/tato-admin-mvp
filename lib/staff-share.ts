@@ -65,6 +65,7 @@ export function serializeStaffShareTask(token: string, task: StaffShareTaskRecor
   return {
     id: task.id,
     staffId: task.staffId,
+    parentTaskId: task.parentTaskId,
     vehicleId: task.vehicleId,
     orderId: task.orderId,
     staffLabel: task.staffLabel,

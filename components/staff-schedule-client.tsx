@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
+import { compressImageFiles } from "@/lib/client-image-compression";
 import { cn, formatDateTime } from "@/lib/utils";
 
 type StaffStatus = "todo" | "in_progress" | "done" | "cancelled";
@@ -41,6 +42,7 @@ type StaffMember = {
 type StaffTask = {
   id: string;
   staffId: string | null;
+  parentTaskId: string | null;
   vehicleId: string | null;
   orderId: string | null;
   staffLabel: string | null;
@@ -152,7 +154,7 @@ function getStaffScheduleCopy(locale: Locale) {
         title: "线下员工排班",
         subtitle: "把接送车、洗车、验车、维修、文件处理等线下工作分配给员工，并关联车辆或订单。",
         addStaff: "新增员工",
-        addTask: "新增任务",
+        addTask: "任务",
         activeTasks: "进行中任务",
         overdue: "逾期",
         completed: "已完成",
@@ -232,8 +234,12 @@ function getStaffScheduleCopy(locale: Locale) {
         category: "类别",
         photos: "任务照片",
         uploadPhotos: "点击或拖拽上传照片",
+        compressingPhotos: "正在压缩图片...",
         pendingPhotos: "保存任务后上传",
         removePhoto: "移除照片",
+        addSubtask: "+子任务",
+        subtaskPlaceholder: "输入子任务...",
+        subtaskPromoteHint: "可拖拽到员工卡片变成正常任务",
         customHint: "可搜索，也可直接输入自定义文字。",
         none: "不关联",
         created: "已保存",
@@ -256,7 +262,7 @@ function getStaffScheduleCopy(locale: Locale) {
         subtitle:
           "Assign handoffs, washes, inspections, repairs, document work, and other offline tasks to staff with vehicle and order context.",
         addStaff: "Add staff",
-        addTask: "Add task",
+        addTask: "Task",
         activeTasks: "Active tasks",
         overdue: "Overdue",
         completed: "Completed",
@@ -336,8 +342,12 @@ function getStaffScheduleCopy(locale: Locale) {
         category: "Category",
         photos: "Task photos",
         uploadPhotos: "Click or drag photos here",
+        compressingPhotos: "Compressing photos...",
         pendingPhotos: "Uploads after saving",
         removePhoto: "Remove photo",
+        addSubtask: "+ Subtask",
+        subtaskPlaceholder: "Type a subtask...",
+        subtaskPromoteHint: "Drag to a staff card to make it a normal task",
         customHint: "Search existing records or type custom text.",
         none: "None",
         created: "Saved",
@@ -396,11 +406,26 @@ export function StaffScheduleClient({
     () => tasks.filter((task) => task.status !== "done" && task.status !== "cancelled"),
     [tasks],
   );
+  const rootActiveTasks = useMemo(
+    () => activeTasks.filter((task) => !task.parentTaskId),
+    [activeTasks],
+  );
   const completedTasks = useMemo(
-    () => tasks.filter((task) => task.status === "done"),
+    () => tasks.filter((task) => task.status === "done" && !task.parentTaskId),
     [tasks],
   );
-  const unassignedTasks = activeTasks.filter((task) => !task.staffId);
+  const unassignedTasks = rootActiveTasks.filter((task) => !task.staffId);
+  const subtasksByParent = useMemo(() => {
+    const map = new Map<string, StaffTask[]>();
+    for (const task of tasks) {
+      if (!task.parentTaskId || task.status === "cancelled") continue;
+      const list = map.get(task.parentTaskId) ?? [];
+      list.push(task);
+      map.set(task.parentTaskId, list);
+    }
+    for (const list of map.values()) list.sort(sortTasks);
+    return map;
+  }, [tasks]);
   const assignedOrderEventKeys = useMemo(
     () =>
       new Set(
@@ -436,17 +461,18 @@ export function StaffScheduleClient({
   const tasksByStaff = useMemo(() => {
     const map = new Map<string, StaffTask[]>();
     for (const member of activeStaff) map.set(member.id, []);
-    for (const task of activeTasks) {
+    for (const task of rootActiveTasks) {
       if (!task.staffId || !map.has(task.staffId)) continue;
       map.get(task.staffId)!.push(task);
     }
     for (const list of map.values()) list.sort(sortTasks);
     return map;
-  }, [activeStaff, activeTasks]);
+  }, [activeStaff, rootActiveTasks]);
   const tasksByArchivedStaff = useMemo(() => {
     const map = new Map<string, StaffTask[]>();
     for (const member of archivedStaff) map.set(member.id, []);
     for (const task of tasks) {
+      if (task.parentTaskId) continue;
       if (!task.staffId || !map.has(task.staffId)) continue;
       map.get(task.staffId)!.push(task);
     }
@@ -495,6 +521,7 @@ export function StaffScheduleClient({
         if (taskId === movedTaskId) {
           body.staffId = staffId ?? "";
           body.staffLabel = "";
+          body.parentTaskId = "";
         }
         return fetch(`/api/staff-schedule/tasks/${taskId}`, {
           method: "PATCH",
@@ -521,7 +548,7 @@ export function StaffScheduleClient({
       ? activeStaff.find((member) => member.id === targetStaffId) ?? null
       : null;
     const sameGroup = sourceStaffId === targetStaffId;
-    const targetGroup = activeTasks
+    const targetGroup = rootActiveTasks
       .filter((task) => task.id !== taskId && (task.staffId ?? null) === targetStaffId)
       .sort(sortTasks);
     const targetIndex = targetTaskId
@@ -530,6 +557,7 @@ export function StaffScheduleClient({
     const nextMovingTask: StaffTask = {
       ...movingTask,
       staffId: targetStaffId,
+      parentTaskId: null,
       staffLabel: null,
       staff: assignedStaff,
     };
@@ -540,12 +568,14 @@ export function StaffScheduleClient({
     nextTargetGroup.forEach((task, index) => {
       updates.set(task.id, {
         sortOrder: (index + 1) * 1000,
-        ...(task.id === taskId ? { staffId: targetStaffId, staffLabel: null, staff: assignedStaff } : {}),
+        ...(task.id === taskId
+          ? { staffId: targetStaffId, parentTaskId: null, staffLabel: null, staff: assignedStaff }
+          : {}),
       });
     });
 
     if (!sameGroup) {
-      activeTasks
+      rootActiveTasks
         .filter((task) => task.id !== taskId && (task.staffId ?? null) === sourceStaffId)
         .sort(sortTasks)
         .forEach((task, index) => {
@@ -571,7 +601,7 @@ export function StaffScheduleClient({
   }
 
   async function createTaskFromOrderEvent(orderEvent: OrderEvent, staffId: string | null) {
-    const existingTask = activeTasks.find(
+    const existingTask = rootActiveTasks.find(
       (task) =>
         task.orderId === orderEvent.orderId &&
         task.category === orderEvent.category &&
@@ -587,7 +617,7 @@ export function StaffScheduleClient({
 
     const staffMember = staffId ? activeStaff.find((member) => member.id === staffId) : null;
     const targetSortOrder =
-      (activeTasks.filter((task) => (task.staffId ?? null) === (staffId ?? null)).length + 1) * 1000;
+      (rootActiveTasks.filter((task) => (task.staffId ?? null) === (staffId ?? null)).length + 1) * 1000;
     const response = await fetch("/api/staff-schedule/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -700,6 +730,58 @@ export function StaffScheduleClient({
       return;
     }
     setTasks((current) => current.filter((item) => item.id !== task.id));
+    setNotice(c.created);
+  }
+
+  async function uploadTaskPhotos(task: StaffTask, files: File[]) {
+    const photoFiles = files.filter(isPhotoFile);
+    if (photoFiles.length === 0) return;
+
+    try {
+      const uploaded = await uploadStaffTaskPhotos(task.id, photoFiles);
+      setTasks((current) =>
+        current.map((item) =>
+          item.id === task.id
+            ? normalizeTask({ ...item, attachments: [...item.attachments, ...uploaded] })
+            : item,
+        ),
+      );
+      setNotice(c.created);
+    } catch {
+      setNotice(c.failed);
+    }
+  }
+
+  async function createSubtask(parentTask: StaffTask, title: string) {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return;
+
+    const siblingCount = subtasksByParent.get(parentTask.id)?.length ?? 0;
+    const response = await fetch("/api/staff-schedule/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        parentTaskId: parentTask.id,
+        staffId: parentTask.staffId ?? "",
+        staffLabel: "",
+        vehicleId: parentTask.vehicleId ?? "",
+        vehicleLabel: parentTask.vehicleId ? "" : parentTask.vehicleLabel ?? "",
+        orderId: parentTask.orderId ?? "",
+        orderLabel: parentTask.orderId ? "" : parentTask.orderLabel ?? "",
+        title: trimmedTitle,
+        details: "",
+        dueDatetime: parentTask.dueDatetime ? toLocalDateInput(parentTask.dueDatetime) : "",
+        timeWindow: parentTask.timeWindow ?? "",
+        sortOrder: (siblingCount + 1) * 1000,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.task) {
+      setNotice(c.failed);
+      return;
+    }
+
+    upsertTask(normalizeTask(payload.task));
     setNotice(c.created);
   }
 
@@ -880,6 +962,7 @@ export function StaffScheduleClient({
               ) : null}
               <TaskList
                 tasks={tasksByStaff.get(member.id) ?? []}
+                subtasksByParent={subtasksByParent}
                 locale={locale}
                 copy={c}
                 dragTaskId={dragTaskId}
@@ -897,6 +980,8 @@ export function StaffScheduleClient({
                 onEdit={setTaskModal}
                 onComplete={(task) => quickStatus(task, task.status === "done" ? "todo" : "done")}
                 onCancel={(task) => deleteTask(task)}
+                onAddSubtask={createSubtask}
+                onUploadPhotos={uploadTaskPhotos}
               />
             </article>
           ))}
@@ -951,6 +1036,7 @@ export function StaffScheduleClient({
           ) : null}
           <TaskList
             tasks={unassignedTasks.sort(sortTasks)}
+            subtasksByParent={subtasksByParent}
             locale={locale}
             copy={c}
             dragTaskId={dragTaskId}
@@ -968,6 +1054,8 @@ export function StaffScheduleClient({
             onEdit={setTaskModal}
             onComplete={(task) => quickStatus(task, "done")}
             onCancel={(task) => deleteTask(task)}
+            onAddSubtask={createSubtask}
+            onUploadPhotos={uploadTaskPhotos}
           />
         </article>
         <article className="card overflow-hidden">
@@ -1000,6 +1088,7 @@ export function StaffScheduleClient({
               </div>
               <TaskList
                 tasks={pagedCompletedTasks}
+                subtasksByParent={subtasksByParent}
                 locale={locale}
                 copy={c}
                 dragTaskId={dragTaskId}
@@ -1010,6 +1099,8 @@ export function StaffScheduleClient({
                 onCancel={(task) => deleteTask(task, true)}
                 showCompleteAction={false}
                 deleteLabel={c.permanentDelete}
+                onAddSubtask={createSubtask}
+                onUploadPhotos={uploadTaskPhotos}
               />
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-3 py-2">
                 <button
@@ -1277,6 +1368,7 @@ function OrderAssignInput({
 
 function TaskList({
   tasks,
+  subtasksByParent,
   locale,
   copy,
   dragTaskId,
@@ -1288,10 +1380,13 @@ function TaskList({
   onEdit,
   onComplete,
   onCancel,
+  onAddSubtask,
+  onUploadPhotos,
   showCompleteAction = true,
   deleteLabel,
 }: {
   tasks: StaffTask[];
+  subtasksByParent: Map<string, StaffTask[]>;
   locale: Locale;
   copy: ReturnType<typeof getStaffScheduleCopy>;
   dragTaskId: string | null;
@@ -1303,6 +1398,8 @@ function TaskList({
   onEdit: (task: StaffTask) => void;
   onComplete: (task: StaffTask) => void;
   onCancel: (task: StaffTask) => void;
+  onAddSubtask: (parentTask: StaffTask, title: string) => void;
+  onUploadPhotos: (task: StaffTask, files: File[]) => void;
   showCompleteAction?: boolean;
   deleteLabel?: string;
 }) {
@@ -1316,6 +1413,7 @@ function TaskList({
         <TaskListItem
           key={task.id}
           task={task}
+          subtasks={subtasksByParent.get(task.id) ?? []}
           locale={locale}
           copy={copy}
           dragTaskId={dragTaskId}
@@ -1327,6 +1425,8 @@ function TaskList({
           onEdit={onEdit}
           onComplete={onComplete}
           onCancel={onCancel}
+          onAddSubtask={onAddSubtask}
+          onUploadPhotos={onUploadPhotos}
           showCompleteAction={showCompleteAction}
           deleteLabel={deleteLabel}
         />
@@ -1337,6 +1437,7 @@ function TaskList({
 
 function TaskListItem({
   task,
+  subtasks,
   locale,
   copy,
   dragTaskId,
@@ -1348,10 +1449,13 @@ function TaskListItem({
   onEdit,
   onComplete,
   onCancel,
+  onAddSubtask,
+  onUploadPhotos,
   showCompleteAction,
   deleteLabel,
 }: {
   task: StaffTask;
+  subtasks: StaffTask[];
   locale: Locale;
   copy: ReturnType<typeof getStaffScheduleCopy>;
   dragTaskId: string | null;
@@ -1363,11 +1467,16 @@ function TaskListItem({
   onEdit: (task: StaffTask) => void;
   onComplete: (task: StaffTask) => void;
   onCancel: (task: StaffTask) => void;
+  onAddSubtask: (parentTask: StaffTask, title: string) => void;
+  onUploadPhotos: (task: StaffTask, files: File[]) => void;
   showCompleteAction: boolean;
   deleteLabel?: string;
 }) {
   const contextText = getTaskContextText(task, copy);
   const detailsText = getTaskDetailsText(task);
+  const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+  const canAddSubtask = task.status !== "done" && task.status !== "cancelled" && showCompleteAction;
 
   return (
     <div
@@ -1442,6 +1551,15 @@ function TaskListItem({
           <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
         </div>
         <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
+          {canAddSubtask && !isAddingSubtask ? (
+            <button
+              className="btn-secondary min-h-7 px-2 py-1 text-[11px] text-neutral-700"
+              type="button"
+              onClick={() => setIsAddingSubtask(true)}
+            >
+              {copy.addSubtask}
+            </button>
+          ) : null}
           <button className="btn-secondary min-h-7 min-w-7 border-amber-300 bg-amber-50 px-1 py-1 text-[11px] text-amber-800 hover:bg-amber-100" onClick={() => onEdit(task)}>
             <Pencil className="h-3 w-3" />
           </button>
@@ -1457,6 +1575,142 @@ function TaskListItem({
           </button>
         </div>
       </div>
+      <SubtaskList
+        parentTask={task}
+        subtasks={subtasks}
+        locale={locale}
+        copy={copy}
+        dragTaskId={dragTaskId}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onEdit={onEdit}
+        onComplete={onComplete}
+        onCancel={onCancel}
+        onUploadPhotos={onUploadPhotos}
+      />
+      {canAddSubtask && isAddingSubtask ? (
+        <form
+          className="mt-2 flex items-center gap-1.5 pl-7"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const nextTitle = subtaskTitle.trim();
+            if (!nextTitle) return;
+            onAddSubtask(task, nextTitle);
+            setSubtaskTitle("");
+            setIsAddingSubtask(false);
+          }}
+        >
+          <input
+            className="input h-7 flex-1 px-2 py-1 text-[11px]"
+            value={subtaskTitle}
+            placeholder={copy.subtaskPlaceholder}
+            onChange={(event) => setSubtaskTitle(event.target.value)}
+            autoFocus
+          />
+          <button className="btn-secondary min-h-7 px-2 py-1 text-[11px]" type="submit">
+            {copy.save}
+          </button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
+function SubtaskList({
+  parentTask,
+  subtasks,
+  locale,
+  copy,
+  dragTaskId,
+  onDragStart,
+  onDragEnd,
+  onEdit,
+  onComplete,
+  onCancel,
+  onUploadPhotos,
+}: {
+  parentTask: StaffTask;
+  subtasks: StaffTask[];
+  locale: Locale;
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+  dragTaskId: string | null;
+  onDragStart: (taskId: string) => void;
+  onDragEnd: () => void;
+  onEdit: (task: StaffTask) => void;
+  onComplete: (task: StaffTask) => void;
+  onCancel: (task: StaffTask) => void;
+  onUploadPhotos: (task: StaffTask, files: File[]) => void;
+}) {
+  if (subtasks.length === 0) return null;
+
+  return (
+    <div className="mt-2 space-y-1 pl-7">
+      {subtasks.map((subtask) => {
+        const closed = subtask.status === "done" || subtask.status === "cancelled";
+        return (
+          <div
+            key={subtask.id}
+            draggable={!closed}
+            onDragStart={(event) => {
+              if (closed) return;
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", subtask.id);
+              onDragStart(subtask.id);
+            }}
+            onDragEnd={onDragEnd}
+            className={cn(
+              "border border-neutral-200 bg-white/60 px-2 py-1.5 text-[11px] transition",
+              !closed ? "cursor-grab active:cursor-grabbing" : "opacity-70",
+              dragTaskId === subtask.id ? "bg-neutral-50 opacity-60" : "",
+            )}
+          >
+            <div className="flex items-start gap-2">
+              <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-300" />
+              <div className="min-w-0 flex-1">
+                <p className={cn("break-words font-medium leading-4 text-neutral-800", closed ? "line-through" : "")}>
+                  {subtask.title}
+                </p>
+                <p className="mt-0.5 text-[10px] leading-3 text-neutral-500">
+                  {formatTaskDue(subtask.dueDatetime ?? parentTask.dueDatetime, locale, copy.noDue)}
+                  {subtask.timeWindow ? ` · ${subtask.timeWindow}` : ""}
+                </p>
+                <p className="mt-0.5 text-[10px] leading-3 text-neutral-400">{copy.subtaskPromoteHint}</p>
+                <TaskAttachmentStrip attachments={subtask.attachments} copy={copy} compact />
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <label className="btn-secondary flex min-h-6 min-w-6 cursor-pointer items-center justify-center border-sky-300 bg-sky-50 px-1 py-1 text-sky-800 hover:bg-sky-100">
+                  <ImagePlus className="h-3 w-3" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(event) => {
+                      onUploadPhotos(subtask, Array.from(event.target.files ?? []));
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+                <button
+                  className="btn-secondary min-h-6 min-w-6 border-amber-300 bg-amber-50 px-1 py-1 text-amber-800 hover:bg-amber-100"
+                  onClick={() => onEdit(subtask)}
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+                <button
+                  className="btn-secondary min-h-6 min-w-6 border-emerald-300 bg-emerald-50 px-1 py-1 text-emerald-800 hover:bg-emerald-100"
+                  onClick={() => onComplete(subtask)}
+                >
+                  {subtask.status === "done" ? <Circle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                </button>
+                <button className="btn-danger min-h-6 min-w-6 px-1 py-1" onClick={() => onCancel(subtask)}>
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1761,25 +2015,7 @@ function TaskModal({
   }
 
   async function uploadTaskPhotos(taskId: string, files: File[]) {
-    if (files.length === 0) return [];
-
-    const formData = new FormData();
-    for (const file of files) {
-      formData.append("files", file);
-    }
-
-    const response = await fetch(`/api/staff-schedule/tasks/${taskId}/attachments`, {
-      method: "POST",
-      body: formData,
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !Array.isArray(payload.attachments)) {
-      throw new Error("UPLOAD_FAILED");
-    }
-
-    return payload.attachments.map((attachment: TaskAttachment) =>
-      normalizeTaskAttachment(taskId, attachment),
-    );
+    return uploadStaffTaskPhotos(taskId, files);
   }
 
   async function acceptPhotoFiles(files: FileList | File[]) {
@@ -1832,6 +2068,7 @@ function TaskModal({
       details: form.details,
       dueDatetime: form.dueDatetime,
       timeWindow: form.timeWindow,
+      ...(task?.parentTaskId && form.staffId !== (task.staffId ?? "") ? { parentTaskId: "" } : {}),
     };
 
     try {
@@ -1927,7 +2164,7 @@ function TaskModal({
           >
             <ImagePlus className="h-5 w-5 text-neutral-500" />
             <span className="font-medium text-neutral-800">
-              {uploading ? `${copy.save}...` : copy.uploadPhotos}
+              {uploading ? copy.compressingPhotos : copy.uploadPhotos}
             </span>
             {!task && pendingFiles.length > 0 ? (
               <span className="text-xs text-neutral-500">
@@ -2102,9 +2339,11 @@ function TaskPhotoGrid({
 function TaskAttachmentStrip({
   attachments,
   copy,
+  compact = false,
 }: {
   attachments: TaskAttachment[];
   copy: ReturnType<typeof getStaffScheduleCopy>;
+  compact?: boolean;
 }) {
   if (attachments.length === 0) return null;
 
@@ -2112,9 +2351,12 @@ function TaskAttachmentStrip({
   const hiddenCount = attachments.length - visibleAttachments.length;
 
   return (
-    <div className="flex w-full shrink-0 flex-wrap gap-1.5 sm:w-[10.125rem] sm:justify-end">
+    <div className={cn("flex w-full shrink-0 flex-wrap gap-1.5", compact ? "mt-1" : "sm:w-[10.125rem] sm:justify-end")}>
       {visibleAttachments.map((attachment) => (
-        <div key={attachment.id} className="h-12 w-12 overflow-hidden border border-neutral-200 bg-neutral-100">
+        <div
+          key={attachment.id}
+          className={cn("overflow-hidden border border-neutral-200 bg-neutral-100", compact ? "h-8 w-8" : "h-12 w-12")}
+        >
           <img
             src={attachment.url}
             alt={attachment.filename || copy.photos}
@@ -2124,7 +2366,12 @@ function TaskAttachmentStrip({
         </div>
       ))}
       {hiddenCount > 0 ? (
-        <div className="flex h-12 w-12 items-center justify-center border border-neutral-200 bg-neutral-50 text-xs font-semibold text-neutral-600">
+        <div
+          className={cn(
+            "flex items-center justify-center border border-neutral-200 bg-neutral-50 text-xs font-semibold text-neutral-600",
+            compact ? "h-8 w-8" : "h-12 w-12",
+          )}
+        >
           +{hiddenCount}
         </div>
       ) : null}
@@ -2347,6 +2594,29 @@ function isPhotoFile(file: File) {
   return file.type.startsWith("image/") || /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
 }
 
+async function uploadStaffTaskPhotos(taskId: string, files: File[]) {
+  if (files.length === 0) return [];
+
+  const formData = new FormData();
+  const uploadFiles = await compressImageFiles(files);
+  for (const file of uploadFiles) {
+    formData.append("files", file);
+  }
+
+  const response = await fetch(`/api/staff-schedule/tasks/${taskId}/attachments`, {
+    method: "POST",
+    body: formData,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !Array.isArray(payload.attachments)) {
+    throw new Error("UPLOAD_FAILED");
+  }
+
+  return payload.attachments.map((attachment: TaskAttachment) =>
+    normalizeTaskAttachment(taskId, attachment),
+  );
+}
+
 function normalizeTaskAttachment(taskId: string, raw: TaskAttachment): TaskAttachment {
   return {
     id: raw.id,
@@ -2443,6 +2713,7 @@ function formatFileSize(size: number | null) {
 function normalizeTask(raw: StaffTask): StaffTask {
   return {
     ...raw,
+    parentTaskId: raw.parentTaskId ?? null,
     sortOrder: raw.sortOrder ?? 0,
     dueDatetime: raw.dueDatetime ? new Date(raw.dueDatetime).toISOString() : null,
     completedAt: raw.completedAt ? new Date(raw.completedAt).toISOString() : null,

@@ -11,7 +11,7 @@ import { notifyAdminsOfStaffTaskAction } from "@/lib/staff-task-notifications";
 type Params = Promise<{ token: string; taskId: string }>;
 
 const taskPatchSchema = z.object({
-  title: z.string().trim().min(2).optional(),
+  title: z.string().trim().min(1).optional(),
   details: z.string().trim().optional().nullable().or(z.literal("")),
   dueDatetime: z.string().optional().nullable().or(z.literal("")),
   timeWindow: z.string().trim().optional().nullable().or(z.literal("")),
@@ -72,7 +72,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   const task = await prisma.staffTask.update({
     where: { id: context.task.id },
     data: {
-      ...(parsed.unassign ? { staffId: null, staffLabel: null, sortOrder: 0 } : {}),
+      ...(parsed.unassign ? { staffId: null, staffLabel: null, parentTaskId: null, sortOrder: 0 } : {}),
       title: parsed.title ?? context.task.title,
       details: parsed.details === undefined ? context.task.details : nullable(parsed.details),
       dueDatetime:

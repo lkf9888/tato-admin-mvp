@@ -377,6 +377,7 @@ model StaffTask {
   workspaceId  String?
   id           String                @id @default(cuid())
   staffId      String?
+  parentTaskId String?
   vehicleId    String?
   orderId      String?
   staffLabel   String?
@@ -395,11 +396,14 @@ model StaffTask {
   updatedAt    DateTime              @updatedAt
   workspace    Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   staff        StaffMember?          @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  parentTask   StaffTask?            @relation("StaffTaskSubtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  subtasks     StaffTask[]           @relation("StaffTaskSubtasks")
   vehicle      Vehicle?              @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   order        Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
   attachments  StaffTaskAttachment[]
 
   @@index([workspaceId, status])
+  @@index([parentTaskId, sortOrder])
   @@index([staffId, dueDatetime])
   @@index([vehicleId, dueDatetime])
   @@index([orderId])

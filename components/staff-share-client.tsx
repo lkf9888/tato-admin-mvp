@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
+import { compressImageFiles } from "@/lib/client-image-compression";
 
 type StaffTaskStatus = "todo" | "in_progress" | "done" | "cancelled";
 
@@ -22,6 +23,7 @@ const HISTORY_PAGE_SIZE = 10;
 export type StaffShareTask = {
   id: string;
   staffId: string | null;
+  parentTaskId: string | null;
   vehicleId: string | null;
   orderId: string | null;
   staffLabel: string | null;
@@ -99,6 +101,7 @@ function copy(locale: Locale) {
         details: "任务说明",
         photos: "照片",
         uploadPhotos: "上传照片",
+        compressingPhotos: "正在压缩图片...",
         addPhotos: "添加照片",
         saved: "已保存",
         failed: "操作失败，请稍后再试。",
@@ -145,6 +148,7 @@ function copy(locale: Locale) {
         details: "Details",
         photos: "Photos",
         uploadPhotos: "Upload photos",
+        compressingPhotos: "Compressing photos...",
         addPhotos: "Add photos",
         saved: "Saved",
         failed: "Something went wrong. Please try again.",
@@ -179,17 +183,28 @@ export function StaffShareClient({
   const activeTasks = useMemo(
     () =>
       tasks
-        .filter((task) => task.status !== "done" && task.status !== "cancelled")
+        .filter((task) => !task.parentTaskId && task.status !== "done" && task.status !== "cancelled")
         .sort(sortTasks),
     [tasks],
   );
   const historyTasks = useMemo(
     () =>
       tasks
-        .filter((task) => task.status === "done" || task.status === "cancelled")
+        .filter((task) => !task.parentTaskId && (task.status === "done" || task.status === "cancelled"))
         .sort(sortHistoryTasks),
     [tasks],
   );
+  const subtasksByParent = useMemo(() => {
+    const map = new Map<string, StaffShareTask[]>();
+    for (const task of tasks) {
+      if (!task.parentTaskId || task.status === "cancelled") continue;
+      const list = map.get(task.parentTaskId) ?? [];
+      list.push(task);
+      map.set(task.parentTaskId, list);
+    }
+    for (const list of map.values()) list.sort(sortTasks);
+    return map;
+  }, [tasks]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const historyPageCount = Math.max(1, Math.ceil(historyTasks.length / HISTORY_PAGE_SIZE));
@@ -279,7 +294,8 @@ export function StaffShareClient({
     if (photoFiles.length === 0) return;
 
     const formData = new FormData();
-    photoFiles.forEach((file) => formData.append("files", file));
+    const uploadFiles = await compressImageFiles(photoFiles);
+    uploadFiles.forEach((file) => formData.append("files", file));
 
     const response = await fetch(`/api/staff-share/${token}/tasks/${task.id}/attachments`, {
       method: "POST",
@@ -383,6 +399,7 @@ export function StaffShareClient({
                 labels={labels}
                 locale={activeLocale}
                 task={task}
+                subtasks={subtasksByParent.get(task.id) ?? []}
                 onEdit={setEditingTask}
                 onComplete={toggleComplete}
                 onUnassign={unassignTask}
@@ -426,6 +443,7 @@ export function StaffShareClient({
                         labels={labels}
                         locale={activeLocale}
                         task={task}
+                        subtasks={subtasksByParent.get(task.id) ?? []}
                         onEdit={setEditingTask}
                         onComplete={toggleComplete}
                         onUnassign={unassignTask}
@@ -510,6 +528,7 @@ function TaskCard({
   labels,
   locale,
   task,
+  subtasks,
   onEdit,
   onComplete,
   onUnassign,
@@ -519,6 +538,7 @@ function TaskCard({
   labels: ReturnType<typeof copy>;
   locale: Locale;
   task: StaffShareTask;
+  subtasks: StaffShareTask[];
   onEdit: (task: StaffShareTask) => void;
   onComplete: (task: StaffShareTask) => void;
   onUnassign: (task: StaffShareTask) => void;
@@ -551,6 +571,16 @@ function TaskCard({
             </p>
           ) : null}
           <AttachmentStrip attachments={task.attachments} labels={labels} onPreview={onPreviewImage} />
+          <StaffShareSubtasks
+            labels={labels}
+            locale={locale}
+            subtasks={subtasks}
+            onEdit={onEdit}
+            onComplete={onComplete}
+            onUnassign={onUnassign}
+            onUploadPhotos={onUploadPhotos}
+            onPreviewImage={onPreviewImage}
+          />
         </div>
       </div>
       <div className="mt-3 grid grid-cols-4 gap-1.5">
@@ -598,6 +628,85 @@ function TaskCard({
   );
 }
 
+function StaffShareSubtasks({
+  labels,
+  locale,
+  subtasks,
+  onEdit,
+  onComplete,
+  onUnassign,
+  onUploadPhotos,
+  onPreviewImage,
+}: {
+  labels: ReturnType<typeof copy>;
+  locale: Locale;
+  subtasks: StaffShareTask[];
+  onEdit: (task: StaffShareTask) => void;
+  onComplete: (task: StaffShareTask) => void;
+  onUnassign: (task: StaffShareTask) => void;
+  onUploadPhotos: (task: StaffShareTask, files: File[]) => void;
+  onPreviewImage: (attachment: StaffShareAttachment) => void;
+}) {
+  if (subtasks.length === 0) return null;
+
+  return (
+    <div className="mt-3 space-y-2">
+      {subtasks.map((subtask) => {
+        const closed = subtask.status === "done" || subtask.status === "cancelled";
+        return (
+          <div key={subtask.id} className="rounded border border-neutral-200 bg-neutral-50 px-2 py-2">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
+              <div className="min-w-0 flex-1">
+                <p className={`break-words text-xs font-semibold leading-4 text-neutral-800 ${closed ? "line-through" : ""}`}>
+                  {subtask.title}
+                </p>
+                <p className="mt-0.5 text-[11px] text-neutral-500">
+                  {formatTaskDue(subtask.dueDatetime, locale, labels.noDue)}
+                  {subtask.timeWindow ? ` · ${subtask.timeWindow}` : ""}
+                </p>
+                <AttachmentStrip attachments={subtask.attachments} labels={labels} onPreview={onPreviewImage} compact />
+              </div>
+            </div>
+            {subtask.status !== "cancelled" ? (
+              <div className="mt-2 grid grid-cols-4 gap-1">
+                {!closed ? (
+                  <button className="mobile-action !min-h-7 flex-col !gap-0.5 !px-0.5 !py-0.5 !text-[9px] leading-tight border-neutral-300 bg-white text-neutral-700" onClick={() => onUnassign(subtask)}>
+                    <RotateCcw className="h-3 w-3" />
+                    {labels.unassign}
+                  </button>
+                ) : null}
+                <button className="mobile-action !min-h-7 flex-col !gap-0.5 !px-0.5 !py-0.5 !text-[9px] leading-tight border-amber-300 bg-amber-50 text-amber-800" onClick={() => onEdit(subtask)}>
+                  <Pencil className="h-3 w-3" />
+                  {labels.edit}
+                </button>
+                <label className="mobile-action flex !min-h-7 cursor-pointer flex-col items-center justify-center !gap-0.5 !px-0.5 !py-0.5 !text-[9px] leading-tight border-sky-300 bg-sky-50 text-sky-800">
+                  <Upload className="h-3 w-3" />
+                  {labels.uploadPhotos}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(event) => {
+                      onUploadPhotos(subtask, Array.from(event.target.files ?? []));
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+                <button className="mobile-action !min-h-7 flex-col !gap-0.5 !px-0.5 !py-0.5 !text-[9px] leading-tight border-emerald-300 bg-emerald-50 text-emerald-800" onClick={() => onComplete(subtask)}>
+                  {subtask.status === "done" ? <Circle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                  {subtask.status === "done" ? labels.reopen : labels.complete}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function EditTaskModal({
   labels,
   token,
@@ -626,7 +735,8 @@ function EditTaskModal({
   async function uploadPhotos(taskId: string, files: File[]) {
     if (files.length === 0) return [];
     const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
+    const uploadFiles = await compressImageFiles(files);
+    uploadFiles.forEach((file) => formData.append("files", file));
     const response = await fetch(`/api/staff-share/${token}/tasks/${taskId}/attachments`, {
       method: "POST",
       body: formData,
@@ -781,20 +891,22 @@ function AttachmentStrip({
   attachments,
   labels,
   onPreview,
+  compact = false,
 }: {
   attachments: StaffShareAttachment[];
   labels: ReturnType<typeof copy>;
   onPreview: (attachment: StaffShareAttachment) => void;
+  compact?: boolean;
 }) {
   if (attachments.length === 0) return null;
   return (
-    <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+    <div className={`${compact ? "mt-2 gap-1.5" : "mt-3 gap-2"} flex overflow-x-auto pb-1`}>
       {attachments.map((attachment) => (
         <button
           key={attachment.id}
           type="button"
           onClick={() => onPreview(attachment)}
-          className="h-16 w-16 shrink-0 overflow-hidden rounded border border-neutral-200 bg-neutral-100"
+          className={`${compact ? "h-10 w-10" : "h-16 w-16"} shrink-0 overflow-hidden rounded border border-neutral-200 bg-neutral-100`}
         >
           <img src={attachment.url} alt={attachment.filename || labels.photos} className="h-full w-full object-cover" />
         </button>
@@ -885,6 +997,7 @@ function DueBadge({ labels, task }: { labels: ReturnType<typeof copy>; task: Sta
 function normalizeTask(task: StaffShareTask): StaffShareTask {
   return {
     ...task,
+    parentTaskId: task.parentTaskId ?? null,
     dueDatetime: task.dueDatetime ? new Date(task.dueDatetime).toISOString() : null,
     completedAt: task.completedAt ? new Date(task.completedAt).toISOString() : null,
     attachments: (task.attachments ?? []).map(normalizeAttachment),

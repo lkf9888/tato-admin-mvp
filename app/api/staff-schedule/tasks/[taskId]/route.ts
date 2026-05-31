@@ -14,12 +14,13 @@ type Params = Promise<{ taskId: string }>;
 
 const taskSchema = z.object({
   staffId: z.string().optional().nullable().or(z.literal("")),
+  parentTaskId: z.string().optional().nullable().or(z.literal("")),
   vehicleId: z.string().optional().nullable().or(z.literal("")),
   orderId: z.string().optional().nullable().or(z.literal("")),
   staffLabel: z.string().trim().optional().nullable().or(z.literal("")),
   vehicleLabel: z.string().trim().optional().nullable().or(z.literal("")),
   orderLabel: z.string().trim().optional().nullable().or(z.literal("")),
-  title: z.string().trim().min(2).optional(),
+  title: z.string().trim().min(1).optional(),
   details: z.string().trim().optional().nullable().or(z.literal("")),
   dueDatetime: z.string().optional().nullable().or(z.literal("")),
   timeWindow: z.string().trim().optional().nullable().or(z.literal("")),
@@ -65,14 +66,26 @@ const taskInclude = {
 
 async function ensureWorkspaceRefs(input: {
   workspaceId: string;
+  taskId?: string | null;
   staffId?: string | null;
+  parentTaskId?: string | null;
   vehicleId?: string | null;
   orderId?: string | null;
 }) {
-  const [staff, vehicle, order] = await Promise.all([
+  const [staff, parentTask, vehicle, order] = await Promise.all([
     input.staffId
       ? prisma.staffMember.findFirst({
           where: { id: input.staffId, workspaceId: input.workspaceId, isActive: true },
+          select: { id: true },
+        })
+      : null,
+    input.parentTaskId
+      ? prisma.staffTask.findFirst({
+          where: {
+            id: input.parentTaskId,
+            workspaceId: input.workspaceId,
+            ...(input.taskId ? { NOT: { id: input.taskId } } : {}),
+          },
           select: { id: true },
         })
       : null,
@@ -91,6 +104,7 @@ async function ensureWorkspaceRefs(input: {
   ]);
 
   if (input.staffId && !staff) return "STAFF_NOT_FOUND";
+  if (input.parentTaskId && !parentTask) return "PARENT_TASK_NOT_FOUND";
   if (input.vehicleId && !vehicle) return "VEHICLE_NOT_FOUND";
   if (input.orderId && !order) return "ORDER_NOT_FOUND";
   return null;
@@ -112,6 +126,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
       })
     : null;
   const staffId = parsed.staffId === undefined ? existing.staffId : nullable(parsed.staffId);
+  const parentTaskId =
+    parsed.parentTaskId === undefined ? existing.parentTaskId : nullable(parsed.parentTaskId);
   const vehicleId = parsed.vehicleId === undefined ? existing.vehicleId : nullable(parsed.vehicleId);
   const orderId = parsed.orderId === undefined ? existing.orderId : nullable(parsed.orderId);
   const staffLabel =
@@ -123,7 +139,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
 
   const refError = await ensureWorkspaceRefs({
     workspaceId: workspace.id,
+    taskId: existing.id,
     staffId,
+    parentTaskId,
     vehicleId,
     orderId,
   });
@@ -133,6 +151,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
 
   const hasNotifiableTaskChange = [
     "staffId",
+    "parentTaskId",
     "vehicleId",
     "orderId",
     "staffLabel",
@@ -167,6 +186,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     where: { id: existing.id },
     data: {
       staffId,
+      parentTaskId,
       vehicleId,
       orderId,
       staffLabel: staffId ? null : staffLabel,
@@ -223,9 +243,15 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
       })
     : null;
 
-  await prisma.staffTask.delete({
-    where: { id: existing.id },
-  });
+  await prisma.$transaction([
+    prisma.staffTask.updateMany({
+      where: { workspaceId: workspace.id, parentTaskId: existing.id },
+      data: { parentTaskId: null },
+    }),
+    prisma.staffTask.delete({
+      where: { id: existing.id },
+    }),
+  ]);
 
   await logActivity({
     workspaceId: workspace.id,

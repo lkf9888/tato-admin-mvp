@@ -9,12 +9,13 @@ import { notifyStaffTaskAssignment } from "@/lib/staff-task-notifications";
 
 const taskSchema = z.object({
   staffId: z.string().optional().or(z.literal("")),
+  parentTaskId: z.string().optional().or(z.literal("")),
   vehicleId: z.string().optional().or(z.literal("")),
   orderId: z.string().optional().or(z.literal("")),
   staffLabel: z.string().trim().optional().or(z.literal("")),
   vehicleLabel: z.string().trim().optional().or(z.literal("")),
   orderLabel: z.string().trim().optional().or(z.literal("")),
-  title: z.string().trim().min(2),
+  title: z.string().trim().min(1),
   details: z.string().trim().optional().or(z.literal("")),
   dueDatetime: z.string().optional().or(z.literal("")),
   timeWindow: z.string().trim().optional().or(z.literal("")),
@@ -55,13 +56,20 @@ const taskInclude = {
 async function ensureWorkspaceRefs(input: {
   workspaceId: string;
   staffId?: string | null;
+  parentTaskId?: string | null;
   vehicleId?: string | null;
   orderId?: string | null;
 }) {
-  const [staff, vehicle, order] = await Promise.all([
+  const [staff, parentTask, vehicle, order] = await Promise.all([
     input.staffId
       ? prisma.staffMember.findFirst({
           where: { id: input.staffId, workspaceId: input.workspaceId, isActive: true },
+          select: { id: true },
+        })
+      : null,
+    input.parentTaskId
+      ? prisma.staffTask.findFirst({
+          where: { id: input.parentTaskId, workspaceId: input.workspaceId },
           select: { id: true },
         })
       : null,
@@ -80,6 +88,7 @@ async function ensureWorkspaceRefs(input: {
   ]);
 
   if (input.staffId && !staff) return "STAFF_NOT_FOUND";
+  if (input.parentTaskId && !parentTask) return "PARENT_TASK_NOT_FOUND";
   if (input.vehicleId && !vehicle) return "VEHICLE_NOT_FOUND";
   if (input.orderId && !order) return "ORDER_NOT_FOUND";
   return null;
@@ -89,12 +98,14 @@ export async function POST(request: NextRequest) {
   const { workspace, user } = await requireCurrentAdminContext();
   const parsed = taskSchema.parse(await request.json());
   const staffId = nullable(parsed.staffId);
+  const parentTaskId = nullable(parsed.parentTaskId);
   const vehicleId = nullable(parsed.vehicleId);
   const orderId = nullable(parsed.orderId);
 
   const refError = await ensureWorkspaceRefs({
     workspaceId: workspace.id,
     staffId,
+    parentTaskId,
     vehicleId,
     orderId,
   });
@@ -106,6 +117,7 @@ export async function POST(request: NextRequest) {
     data: {
       workspaceId: workspace.id,
       staffId,
+      parentTaskId,
       vehicleId,
       orderId,
       staffLabel: staffId ? null : nullable(parsed.staffLabel),

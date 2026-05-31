@@ -106,6 +106,7 @@ export default async function StaffSchedulePage() {
       initialTasks={tasks.map((task) => ({
         id: task.id,
         staffId: task.staffId,
+        parentTaskId: task.parentTaskId,
         vehicleId: task.vehicleId,
         orderId: task.orderId,
         staffLabel: task.staffLabel,

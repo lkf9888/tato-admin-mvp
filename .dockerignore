@@ -4,8 +4,13 @@
 .env.production
 .git
 .gitignore
+.codegraph
 .next
 node_modules
+staff-ios-app/.expo
+staff-ios-app/dist
+staff-ios-app/ios
+staff-ios-app/android
 prisma/dev.db
 data
 npm-debug.log*

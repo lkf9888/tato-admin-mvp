@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "TATO Staff",
+    "slug": "tato-staff",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "tatostaff",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "co.tatocar.staff",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "TATO Staff uses the camera so employees can upload task photos.",
+        "NSPhotoLibraryUsageDescription": "TATO Staff uses the photo library so employees can upload task photos."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TATO Staff uses your photos so you can upload task images.",
+          "cameraPermission": "TATO Staff uses your camera so you can take task photos.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "extra": {
+      "apiBaseUrl": "https://tatocar.co"
+    }
+  }
+}

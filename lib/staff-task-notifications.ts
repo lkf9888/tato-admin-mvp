@@ -5,6 +5,7 @@ import {
   sendStaffTaskAssignmentEmail,
 } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { sendStaffTaskSms } from "@/lib/sms";
 import { sendStaffTaskWeChatMessage } from "@/lib/staff-mini-program";
 
 type StaffTaskNotificationRecord = {
@@ -19,6 +20,7 @@ type StaffTaskNotificationRecord = {
   staff?: {
     name: string;
     email: string | null;
+    phone?: string | null;
     shareToken: string | null;
     wechatOpenId?: string | null;
     wechatNotificationEnabled?: boolean | null;
@@ -72,6 +74,21 @@ export async function notifyStaffTaskChange(
   if (task.staff.email) {
     await sendStaffTaskAssignmentEmail({
       to: task.staff.email,
+      staffName: task.staff.name,
+      taskTitle: task.title,
+      action,
+      dueLabel: formatDueDate(task.dueDatetime),
+      timeWindow: task.timeWindow,
+      vehicleLabel,
+      orderLabel,
+      details: task.details,
+      taskUrl,
+    });
+  }
+
+  if (task.staff.phone) {
+    await sendStaffTaskSms({
+      to: task.staff.phone,
       staffName: task.staff.name,
       taskTitle: task.title,
       action,

@@ -43,7 +43,11 @@
       "expo-secure-store"
     ],
     "extra": {
-      "apiBaseUrl": "https://tatocar.co"
-    }
+      "apiBaseUrl": "https://tatocar.co",
+      "eas": {
+        "projectId": "4f3f7edf-8d7b-4bc5-aeca-e74e2e135db5"
+      }
+    },
+    "owner": "lkf9888"
   }
 }

@@ -29,9 +29,10 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex min-h-9 items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                    "tap-press flex min-h-9 items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors active:scale-[0.98]",
                     active
                       ? "bg-neutral-900 text-white shadow-sm"
                       : "text-neutral-700 hover:bg-neutral-100",

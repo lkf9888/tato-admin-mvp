@@ -3,6 +3,7 @@ import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { ContactButton } from "@/components/contact-button";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { MobileNav } from "@/components/mobile-nav";
+import { NavigationOptimizer } from "@/components/navigation-optimizer";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { getMessages, type Locale } from "@/lib/i18n";
 import { APP_VERSION_LABEL } from "@/lib/version";
@@ -91,6 +92,7 @@ export function AppShell({
   // map and visitors who learn the app this way can find anything in
   // one place.
   const moreItems = navGroups.flatMap((group) => group.items);
+  const navHrefs = moreItems.map((item) => item.href);
 
   // The non-nav controls (language switcher, sign out, version chip)
   // need to live somewhere on mobile too. They get tucked into the
@@ -199,6 +201,7 @@ export function AppShell({
         currentUserName={currentUserName}
         currentUserEmail={currentUserEmail}
       />
+      <NavigationOptimizer hrefs={navHrefs} />
     </div>
   );
 }

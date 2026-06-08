@@ -131,6 +131,7 @@ export function BottomTabBar({
               <Link
                 key={tab.href}
                 href={tab.href}
+                prefetch
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "tap-press flex flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-medium",
@@ -211,6 +212,7 @@ export function BottomTabBar({
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      prefetch
                       className={cn(
                         "tap-press flex items-center justify-between rounded-md px-4 py-3.5 text-[15px] font-medium",
                         active

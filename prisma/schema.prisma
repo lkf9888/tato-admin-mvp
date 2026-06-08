@@ -74,6 +74,41 @@ enum StaffTaskPriority {
   high
 }
 
+enum ContractFieldType {
+  SIGNATURE
+  TEXT
+  DATE
+  CHECKBOX
+  REDACTION
+}
+
+enum ContractEnvelopeStatus {
+  DRAFT
+  SENT
+  PARTIALLY_SIGNED
+  COMPLETED
+  VOIDED
+  EXPIRED
+}
+
+enum ContractRecipientStatus {
+  PENDING
+  VIEWED
+  SIGNED
+  DECLINED
+}
+
+enum ContractAuditEvent {
+  CREATED
+  SENT
+  VIEWED
+  SIGNED
+  COMPLETED
+  VOIDED
+  PDF_GENERATED
+  EMAIL_FAILED
+}
+
 model Workspace {
   id                            String                         @id @default(cuid())
   name                          String
@@ -95,6 +130,10 @@ model Workspace {
   staffTaskAttachments          StaffTaskAttachment[]
   staffTaskNotificationTemplate StaffTaskNotificationTemplate?
   directBookingDocuments        DirectBookingDocument[]
+  contractTemplates             ContractTemplate[]
+  contractEnvelopes             ContractEnvelope[]
+  contractAuditLogs             ContractAuditLog[]
+  contractTextPresets           ContractTextPreset[]
   turoSyncConfig                TuroSyncConfig?
   billing                       WorkspaceBilling?
 }
@@ -202,6 +241,7 @@ model Order {
   attachments            OrderAttachment[]
   staffTasks             StaffTask[]
   directBookingDocuments DirectBookingDocument[]
+  contractEnvelopes      ContractEnvelope[]
 
   @@index([workspaceId])
   @@index([workspaceId, isArchived])
@@ -442,6 +482,174 @@ model StaffTaskNotificationTemplate {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model ContractTemplate {
+  workspaceId        String?
+  id                 String                      @id @default(cuid())
+  name               String
+  description        String?
+  pdfUrl             String
+  pdfPathname        String
+  pdfFilename        String?
+  pdfContentType     String?
+  pdfSize            Int?
+  sourceType         String                      @default("PDF")
+  sourceUrl          String?
+  sourcePathname     String?
+  sourceFilename     String?
+  sourceContentType  String?
+  sourceSize         Int?
+  editableContent    String?
+  pageCount          Int                         @default(1)
+  pageSizes          Json?
+  active             Boolean                     @default(true)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  workspace          Workspace?                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fields             ContractTemplateField[]
+  recipients         ContractTemplateRecipient[]
+  envelopes          ContractEnvelope[]
+
+  @@index([workspaceId, active])
+  @@index([createdAt])
+}
+
+model ContractTemplateRecipient {
+  id           String           @id @default(cuid())
+  templateId   String
+  name         String
+  email        String
+  signingOrder Int              @default(1)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  template     ContractTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId, signingOrder])
+}
+
+model ContractTemplateField {
+  id             String               @id @default(cuid())
+  templateId     String
+  type           ContractFieldType
+  label          String
+  required       Boolean              @default(true)
+  recipientIndex Int?
+  page           Int
+  x              Float
+  y              Float
+  width          Float
+  height         Float
+  placeholder    String?
+  defaultValue   String?
+  fontSize       Float?
+  sortOrder      Int                  @default(0)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  template       ContractTemplate     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  values         ContractFieldValue[]
+
+  @@index([templateId, page, sortOrder])
+}
+
+model ContractEnvelope {
+  workspaceId          String?
+  id                   String                 @id @default(cuid())
+  templateId           String
+  orderId              String?
+  title                String
+  message              String?
+  status               ContractEnvelopeStatus @default(DRAFT)
+  signedPdfUrl         String?
+  signedPdfPathname    String?
+  signedPdfFilename    String?
+  signedPdfContentType String?
+  signedPdfSize        Int?
+  signedPdfSha256      String?
+  sentAt               DateTime?
+  completedAt          DateTime?
+  voidedAt             DateTime?
+  expiresAt            DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  workspace            Workspace?             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  template             ContractTemplate       @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  order                Order?                 @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  recipients           ContractRecipient[]
+  values               ContractFieldValue[]
+  auditLogs            ContractAuditLog[]
+
+  @@index([workspaceId, status])
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+model ContractRecipient {
+  id           String                  @id @default(cuid())
+  envelopeId   String
+  name         String
+  email        String
+  signingOrder Int                     @default(1)
+  token        String                  @unique
+  status       ContractRecipientStatus @default(PENDING)
+  viewedAt     DateTime?
+  signedAt     DateTime?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  envelope     ContractEnvelope        @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  values       ContractFieldValue[]
+  auditLogs    ContractAuditLog[]
+
+  @@index([envelopeId, signingOrder])
+  @@index([email])
+}
+
+model ContractFieldValue {
+  id          String                @id @default(cuid())
+  envelopeId  String
+  fieldId     String
+  recipientId String?
+  value       String?
+  signature   String?
+  checked     Boolean?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  envelope    ContractEnvelope      @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  field       ContractTemplateField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  recipient   ContractRecipient?    @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+
+  @@unique([envelopeId, fieldId])
+  @@index([recipientId])
+}
+
+model ContractAuditLog {
+  workspaceId  String?
+  id           String              @id @default(cuid())
+  envelopeId   String
+  recipientId  String?
+  event        ContractAuditEvent
+  ip           String?
+  userAgent    String?
+  metadata     Json?
+  createdAt    DateTime            @default(now())
+  workspace    Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  envelope     ContractEnvelope    @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  recipient    ContractRecipient?  @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+
+  @@index([envelopeId, createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+model ContractTextPreset {
+  workspaceId String?
+  id          String     @id @default(cuid())
+  label       String
+  value       String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
 }
 
 model ShareLink {

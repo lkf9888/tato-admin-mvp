@@ -69,6 +69,7 @@ export function AppShell({
     {
       label: messages.shell.nav.groupFiles,
       items: [
+        { href: "/contracts", label: messages.shell.nav.contracts, icon: "✎" },
         { href: "/photos", label: messages.shell.nav.photos, icon: "▤" },
         { href: "/documents", label: messages.shell.nav.documents, icon: "▥" },
         { href: "/activity", label: messages.shell.nav.activity, icon: "♺" },

@@ -63,7 +63,7 @@ type SendInput = {
   timeoutMs?: number;
 };
 
-async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: string }> {
+export async function sendMail(input: SendInput): Promise<{ ok: boolean; reason?: string }> {
   const config = getResendConfig();
   if (!config) {
     // Dev / unconfigured fallback: log the message so the verification flow

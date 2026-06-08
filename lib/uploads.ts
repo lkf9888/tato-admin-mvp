@@ -73,6 +73,24 @@ export function makeOwnerLedgerReceiptPath(itemId: string, filename: string) {
   return path.posix.join("owner-ledger", itemId, "receipts", `${stamp}${ext}`);
 }
 
+export function makeContractTemplateSourcePath(workspaceId: string, filename: string) {
+  const ext = extensionFromFilename(filename);
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return path.posix.join("contracts", "templates", workspaceId, "sources", `${stamp}${ext}`);
+}
+
+export function makeContractTemplatePdfPath(templateId: string, filename: string) {
+  const ext = extensionFromFilename(filename) === ".pdf" ? ".pdf" : ".pdf";
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return path.posix.join("contracts", "templates", templateId, `${stamp}${ext}`);
+}
+
+export function makeContractEnvelopeSignedPdfPath(envelopeId: string, filename: string) {
+  const safeStem = sanitizeFilename(filename).replace(/\.[^.]+$/, "") || "signed-contract";
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return path.posix.join("contracts", "envelopes", envelopeId, `${safeStem}-${stamp}.pdf`);
+}
+
 export function resolveUploadPath(pathname: string) {
   const normalized = path.posix.normalize(pathname).replace(/^(\.\.(\/|\\|$))+/, "");
   if (normalized.startsWith("/") || normalized.includes("..")) {

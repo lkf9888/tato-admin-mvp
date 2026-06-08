@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  Bell,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,11 @@ import {
 
 import type { Locale } from "@/lib/i18n";
 import { compressImageFiles } from "@/lib/client-image-compression";
+import {
+  STAFF_TASK_TEMPLATE_VARIABLES,
+  normalizeStaffTaskNotificationTemplate,
+  type StaffTaskNotificationTemplate,
+} from "@/lib/staff-task-notification-template";
 import { cn, formatDateTime } from "@/lib/utils";
 
 type StaffStatus = "todo" | "in_progress" | "done" | "cancelled";
@@ -154,6 +160,15 @@ function getStaffScheduleCopy(locale: Locale) {
         title: "线下员工排班",
         subtitle: "把接送车、洗车、验车、维修、文件处理等线下工作分配给员工，并关联车辆或订单。",
         addStaff: "新增员工",
+        notificationTemplates: "通知模板",
+        notificationTemplateTitle: "任务通知模板",
+        notificationTemplateHint:
+          "用于 admin 创建、修改、删除员工任务时发送的 email 和短信。可以使用下方变量。",
+        emailSubjectTemplate: "Email 标题",
+        emailBodyTemplate: "Email 内容",
+        smsBodyTemplate: "短信内容",
+        templateVariables: "可用变量",
+        templateSaved: "通知模板已保存",
         addTask: "任务",
         activeTasks: "进行中任务",
         overdue: "逾期",
@@ -262,6 +277,15 @@ function getStaffScheduleCopy(locale: Locale) {
         subtitle:
           "Assign handoffs, washes, inspections, repairs, document work, and other offline tasks to staff with vehicle and order context.",
         addStaff: "Add staff",
+        notificationTemplates: "Templates",
+        notificationTemplateTitle: "Task notification templates",
+        notificationTemplateHint:
+          "Used when admins create, update, remove, or delete staff tasks. You can use the variables below.",
+        emailSubjectTemplate: "Email subject",
+        emailBodyTemplate: "Email body",
+        smsBodyTemplate: "SMS body",
+        templateVariables: "Variables",
+        templateSaved: "Notification templates saved",
         addTask: "Task",
         activeTasks: "Active tasks",
         overdue: "Overdue",
@@ -373,6 +397,7 @@ export function StaffScheduleClient({
   vehicles,
   orders,
   upcomingOrders,
+  initialNotificationTemplate,
 }: {
   locale: Locale;
   initialStaff: StaffMember[];
@@ -380,13 +405,18 @@ export function StaffScheduleClient({
   vehicles: VehicleOption[];
   orders: OrderOption[];
   upcomingOrders: OrderOption[];
+  initialNotificationTemplate: StaffTaskNotificationTemplate;
 }) {
   const c = getStaffScheduleCopy(locale);
   const [staff, setStaff] = useState(initialStaff);
   const [tasks, setTasks] = useState(initialTasks);
+  const [notificationTemplate, setNotificationTemplate] = useState(() =>
+    normalizeStaffTaskNotificationTemplate(initialNotificationTemplate),
+  );
   const [notice, setNotice] = useState<string | null>(null);
   const [staffModal, setStaffModal] = useState<StaffMember | "new" | null>(null);
   const [taskModal, setTaskModal] = useState<TaskModalState>(null);
+  const [notificationTemplateOpen, setNotificationTemplateOpen] = useState(false);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [dragOrderEvent, setDragOrderEvent] = useState<OrderEvent | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
@@ -794,6 +824,10 @@ export function StaffScheduleClient({
           <p className="mt-1 max-w-3xl text-sm text-neutral-500">{c.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button className="btn-secondary min-h-11 px-4 py-2 text-sm" onClick={() => setNotificationTemplateOpen(true)}>
+            <Bell className="h-4 w-4" />
+            {c.notificationTemplates}
+          </button>
           <button className="btn-secondary min-h-11 px-4 py-2 text-sm" onClick={() => setShowArchivedStaff((open) => !open)}>
             {showArchivedStaff ? c.hideArchivedStaff : c.viewArchivedStaff}
           </button>
@@ -1147,6 +1181,19 @@ export function StaffScheduleClient({
             upsertStaff(normalizeStaff(member));
             setNotice(c.created);
             setStaffModal(null);
+          }}
+        />
+      ) : null}
+
+      {notificationTemplateOpen ? (
+        <NotificationTemplateModal
+          copy={c}
+          template={notificationTemplate}
+          onClose={() => setNotificationTemplateOpen(false)}
+          onSaved={(template) => {
+            setNotificationTemplate(normalizeStaffTaskNotificationTemplate(template));
+            setNotice(c.templateSaved);
+            setNotificationTemplateOpen(false);
           }}
         />
       ) : null}
@@ -1925,6 +1972,97 @@ function StaffModal({
             <span />
           )}
           <button className="btn-primary min-h-10 px-4 py-2 text-sm" disabled={saving}>{copy.save}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function NotificationTemplateModal({
+  copy,
+  template,
+  onClose,
+  onSaved,
+}: {
+  copy: ReturnType<typeof getStaffScheduleCopy>;
+  template: StaffTaskNotificationTemplate;
+  onClose: () => void;
+  onSaved: (template: StaffTaskNotificationTemplate) => void;
+}) {
+  const [form, setForm] = useState(() => normalizeStaffTaskNotificationTemplate(template));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/staff-schedule/notification-template", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.template) {
+        setError(copy.failed);
+        return;
+      }
+      onSaved(normalizeStaffTaskNotificationTemplate(payload.template));
+    } catch {
+      setError(copy.failed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title={copy.notificationTemplateTitle} onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <p className="text-sm leading-5 text-neutral-500">{copy.notificationTemplateHint}</p>
+        <Field label={copy.emailSubjectTemplate}>
+          <input
+            className="input"
+            value={form.emailSubjectTemplate}
+            onChange={(event) => setForm({ ...form, emailSubjectTemplate: event.target.value })}
+          />
+        </Field>
+        <Field label={copy.emailBodyTemplate}>
+          <textarea
+            className="input min-h-52 resize-y font-mono text-sm leading-5"
+            value={form.emailBodyTemplate}
+            onChange={(event) => setForm({ ...form, emailBodyTemplate: event.target.value })}
+          />
+        </Field>
+        <Field label={copy.smsBodyTemplate}>
+          <textarea
+            className="input min-h-36 resize-y font-mono text-sm leading-5"
+            value={form.smsBodyTemplate}
+            onChange={(event) => setForm({ ...form, smsBodyTemplate: event.target.value })}
+          />
+        </Field>
+        <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2">
+          <p className="text-xs font-semibold text-neutral-500">{copy.templateVariables}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {STAFF_TASK_TEMPLATE_VARIABLES.map((variable) => (
+              <span
+                key={variable}
+                className="border border-neutral-200 bg-white px-2 py-1 font-mono text-[11px] text-neutral-700"
+              >
+                {`{${variable}}`}
+              </span>
+            ))}
+          </div>
+        </div>
+        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn-secondary min-h-10 px-4 py-2 text-sm" onClick={onClose}>
+            {copy.cancel}
+          </button>
+          <button className="btn-primary min-h-10 px-4 py-2 text-sm" disabled={saving}>
+            {copy.save}
+          </button>
         </div>
       </form>
     </Modal>

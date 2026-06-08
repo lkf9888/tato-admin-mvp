@@ -4,6 +4,7 @@ import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { ensureStaffShareTokens } from "@/lib/staff-share";
 import { ensureStaffMiniProgramCodes } from "@/lib/staff-mini-program";
+import { normalizeStaffTaskNotificationTemplate } from "@/lib/staff-task-notification-template";
 
 export default async function StaffSchedulePage() {
   const workspace = await requireCurrentWorkspace();
@@ -15,7 +16,7 @@ export default async function StaffSchedulePage() {
   orderWindowEnd.setDate(orderWindowEnd.getDate() + 5);
   orderWindowEnd.setHours(23, 59, 59, 999);
 
-  const [{ locale }, staff, tasks, vehicles, orders, upcomingOrders] = await Promise.all([
+  const [{ locale }, staff, tasks, vehicles, orders, upcomingOrders, notificationTemplate] = await Promise.all([
     getI18n(),
     prisma.staffMember.findMany({
       where: { workspaceId: workspace.id },
@@ -79,6 +80,9 @@ export default async function StaffSchedulePage() {
         vehicleId: true,
         vehicle: { select: { plateNumber: true, nickname: true, pickupPassword: true } },
       },
+    }),
+    prisma.staffTaskNotificationTemplate.findUnique({
+      where: { workspaceId: workspace.id },
     }),
   ]);
   const staffWithShareTokens = await ensureStaffShareTokens(staff);
@@ -179,6 +183,7 @@ export default async function StaffSchedulePage() {
         vehicleLabel: `${order.vehicle.plateNumber} · ${order.vehicle.nickname}`,
         pickupPassword: order.vehicle.pickupPassword,
       }))}
+      initialNotificationTemplate={normalizeStaffTaskNotificationTemplate(notificationTemplate)}
     />
   );
 }

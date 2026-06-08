@@ -17,6 +17,7 @@ type StaffTaskSmsInput = {
   orderLabel?: string | null;
   details?: string | null;
   taskUrl?: string | null;
+  renderedBody?: string | null;
 };
 
 function getTwilioConfig() {
@@ -83,7 +84,7 @@ export async function sendStaffTaskSms(input: StaffTaskSmsInput): Promise<SmsRes
 
   const params = new URLSearchParams({
     To: to,
-    Body: buildTaskSms(input),
+    Body: input.renderedBody?.trim() || buildTaskSms(input),
   });
   if (config.messagingServiceSid) {
     params.set("MessagingServiceSid", config.messagingServiceSid);

@@ -375,6 +375,8 @@ export async function sendStaffTaskAssignmentEmail(input: {
   orderLabel?: string | null;
   details?: string | null;
   taskUrl?: string | null;
+  renderedSubject?: string | null;
+  renderedBody?: string | null;
 }): Promise<{ ok: boolean; reason?: string }> {
   const action = input.action ?? "created";
   const actionCopy = {
@@ -408,7 +410,7 @@ export async function sendStaffTaskAssignmentEmail(input: {
     },
   }[action];
 
-  const subject = `${actionCopy.subject}：${input.taskTitle}`;
+  const subject = input.renderedSubject?.trim() || `${actionCopy.subject}：${input.taskTitle}`;
   const contextLines = [
     input.dueLabel ? `到期：${input.dueLabel}` : null,
     input.timeWindow ? `时间段：${input.timeWindow}` : null,
@@ -417,46 +419,52 @@ export async function sendStaffTaskAssignmentEmail(input: {
     input.taskUrl ? `打开任务：${input.taskUrl}` : null,
   ].filter(Boolean) as string[];
 
-  const text = [
-    actionCopy.textIntro,
-    "",
-    input.taskTitle,
-    ...contextLines,
-    input.details ? "" : null,
-    input.details ? input.details : null,
-    "",
-    actionCopy.footer,
-  ]
-    .filter((line): line is string => line !== null)
-    .join("\n");
+  const text =
+    input.renderedBody?.trim() ||
+    [
+      actionCopy.textIntro,
+      "",
+      input.taskTitle,
+      ...contextLines,
+      input.details ? "" : null,
+      input.details ? input.details : null,
+      "",
+      actionCopy.footer,
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n");
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 28px 24px; color: #111318;">
       <p style="font-size: 11px; letter-spacing: 0.34em; text-transform: uppercase; color: #6b6f78; margin: 0 0 8px;">TATO</p>
       <h1 style="font-size: 22px; font-weight: 650; margin: 0 0 8px;">${actionCopy.heading}</h1>
-      <p style="font-size: 14px; color: #4b5563; margin: 0 0 18px;">${escapeHtml(actionCopy.intro)}</p>
-      <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px; background: #ffffff;">
-        <h2 style="font-size: 18px; line-height: 1.35; margin: 0 0 12px;">${escapeHtml(input.taskTitle)}</h2>
-        ${
-          contextLines.length > 0
-            ? `<table style="border-collapse: collapse; width: 100%; font-size: 13px; color: #374151;">${contextLines
-                .map((line) => {
-                  const [key, ...rest] = line.split("：");
-                  const value = rest.join("：");
-                  const renderedValue = value.startsWith("http")
-                    ? `<a href="${escapeHtml(value)}" style="color: #111827;">${escapeHtml(value)}</a>`
-                    : escapeHtml(value);
-                  return `<tr><td style="padding: 4px 12px 4px 0; color: #6b7280; white-space: nowrap;">${escapeHtml(key)}</td><td style="padding: 4px 0; word-break: break-word;">${renderedValue}</td></tr>`;
-                })
-                .join("")}</table>`
-            : ""
-        }
-        ${
-          input.details
-            ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f3f4f6; white-space: pre-wrap; font-size: 13px; line-height: 20px; color: #374151;">${escapeHtml(input.details)}</div>`
-            : ""
-        }
-      </div>
+      ${
+        input.renderedBody?.trim()
+          ? `<div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px; background: #ffffff; white-space: pre-wrap; font-size: 14px; line-height: 22px; color: #374151;">${escapeHtml(text)}</div>`
+          : `<p style="font-size: 14px; color: #4b5563; margin: 0 0 18px;">${escapeHtml(actionCopy.intro)}</p>
+            <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px; background: #ffffff;">
+              <h2 style="font-size: 18px; line-height: 1.35; margin: 0 0 12px;">${escapeHtml(input.taskTitle)}</h2>
+              ${
+                contextLines.length > 0
+                  ? `<table style="border-collapse: collapse; width: 100%; font-size: 13px; color: #374151;">${contextLines
+                      .map((line) => {
+                        const [key, ...rest] = line.split("：");
+                        const value = rest.join("：");
+                        const renderedValue = value.startsWith("http")
+                          ? `<a href="${escapeHtml(value)}" style="color: #111827;">${escapeHtml(value)}</a>`
+                          : escapeHtml(value);
+                        return `<tr><td style="padding: 4px 12px 4px 0; color: #6b7280; white-space: nowrap;">${escapeHtml(key)}</td><td style="padding: 4px 0; word-break: break-word;">${renderedValue}</td></tr>`;
+                      })
+                      .join("")}</table>`
+                  : ""
+              }
+              ${
+                input.details
+                  ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f3f4f6; white-space: pre-wrap; font-size: 13px; line-height: 20px; color: #374151;">${escapeHtml(input.details)}</div>`
+                  : ""
+              }
+            </div>`
+      }
     </div>
   `;
 

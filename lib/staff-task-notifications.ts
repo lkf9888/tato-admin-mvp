@@ -7,8 +7,14 @@ import {
 import { prisma } from "@/lib/prisma";
 import { sendStaffTaskSms } from "@/lib/sms";
 import { sendStaffTaskWeChatMessage } from "@/lib/staff-mini-program";
+import {
+  buildStaffTaskTemplateValues,
+  normalizeStaffTaskNotificationTemplate,
+  renderStaffTaskTemplate,
+} from "@/lib/staff-task-notification-template";
 
 type StaffTaskNotificationRecord = {
+  workspaceId?: string | null;
   id?: string;
   title: string;
   details: string | null;
@@ -70,6 +76,25 @@ export async function notifyStaffTaskChange(
     ? `${task.vehicle.plateNumber} · ${task.vehicle.nickname}`
     : task.vehicleLabel;
   const orderLabel = task.order ? task.order.renterName : task.orderLabel;
+  const savedTemplate = task.workspaceId
+    ? await prisma.staffTaskNotificationTemplate.findUnique({
+        where: { workspaceId: task.workspaceId },
+      })
+    : null;
+  const template = savedTemplate ? normalizeStaffTaskNotificationTemplate(savedTemplate) : null;
+  const templateValues = template
+    ? buildStaffTaskTemplateValues({
+        staffName: task.staff.name,
+        taskTitle: task.title,
+        action,
+        dueLabel: formatDueDate(task.dueDatetime),
+        timeWindow: task.timeWindow,
+        vehicleLabel,
+        orderLabel,
+        details: task.details,
+        taskUrl,
+      })
+    : null;
 
   if (task.staff.email) {
     await sendStaffTaskAssignmentEmail({
@@ -83,6 +108,14 @@ export async function notifyStaffTaskChange(
       orderLabel,
       details: task.details,
       taskUrl,
+      renderedSubject:
+        template && templateValues
+          ? renderStaffTaskTemplate(template.emailSubjectTemplate, templateValues)
+          : null,
+      renderedBody:
+        template && templateValues
+          ? renderStaffTaskTemplate(template.emailBodyTemplate, templateValues)
+          : null,
     });
   }
 
@@ -98,6 +131,10 @@ export async function notifyStaffTaskChange(
       orderLabel,
       details: task.details,
       taskUrl,
+      renderedBody:
+        template && templateValues
+          ? renderStaffTaskTemplate(template.smsBodyTemplate, templateValues)
+          : null,
     });
   }
 

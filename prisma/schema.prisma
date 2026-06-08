@@ -75,27 +75,28 @@ enum StaffTaskPriority {
 }
 
 model Workspace {
-  id                     String                  @id @default(cuid())
-  name                   String
-  slug                   String                  @unique
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  users                  User[]
-  owners                 Owner[]
-  vehicles               Vehicle[]
-  orders                 Order[]
-  importBatches          ImportBatch[]
-  shareLinks             ShareLink[]
-  activityLogs           ActivityLog[]
-  ownerLedgerItems       OwnerLedgerItem[]
-  ownerLedgerReceipts    OwnerLedgerReceipt[]
-  orderAttachments       OrderAttachment[]
-  staffMembers           StaffMember[]
-  staffTasks             StaffTask[]
-  staffTaskAttachments   StaffTaskAttachment[]
-  directBookingDocuments DirectBookingDocument[]
-  turoSyncConfig         TuroSyncConfig?
-  billing                WorkspaceBilling?
+  id                            String                         @id @default(cuid())
+  name                          String
+  slug                          String                         @unique
+  createdAt                     DateTime                       @default(now())
+  updatedAt                     DateTime                       @updatedAt
+  users                         User[]
+  owners                        Owner[]
+  vehicles                      Vehicle[]
+  orders                        Order[]
+  importBatches                 ImportBatch[]
+  shareLinks                    ShareLink[]
+  activityLogs                  ActivityLog[]
+  ownerLedgerItems              OwnerLedgerItem[]
+  ownerLedgerReceipts           OwnerLedgerReceipt[]
+  orderAttachments              OrderAttachment[]
+  staffMembers                  StaffMember[]
+  staffTasks                    StaffTask[]
+  staffTaskAttachments          StaffTaskAttachment[]
+  staffTaskNotificationTemplate StaffTaskNotificationTemplate?
+  directBookingDocuments        DirectBookingDocument[]
+  turoSyncConfig                TuroSyncConfig?
+  billing                       WorkspaceBilling?
 }
 
 model User {
@@ -430,6 +431,17 @@ model StaffTaskAttachment {
   @@index([taskId, kind])
   @@index([isArchived])
   @@index([uploadedAt])
+}
+
+model StaffTaskNotificationTemplate {
+  workspaceId          String    @unique
+  id                   String    @id @default(cuid())
+  emailSubjectTemplate String?
+  emailBodyTemplate    String?
+  smsBodyTemplate      String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model ShareLink {

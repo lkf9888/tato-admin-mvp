@@ -242,7 +242,7 @@ function normalizeField(
     templateId,
     type: type as "SIGNATURE" | "TEXT" | "DATE" | "CHECKBOX" | "REDACTION",
     label,
-    required: type === "REDACTION" ? false : record.required !== false,
+    required: type === "REDACTION" || type === "CHECKBOX" ? false : record.required !== false,
     recipientIndex: type === "REDACTION" ? null : toOptionalPositiveInt(record.recipientIndex) ?? 1,
     page,
     x: clampNumber(record.x, 0, 0.98),

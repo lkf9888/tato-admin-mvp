@@ -392,15 +392,13 @@ function validateRequiredFields(
 ) {
   const byField = new Map(values.map((value) => [value.fieldId, value]));
   for (const field of fields) {
+    if (field.type === "CHECKBOX") continue;
     if (!field.required) continue;
     const value = byField.get(field.id);
     if (field.type === "SIGNATURE" && !value?.signature && !value?.value) {
       return `${field.label} is required.`;
     }
-    if (field.type === "CHECKBOX" && value?.checked !== true) {
-      return `${field.label} must be checked.`;
-    }
-    if (field.type !== "SIGNATURE" && field.type !== "CHECKBOX" && !value?.value) {
+    if (field.type !== "SIGNATURE" && !value?.value) {
       return `${field.label} is required.`;
     }
   }

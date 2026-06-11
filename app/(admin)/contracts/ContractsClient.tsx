@@ -665,7 +665,7 @@ export default function ContractsClient({
         id,
         type,
         label: FIELD_TYPE_LABELS[type],
-        required: type !== "REDACTION",
+        required: type !== "REDACTION" && type !== "CHECKBOX",
         recipientIndex: type === "REDACTION" ? null : 1,
         page: targetPage,
         x: 0.12,
@@ -711,7 +711,7 @@ export default function ContractsClient({
           recipients: cleanDraftRecipients(templateRecipients),
           fields: fields.map((field) => ({
             ...field,
-            required: field.type === "REDACTION" ? false : field.required,
+            required: field.type === "REDACTION" || field.type === "CHECKBOX" ? false : field.required,
             recipientIndex: field.type === "REDACTION" ? null : field.recipientIndex ?? 1,
           })),
         }),
@@ -1710,7 +1710,7 @@ function cleanDraftRecipients(recipients: DraftRecipient[]) {
       name: recipient.name.trim(),
       email: recipient.email.trim(),
     }))
-    .filter((recipient) => recipient.name && recipient.email);
+    .filter((recipient) => recipient.name && isDraftEmail(recipient.email));
 }
 
 function snapshotFields(fields: TemplateField[]) {
@@ -1752,12 +1752,18 @@ function internalHrefForRouter(href: string) {
 }
 
 function canSaveDraftRecipients(recipients: DraftRecipient[]) {
-  return recipients.length > 0
+  const completeRecipients = cleanDraftRecipients(recipients);
+  return completeRecipients.length > 0
     && recipients.every((recipient) => {
       const name = recipient.name.trim();
       const email = recipient.email.trim();
-      return name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (!name && !email) return true;
+      return Boolean(name && isDraftEmail(email));
     });
+}
+
+function isDraftEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function UnsavedChangesModal({
@@ -1901,11 +1907,15 @@ function FieldEditModal({
               </select>
             </label>
           )}
-          {field.type !== "REDACTION" ? (
+          {field.type !== "REDACTION" && field.type !== "CHECKBOX" ? (
             <label className="flex items-center gap-2 self-end rounded-lg border border-neutral-200 px-3 py-3 text-sm dark:border-neutral-800">
               <input type="checkbox" checked={field.required} onChange={(event) => onChange({ required: event.target.checked })} />
               必填
             </label>
+          ) : field.type === "CHECKBOX" ? (
+            <div className="rounded-lg border border-neutral-200 px-3 py-3 text-sm text-neutral-500 dark:border-neutral-800">
+              勾选框为 Optional，租客可不勾选也能提交。
+            </div>
           ) : (
             <div className="rounded-lg border border-neutral-200 px-3 py-3 text-sm text-neutral-500 dark:border-neutral-800">
               涂改字段只会覆盖 PDF 原文字，不会出现在租客填写表单里。

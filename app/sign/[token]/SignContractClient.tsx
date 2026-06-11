@@ -443,7 +443,7 @@ function DocumentField({
       title={field.label}
     >
       <span className="pointer-events-none absolute -top-4 left-0 max-w-full truncate rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-        {field.label}{field.required ? " *" : ""}
+        {field.label}{field.required && field.type !== "CHECKBOX" ? " *" : ""}
       </span>
       {field.type === "SIGNATURE" ? (
         <SignaturePad

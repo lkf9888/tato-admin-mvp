@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -118,6 +119,14 @@ const RECIPIENT_COLORS = [
   { border: "#0891b2", bg: "rgba(8, 145, 178, 0.16)", text: "#0e7490" },
 ];
 const REDACTION_COLOR = { border: "#111827", bg: "rgba(17, 24, 39, 0.24)", text: "#111827" };
+
+const PdfPageCanvas = dynamic(
+  () => import("@/components/pdf-page-canvas").then((module) => module.PdfPageCanvas),
+  {
+    ssr: false,
+    loading: () => <div className="absolute inset-0 bg-white" />,
+  },
+);
 
 function safeFileStem(value: string) {
   return (
@@ -1393,11 +1402,10 @@ export default function ContractsClient({
                       className="relative w-full overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
                       style={{ aspectRatio: `${page.width} / ${page.height}` }}
                     >
-                      <iframe
-                        src={pdfPreviewUrl(selectedTemplate.pdfUrl, page.page)}
-                        title={`${selectedTemplate.name} page ${page.page}`}
-                        className="absolute inset-0 h-full w-full border-0 bg-white"
-                        style={{ pointerEvents: "none" }}
+                      <PdfPageCanvas
+                        url={selectedTemplate.pdfUrl}
+                        pageNumber={page.page}
+                        className="absolute inset-0 h-full w-full bg-white"
                       />
                       <div className="absolute left-2 top-2 rounded bg-white/90 px-2 py-1 text-[11px] font-medium text-neutral-500 shadow-sm">
                         PDF Page {page.page} · {Math.round(page.width)}×{Math.round(page.height)}
@@ -2015,9 +2023,4 @@ function fieldMinSize(type: FieldType) {
 function clampFieldSize(value: number, min: number, max: number) {
   const safeMax = Math.max(0.01, max);
   return clamp(value, Math.min(min, safeMax), safeMax);
-}
-
-function pdfPreviewUrl(url: string, page: number) {
-  const separator = url.includes("#") ? "&" : "#";
-  return `${url}${separator}page=${page}&toolbar=0&navpanes=0&scrollbar=0&view=Fit`;
 }

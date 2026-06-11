@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
+import dynamic from "next/dynamic";
 
 type FieldType = "SIGNATURE" | "TEXT" | "DATE" | "CHECKBOX";
 
@@ -65,6 +66,14 @@ const SIGN_LOCALES: Array<{ value: SignLocale; label: string }> = [
   { value: "zh-CN", label: "简体中文" },
   { value: "zh-TW", label: "繁體中文" },
 ];
+
+const PdfPageCanvas = dynamic(
+  () => import("@/components/pdf-page-canvas").then((module) => module.PdfPageCanvas),
+  {
+    ssr: false,
+    loading: () => <div className="absolute inset-0 bg-white" />,
+  },
+);
 
 const SIGN_COPY: Record<
   SignLocale,
@@ -350,11 +359,10 @@ export default function SignContractClient({ token }: { token: string }) {
                     className="relative w-full overflow-hidden rounded-xl border border-neutral-300 bg-white shadow-sm"
                     style={{ aspectRatio: `${page.width} / ${page.height}` }}
                   >
-                    <iframe
-                      src={pdfPreviewUrl(data.template.pdfUrl, page.page)}
-                      title={`${data.template.name} page ${page.page}`}
-                      className="absolute inset-0 h-full w-full border-0 bg-white"
-                      style={{ pointerEvents: "none" }}
+                    <PdfPageCanvas
+                      url={data.template.pdfUrl}
+                      pageNumber={page.page}
+                      className="absolute inset-0 h-full w-full bg-white"
                     />
                     <div className="absolute inset-0">
                       {(fieldsByPage.get(page.page) || []).map((field) => (
@@ -631,9 +639,4 @@ function todayDateInputValue() {
   const month = `${now.getMonth() + 1}`.padStart(2, "0");
   const day = `${now.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function pdfPreviewUrl(url: string, page: number) {
-  const separator = url.includes("#") ? "&" : "#";
-  return `${url}${separator}page=${page}&toolbar=0&navpanes=0&scrollbar=0&view=Fit`;
 }

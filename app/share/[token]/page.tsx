@@ -43,6 +43,9 @@ export default async function SharePage({
                   status: {
                     not: "cancelled",
                   },
+                  ownerLedgerSyncedAt: {
+                    not: null,
+                  },
                 },
               },
             },
@@ -165,6 +168,7 @@ export default async function SharePage({
       paymentMethod: order.paymentMethod,
       contractNumber: order.contractNumber,
       externalOrderId: order.externalOrderId,
+      ownerLedgerSyncedAt: order.ownerLedgerSyncedAt?.toISOString() ?? null,
       notes:
         shareLink.visibility === "privacy"
           ? messages.calendar.bookingLabel(getStatusLabel(order.source, locale))

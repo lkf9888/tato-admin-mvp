@@ -67,6 +67,7 @@ function copy(locale: Locale) {
         openLedger: "打开对账单",
         viewAsOwner: "以车主身份查看",
         openStatements: "打开 statement",
+        openCalendar: "打开日历",
         deleteOwner: "删除车主",
       }
     : {
@@ -110,6 +111,7 @@ function copy(locale: Locale) {
         openLedger: "Open ledger",
         viewAsOwner: "View as owner",
         openStatements: "Open statement",
+        openCalendar: "Open calendar",
         deleteOwner: "Delete owner",
       };
 }
@@ -345,8 +347,13 @@ export function OwnerEditor({
             </a>
           ) : null}
           {shareToken ? (
-            <a href={`/share/${shareToken}`} target="_blank" rel="noreferrer" className="btn-secondary">
+            <a href={`/share/${shareToken}?tab=statements`} target="_blank" rel="noreferrer" className="btn-secondary">
               {labels.openStatements}
+            </a>
+          ) : null}
+          {shareToken ? (
+            <a href={`/share/${shareToken}?tab=calendar`} target="_blank" rel="noreferrer" className="btn-secondary">
+              {labels.openCalendar}
             </a>
           ) : null}
         </div>

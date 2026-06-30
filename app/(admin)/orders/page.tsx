@@ -308,6 +308,7 @@ export default async function OrdersPage({
     notes: order.notes,
     createdBy: order.createdBy,
     externalOrderId: order.externalOrderId,
+    ownerLedgerSyncedAt: order.ownerLedgerSyncedAt?.toISOString() ?? null,
   }));
   const orderVehicleOptions = vehicles.map((vehicle) => ({
     id: vehicle.id,

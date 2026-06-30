@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -207,6 +207,17 @@ function defaultPageSizes(template: Template | null): PageSize[] {
   }));
 }
 
+function mergeMeasuredPageSizes(stored: PageSize[], measured: Record<number, PageSize>) {
+  return stored.map((page) => measured[page.page] || page);
+}
+
+function isSamePageSize(left: PageSize, right: PageSize) {
+  return (
+    Math.abs(left.width - right.width) < 0.01 &&
+    Math.abs(left.height - right.height) < 0.01
+  );
+}
+
 export default function ContractsClient({
   userId,
   templates: initialTemplates,
@@ -237,6 +248,7 @@ export default function ContractsClient({
   const [notice, setNotice] = useState<string | null>(null);
   const [pdfZoom, setPdfZoom] = useState(1);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
+  const [measuredPageSizes, setMeasuredPageSizes] = useState<Record<number, PageSize>>({});
   const localFieldCounterRef = useRef(0);
   const [fieldInteraction, setFieldInteraction] = useState<{
     id: string;
@@ -300,7 +312,11 @@ export default function ContractsClient({
     () => fields.find((field) => field.id === selectedFieldId) || null,
     [fields, selectedFieldId],
   );
-  const pageSizes = useMemo(() => defaultPageSizes(selectedTemplate), [selectedTemplate]);
+  const storedPageSizes = useMemo(() => defaultPageSizes(selectedTemplate), [selectedTemplate]);
+  const pageSizes = useMemo(
+    () => mergeMeasuredPageSizes(storedPageSizes, measuredPageSizes),
+    [storedPageSizes, measuredPageSizes],
+  );
   const fieldInsertPageMax = Math.max(1, pageSizes.length || selectedTemplate?.pageCount || 1);
   const validFieldInsertPage = clampPage(fieldInsertPage, fieldInsertPageMax);
   const signerOptions = useMemo(
@@ -324,6 +340,17 @@ export default function ContractsClient({
     () => envelopes.filter((envelope) => envelope.status === "COMPLETED" && envelope.signedPdfUrl),
     [envelopes],
   );
+  const handlePdfPageMeasured = useCallback((size: PageSize) => {
+    setMeasuredPageSizes((current) => {
+      const existing = current[size.page];
+      if (existing && isSamePageSize(existing, size)) return current;
+      return { ...current, [size.page]: size };
+    });
+  }, []);
+
+  useEffect(() => {
+    setMeasuredPageSizes({});
+  }, [selectedTemplate?.id, selectedTemplate?.pdfUrl]);
 
   useEffect(() => {
     return () => {
@@ -1406,6 +1433,7 @@ export default function ContractsClient({
                         url={selectedTemplate.pdfUrl}
                         pageNumber={page.page}
                         className="absolute inset-0 h-full w-full bg-white"
+                        onPageMeasured={handlePdfPageMeasured}
                       />
                       <div className="absolute left-2 top-2 rounded bg-white/90 px-2 py-1 text-[11px] font-medium text-neutral-500 shadow-sm">
                         PDF Page {page.page} · {Math.round(page.width)}×{Math.round(page.height)}

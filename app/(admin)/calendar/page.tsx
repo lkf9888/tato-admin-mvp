@@ -118,6 +118,7 @@ export default async function CalendarPage() {
             notes: getDisplayOrderNote(order.notes, order.source),
             createdBy: order.createdBy,
             externalOrderId: order.externalOrderId,
+            ownerLedgerSyncedAt: order.ownerLedgerSyncedAt?.toISOString() ?? null,
           }))}
         />
       </div>

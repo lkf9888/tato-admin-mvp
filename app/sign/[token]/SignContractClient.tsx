@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import dynamic from "next/dynamic";
 
@@ -174,6 +174,7 @@ export default function SignContractClient({ token }: { token: string }) {
   const [completedUrl, setCompletedUrl] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [locale, setLocale] = useState<SignLocale>(() => preferredSignLocale());
+  const [measuredPageSizes, setMeasuredPageSizes] = useState<Record<number, PageSize>>({});
 
   const copy = SIGN_COPY[locale];
 
@@ -188,6 +189,7 @@ export default function SignContractClient({ token }: { token: string }) {
         if (!res.ok) throw new Error(payload.error || SIGN_COPY.en.unableToLoad);
         if (cancelled) return;
         setData(payload);
+        setMeasuredPageSizes({});
         const openedDate = todayDateInputValue();
         const next: Record<string, FieldState> = {};
         for (const field of payload.template.fields as Field[]) {
@@ -212,7 +214,18 @@ export default function SignContractClient({ token }: { token: string }) {
     };
   }, [token]);
 
-  const pageSizes = useMemo(() => defaultPageSizes(data?.template), [data?.template]);
+  const storedPageSizes = useMemo(() => defaultPageSizes(data?.template), [data?.template]);
+  const pageSizes = useMemo(
+    () => mergeMeasuredPageSizes(storedPageSizes, measuredPageSizes),
+    [storedPageSizes, measuredPageSizes],
+  );
+  const handlePdfPageMeasured = useCallback((size: PageSize) => {
+    setMeasuredPageSizes((current) => {
+      const existing = current[size.page];
+      if (existing && isSamePageSize(existing, size)) return current;
+      return { ...current, [size.page]: size };
+    });
+  }, []);
 
   async function submit() {
     if (!data) return;
@@ -363,6 +376,7 @@ export default function SignContractClient({ token }: { token: string }) {
                       url={data.template.pdfUrl}
                       pageNumber={page.page}
                       className="absolute inset-0 h-full w-full bg-white"
+                      onPageMeasured={handlePdfPageMeasured}
                     />
                     <div className="absolute inset-0">
                       {(fieldsByPage.get(page.page) || []).map((field) => (
@@ -631,6 +645,17 @@ function defaultPageSizes(template: SignPayload["template"] | null | undefined):
     width: 612,
     height: 792,
   }));
+}
+
+function mergeMeasuredPageSizes(stored: PageSize[], measured: Record<number, PageSize>) {
+  return stored.map((page) => measured[page.page] || page);
+}
+
+function isSamePageSize(left: PageSize, right: PageSize) {
+  return (
+    Math.abs(left.width - right.width) < 0.01 &&
+    Math.abs(left.height - right.height) < 0.01
+  );
 }
 
 function todayDateInputValue() {

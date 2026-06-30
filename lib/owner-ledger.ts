@@ -1,9 +1,9 @@
-import { OwnerLedgerKind, OrderStatus } from "@prisma/client";
+import { OwnerLedgerKind, OrderStatus, type Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getOrderNetEarning } from "@/lib/utils";
 
-type Tx = typeof prisma;
+type Tx = typeof prisma | Prisma.TransactionClient;
 
 const AUTO_KINDS = [
   OwnerLedgerKind.OWNER_NET_EARNING,
@@ -38,6 +38,11 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
     order.status === OrderStatus.cancelled ||
     !order.vehicle.ownerId
   ) {
+    await removeOrderAutoOwnerLedger(orderId, db);
+    return;
+  }
+
+  if (!order.ownerLedgerSyncedAt) {
     await removeOrderAutoOwnerLedger(orderId, db);
     return;
   }

@@ -5,6 +5,7 @@ import { QuickVehicleReimbursementButton } from "@/components/quick-vehicle-reim
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import { cn, formatCurrency } from "@/lib/utils";
 
 type SearchParams = Promise<{ q?: string; error?: string }>;
 
@@ -29,6 +30,7 @@ function copy(locale: string) {
         emptyTitle: "还没有车主。",
         emptyCta: "新建车主",
         vehicleCount: (count: number) => `${count} 台车`,
+        balance: "余额",
         shareEnabled: "已开启共享链接",
         deleteError: "该车主名下还有车辆，请先重新分配车辆后再删除。",
       }
@@ -41,6 +43,7 @@ function copy(locale: string) {
         emptyTitle: "No owners yet.",
         emptyCta: "New owner",
         vehicleCount: (count: number) => `${count} vehicle${count === 1 ? "" : "s"}`,
+        balance: "Balance",
         shareEnabled: "Share link enabled",
         deleteError: "Owners with assigned vehicles need those vehicles reassigned first.",
       };
@@ -82,7 +85,7 @@ export default async function OwnersPage({
       }
     : {};
 
-  const [owners, reimbursableVehicles] = await Promise.all([
+  const [owners, reimbursableVehicles, ownerBalances] = await Promise.all([
     prisma.owner.findMany({
       where: { workspaceId: workspace.id, ...searchWhere },
       orderBy: { createdAt: "asc" },
@@ -126,7 +129,19 @@ export default async function OwnersPage({
         owner: { select: { id: true, name: true } },
       },
     }),
+    prisma.ownerLedgerItem.groupBy({
+      by: ["ownerId"],
+      where: { workspaceId: workspace.id },
+      _sum: { amount: true },
+    }),
   ]);
+  const balanceByOwnerId = new Map(
+    ownerBalances.map((row) => [row.ownerId, row._sum.amount ?? 0]),
+  );
+  const ownersWithBalance = owners.map((owner) => ({
+    owner,
+    balance: balanceByOwnerId.get(owner.id) ?? 0,
+  }));
 
   return (
     <div className="max-w-5xl p-3 sm:p-6">
@@ -187,7 +202,7 @@ export default async function OwnersPage({
         </div>
       ) : (
         <div className="space-y-2">
-          {owners.map((owner) => (
+          {ownersWithBalance.map(({ owner, balance }) => (
             <Link
               key={owner.id}
               href={`/owners/${owner.id}`}
@@ -203,7 +218,21 @@ export default async function OwnersPage({
                   </div>
                 </div>
                 <div className="shrink-0 text-left text-xs text-neutral-500 sm:text-right">
-                  {labels.vehicleCount(owner._count.vehicles)}
+                  <div className="font-medium text-neutral-600">
+                    {labels.vehicleCount(owner._count.vehicles)}
+                  </div>
+                  <div
+                    className={cn(
+                      "mt-0.5 font-semibold",
+                      balance > 0
+                        ? "text-emerald-700"
+                        : balance < 0
+                          ? "text-amber-700"
+                          : "text-neutral-500",
+                    )}
+                  >
+                    {labels.balance}: {formatCurrency(balance, locale)}
+                  </div>
                   {owner.shareLinks.length > 0 ? (
                     <div className="mt-0.5 text-emerald-600">{labels.shareEnabled}</div>
                   ) : null}

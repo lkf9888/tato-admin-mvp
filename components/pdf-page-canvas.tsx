@@ -24,20 +24,33 @@ function isRenderCancelled(error: unknown) {
   return error instanceof Error && error.name === "RenderingCancelledException";
 }
 
+export type PdfPageMeasuredSize = {
+  page: number;
+  width: number;
+  height: number;
+};
+
 export function PdfPageCanvas({
   url,
   pageNumber,
   className = "",
+  onPageMeasured,
 }: {
   url: string;
   pageNumber: number;
   className?: string;
+  onPageMeasured?: (size: PdfPageMeasuredSize) => void;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
+  const onPageMeasuredRef = useRef(onPageMeasured);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    onPageMeasuredRef.current = onPageMeasured;
+  }, [onPageMeasured]);
 
   useEffect(() => {
     const element = wrapperRef.current;
@@ -45,9 +58,17 @@ export function PdfPageCanvas({
 
     const updateSize = () => {
       const rect = element.getBoundingClientRect();
-      setSize({
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
+      setSize((current) => {
+        if (
+          Math.abs(current.width - rect.width) < 0.1 &&
+          Math.abs(current.height - rect.height) < 0.1
+        ) {
+          return current;
+        }
+        return {
+          width: rect.width,
+          height: rect.height,
+        };
       });
     };
 
@@ -72,6 +93,11 @@ export function PdfPageCanvas({
         if (cancelled) return;
 
         const baseViewport = page.getViewport({ scale: 1 });
+        onPageMeasuredRef.current?.({
+          page: pageNumber,
+          width: baseViewport.width,
+          height: baseViewport.height,
+        });
         const scale = Math.min(
           size.width / baseViewport.width,
           size.height / baseViewport.height,
@@ -112,7 +138,7 @@ export function PdfPageCanvas({
 
   return (
     <div ref={wrapperRef} className={className} aria-hidden="true">
-      <canvas ref={canvasRef} className="h-full w-full bg-white" />
+      <canvas ref={canvasRef} className="block h-full w-full bg-white" />
       {failed ? (
         <div className="absolute inset-0 flex items-center justify-center bg-white text-xs text-neutral-500">
           PDF 预览加载失败

@@ -232,6 +232,7 @@ model Order {
   createdBy              String
   isArchived             Boolean                 @default(false)
   hasConflict            Boolean                 @default(false)
+  ownerLedgerSyncedAt    DateTime?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   workspace              Workspace?              @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
@@ -247,6 +248,7 @@ model Order {
   @@index([workspaceId, isArchived])
   @@index([vehicleId, pickupDatetime, returnDatetime])
   @@index([source, externalOrderId])
+  @@index([ownerLedgerSyncedAt])
 }
 
 model ImportBatch {
@@ -485,31 +487,31 @@ model StaffTaskNotificationTemplate {
 }
 
 model ContractTemplate {
-  workspaceId        String?
-  id                 String                      @id @default(cuid())
-  name               String
-  description        String?
-  pdfUrl             String
-  pdfPathname        String
-  pdfFilename        String?
-  pdfContentType     String?
-  pdfSize            Int?
-  sourceType         String                      @default("PDF")
-  sourceUrl          String?
-  sourcePathname     String?
-  sourceFilename     String?
-  sourceContentType  String?
-  sourceSize         Int?
-  editableContent    String?
-  pageCount          Int                         @default(1)
-  pageSizes          Json?
-  active             Boolean                     @default(true)
-  createdAt          DateTime                    @default(now())
-  updatedAt          DateTime                    @updatedAt
-  workspace          Workspace?                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  fields             ContractTemplateField[]
-  recipients         ContractTemplateRecipient[]
-  envelopes          ContractEnvelope[]
+  workspaceId       String?
+  id                String                      @id @default(cuid())
+  name              String
+  description       String?
+  pdfUrl            String
+  pdfPathname       String
+  pdfFilename       String?
+  pdfContentType    String?
+  pdfSize           Int?
+  sourceType        String                      @default("PDF")
+  sourceUrl         String?
+  sourcePathname    String?
+  sourceFilename    String?
+  sourceContentType String?
+  sourceSize        Int?
+  editableContent   String?
+  pageCount         Int                         @default(1)
+  pageSizes         Json?
+  active            Boolean                     @default(true)
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  workspace         Workspace?                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fields            ContractTemplateField[]
+  recipients        ContractTemplateRecipient[]
+  envelopes         ContractEnvelope[]
 
   @@index([workspaceId, active])
   @@index([createdAt])
@@ -623,18 +625,18 @@ model ContractFieldValue {
 }
 
 model ContractAuditLog {
-  workspaceId  String?
-  id           String              @id @default(cuid())
-  envelopeId   String
-  recipientId  String?
-  event        ContractAuditEvent
-  ip           String?
-  userAgent    String?
-  metadata     Json?
-  createdAt    DateTime            @default(now())
-  workspace    Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  envelope     ContractEnvelope    @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
-  recipient    ContractRecipient?  @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  workspaceId String?
+  id          String             @id @default(cuid())
+  envelopeId  String
+  recipientId String?
+  event       ContractAuditEvent
+  ip          String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime           @default(now())
+  workspace   Workspace?         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  envelope    ContractEnvelope   @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  recipient   ContractRecipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
 
   @@index([envelopeId, createdAt])
   @@index([workspaceId, createdAt])

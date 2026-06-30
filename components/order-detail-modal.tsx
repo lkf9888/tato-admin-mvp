@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Trash2, X } from "lucide-react";
+import { Save, Share2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { OrderAttachments } from "@/components/order-attachments";
@@ -43,6 +43,7 @@ export type EditableOrder = {
   notes?: string | null;
   createdBy?: string | null;
   externalOrderId?: string | null;
+  ownerLedgerSyncedAt?: string | null;
 };
 
 export type OrderEditorVehicleOption = {
@@ -125,6 +126,18 @@ function labels(locale: Locale) {
         externalOrderId: "外部订单号",
         attachments: "照片 / 视频 / 合约文件",
         readOnly: "共享视图只读",
+        ownerShare: "车主共享",
+        ownerShareHelp: "同步后，这条订单会出现在车主共享日历和车主分成流水账中。",
+        ownerShareNotAssigned: "车辆还没有绑定车主，暂时无法同步。",
+        ownerShareUnsynced: "未同步给车主",
+        ownerShareSynced: "已同步给车主",
+        ownerShareSync: "同步给车主共享",
+        ownerShareResync: "重新同步",
+        ownerShareSyncing: "同步中...",
+        ownerShareSyncSuccess: "已同步到车主共享。",
+        ownerShareSyncError: "同步失败，请稍后再试。",
+        ownerShareSyncOwnerRequired: "请先给车辆绑定车主。",
+        ownerShareLastSynced: "最后同步",
       }
     : {
         title: "Order details and edits",
@@ -157,6 +170,18 @@ function labels(locale: Locale) {
         externalOrderId: "External order ID",
         attachments: "Photos / videos / contract files",
         readOnly: "Shared view is read-only",
+        ownerShare: "Owner share",
+        ownerShareHelp: "After sync, this order appears in the owner share calendar and owner ledger.",
+        ownerShareNotAssigned: "Assign this vehicle to an owner before syncing.",
+        ownerShareUnsynced: "Not shared with owner",
+        ownerShareSynced: "Shared with owner",
+        ownerShareSync: "Sync to owner share",
+        ownerShareResync: "Resync",
+        ownerShareSyncing: "Syncing...",
+        ownerShareSyncSuccess: "Synced to owner share.",
+        ownerShareSyncError: "Sync failed. Please try again.",
+        ownerShareSyncOwnerRequired: "Assign this vehicle to an owner first.",
+        ownerShareLastSynced: "Last synced",
       };
 }
 
@@ -185,13 +210,16 @@ export function OrderDetailModal({
   const [currentOrder, setCurrentOrder] = useState(order);
   const [draft, setDraft] = useState<OrderDraft>(() => buildDraft(order));
   const [error, setError] = useState<string | null>(null);
+  const [ownerSyncMessage, setOwnerSyncMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncingOwner, setIsSyncingOwner] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setCurrentOrder(order);
     setDraft(buildDraft(order));
     setError(null);
+    setOwnerSyncMessage(null);
   }, [order]);
 
   const inputClass =
@@ -204,13 +232,14 @@ export function OrderDetailModal({
 
   const selectedVehicle = vehicleOptions.find((vehicle) => vehicle.id === draft.vehicleId);
   const displayPhone = maskSensitive ? maskPhone(currentOrder.renterPhone) : currentOrder.renterPhone || "-";
+  const selectedOwnerId = selectedVehicle?.ownerId ?? currentOrder.ownerId ?? null;
+  const ownerShareSyncedAt = currentOrder.ownerLedgerSyncedAt ?? null;
 
   const updateDraft = (patch: Partial<OrderDraft>) => {
     setDraft((current) => ({ ...current, ...patch }));
   };
 
-  const saveOrder = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const persistOrder = async () => {
     if (readOnly || isSaving) return;
 
     const pickupDatetime = parseDateTimeInputParts(draft.pickupDate, draft.pickupTime);
@@ -223,11 +252,12 @@ export function OrderDetailModal({
       returnDatetime <= pickupDatetime
     ) {
       setError(t.validationError);
-      return;
+      return null;
     }
 
     setIsSaving(true);
     setError(null);
+    setOwnerSyncMessage(null);
 
     try {
       const response = await fetch(`/api/orders/${currentOrder.id}`, {
@@ -259,17 +289,68 @@ export function OrderDetailModal({
             ? t.validationError
             : t.saveError,
         );
-        return;
+        return null;
       }
 
       setCurrentOrder(payload.order);
       setDraft(buildDraft(payload.order));
       onSaved?.(payload.order);
       router.refresh();
+      return payload.order;
     } catch {
       setError(t.saveError);
+      return null;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const saveOrder = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await persistOrder();
+  };
+
+  const syncOwnerShare = async () => {
+    if (readOnly || isSaving || isSyncingOwner) return;
+    if (!selectedOwnerId) {
+      setError(t.ownerShareSyncOwnerRequired);
+      return;
+    }
+
+    setIsSyncingOwner(true);
+    setOwnerSyncMessage(null);
+
+    const savedOrder = await persistOrder();
+    if (!savedOrder) {
+      setIsSyncingOwner(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/orders/${savedOrder.id}/owner-sync`, {
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { ownerLedgerSyncedAt?: string; error?: string }
+        | null;
+
+      if (!response.ok || !payload?.ownerLedgerSyncedAt) {
+        setError(payload?.error === "VEHICLE_OWNER_REQUIRED" ? t.ownerShareSyncOwnerRequired : t.ownerShareSyncError);
+        return;
+      }
+
+      const updatedOrder = {
+        ...savedOrder,
+        ownerLedgerSyncedAt: payload.ownerLedgerSyncedAt,
+      };
+      setCurrentOrder(updatedOrder);
+      onSaved?.(updatedOrder);
+      setOwnerSyncMessage(t.ownerShareSyncSuccess);
+      router.refresh();
+    } catch {
+      setError(t.ownerShareSyncError);
+    } finally {
+      setIsSyncingOwner(false);
     }
   };
 
@@ -371,6 +452,42 @@ export function OrderDetailModal({
               <p className="mt-1 truncate font-semibold">{displayPhone}</p>
             </div>
           </div>
+
+          {!readOnly ? (
+            <div className="mt-3 rounded-md border border-[rgba(17,19,24,0.08)] bg-white/72 px-3 py-3 text-[12px] text-[color:var(--ink)]">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
+                    {t.ownerShare}
+                  </p>
+                  <p className="mt-1 font-semibold">
+                    {ownerShareSyncedAt ? t.ownerShareSynced : selectedOwnerId ? t.ownerShareUnsynced : t.ownerShareNotAssigned}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-4 text-[color:var(--ink-soft)]">
+                    {ownerShareSyncedAt
+                      ? `${t.ownerShareLastSynced}: ${formatDateTime(ownerShareSyncedAt, locale)}`
+                      : t.ownerShareHelp}
+                  </p>
+                  {ownerSyncMessage ? (
+                    <p className="mt-1 text-[11px] font-semibold text-emerald-700">{ownerSyncMessage}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={syncOwnerShare}
+                  disabled={!selectedOwnerId || isSaving || isSyncingOwner || isDeleting}
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-[var(--ink)] bg-[var(--ink)] px-3.5 text-[12px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[var(--surface-muted)] disabled:text-[color:var(--ink-soft)]"
+                >
+                  <Share2 className="h-3.5 w-3.5" aria-hidden />
+                  {isSyncingOwner
+                    ? t.ownerShareSyncing
+                    : ownerShareSyncedAt
+                      ? t.ownerShareResync
+                      : t.ownerShareSync}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className={labelClass}>

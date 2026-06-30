@@ -67,6 +67,7 @@ function buildResponseOrder(order: OrderForResponse) {
     notes: order.notes,
     createdBy: order.createdBy,
     externalOrderId: order.externalOrderId,
+    ownerLedgerSyncedAt: order.ownerLedgerSyncedAt?.toISOString() ?? null,
   };
 }
 

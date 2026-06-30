@@ -9,7 +9,7 @@ import { APP_VERSION_LABEL } from "@/lib/version";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; retryAfter?: string }>;
+  searchParams: Promise<{ error?: string; expired?: string; retryAfter?: string }>;
 }) {
   const authenticated = await isAdminAuthenticated();
   if (authenticated) redirect("/dashboard");
@@ -101,7 +101,11 @@ export default async function LoginPage({
                   />
                 </label>
 
-                {params.error === "throttled" ? (
+                {params.expired ? (
+                  <p className="rounded-md border border-black bg-black/5 px-4 py-3 text-sm text-black">
+                    {loginMessages.sessionExpired}
+                  </p>
+                ) : params.error === "throttled" ? (
                   <p className="rounded-md border border-black bg-black/5 px-4 py-3 text-sm text-black">
                     {loginMessages.throttled}
                   </p>

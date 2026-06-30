@@ -10,6 +10,7 @@ import { ensureUserWorkspace } from "@/lib/workspaces";
 
 const ADMIN_COOKIE = "turo-admin-session";
 const SHARE_COOKIE_PREFIX = "turo-share-access-";
+const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -58,7 +59,7 @@ export async function setAdminSession(value = "admin") {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 8,
+    maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
   });
 }
 

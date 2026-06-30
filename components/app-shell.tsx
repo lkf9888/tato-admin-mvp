@@ -4,6 +4,7 @@ import { ContactButton } from "@/components/contact-button";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { MobileNav } from "@/components/mobile-nav";
 import { NavigationOptimizer } from "@/components/navigation-optimizer";
+import { SessionExpiryRedirect } from "@/components/session-expiry-redirect";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { getMessages, type Locale } from "@/lib/i18n";
 import { APP_VERSION_LABEL } from "@/lib/version";
@@ -202,6 +203,7 @@ export function AppShell({
         currentUserEmail={currentUserEmail}
       />
       <NavigationOptimizer hrefs={navHrefs} />
+      <SessionExpiryRedirect />
     </div>
   );
 }

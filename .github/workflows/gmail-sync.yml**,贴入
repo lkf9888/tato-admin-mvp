@@ -1,0 +1,25 @@
+name: Gmail sync
+
+# Turo has no webhooks, so we poll the mailbox. Every 15 minutes is a
+# reasonable trade between freshness and Kimi extraction cost — each run
+# only pays for genuinely new mail, since the sync dedupes on Message-ID.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Turo inbox sync
+        run: |
+          code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
+            -X POST https://tatocar.co/api/gmail-sync \
+            -H "x-tato-sync-secret: ${{ secrets.GMAIL_SYNC_SECRET }}")
+          cat /tmp/out.json
+          echo ""
+          if [ "$code" != "200" ]; then
+            echo "::error::Gmail sync returned HTTP $code"
+            exit 1
+          fi

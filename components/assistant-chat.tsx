@@ -80,15 +80,22 @@ export function AssistantChat({
         message?: ChatMessage;
         snapshot?: SnapshotSummary;
         error?: string;
+        reason?: string;
       };
 
       if (!response.ok || !data.message) {
+        // Surface the upstream reason rather than collapsing everything
+        // to one sentence. This page is admin-only, and the operator is
+        // the person who configures the API key — hiding "invalid api
+        // key" or "model not found" from them just turns a 30-second
+        // fix into a support round-trip.
+        const detail = data.reason ? ` (${data.reason})` : "";
         setError(
           data.error === "RATE_LIMITED"
             ? t.errorRateLimited
             : data.error === "ASSISTANT_NOT_CONFIGURED"
               ? t.errorNotConfigured
-              : t.errorGeneric,
+              : `${t.errorGeneric}${detail}`,
         );
         // Drop the optimistic echo — the question was not recorded.
         setMessages((current) => current.filter((m) => m.id !== optimistic.id));

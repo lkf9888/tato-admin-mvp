@@ -11,6 +11,7 @@ import {
   uploadGeneratedTemplatePdf,
 } from "@/lib/contract-documents";
 import { prisma } from "@/lib/prisma";
+import { resolveUploadPathWithin } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 
@@ -279,9 +280,11 @@ function parseAppendDocument(value: unknown, workspaceId: string) {
   const sourceType = clean(record.sourceType) === "WORD" ? "WORD" : "PDF";
   const sourcePathname = clean(record.sourcePathname);
   if (!sourcePathname) return null;
-  if (!sourcePathname.startsWith(`contracts/templates/${workspaceId}/sources/`)) {
-    throw new Error("Invalid appended document pathname.");
-  }
+  // Assert containment on the *resolved* path. The previous raw-string
+  // prefix test could be satisfied by a pathname whose `../` segments
+  // walk into another workspace's sources directory, which this route
+  // would then merge into the caller's own template PDF.
+  resolveUploadPathWithin(sourcePathname, `contracts/templates/${workspaceId}/sources`);
   return {
     sourceType: sourceType as "PDF" | "WORD",
     sourcePathname,

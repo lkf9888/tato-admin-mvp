@@ -249,15 +249,35 @@ function parseCsvOrderStatus(value?: string) {
   return OrderStatus.booked;
 }
 
+// Order matters. date-fns's `yyyy` token matches 1-4 digits greedily,
+// so `M/d/yyyy` happily consumes "3/8/26" and yields the year 26 AD —
+// which passes the isNaN check and imports as a real order that then
+// vanishes from every date-filtered view. The two-digit `yy` formats
+// have to be tried *first* so they claim those strings. Verified that
+// this ordering still resolves four-digit years correctly, because
+// date-fns rejects trailing content: "3/8/2026 9:00 AM" fails `M/d/yy`
+// (leftover "26 9:00 AM") and falls through to the `yyyy` entries.
+//
+// The real Turo earnings export uses `yyyy-MM-dd hh:mm a`
+// ("2025-12-20 09:00 PM") — confirmed against a 2,183-row export. The
+// AM/PM marker is honoured, not silently dropped, for the same
+// trailing-content reason: `yyyy-MM-dd HH:mm` does not match a string
+// ending in " PM".
 const CSV_DATE_FORMATS = [
-  // ISO-ish formats
+  // ISO-ish formats — what Turo actually emits today
   "yyyy-MM-dd HH:mm:ss",
   "yyyy-MM-dd HH:mm",
   "yyyy-MM-dd hh:mm a",
   "yyyy-MM-dd h:mm a",
   "yyyy-MM-dd'T'HH:mm:ss",
   "yyyy-MM-dd'T'HH:mm",
-  // US-style formats Turo earnings export commonly uses
+  // Two-digit years first — see note above
+  "M/d/yy h:mm a",
+  "M/d/yy hh:mm a",
+  "M/d/yy H:mm",
+  "MM/dd/yy hh:mm a",
+  "MM/dd/yy HH:mm",
+  // US-style four-digit-year formats
   "MM/dd/yyyy hh:mm a",
   "MM/dd/yyyy h:mm a",
   "MM/dd/yyyy HH:mm",
@@ -265,8 +285,6 @@ const CSV_DATE_FORMATS = [
   "M/d/yyyy hh:mm a",
   "M/d/yyyy HH:mm",
   "M/d/yyyy H:mm",
-  "M/d/yy h:mm a",
-  "M/d/yy H:mm",
   // Month-name formats, e.g. "Apr 22, 2026 9:00 AM"
   "MMM d, yyyy h:mm a",
   "MMM d, yyyy hh:mm a",
@@ -275,9 +293,17 @@ const CSV_DATE_FORMATS = [
   "MMMM d, yyyy hh:mm a",
   // Date-only fallbacks
   "yyyy-MM-dd",
+  "M/d/yy",
   "MM/dd/yyyy",
   "M/d/yyyy",
 ];
+
+// A trip date outside this range is a parse artifact, not real data.
+// Guards against a format matching the wrong way round (year 26 AD)
+// and against V8's fuzzy `new Date()` inventing a plausible-looking
+// date from garbage.
+const MIN_PLAUSIBLE_YEAR = 2000;
+const MAX_PLAUSIBLE_YEAR = 2100;
 
 function getCsvImportTimeZone() {
   return process.env.CSV_IMPORT_TIMEZONE?.trim() || "America/Vancouver";
@@ -327,8 +353,11 @@ function parseCsvDate(value: string) {
     const parsed = parse(trimmed, format, new Date());
     if (Number.isNaN(parsed.getTime())) continue;
 
+    const year = parsed.getFullYear();
+    if (year < MIN_PLAUSIBLE_YEAR || year > MAX_PLAUSIBLE_YEAR) continue;
+
     return zonedWallClockToUtc(
-      parsed.getFullYear(),
+      year,
       parsed.getMonth() + 1,
       parsed.getDate(),
       parsed.getHours(),
@@ -338,8 +367,17 @@ function parseCsvDate(value: string) {
     );
   }
 
-  const fallback = new Date(trimmed);
-  return fallback;
+  // No `new Date(trimmed)` fallback. V8's legacy parser does not return
+  // Invalid Date for junk — "4/22/2026 9:00 AM PDT" yields 2022-06-04,
+  // roughly four years off, which then passes the caller's isNaN check
+  // and imports as a real order. It also bypasses `zonedWallClockToUtc`
+  // entirely, so such rows would be stored in the server's timezone
+  // while every other row in the same file uses CSV_IMPORT_TIMEZONE.
+  //
+  // Returning an Invalid Date makes the caller fail the row and surface
+  // it in ImportBatch.failures, where the operator can see the
+  // unrecognized format and we can add it here.
+  return new Date(NaN);
 }
 
 function extractFinancialsFromRow(row: CsvImportRow) {

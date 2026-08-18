@@ -263,11 +263,18 @@ export async function POST(
     contentType: "application/pdf",
   };
   for (const item of fresh.recipients) {
+    // The signed-PDF route requires either an admin session or a valid
+    // recipient token (see that route's header comment). Signers have
+    // neither a session nor the bare URL, so carry their own token on
+    // the link — it is the same secret that gated the signing page.
+    const recipientPdfUrl = blob.url
+      ? `${blob.url}?token=${encodeURIComponent(item.token)}`
+      : blob.url;
     const result = await sendContractCompletedEmail({
       to: item.email,
       recipientName: item.name,
       contractTitle: fresh.title,
-      signedPdfUrl: blob.url,
+      signedPdfUrl: recipientPdfUrl,
       signedPdfAttachment,
     });
     if (!result.ok) {

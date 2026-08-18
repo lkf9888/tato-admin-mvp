@@ -11,6 +11,7 @@ import {
   uploadGeneratedTemplatePdf,
 } from "@/lib/contract-documents";
 import { prisma } from "@/lib/prisma";
+import { resolveUploadPathWithin } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 
@@ -44,7 +45,14 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  if (!sourcePathname.startsWith(`contracts/templates/${workspace.id}/sources/`)) {
+  // Normalize before asserting containment — a raw-string prefix test
+  // is satisfied by `.../sources/../../<other workspace>/sources/x.docx`,
+  // which then resolves outside this workspace. `fetchDocumentBytes`
+  // below reads whatever this resolves to, so the check has to survive
+  // normalization.
+  try {
+    resolveUploadPathWithin(sourcePathname, `contracts/templates/${workspace.id}/sources`);
+  } catch {
     return NextResponse.json({ error: "Invalid template pathname." }, { status: 400 });
   }
 

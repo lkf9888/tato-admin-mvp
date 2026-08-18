@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
-import { makeOwnerLedgerReceiptPath, resolveUploadPath, sanitizeFilename } from "@/lib/uploads";
+import { checkUploadLimits, makeOwnerLedgerReceiptPath, resolveUploadPath, sanitizeFilename } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 
@@ -66,6 +66,15 @@ export async function POST(request: NextRequest, { params }: { params: Params })
   const files = formData.getAll("files").filter((entry): entry is File => entry instanceof File);
   if (files.length === 0) {
     return NextResponse.json({ error: "NO_FILES" }, { status: 400 });
+  }
+
+  // Reject oversized batches before anything reaches the volume. These
+  // routes are Route Handlers, which Next does not body-size cap by
+  // default (`serverActions.bodySizeLimit` covers Server Actions only).
+  const limitError = checkUploadLimits(files);
+  if (limitError) {
+    const { status, ...payload } = limitError;
+    return NextResponse.json(payload, { status });
   }
 
   const created = [];

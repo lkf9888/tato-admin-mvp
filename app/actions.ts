@@ -50,6 +50,17 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const SHARE_UNLOCK_LIMIT = 6;
 const SHARE_UNLOCK_WINDOW_MS = 15 * 60 * 1000;
 
+// Password reset is the highest-value unauthenticated surface in the
+// app — a correct 6-digit code yields a full admin session. Limits are
+// tighter than login because a legitimate user types one code from
+// their inbox, not five guesses. The request bucket is separate from
+// the verify bucket so that asking for a fresh code (a normal thing to
+// do when the first email is slow) doesn't consume guess budget.
+const PASSWORD_RESET_EMAIL_LIMIT = 5;
+const PASSWORD_RESET_IP_LIMIT = 10;
+const PASSWORD_RESET_REQUEST_IP_LIMIT = 10;
+const PASSWORD_RESET_WINDOW_MS = 15 * 60 * 1000;
+
 const ownerSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(2),
@@ -653,6 +664,22 @@ export async function requestPasswordResetCodeAction(input: {
   }
 
   const email = normalizeEmail(parsed.data.email);
+  const ip = await getClientIp();
+
+  // Cap how many codes one IP can cause to be issued. `issuePasswordResetCode`
+  // already throttles per email (30s), but without an IP bucket an
+  // attacker can rotate through addresses to keep minting fresh codes —
+  // which is also what resets the per-code attempt counter.
+  const ipDecision = await checkRateLimit({
+    scope: "password_reset_request_ip",
+    identifier: ip,
+    maxAttempts: PASSWORD_RESET_REQUEST_IP_LIMIT,
+    windowMs: PASSWORD_RESET_WINDOW_MS,
+  });
+  if (!ipDecision.allowed) {
+    return { ok: false, error: "throttled" };
+  }
+
   const locale = await getLocale();
   const result = await issuePasswordResetCode({ email, locale });
   if (!result.ok) {
@@ -662,6 +689,12 @@ export async function requestPasswordResetCodeAction(input: {
     return { ok: false, error: "invalid" };
   }
 
+  await recordFailedAttempt({
+    scope: "password_reset_request_ip",
+    identifier: ip,
+    windowMs: PASSWORD_RESET_WINDOW_MS,
+  });
+
   return { ok: true, sent: result.sent };
 }
 
@@ -669,6 +702,14 @@ export async function requestPasswordResetCodeAction(input: {
  * Step 2 of the password-reset flow. Verifies the code, then writes a
  * fresh bcrypt hash and clears any active rate-limit buckets for the
  * email so the user can sign in again immediately.
+ *
+ * Rate limiting here is not optional. This is an unauthenticated action
+ * that hands out account access on a correct 6-digit code, and until
+ * v0.23.1 it had none at all — `loginAction` was bucketed but this path
+ * was not, so the only cost of a guess was one bcrypt compare. Paired
+ * with the per-code cap now enforced atomically in
+ * `verifyCodeForPurpose`, a guessing campaign has to burn a bucket slot
+ * per attempt on both the email and the IP.
  */
 export async function resetPasswordAction(input: {
   email: string;
@@ -681,11 +722,45 @@ export async function resetPasswordAction(input: {
   }
 
   const email = normalizeEmail(parsed.data.email);
+  const ip = await getClientIp();
+
+  // Check both buckets before spending a bcrypt cycle, so the lockout
+  // itself can't be turned into a CPU-exhaustion vector.
+  const emailDecision = await checkRateLimit({
+    scope: "password_reset_email",
+    identifier: email,
+    maxAttempts: PASSWORD_RESET_EMAIL_LIMIT,
+    windowMs: PASSWORD_RESET_WINDOW_MS,
+  });
+  if (!emailDecision.allowed) {
+    return { ok: false, error: "too_many_attempts" };
+  }
+
+  const ipDecision = await checkRateLimit({
+    scope: "password_reset_ip",
+    identifier: ip,
+    maxAttempts: PASSWORD_RESET_IP_LIMIT,
+    windowMs: PASSWORD_RESET_WINDOW_MS,
+  });
+  if (!ipDecision.allowed) {
+    return { ok: false, error: "too_many_attempts" };
+  }
+
   const verifyResult = await verifyPasswordResetCode({
     email,
     code: input.code,
   });
   if (!verifyResult.ok) {
+    await recordFailedAttempt({
+      scope: "password_reset_email",
+      identifier: email,
+      windowMs: PASSWORD_RESET_WINDOW_MS,
+    });
+    await recordFailedAttempt({
+      scope: "password_reset_ip",
+      identifier: ip,
+      windowMs: PASSWORD_RESET_WINDOW_MS,
+    });
     return { ok: false, error: verifyResult.reason };
   }
 
@@ -702,7 +777,11 @@ export async function resetPasswordAction(input: {
     data: { passwordHash: await bcrypt.hash(parsed.data.password, 10) },
   });
 
+  // Clear every bucket the user could have tripped on the way here, so
+  // a successful reset lets them sign in immediately.
   await resetAttempts({ scope: "login_email", identifier: email });
+  await resetAttempts({ scope: "password_reset_email", identifier: email });
+  await resetAttempts({ scope: "password_reset_ip", identifier: ip });
 
   await logActivity({
     workspaceId: user.workspaceId ?? null,

@@ -2,18 +2,26 @@ import { readFile, stat } from "fs/promises";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
-import { resolveUploadPath } from "@/lib/uploads";
+import { resolveUploadPathWithin } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const { workspace } = await requireCurrentAdminContext();
   const pathname = request.nextUrl.searchParams.get("pathname") || "";
-  if (!pathname.startsWith(`contracts/templates/${workspace.id}/sources/`)) {
+
+  // Resolve first, then assert containment. Checking the raw string
+  // before normalizing let `../` sequences escape the workspace
+  // directory while still satisfying the prefix test.
+  let absolutePath: string;
+  try {
+    absolutePath = resolveUploadPathWithin(
+      pathname,
+      `contracts/templates/${workspace.id}/sources`,
+    );
+  } catch {
     return NextResponse.json({ error: "FILE_NOT_FOUND" }, { status: 404 });
   }
-
-  const absolutePath = resolveUploadPath(pathname);
   const fileStat = await stat(absolutePath).catch(() => null);
   if (!fileStat?.isFile()) {
     return NextResponse.json({ error: "FILE_NOT_FOUND" }, { status: 404 });

@@ -167,6 +167,9 @@ model Workspace {
   contractTextPresets           ContractTextPreset[]
   turoSyncConfig                TuroSyncConfig?
   billing                       WorkspaceBilling?
+  inboundEmails                 InboundEmail[]
+  assistantThreads              AssistantThread[]
+  assistantAlerts               AssistantAlert[]
 }
 
 model User {
@@ -274,6 +277,7 @@ model Order {
   staffTasks             StaffTask[]
   directBookingDocuments DirectBookingDocument[]
   contractEnvelopes      ContractEnvelope[]
+  inboundEmails          InboundEmail[]
 
   @@index([workspaceId])
   @@index([workspaceId, isArchived])
@@ -799,4 +803,142 @@ model RateLimitAttempt {
 
   @@unique([scope, identifier])
   @@index([windowStart])
+}
+
+// ---------------------------------------------------------------------
+// AI assistant + Turo inbox
+// ---------------------------------------------------------------------
+
+// Turo gives hosts no API and no webhooks, but it does email every
+// material event: guest messages, booking created / modified /
+// cancelled, and support notices. Those land in the operator's Gmail.
+// Pulling them in over IMAP is the only near-real-time channel Turo
+// leaves open, so this table is TATO's Turo event stream.
+enum InboundEmailKind {
+  GUEST_MESSAGE
+  BOOKING_CREATED
+  BOOKING_MODIFIED
+  BOOKING_CANCELLED
+  TRIP_STARTED
+  TRIP_ENDED
+  PAYOUT
+  SUPPORT
+  OTHER
+}
+
+model InboundEmail {
+  id          String           @id @default(cuid())
+  workspaceId String
+
+  // RFC 5322 Message-ID. The dedupe key — an IMAP poll that overlaps a
+  // previous run, or a reconnect that replays a range, must not create
+  // a second row. Unique per workspace rather than globally so two
+  // workspaces watching the same shared mailbox don't collide.
+  messageId   String
+  fromAddress String
+  fromName    String?
+  subject     String
+  receivedAt  DateTime
+  // Plain-text body, truncated at ingest. We deliberately do not store
+  // the HTML part or attachments: this table exists to drive alerts and
+  // assistant answers, not to be a mail archive.
+  bodyText    String
+
+  // Populated by the Kimi extraction pass. `kind` stays OTHER and
+  // `parsedAt` stays null when extraction fails, so a failed parse is
+  // visible and retryable rather than silently mislabelled.
+  kind        InboundEmailKind @default(OTHER)
+  parsedAt    DateTime?
+  // Extracted fields as JSON: guest name, reservation id, vehicle,
+  // dates, amount — whichever the email actually carried.
+  parsed      String?
+  // Set once the assistant has surfaced this to the operator.
+  acknowledgedAt DateTime?
+
+  // Best-effort link back to the order this email is about, matched on
+  // the reservation id the extractor pulls out. Null when the email
+  // predates the order's import or carries no reservation id.
+  orderId     String?
+
+  createdAt   DateTime         @default(now())
+
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  order       Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, messageId])
+  @@index([workspaceId, receivedAt])
+  @@index([workspaceId, kind, acknowledgedAt])
+  @@index([orderId])
+}
+
+model AssistantThread {
+  id          String             @id @default(cuid())
+  workspaceId String
+  userId      String
+  title       String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages    AssistantMessage[]
+
+  @@index([workspaceId, userId, updatedAt])
+}
+
+enum AssistantMessageRole {
+  USER
+  ASSISTANT
+}
+
+model AssistantMessage {
+  id        String               @id @default(cuid())
+  threadId  String
+  role      AssistantMessageRole
+  content   String
+  // Which data the assistant consulted to answer, as JSON. Shown in the
+  // UI so the operator can tell an answer grounded in their fleet from
+  // one the model invented.
+  context   String?
+  createdAt DateTime             @default(now())
+
+  thread    AssistantThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+}
+
+enum AssistantAlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// Something the operator should look at. Written by the alert scan, not
+// by the model — the model only phrases them. Keeping detection in
+// plain code means an alert never fires because of a hallucination, and
+// never fails to fire because the model was having an off day.
+model AssistantAlert {
+  id          String                 @id @default(cuid())
+  workspaceId String
+
+  // Stable identity for a given real-world condition, e.g.
+  // "conflict:<orderId>" or "gmail_sync_failed". Lets a repeated scan
+  // update the existing alert instead of stacking duplicates.
+  dedupeKey   String
+  severity    AssistantAlertSeverity @default(INFO)
+  title       String
+  body        String
+  // Deep link into the app, e.g. /orders?q=<reservation>.
+  href        String?
+
+  resolvedAt      DateTime?
+  acknowledgedAt  DateTime?
+  notifiedAt      DateTime?
+
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  workspace   Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, dedupeKey])
+  @@index([workspaceId, resolvedAt, severity])
 }

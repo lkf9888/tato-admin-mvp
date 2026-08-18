@@ -43,6 +43,7 @@ export function AppShell({
       label: messages.shell.nav.groupOperations,
       items: [
         { href: "/dashboard", label: messages.shell.nav.dashboard, icon: "◐" },
+        { href: "/assistant", label: messages.shell.nav.assistant, icon: "✦" },
         { href: "/calendar", label: messages.shell.nav.calendar, icon: "▦" },
         { href: "/orders", label: messages.shell.nav.orders, icon: "◈" },
         { href: "/imports", label: messages.shell.nav.imports, icon: "⇧" },

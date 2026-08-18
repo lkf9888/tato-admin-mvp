@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.26.0 - 2026-08-18
+
+### Fleet assistant
+
+New `/assistant` page: ask about today's schedule, booking conflicts, revenue, or unread Turo messages, and get answers grounded in live fleet data. Powered by Kimi (Moonshot AI) — set `KIMI_API_KEY` to enable; without it the page explains it isn't configured rather than erroring.
+
+**The model never queries the database and never takes an action.** `lib/assistant.ts` gathers a factual snapshot in plain code — fleet size, what's on rent, this month's revenue, the next 7 days of pickups and returns, open conflicts, unread Turo mail, open staff tasks — and hands it to the model as context. The model's only job is phrasing and reasoning over numbers it was given.
+
+That's a deliberate trade against tool-calling. This system manages real money and real vehicles: a model that can run its own queries can also confidently report a number it derived wrongly, and a model that can act can act wrongly. Snapshot-in / prose-out means a wrong answer is a wrong *sentence about correct data*, which an operator can catch. The system prompt forbids inventing values and requires the assistant to say when the snapshot doesn't contain an answer. Each reply shows what it was grounded in ("42 vehicles · 18 trips this week · 2 conflicts · 5 unread emails").
+
+Drafting outbound messages is supported. **Sending is not** — drafts come back as text to review and send yourself; nothing in the assistant path touches the email or SMS layer.
+
+Rate limited to 60 questions per 10 minutes per workspace+IP, since each one costs a model call.
+
+### Turo inbox over Gmail
+
+Turo closed its public API in April 2023 and offers hosts no webhooks — but it still emails every material event: guest messages, bookings created / modified / cancelled, trip start and end, payouts, support notices. Reading that mailbox is the only near-real-time channel Turo leaves open.
+
+`POST /api/gmail-sync` pulls recent Turo mail over IMAP into a new `InboundEmail` table, then uses Kimi to classify each message and extract reservation id, guest, vehicle, dates, amount, a one-line summary, and whether it needs a reply. Emails carrying a reservation id we recognise are linked to that order. Results surface in a panel beside the chat, sorted so anything awaiting a reply floats to the top, and feed the assistant's snapshot so "which Turo messages need a reply?" is answerable.
+
+Credential handling, deliberately different from `TuroSyncConfig.csvAuthHeader`:
+
+- The Gmail password lives in an **environment variable, never the database**. Railway's env store is already a secret store; a mailbox credential in a SQLite column turns a DB leak into a mailbox takeover.
+- It must be a Gmail **App Password**, not the account password — Google requires 2-Step Verification to issue one, and it can be revoked independently.
+- The IMAP search is **scoped to Turo's sending domains** via `GMAIL_ALLOWED_SENDERS`. The credential could read the whole mailbox, so it reads as little as possible.
+- Only condensed plain text is stored — no HTML part, no attachments. This is an event stream, not a mail archive.
+
+Idempotent: dedupes on `(workspaceId, Message-ID)`, so overlapping runs and IMAP replays are harmless. Auth is a session or `GMAIL_SYNC_SECRET`, compared in constant time (the older `/api/turo-sync` uses `===`, which leaks a secret byte-by-byte under timing analysis).
+
+### Notes
+
+- Model names move fast on this platform: the `kimi-k2` series was discontinued 2026-05-25 and `kimi-latest` on 2026-01-28. Defaults are `kimi-k2.6` for chat and `kimi-k2.5` for extraction, both overridable by env so a deprecation doesn't need a deploy.
+- New schema: `InboundEmail`, `AssistantThread`, `AssistantMessage`, `AssistantAlert`. The alert table is written by scans in plain code, not by the model — an alert should never fire because of a hallucination, or fail to fire because the model was having an off day. The scan itself lands next.
+
 ## v0.25.0 - 2026-08-18
 
 ### Configurable owner revenue split

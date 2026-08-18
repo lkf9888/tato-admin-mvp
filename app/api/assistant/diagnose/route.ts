@@ -80,7 +80,6 @@ export async function GET() {
   const test = await kimiChat({
     messages: [{ role: "user", content: "Reply with the single word: ok" }],
     maxTokens: 8,
-    temperature: 0,
     timeoutMs: 20_000,
   });
 

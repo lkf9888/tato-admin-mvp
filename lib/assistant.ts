@@ -304,7 +304,7 @@ export async function askAssistant(input: {
     { role: "user", content: input.question },
   ];
 
-  const result = await kimiChat({ messages, temperature: 0.3, maxTokens: 1500 });
+  const result = await kimiChat({ messages, maxTokens: 1500 });
   if (!result.ok) {
     return { ok: false, reason: result.reason };
   }

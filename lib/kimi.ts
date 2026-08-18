@@ -108,7 +108,13 @@ export async function kimiChat(input: {
       body: JSON.stringify({
         model: input.model ?? getChatModel(),
         messages: input.messages,
-        temperature: input.temperature ?? 0.3,
+        // Temperature is omitted unless a caller explicitly sets one.
+        // The current Kimi models reject any value other than 1 —
+        // `invalid temperature: only 1 is allowed for this model` —
+        // the same constraint OpenAI's reasoning models have. Sending
+        // nothing lets each model use whatever it was tuned for, and
+        // keeps this client working across a model switch.
+        ...(input.temperature != null ? { temperature: input.temperature } : {}),
         max_tokens: input.maxTokens ?? 2048,
         ...(input.jsonMode ? { response_format: { type: "json_object" } } : {}),
       }),
@@ -180,7 +186,6 @@ export async function kimiExtractJson<T>(input: {
       { role: "user", content: input.user },
     ],
     model: input.model ?? getExtractionModel(),
-    temperature: 0,
     maxTokens: input.maxTokens ?? 1024,
     timeoutMs: input.timeoutMs,
     jsonMode: true,

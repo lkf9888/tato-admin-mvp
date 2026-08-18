@@ -53,7 +53,12 @@ export class GmailInboxError extends Error {
 
 export function getGmailConfig() {
   const user = process.env.GMAIL_IMAP_USER?.trim() || "";
-  const password = process.env.GMAIL_IMAP_PASSWORD?.trim() || "";
+  // Google displays App Passwords grouped as `xxxx xxxx xxxx xxxx` for
+  // readability, and the spaces come along when you copy them. The real
+  // password is the 16 characters without spaces. Some IMAP servers
+  // tolerate the spaces and some reject the login outright, so strip
+  // all whitespace rather than depending on which.
+  const password = (process.env.GMAIL_IMAP_PASSWORD ?? "").replace(/\s+/g, "");
   const host = process.env.GMAIL_IMAP_HOST?.trim() || "imap.gmail.com";
   const port = Number.parseInt(process.env.GMAIL_IMAP_PORT?.trim() || "993", 10);
   const mailbox = process.env.GMAIL_IMAP_MAILBOX?.trim() || DEFAULT_MAILBOX;

@@ -564,3 +564,83 @@ export async function sendStaffTaskAdminNotificationEmail(input: {
     html,
   });
 }
+
+function escapeHtmlText(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/**
+ * Digest of proactive alerts.
+ *
+ * One email per scan covering everything new, rather than one email per
+ * alert. An operator who gets five separate emails about five overdue
+ * tasks learns to filter the sender; one email listing five things gets
+ * read.
+ */
+export async function sendAlertDigestEmail(input: {
+  to: string;
+  recipientName: string;
+  appUrl: string;
+  alerts: Array<{
+    severity: "INFO" | "WARNING" | "CRITICAL";
+    title: string;
+    body: string;
+    href?: string | null;
+  }>;
+}): Promise<{ ok: boolean; reason?: string }> {
+  if (input.alerts.length === 0) return { ok: true };
+
+  const criticalCount = input.alerts.filter((alert) => alert.severity === "CRITICAL").length;
+  const subject =
+    criticalCount > 0
+      ? `TATO 提醒:${criticalCount} 项需要立即处理`
+      : `TATO 提醒:${input.alerts.length} 项待处理`;
+
+  const toneColor: Record<string, string> = {
+    CRITICAL: "#b5261a",
+    WARNING: "#9a5a00",
+    INFO: "#4a4e5a",
+  };
+  const toneLabel: Record<string, string> = {
+    CRITICAL: "紧急",
+    WARNING: "注意",
+    INFO: "提示",
+  };
+
+  const text = [
+    `${input.recipientName},`,
+    "",
+    ...input.alerts.flatMap((alert) => [
+      `[${toneLabel[alert.severity]}] ${alert.title}`,
+      alert.body,
+      "",
+    ]),
+    `查看详情:${input.appUrl}/assistant`,
+    "",
+    "— TATO",
+  ].join("\n");
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 540px; margin: 0 auto; padding: 24px; color: #16181d;">
+      <p style="font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: #74788a; margin: 0 0 6px;">TATO</p>
+      <h1 style="font-size: 19px; font-weight: 650; margin: 0 0 18px;">${escapeHtmlText(subject)}</h1>
+      ${input.alerts
+        .map(
+          (alert) => `
+        <div style="border-left: 3px solid ${toneColor[alert.severity]}; padding: 2px 0 2px 12px; margin-bottom: 16px;">
+          <p style="margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: ${toneColor[alert.severity]};">${toneLabel[alert.severity]}</p>
+          <p style="margin: 0 0 6px; font-size: 15px; font-weight: 600; line-height: 22px;">${escapeHtmlText(alert.title)}</p>
+          <p style="margin: 0; font-size: 13px; line-height: 21px; color: #4a4e5a; white-space: pre-wrap;">${escapeHtmlText(alert.body)}</p>
+        </div>`,
+        )
+        .join("")}
+      <a href="${escapeHtmlText(input.appUrl)}/assistant" style="display: inline-block; margin-top: 8px; background: #16181d; color: #ffffff; text-decoration: none; border-radius: 999px; padding: 11px 18px; font-size: 13px; font-weight: 600;">在 TATO 中查看</a>
+      <p style="margin: 20px 0 0; font-size: 11px; color: #74788a;">条件消失后提醒会自动关闭,无需手动清理。</p>
+    </div>
+  `;
+
+  return sendMail({ to: input.to, subject, text, html, timeoutMs: 20_000 });
+}

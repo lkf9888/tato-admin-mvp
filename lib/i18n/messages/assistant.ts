@@ -21,6 +21,13 @@ export const assistantMessages = {
       errorNotConfigured: "The assistant is not set up on this deployment yet.",
       notConfiguredHint:
         "Set KIMI_API_KEY in your environment to enable the assistant. Get a key at platform.moonshot.ai.",
+      alertsTitle: "Alerts",
+      alertsCopy: "Detected in code, not guessed by the model. Alerts close themselves when the condition clears.",
+      alertsScan: "Rescan",
+      alertsScanning: "Scanning…",
+      alertsEmpty: "Nothing needs your attention.",
+      alertsOpen: "Open",
+      alertsAcknowledge: "Got it",
       inboxTitle: "Turo inbox",
       inboxCopy:
         "Messages Turo emailed you, pulled in automatically and sorted by what needs a reply.",
@@ -56,6 +63,13 @@ export const assistantMessages = {
       errorNotConfigured: "这个部署还没有配置助理。",
       notConfiguredHint:
         "在环境变量里设置 KIMI_API_KEY 以启用助理。到 platform.moonshot.ai 申请密钥。",
+      alertsTitle: "提醒",
+      alertsCopy: "由代码检测,不是模型猜的。条件消失后提醒会自动关闭。",
+      alertsScan: "重新扫描",
+      alertsScanning: "扫描中…",
+      alertsEmpty: "目前没有需要你处理的事。",
+      alertsOpen: "查看",
+      alertsAcknowledge: "知道了",
       inboxTitle: "Turo 收件箱",
       inboxCopy: "Turo 发给你的邮件,自动收取并按是否需要回复排序。",
       inboxEmpty: "还没有 Turo 邮件。Gmail 同步跑过之后会出现在这里。",

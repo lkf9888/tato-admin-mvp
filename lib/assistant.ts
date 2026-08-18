@@ -2,6 +2,7 @@ import "server-only";
 
 import { InboundEmailKind, OrderStatus } from "@prisma/client";
 
+import { listActiveAlerts } from "@/lib/assistant-alerts";
 import { kimiChat, type KimiMessage } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
 import { getOrderNetEarning } from "@/lib/utils";
@@ -60,6 +61,7 @@ export type AssistantSnapshot = {
     conflicts: number;
     unreadEmails: number;
     openTasks: number;
+    activeAlerts: number;
   };
 };
 
@@ -89,6 +91,7 @@ export async function buildAssistantSnapshot(workspaceId: string): Promise<Assis
     unreadEmails,
     openTasks,
     lastImport,
+    activeAlerts,
   ] = await Promise.all([
     prisma.vehicle.count({ where: { workspaceId } }),
     prisma.owner.count({ where: { workspaceId } }),
@@ -157,6 +160,7 @@ export async function buildAssistantSnapshot(workspaceId: string): Promise<Assis
       orderBy: { importedAt: "desc" },
       select: { importedAt: true, successRows: true, failedRows: true, fileName: true },
     }),
+    listActiveAlerts(workspaceId),
   ]);
 
   const monthRevenue = monthOrders.reduce(
@@ -178,6 +182,19 @@ export async function buildAssistantSnapshot(workspaceId: string): Promise<Assis
     );
   } else {
     lines.push("Last CSV import: never");
+  }
+
+  lines.push("");
+  lines.push(`## Open alerts (${activeAlerts.length})`);
+  if (activeAlerts.length === 0) {
+    lines.push("(none)");
+  } else {
+    for (const alert of activeAlerts) {
+      lines.push(`- [${alert.severity}] ${alert.title}`);
+      for (const detail of alert.body.split("\n").slice(0, 4)) {
+        if (detail.trim()) lines.push(`    ${detail.trim()}`);
+      }
+    }
   }
 
   lines.push("");
@@ -254,6 +271,7 @@ export async function buildAssistantSnapshot(workspaceId: string): Promise<Assis
       conflicts: conflicts.length,
       unreadEmails: unreadEmails.length,
       openTasks: openTasks.length,
+      activeAlerts: activeAlerts.length,
     },
   };
 }

@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { LedgerShareTarget } from "@prisma/client";
+
 import { normalizeEmail, requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +19,7 @@ type AccountSettingsStatus =
   | "password_saved"
   | "stripe_saved"
   | "stripe_cleared"
+  | "ledger_policy_saved"
   | "invalid"
   | "bad_password"
   | "email_in_use"
@@ -286,4 +289,58 @@ export async function updateStripePayoutBindingAction(formData: FormData) {
   });
 
   finish("stripe_saved");
+}
+
+const ledgerPolicySchema = z.object({
+  reimbursementShare: z.nativeEnum(LedgerShareTarget),
+  serviceShare: z.nativeEnum(LedgerShareTarget),
+  penaltyShare: z.nativeEnum(LedgerShareTarget),
+});
+
+/**
+ * Owner revenue-split policy.
+ *
+ * Changing this does not rewrite existing statements — ledger rows are
+ * only recomputed when their order is next synced. That is deliberate:
+ * silently restating a month that has already been settled with an
+ * owner would be worse than requiring an explicit resync. Use the
+ * per-owner "resync" action to apply a new policy to past trips once
+ * you have agreed the change with that owner.
+ */
+export async function updateLedgerPolicyAction(formData: FormData) {
+  const parsed = ledgerPolicySchema.safeParse({
+    reimbursementShare: formData.get("reimbursementShare"),
+    serviceShare: formData.get("serviceShare"),
+    penaltyShare: formData.get("penaltyShare"),
+  });
+
+  if (!parsed.success) {
+    finish("invalid");
+  }
+
+  const { user, workspace } = await requireCurrentAdminContext();
+
+  await prisma.workspace.update({
+    where: { id: workspace.id },
+    data: {
+      reimbursementShare: parsed.data.reimbursementShare,
+      serviceShare: parsed.data.serviceShare,
+      penaltyShare: parsed.data.penaltyShare,
+    },
+  });
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.email,
+    action: "ledger_policy_updated",
+    entityType: "Workspace",
+    entityId: workspace.id,
+    metadata: {
+      reimbursementShare: parsed.data.reimbursementShare,
+      serviceShare: parsed.data.serviceShare,
+      penaltyShare: parsed.data.penaltyShare,
+    },
+  });
+
+  finish("ledger_policy_saved");
 }

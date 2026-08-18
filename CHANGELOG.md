@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.25.0 - 2026-08-18
+
+### Configurable owner revenue split
+
+Turo's `Total earnings` bundles four different kinds of income into one number, and who they belong to depends on the arrangement with each vehicle owner. Account Settings now carries a per-workspace policy for three of them:
+
+| Category | Turo columns | Share of a real 2,183-row export |
+|---|---|---|
+| Cost reimbursements | Gas reimbursement, Gas fee, Tolls & tickets, On-trip / Post-trip EV charging, Cleaning | $24,545 |
+| Service income | Delivery, Extras, Airport operations fee, Airport parking credit | $34,208 |
+| Penalties and damages | Late fee, Improper return fee, Smoking, Fines (paid to host), Cancellation fee, Additional usage, Excess distance | $5,060 |
+
+Each is set to the vehicle owner or to the fleet operator. **All three default to the owner**, which reproduces v0.24.0 behaviour exactly — nobody's statement changes until they opt in.
+
+How it works:
+
+- `Order.totalPrice` is untouched. It stays equal to Turo's `Total earnings`, because that is what the vehicle earned and vehicle ROI depends on that being true.
+- Amounts the operator retains become an explicit `EXPENSE_REIMBURSEMENT` deduction line on the owner's statement, annotated with which categories contributed and how much each was. Withheld money is visible and auditable rather than silently missing from a revenue figure.
+- Commission is charged on `netEarning − retained`, not on the full total. Charging commission on money the operator already kept would take the same amount twice.
+- Retention is capped at the trip's positive earnings, and negative category totals (a refunded delivery fee, say) stay with the owner and net against their revenue exactly as they do in Turo's own arithmetic.
+- Offline orders have no Turo component columns, so the policy has no effect on them — correct, since an offline booking's price is entered directly rather than decomposed.
+
+Verified against the real export at a 20% commission rate. In all three configurations, owner payout + operator take reconciles to Turo's `Total earnings` of $417,605.40 to the cent:
+
+| Policy | Operator | Owner |
+|---|---|---|
+| All to owner (default) | $83,940 | $333,666 |
+| Reimbursements retained | $103,447 | $314,159 |
+| Reimbursements + service retained | $129,870 | $287,736 |
+
+**Saving a new policy does not rewrite past statements.** Existing ledger rows keep their amounts until that owner is explicitly resynced, so a month already settled with an owner cannot change underneath you.
+
+### Also fixed
+
+- `roundLedgerAmount` in `lib/owner-ledger.ts` carried the same string-round defect fixed in `roundCurrencyAmount` last release — sub-cent float residues became `NaN` and landed in `OwnerLedgerItem.amount`.
+
 ## v0.24.0 - 2026-08-18
 
 Security, money-accuracy, and date-handling fixes from a three-track audit (auth/multi-tenancy, accounting/CSV, ops/reliability). Every finding below was reproduced against the code — the money and parsing fixes are verified against a real 2,183-row Turo earnings export spanning 2016 → 2026.

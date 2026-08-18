@@ -68,6 +68,24 @@ export const accountSettingsMessages = {
         "Public booking rates, deposits, insurance, tax labels, and booking availability from Online Booking.",
         "Turo CSV sync source settings from CSV Imports.",
       ],
+      ledgerTitle: "Owner revenue split",
+      ledgerCopy:
+        "Turo's payout bundles rental revenue together with reimbursements, service fees, and penalties. Choose who keeps each part when settling with a vehicle owner. Amounts you keep appear as an explicit deduction line on the owner's statement, and commission is charged only on what actually reaches them.",
+      ledgerOwner: "Vehicle owner",
+      ledgerManager: "Me (fleet operator)",
+      ledgerReimbursementTitle: "Cost reimbursements",
+      ledgerReimbursementCopy:
+        "Gas, tolls, EV charging, cleaning. The guest paid these back to cover a cost someone already fronted — keep them if you paid.",
+      ledgerServiceTitle: "Service income",
+      ledgerServiceCopy:
+        "Delivery, extras, airport handling. Payment for work performed — keep it if your team did the work.",
+      ledgerPenaltyTitle: "Penalties and damages",
+      ledgerPenaltyCopy:
+        "Late returns, improper return, smoking, fines paid to host. These usually stay with the owner because they compensate for the vehicle.",
+      ledgerSave: "Save revenue split",
+      ledgerResyncNotice:
+        "Saving does not rewrite past statements. Existing ledger rows keep their current amounts until you resync that owner — so a month you have already settled will not change underneath you.",
+      ledgerSaved: "Revenue split saved.",
     },
   },
   zh: {
@@ -136,6 +154,23 @@ export const accountSettingsMessages = {
         "在线预定页面里的车辆日租金、押金、保险费、税种和可预订开关。",
         "CSV 导入页面里的 Turo 同步来源设置。",
       ],
+      ledgerTitle: "车主分账规则",
+      ledgerCopy:
+        "Turo 的打款把租金收入、代垫费用报销、增值服务收入和罚金混在一起。你可以分别决定每一类在和车主结算时归谁。归你的部分会作为一条明确的扣款行出现在车主对账单上，佣金只按真正到车主手里的金额收取。",
+      ledgerOwner: "车主",
+      ledgerManager: "我（车队方）",
+      ledgerReimbursementTitle: "代垫费用报销",
+      ledgerReimbursementCopy:
+        "加油、过路费、充电、清洁。这是租客补回来的、别人已经先垫付的成本——你垫的就归你。",
+      ledgerServiceTitle: "增值服务收入",
+      ledgerServiceCopy: "送车、附加项、机场服务。这是干活的报酬——你的人干的就归你。",
+      ledgerPenaltyTitle: "罚金与赔偿",
+      ledgerPenaltyCopy:
+        "逾期还车、不当归还、吸烟、付给车主的罚款。这类通常归车主，因为它补偿的是车辆本身。",
+      ledgerSave: "保存分账规则",
+      ledgerResyncNotice:
+        "保存不会改写已有的对账单。现有分账行会保持当前金额，直到你对该车主执行一次重新同步——所以已经结算过的月份不会在你不知情的情况下变动。",
+      ledgerSaved: "分账规则已保存。",
     },
   },
 } as const;

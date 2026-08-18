@@ -4,6 +4,7 @@ import {
   updateAccountEmailAction,
   updateAccountPasswordAction,
   updateAccountProfileAction,
+  updateLedgerPolicyAction,
   updateStripePayoutBindingAction,
 } from "@/lib/account-settings-actions";
 import { requireCurrentAdminContext } from "@/lib/auth";
@@ -271,6 +272,66 @@ export default async function AccountSettingsPage({
           ))}
         </ul>
       </section>
+
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 shadow-sm sm:px-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+          {t.ledgerTitle}
+        </p>
+        <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
+          {t.ledgerCopy}
+        </p>
+
+        <form action={updateLedgerPolicyAction} className="mt-3 space-y-2">
+          {(
+            [
+              {
+                name: "reimbursementShare",
+                value: workspace.reimbursementShare,
+                title: t.ledgerReimbursementTitle,
+                copy: t.ledgerReimbursementCopy,
+              },
+              {
+                name: "serviceShare",
+                value: workspace.serviceShare,
+                title: t.ledgerServiceTitle,
+                copy: t.ledgerServiceCopy,
+              },
+              {
+                name: "penaltyShare",
+                value: workspace.penaltyShare,
+                title: t.ledgerPenaltyTitle,
+                copy: t.ledgerPenaltyCopy,
+              },
+            ] as const
+          ).map((row) => (
+            <div
+              key={row.name}
+              className="flex flex-col gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+            >
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-[var(--ink)]">{row.title}</p>
+                <p className="mt-0.5 text-[11.5px] leading-5 text-[var(--ink-soft)]">{row.copy}</p>
+              </div>
+              <select
+                name={row.name}
+                defaultValue={row.value}
+                className="h-9 shrink-0 rounded-md border border-[var(--line)] bg-white px-3 text-[12px] font-medium text-[var(--ink)] outline-none sm:w-48"
+              >
+                <option value="OWNER">{t.ledgerOwner}</option>
+                <option value="MANAGER">{t.ledgerManager}</option>
+              </select>
+            </div>
+          ))}
+
+          <p className="rounded-md border border-[var(--line)] bg-[var(--accent-soft)] px-3 py-2 text-[11.5px] leading-5 text-[var(--ink)]">
+            {t.ledgerResyncNotice}
+          </p>
+
+          <button className="h-9 rounded-full bg-[var(--ink)] px-4 text-[12px] font-semibold text-white transition hover:bg-[#2a2f3a]">
+            {t.ledgerSave}
+          </button>
+        </form>
+      </section>
     </div>
   );
 }
@@ -320,6 +381,7 @@ function getAccountSettingsNotice(status: string | undefined, t: AccountSettings
     password_saved: t.saved.password,
     stripe_saved: t.saved.stripe,
     stripe_cleared: t.saved.stripeCleared,
+    ledger_policy_saved: t.ledgerSaved,
   };
   const errorMap: Record<string, string> = {
     invalid: t.errors.invalid,

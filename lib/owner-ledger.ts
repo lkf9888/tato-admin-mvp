@@ -1,5 +1,11 @@
 import { OwnerLedgerKind, OrderStatus, type Prisma } from "@prisma/client";
 
+import {
+  getManagerRetention,
+  getOrderCategoryBreakdown,
+  resolveWorkspaceLedgerPolicy,
+  type LedgerShareCategory,
+} from "@/lib/ledger-policy";
 import { prisma } from "@/lib/prisma";
 import { getOrderNetEarning } from "@/lib/utils";
 
@@ -9,7 +15,14 @@ const AUTO_KINDS = [
   OwnerLedgerKind.OWNER_NET_EARNING,
   OwnerLedgerKind.MANAGER_COMMISSION,
   OwnerLedgerKind.CLEANING_FEE,
+  OwnerLedgerKind.EXPENSE_REIMBURSEMENT,
 ] as const;
+
+const RETENTION_CATEGORY_LABELS: Record<LedgerShareCategory, string> = {
+  reimbursement: "reimbursements",
+  service: "service fees",
+  penalty: "penalty fees",
+};
 
 export function isStatementKind(kind: OwnerLedgerKind) {
   return kind !== OwnerLedgerKind.SETTLEMENT_PAYMENT;
@@ -29,7 +42,7 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
   const db = tx ?? prisma;
   const order = await db.order.findUnique({
     where: { id: orderId },
-    include: { vehicle: true },
+    include: { vehicle: true, workspace: true },
   });
   if (!order) return;
 
@@ -58,8 +71,28 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
     return;
   }
 
+  // Owner revenue-split policy. Turo's `Total earnings` bundles trip
+  // revenue together with reimbursements (gas, tolls, charging,
+  // cleaning), service income (delivery, extras), and penalty fees.
+  // Whoever fronted the cost or performed the work is entitled to the
+  // corresponding slice — configured per workspace, defaulting to the
+  // owner so behaviour is unchanged until an operator opts in.
+  //
+  // The retained amount becomes an explicit deduction line on the
+  // statement rather than being netted out of the revenue figure, so
+  // the owner can see exactly what was withheld and why.
+  const policy = resolveWorkspaceLedgerPolicy(order.workspace);
+  const retention = getManagerRetention(
+    getOrderCategoryBreakdown(order.sourceMetadata),
+    policy,
+  );
+  const retainedAmount = roundLedgerAmount(Math.min(retention.total, Math.max(0, netEarning ?? 0)));
+
   const commissionRate = order.vehicle.ownerCommissionRate ?? 0;
-  const commissionBase = Math.max(0, netEarning ?? 0);
+  // Commission is charged on what actually reaches the owner. Charging
+  // it on the full `Total earnings` while also retaining part of that
+  // total would take the same money twice.
+  const commissionBase = Math.max(0, (netEarning ?? 0) - retainedAmount);
   const commission = +(commissionBase * commissionRate).toFixed(2);
   const sourceLabel = order.source === "turo" ? "Turo" : "Offline";
   const vehicleLabel = order.vehicle.plateNumber
@@ -79,6 +112,21 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
       amount: +netEarning.toFixed(2),
       occurredAt: order.pickupDatetime,
       note: `${sourceLabel} net earning · ${order.renterName} · ${vehicleLabel}`,
+    });
+  }
+
+  if (retainedAmount > 0.005) {
+    const detail = retention.categories
+      .map(
+        (entry) =>
+          `${RETENTION_CATEGORY_LABELS[entry.category]} ${roundLedgerAmount(entry.amount).toFixed(2)}`,
+      )
+      .join(" + ");
+    desired.push({
+      kind: OwnerLedgerKind.EXPENSE_REIMBURSEMENT,
+      amount: -retainedAmount,
+      occurredAt: order.pickupDatetime,
+      note: `Retained by TATO · ${detail} · ${order.renterName} · ${vehicleLabel}`,
     });
   }
 
@@ -205,5 +253,11 @@ export function isAutoOwnerLedgerKind(kind: OwnerLedgerKind) {
 }
 
 function roundLedgerAmount(value: number) {
-  return Number(`${Math.round(Number(`${value}e2`))}e-2`);
+  // Same defect as the old `roundCurrencyAmount`: building and
+  // re-parsing a string turns any |value| below 1e-6 into "1.13e-13e2",
+  // i.e. NaN, which then lands in OwnerLedgerItem.amount. Sub-cent
+  // residues are float noise from summing money, so snap them to zero.
+  if (!Number.isFinite(value)) return 0;
+  if (Math.abs(value) < 0.005) return 0;
+  return Math.round(value * 100) / 100;
 }

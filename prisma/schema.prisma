@@ -109,12 +109,43 @@ enum ContractAuditEvent {
   EMAIL_FAILED
 }
 
+// Who keeps a given category of trip income when splitting with a
+// vehicle owner. OWNER means it flows through to the owner's statement
+// like ordinary rental revenue; MANAGER means the fleet operator keeps
+// it and the owner's statement carries an explicit deduction line for
+// that amount.
+enum LedgerShareTarget {
+  OWNER
+  MANAGER
+}
+
 model Workspace {
   id                            String                         @id @default(cuid())
   name                          String
   slug                          String                         @unique
   createdAt                     DateTime                       @default(now())
   updatedAt                     DateTime                       @updatedAt
+
+  // Owner revenue-split policy. Turo's `Total earnings` bundles several
+  // kinds of income together, and who they belong to depends on the
+  // operator's arrangement with each vehicle owner:
+  //
+  //   reimbursementShare — gas, tolls, EV charging, cleaning. Money the
+  //     guest paid back for a cost somebody fronted. Belongs to whoever
+  //     actually paid it.
+  //   serviceShare       — delivery, extras, airport operations fee.
+  //     Payment for labour, so it belongs to whoever performed it.
+  //   penaltyShare       — late / improper-return / smoking fees and
+  //     fines paid to host. These compensate for harm to the vehicle,
+  //     so OWNER is the usual answer.
+  //
+  // All three default to OWNER, which reproduces the behaviour that
+  // shipped in v0.24.0 (the full `Total earnings` reaching the owner).
+  // Changing a setting only affects statements the next time the
+  // affected orders are re-synced.
+  reimbursementShare            LedgerShareTarget              @default(OWNER)
+  serviceShare                  LedgerShareTarget              @default(OWNER)
+  penaltyShare                  LedgerShareTarget              @default(OWNER)
   users                         User[]
   owners                        Owner[]
   vehicles                      Vehicle[]

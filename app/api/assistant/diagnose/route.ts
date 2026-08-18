@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { getGmailConfig, isGmailInboxConfigured } from "@/lib/gmail-inbox";
 import { getChatModel, getExtractionModel, getKimiApiKey, kimiChat } from "@/lib/kimi";
+import { APP_VERSION } from "@/lib/version";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,9 @@ export async function GET() {
   const gmail = getGmailConfig();
 
   const diagnostics: Record<string, unknown> = {
+    // Which build answered. Without this, "the fix didn't work" and
+    // "the fix isn't deployed yet" look identical from the outside.
+    version: APP_VERSION,
     kimi: {
       apiKey: describeSecret(apiKey),
       baseUrl,

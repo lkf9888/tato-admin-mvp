@@ -64,7 +64,16 @@ export function getExtractionModel() {
 }
 
 type ChatCompletionResponse = {
-  choices?: Array<{ message?: { content?: string } }>;
+  choices?: Array<{
+    message?: {
+      content?: string;
+      /** Reasoning models emit their scratchpad separately from the
+       *  answer. Never shown to the operator, but its presence tells
+       *  us why `content` came back empty. */
+      reasoning_content?: string;
+    };
+    finish_reason?: string;
+  }>;
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
@@ -138,9 +147,25 @@ export async function kimiChat(input: {
     }
 
     const data = (await response.json()) as ChatCompletionResponse;
-    const content = data.choices?.[0]?.message?.content?.trim() ?? "";
+    const choice = data.choices?.[0];
+    const content = choice?.message?.content?.trim() ?? "";
+
     if (!content) {
-      return { ok: false, reason: "empty_response" };
+      // An empty `content` with a non-error response almost always
+      // means the token budget was spent before the answer started.
+      // The current Kimi models reason before answering, and those
+      // reasoning tokens count against `max_tokens` — so a budget
+      // sized for the visible answer alone yields nothing at all.
+      // Report enough to tell that apart from a genuine empty reply.
+      const finish = choice?.finish_reason ?? "unknown";
+      const reasoned = Boolean(choice?.message?.reasoning_content?.trim());
+      const detail =
+        finish === "length"
+          ? `empty_response (truncated: finish_reason=length, max_tokens=${input.maxTokens ?? 2048}${reasoned ? ", model emitted reasoning tokens" : ""} — raise maxTokens)`
+          : `empty_response (finish_reason=${finish}${reasoned ? ", reasoning only" : ""})`;
+      // eslint-disable-next-line no-console
+      console.error(`[kimi] ${detail}`);
+      return { ok: false, reason: detail };
     }
 
     return {
@@ -187,7 +212,7 @@ export async function kimiExtractJson<T>(input: {
       { role: "user", content: input.user },
     ],
     model: input.model ?? getExtractionModel(),
-    maxTokens: input.maxTokens ?? 1024,
+    maxTokens: input.maxTokens ?? 2048,
     timeoutMs: input.timeoutMs,
     jsonMode: true,
   });

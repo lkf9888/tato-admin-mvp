@@ -79,12 +79,14 @@ export async function GET() {
     });
   }
 
-  // One tiny live call. `max_tokens` is small on purpose — this should
-  // cost effectively nothing to run repeatedly while debugging.
+  // A small live call, but not a tiny one: the current Kimi models
+  // reason before answering and those tokens count against
+  // `max_tokens`, so a budget sized for the answer alone comes back
+  // with empty content and no error.
   const test = await kimiChat({
     messages: [{ role: "user", content: "Reply with the single word: ok" }],
-    maxTokens: 8,
-    timeoutMs: 20_000,
+    maxTokens: 512,
+    timeoutMs: 30_000,
   });
 
   return NextResponse.json({

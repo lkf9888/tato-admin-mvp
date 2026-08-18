@@ -182,8 +182,8 @@ async function extractTuroEmail(input: {
     ]
       .filter(Boolean)
       .join("\n"),
-    maxTokens: 600,
-    timeoutMs: 30_000,
+    maxTokens: 2048,
+    timeoutMs: 45_000,
   });
 
   if (!parsed) return null;

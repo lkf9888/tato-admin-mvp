@@ -322,7 +322,9 @@ export async function askAssistant(input: {
     { role: "user", content: input.question },
   ];
 
-  const result = await kimiChat({ messages, maxTokens: 1500 });
+  // Generous budget: reasoning tokens count against this, so a limit
+  // sized for the visible answer alone can return nothing at all.
+  const result = await kimiChat({ messages, maxTokens: 3000 });
   if (!result.ok) {
     return { ok: false, reason: result.reason };
   }

@@ -89,9 +89,14 @@ export default async function GuestMessagesPage() {
         orderId: email.orderId,
         guestText: email.guestText,
         summary: extracted?.summary ?? null,
-        // One Chinese line per message, from whichever source it was
-        // made of. The guest's words win when we have them.
-        summaryZh: email.guestTextZh ?? email.summaryZh,
+        // The Chinese has to have been made from the text shown above
+        // it. Falling back to the summary's translation whenever the
+        // guest's was missing defeated the split it was meant to fix:
+        // the stale line kept rendering, the client saw "already
+        // translated", and nothing ever retranslated. So the summary's
+        // Chinese is only used where there is no guest text to have
+        // translated instead.
+        summaryZh: email.guestText ? email.guestTextZh : email.summaryZh,
         needsAction: extracted?.needsAction === true,
       };
     }),

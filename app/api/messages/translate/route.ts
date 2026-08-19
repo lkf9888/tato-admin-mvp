@@ -15,9 +15,22 @@ const TRANSLATE_WINDOW_MS = 10 * 60 * 1000;
  *  archive; the operator reads the recent end of it. */
 const BATCH = 12;
 
+/**
+ * A thread is identified by the ids of its messages, not by
+ * guest + vehicle.
+ *
+ * The page resolves a thread's car from its matched trip when the
+ * subject could not name one -- three Honda Odysseys mean "Honda
+ * Odyssey" identifies none of them. That makes the thread's vehicle id
+ * and the email rows' own vehicle ids legitimately different, so
+ * selecting by guest + vehicle found nothing and the feature silently
+ * did nothing. Ids cannot drift like that.
+ *
+ * Still scoped to the workspace: an id from another tenant must not
+ * resolve, however it arrived.
+ */
 const translateSchema = z.object({
-  guestName: z.string().trim().min(1).max(200),
-  vehicleId: z.string().trim().min(1).nullish(),
+  emailIds: z.array(z.string().trim().min(1)).min(1).max(60),
 });
 
 const SYSTEM_PROMPT = [
@@ -71,9 +84,7 @@ export async function POST(request: Request) {
   const pending = await prisma.inboundEmail.findMany({
     where: {
       workspaceId: context.workspace.id,
-      guestName: parsed.data.guestName,
-      vehicleId: parsed.data.vehicleId ?? null,
-      kind: { in: ["GUEST_MESSAGE", "SUPPORT"] },
+      id: { in: parsed.data.emailIds },
       summaryZh: null,
       parsed: { not: null },
     },

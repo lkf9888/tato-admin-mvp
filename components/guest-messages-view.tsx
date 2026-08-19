@@ -196,7 +196,7 @@ export function GuestMessagesView({
       const response = await fetch("/api/messages/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestName: thread.guestName, vehicleId: thread.vehicleId }),
+        body: JSON.stringify({ emailIds: thread.messages.map((m) => m.id) }),
       });
       const data = (await response.json().catch(() => ({}))) as {
         translations?: Record<string, string>;
@@ -227,6 +227,7 @@ export function GuestMessagesView({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          emailIds: selected.messages.map((m) => m.id),
           guestName: selected.guestName,
           vehicleId: selected.vehicleId,
           emailId: message.id,
@@ -263,7 +264,9 @@ export function GuestMessagesView({
       await fetch("/api/messages/acknowledge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestName: selected.guestName, vehicleId: selected.vehicleId }),
+        body: JSON.stringify({
+          emailIds: selected.messages.filter((m) => !m.acknowledgedAt).map((m) => m.id),
+        }),
       });
       router.refresh();
     } finally {

@@ -14,6 +14,10 @@ const DRAFT_LIMIT = 40;
 const DRAFT_WINDOW_MS = 10 * 60 * 1000;
 
 const draftSchema = z.object({
+  /** The thread's message ids. See the note in the translate route:
+   *  guest + vehicle stopped identifying a thread once the page began
+   *  resolving the car from the matched trip. */
+  emailIds: z.array(z.string().trim().min(1)).min(1).max(60),
   guestName: z.string().trim().min(1).max(200),
   // `.nullish()` rather than `.optional()`: the client holds this in
   // state initialised to null and JSON.stringify sends the key. The
@@ -82,9 +86,7 @@ export async function POST(request: Request) {
   const emails = await prisma.inboundEmail.findMany({
     where: {
       workspaceId: context.workspace.id,
-      guestName: parsed.data.guestName,
-      vehicleId: parsed.data.vehicleId ?? null,
-      kind: { in: ["GUEST_MESSAGE", "SUPPORT"] },
+      id: { in: parsed.data.emailIds },
     },
     orderBy: { receivedAt: "desc" },
     // Five, not eight. A guest's question is answered by the last

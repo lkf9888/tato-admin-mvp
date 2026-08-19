@@ -21,8 +21,9 @@ export const runtime = "nodejs";
  */
 const acknowledgeSchema = z.union([
   z.object({
-    guestName: z.string().trim().min(1).max(200),
-    vehicleId: z.string().trim().min(1).nullish(),
+    /** The thread's message ids -- see the note in the translate
+     *  route on why guest + vehicle no longer identifies a thread. */
+    emailIds: z.array(z.string().trim().min(1)).min(1).max(200),
   }),
   z.object({
     /** Everything received strictly before this instant. */
@@ -53,8 +54,7 @@ export async function POST(request: Request) {
       : {
           workspaceId: context.workspace.id,
           acknowledgedAt: null,
-          guestName: parsed.data.guestName,
-          vehicleId: parsed.data.vehicleId ?? null,
+          id: { in: parsed.data.emailIds },
         };
 
   const updated = await prisma.inboundEmail.updateMany({

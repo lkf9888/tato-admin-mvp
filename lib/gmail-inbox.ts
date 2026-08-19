@@ -332,6 +332,11 @@ export async function runGmailSync(input: {
    *  every fifteen minutes would spend most of its time re-reading
    *  messages it already has. */
   lookbackDays?: number;
+  /** Companion to `lookbackDays`. Widening the window alone does
+   *  nothing, because the cap takes the newest N and those are exactly
+   *  the messages already stored -- a 365-day run scanned 100 and
+   *  imported one. */
+  maxMessages?: number;
 }): Promise<GmailSyncResult> {
   const config = getGmailConfig();
   if (!config.user || !config.password) {
@@ -405,17 +410,22 @@ export async function runGmailSync(input: {
 
     // Newest first, capped — a first run against a busy mailbox should
     // not try to ingest years of history in one request.
-    const selected = uids.slice(-getMaxMessages());
+    const selected = uids.slice(-(input.maxMessages ?? getMaxMessages()));
     result.scanned = selected.length;
 
-    // Pre-load the message ids we already have so the common case (a
-    // poll that finds nothing new) costs one query rather than one per
+    // Pre-load the ids we already have, so the common case -- a poll
+    // that finds nothing new -- costs one query rather than one per
     // message.
+    //
+    // Every stored id, not the newest 500. The cap was invisible while
+    // the mailbox held less than that; the moment a backfill pushes it
+    // past, dedupe starts missing and every miss becomes a unique
+    // constraint violation on insert. Ids are short strings -- ten
+    // thousand of them is a rounding error next to the message bodies
+    // this function is already holding.
     const existing = await prisma.inboundEmail.findMany({
       where: { workspaceId: input.workspaceId },
       select: { messageId: true },
-      orderBy: { receivedAt: "desc" },
-      take: 500,
     });
     const seen = new Set(existing.map((row) => row.messageId));
 
@@ -465,20 +475,30 @@ export async function runGmailSync(input: {
         fleet,
       });
 
-      await prisma.inboundEmail.create({
-        data: {
-          workspaceId: input.workspaceId,
-          messageId,
-          fromAddress,
-          fromName,
-          subject,
-          receivedAt,
-          bodyText,
-          ...attribution,
-          parsedAt: null,
-          parsed: null,
-        },
-      });
+      // Two runs overlapping, or an id that arrived after the pre-load,
+      // both land here as a unique violation. That is a duplicate, not
+      // a failure: count it and keep reading. Throwing would abandon
+      // every message after it in the batch.
+      try {
+        await prisma.inboundEmail.create({
+          data: {
+            workspaceId: input.workspaceId,
+            messageId,
+            fromAddress,
+            fromName,
+            subject,
+            receivedAt,
+            bodyText,
+            ...attribution,
+            parsedAt: null,
+            parsed: null,
+          },
+        });
+      } catch {
+        result.skippedDuplicate += 1;
+        seen.add(messageId);
+        continue;
+      }
 
       seen.add(messageId);
       result.imported += 1;

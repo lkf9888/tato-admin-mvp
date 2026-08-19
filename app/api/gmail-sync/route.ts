@@ -86,7 +86,20 @@ export async function POST(request: Request) {
         ? Math.min(requestedDays, 3650)
         : undefined;
 
-    const result = await runGmailSync({ workspaceId: context.workspaceId, lookbackDays });
+    const requestedMax = Number.parseInt(
+      new URL(request.url).searchParams.get("max") ?? "",
+      10,
+    );
+    const maxMessages =
+      context.actor && Number.isFinite(requestedMax) && requestedMax > 0
+        ? Math.min(requestedMax, 2000)
+        : undefined;
+
+    const result = await runGmailSync({
+      workspaceId: context.workspaceId,
+      lookbackDays,
+      maxMessages,
+    });
 
     // Only log when something actually happened. A poll that finds
     // nothing new is the common case and would otherwise bury the

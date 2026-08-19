@@ -89,7 +89,15 @@ export function AssistantChat({
         // the person who configures the API key — hiding "invalid api
         // key" or "model not found" from them just turns a 30-second
         // fix into a support round-trip.
-        const detail = data.reason ? ` (${data.reason})` : "";
+        // Fall back to the error code when there is no upstream reason.
+        // A VALIDATION_ERROR carries no `reason`, so it used to render
+        // as the bare "try again later" sentence -- which reads as a
+        // model outage and sent us hunting the wrong bug for hours.
+        const detail = data.reason
+          ? ` (${data.reason})`
+          : data.error
+            ? ` (${data.error})`
+            : "";
         setError(
           data.error === "RATE_LIMITED"
             ? t.errorRateLimited

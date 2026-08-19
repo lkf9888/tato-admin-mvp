@@ -6,6 +6,7 @@ import { simpleParser, type ParsedMail } from "mailparser";
 
 import { kimiExtractJson, isKimiConfigured } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
+import { classifyTuroSubject } from "@/lib/turo-subjects";
 
 /**
  * Turo → TATO event ingestion over Gmail IMAP.
@@ -208,6 +209,8 @@ export type GmailSyncResult = {
   skippedSender: number;
   parsed: number;
   parseFailed: number;
+  /** Historical rows healed by the subject classifier this run. */
+  reclassified: number;
 };
 
 /**
@@ -234,7 +237,15 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
     skippedSender: 0,
     parsed: 0,
     parseFailed: 0,
+    reclassified: 0,
   };
+
+  // Heal history before fetching anything new. Rows imported while the
+  // model was failing all landed as OTHER, which made the guest-message
+  // alert detector -- it selects on kind -- report an empty fleet while
+  // guests were waiting. The classifier needs no network and no model,
+  // so this is a cheap pass that runs even when there is no new mail.
+  result.reclassified = await reclassifyBySubject(input.workspaceId);
 
   const client = new ImapFlow({
     host: config.host,
@@ -312,6 +323,7 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
       const fromName = envelope?.from?.[0]?.name?.trim() || null;
       const receivedAt = envelope?.date ?? parsedMail.date ?? new Date();
 
+      const bySubject = classifyTuroSubject(subject);
       const extracted = await extractTuroEmail({ subject, fromName, bodyText });
       if (extracted) {
         result.parsed += 1;
@@ -342,7 +354,11 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
           subject,
           receivedAt,
           bodyText,
-          kind: extracted?.kind ?? InboundEmailKind.OTHER,
+          // The subject wins when it matches. Turo generates these
+          // from fixed templates, so a pattern match is exact where
+          // the model is only probable -- and it keeps classification
+          // working when the model does not.
+          kind: bySubject?.kind ?? extracted?.kind ?? InboundEmailKind.OTHER,
           parsedAt: extracted ? new Date() : null,
           parsed: extracted ? JSON.stringify(extracted) : null,
           orderId,
@@ -360,6 +376,44 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
   return result;
 }
 
+/**
+ * Re-classify stored messages the model left as OTHER.
+ *
+ * Only touches rows whose subject the classifier recognises, and only
+ * rows currently sitting in OTHER -- a kind the model or an earlier
+ * pass already decided is left alone. `parsed` is deliberately not
+ * written: the extractor's structured fields (reservation id, guest
+ * name, summary) are still missing, and the alert detector treats a
+ * null `parsed` as "surface it" rather than "ignore it", which is the
+ * safe side for a message that may need a reply.
+ */
+async function reclassifyBySubject(workspaceId: string) {
+  const stale = await prisma.inboundEmail.findMany({
+    where: { workspaceId, kind: InboundEmailKind.OTHER },
+    select: { id: true, subject: true },
+  });
+
+  let updated = 0;
+
+  for (const email of stale) {
+    const match = classifyTuroSubject(email.subject ?? "");
+    if (!match || match.kind === InboundEmailKind.OTHER) continue;
+
+    await prisma.inboundEmail.update({
+      where: { id: email.id },
+      data: { kind: match.kind },
+    });
+    updated += 1;
+  }
+
+  if (updated > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[gmail-sync] reclassified ${updated} stored message(s) by subject`);
+  }
+
+  return updated;
+}
+
 export function summarizeGmailSyncResult(result: GmailSyncResult) {
   return [
     `scanned=${result.scanned}`,
@@ -368,5 +422,6 @@ export function summarizeGmailSyncResult(result: GmailSyncResult) {
     `otherSender=${result.skippedSender}`,
     `parsed=${result.parsed}`,
     `parseFailed=${result.parseFailed}`,
+    `reclassified=${result.reclassified}`,
   ].join(" ");
 }

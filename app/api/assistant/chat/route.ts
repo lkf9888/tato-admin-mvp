@@ -16,7 +16,14 @@ const ASSISTANT_LIMIT = 60;
 const ASSISTANT_WINDOW_MS = 10 * 60 * 1000;
 
 const chatSchema = z.object({
-  threadId: z.string().trim().optional(),
+  // `.nullish()`, not `.optional()`. The composer holds the current
+  // thread in React state initialised to `null`, and JSON.stringify
+  // sends that as `null` rather than dropping the key — which a bare
+  // `.optional()` rejects. That rejected every first message in a new
+  // thread, and since the thread is only created once a message
+  // validates, the assistant could never get past its own first
+  // question. Accept both spellings of "no thread yet".
+  threadId: z.string().trim().min(1).nullish(),
   message: z.string().trim().min(1).max(4000),
 });
 

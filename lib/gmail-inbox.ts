@@ -211,6 +211,10 @@ export type GmailSyncResult = {
   parseFailed: number;
   /** Historical rows healed by the subject classifier this run. */
   reclassified: number;
+  /** Messages still waiting for a summary after this run's budget ran
+   *  out. Drains over subsequent runs; non-zero is normal after a
+   *  burst, persistently large means the schedule is too slow. */
+  enrichRemaining: number;
 };
 
 /**
@@ -238,6 +242,7 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
     parsed: 0,
     parseFailed: 0,
     reclassified: 0,
+    enrichRemaining: 0,
   };
 
   // Heal history before fetching anything new. Rows imported while the
@@ -323,27 +328,13 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
       const fromName = envelope?.from?.[0]?.name?.trim() || null;
       const receivedAt = envelope?.date ?? parsedMail.date ?? new Date();
 
+      // No model call on this path. Classification comes from the
+      // subject, which is exact for Turo's templates and costs
+      // nothing; summaries and reservation ids are filled in by the
+      // bounded enrichment pass after the mailbox is drained. Calling
+      // the model here is what made this endpoint exceed the 300s
+      // gateway timeout and fail the whole sync.
       const bySubject = classifyTuroSubject(subject);
-      const extracted = await extractTuroEmail({ subject, fromName, bodyText });
-      if (extracted) {
-        result.parsed += 1;
-      } else {
-        result.parseFailed += 1;
-      }
-
-      // Link to the order this email is about, when the extractor found
-      // a reservation id we already know.
-      let orderId: string | null = null;
-      if (extracted?.reservationId) {
-        const order = await prisma.order.findFirst({
-          where: {
-            workspaceId: input.workspaceId,
-            externalOrderId: extracted.reservationId.trim(),
-          },
-          select: { id: true },
-        });
-        orderId = order?.id ?? null;
-      }
 
       await prisma.inboundEmail.create({
         data: {
@@ -354,14 +345,10 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
           subject,
           receivedAt,
           bodyText,
-          // The subject wins when it matches. Turo generates these
-          // from fixed templates, so a pattern match is exact where
-          // the model is only probable -- and it keeps classification
-          // working when the model does not.
-          kind: bySubject?.kind ?? extracted?.kind ?? InboundEmailKind.OTHER,
-          parsedAt: extracted ? new Date() : null,
-          parsed: extracted ? JSON.stringify(extracted) : null,
-          orderId,
+          kind: bySubject?.kind ?? InboundEmailKind.OTHER,
+          parsedAt: null,
+          parsed: null,
+          orderId: null,
         },
       });
 
@@ -373,7 +360,98 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
     await client.logout().catch(() => null);
   }
 
+  // Enrich after the mailbox is closed: these are slow model calls and
+  // there is no reason to hold an IMAP connection open through them.
+  await enrichPendingEmails(input.workspaceId, result);
+
   return result;
+}
+
+/** Model calls per sync run. */
+const ENRICH_MAX_MESSAGES = 12;
+
+/** Wall-clock ceiling for the enrichment pass, in milliseconds.
+ *
+ *  Railway's gateway cuts a request off at 300s. Ingestion itself is
+ *  IMAP and SQLite, so it is measured in seconds; this budget is what
+ *  keeps the whole endpoint comfortably inside the limit no matter how
+ *  slowly the model is answering today. Both bounds are needed: the
+ *  count alone cannot cap duration when a single call can take 45s. */
+const ENRICH_TIME_BUDGET_MS = 90_000;
+
+/**
+ * Fill in what the subject cannot give us: summaries, guest names,
+ * reservation ids, and the order link.
+ *
+ * Split out of ingestion because the two have opposite cost profiles.
+ * Reading the mailbox is fast and must finish; asking a reasoning
+ * model about each message is slow and merely improves the result. The
+ * first version did both in one loop, so a burst of new mail took the
+ * request past the gateway timeout and lost the entire sync -- new
+ * messages included. Now the mail always lands, classified, and the
+ * summaries catch up over the next few runs.
+ *
+ * Newest first: a summary matters most for a message someone may still
+ * need to answer.
+ */
+async function enrichPendingEmails(workspaceId: string, result: GmailSyncResult) {
+  const pending = await prisma.inboundEmail.findMany({
+    where: { workspaceId, parsedAt: null },
+    orderBy: { receivedAt: "desc" },
+    select: { id: true, subject: true, fromName: true, bodyText: true, kind: true },
+    take: ENRICH_MAX_MESSAGES,
+  });
+
+  const startedAt = Date.now();
+
+  for (const email of pending) {
+    if (Date.now() - startedAt > ENRICH_TIME_BUDGET_MS) break;
+
+    const extracted = await extractTuroEmail({
+      subject: email.subject ?? "",
+      fromName: email.fromName,
+      bodyText: email.bodyText ?? "",
+    });
+
+    if (!extracted) {
+      result.parseFailed += 1;
+      continue;
+    }
+
+    // Link to the order this email is about, when the extractor found
+    // a reservation id we already know.
+    let orderId: string | null = null;
+    if (extracted.reservationId) {
+      const order = await prisma.order.findFirst({
+        where: { workspaceId, externalOrderId: extracted.reservationId.trim() },
+        select: { id: true },
+      });
+      orderId = order?.id ?? null;
+    }
+
+    await prisma.inboundEmail.update({
+      where: { id: email.id },
+      data: {
+        // The subject classifier already had its say at ingest. Only
+        // let the model name the kind where the patterns declined to.
+        kind: email.kind === InboundEmailKind.OTHER ? extracted.kind : email.kind,
+        parsed: JSON.stringify(extracted),
+        parsedAt: new Date(),
+        orderId,
+      },
+    });
+
+    result.parsed += 1;
+  }
+
+  result.enrichRemaining = await prisma.inboundEmail.count({
+    where: { workspaceId, parsedAt: null },
+  });
+
+  if (result.enrichRemaining > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[gmail-sync] ${result.enrichRemaining} message(s) still awaiting a summary`);
+  }
 }
 
 /**
@@ -423,5 +501,6 @@ export function summarizeGmailSyncResult(result: GmailSyncResult) {
     `parsed=${result.parsed}`,
     `parseFailed=${result.parseFailed}`,
     `reclassified=${result.reclassified}`,
+    `enrichRemaining=${result.enrichRemaining}`,
   ].join(" ");
 }

@@ -74,13 +74,35 @@ function formatDateTime(value: Date) {
   });
 }
 
-/** Booking conflicts — two live reservations on one vehicle. */
+/** How many conflicting bookings to spell out before summarising. */
+const CONFLICT_SAMPLE = 6;
+
+/**
+ * Booking conflicts — two *still-fixable* reservations on one vehicle.
+ *
+ * The date filter is the whole point. `hasConflict` is a stored flag
+ * covering the entire imported history, and this fleet's history goes
+ * back years, so an unfiltered query reported months of long-finished
+ * trips as CRITICAL. A double-booking in March cannot be fixed in
+ * August; surfacing it costs attention and teaches the operator that
+ * red means nothing.
+ *
+ * A vehicle needs at least two conflicting bookings that have not
+ * ended yet to qualify. One future booking whose overlapping partner
+ * already came and went is not an open problem — that conflict has
+ * already resolved itself, however badly.
+ */
 async function detectConflicts(workspaceId: string): Promise<AlertDraft[]> {
   const conflicts = await prisma.order.findMany({
-    where: { workspaceId, isArchived: false, hasConflict: true },
+    where: {
+      workspaceId,
+      isArchived: false,
+      hasConflict: true,
+      // Ongoing or upcoming only.
+      returnDatetime: { gte: new Date() },
+    },
     include: { vehicle: { select: { plateNumber: true, nickname: true } } },
     orderBy: { pickupDatetime: "asc" },
-    take: 50,
   });
 
   // Group by vehicle: two overlapping orders are one problem to solve,
@@ -92,27 +114,40 @@ async function detectConflicts(workspaceId: string): Promise<AlertDraft[]> {
     byVehicle.set(order.vehicleId, list);
   }
 
-  return [...byVehicle.entries()].map(([vehicleId, orders]) => {
-    const vehicle = orders[0].vehicle;
-    const label = vehicle.plateNumber
-      ? `${vehicle.plateNumber} · ${vehicle.nickname}`
-      : vehicle.nickname;
-    return {
-      dedupeKey: `conflict:${vehicleId}`,
-      severity: AssistantAlertSeverity.CRITICAL,
-      title: `${label} 有 ${orders.length} 笔订单时间冲突`,
-      body: orders
+  return [...byVehicle.entries()]
+    .filter(([, orders]) => orders.length >= 2)
+    .map(([vehicleId, orders]) => {
+      const vehicle = orders[0].vehicle;
+      const label = vehicle.plateNumber
+        ? `${vehicle.plateNumber} · ${vehicle.nickname}`
+        : vehicle.nickname;
+
+      const lines = orders
+        .slice(0, CONFLICT_SAMPLE)
         .map(
           (order) =>
             `${order.renterName} ${formatDateTime(order.pickupDatetime)} → ${formatDateTime(order.returnDatetime)}${order.externalOrderId ? ` (${order.externalOrderId})` : ""}`,
-        )
-        .join("\n"),
-      href: "/calendar",
-    };
-  });
+        );
+      if (orders.length > CONFLICT_SAMPLE) {
+        lines.push(`…还有 ${orders.length - CONFLICT_SAMPLE} 笔`);
+      }
+
+      return {
+        dedupeKey: `conflict:${vehicleId}`,
+        severity: AssistantAlertSeverity.CRITICAL,
+        title: `${label} 有 ${orders.length} 笔订单时间冲突`,
+        body: lines.join("\n"),
+        href: "/calendar",
+      };
+    });
 }
 
 /** Turo guest messages that have gone unanswered past the grace period. */
+/** Upper bound on messages examined per scan. See the note at the
+ *  query below — the alert title reports how many of these need a
+ *  reply, so the cap has to be well clear of a realistic backlog. */
+const GUEST_MESSAGE_SCAN_CAP = 500;
+
 async function detectUnansweredGuestMessages(workspaceId: string): Promise<AlertDraft[]> {
   const pending = await prisma.inboundEmail.findMany({
     where: {
@@ -122,7 +157,13 @@ async function detectUnansweredGuestMessages(workspaceId: string): Promise<Alert
       kind: { in: ["GUEST_MESSAGE", "SUPPORT"] },
     },
     orderBy: { receivedAt: "asc" },
-    take: 50,
+    // Raised from 50 because the title reports this list's length: at
+    // the old cap a backlog of any size rendered as exactly "50 条",
+    // which is a LIMIT echoed back as if it were a measurement. The
+    // needsAction test reads a JSON column, so it cannot move into the
+    // query and be counted in SQL; a generous ceiling with an explicit
+    // "+" on overflow is the honest version.
+    take: GUEST_MESSAGE_SCAN_CAP,
   });
 
   // Only the ones the extractor judged as needing a reply. A guest
@@ -143,7 +184,9 @@ async function detectUnansweredGuestMessages(workspaceId: string): Promise<Alert
     {
       dedupeKey: "guest_messages_unanswered",
       severity: AssistantAlertSeverity.WARNING,
-      title: `${needsReply.length} 条 Turo 消息等待回复`,
+      // `+` when the scan hit its ceiling, so a capped number never
+      // reads as an exact count.
+      title: `${needsReply.length}${pending.length >= GUEST_MESSAGE_SCAN_CAP ? "+" : ""} 条 Turo 消息等待回复`,
       body: needsReply
         .slice(0, 5)
         .map((email) => {

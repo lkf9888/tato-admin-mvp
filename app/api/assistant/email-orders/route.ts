@@ -84,12 +84,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { apply?: boolean };
+  const body = (await request.json().catch(() => ({}))) as {
+    apply?: boolean;
+    plateOverrides?: Record<string, string>;
+  };
 
   const outcome = await applyTuroEmailsToOrders({
     workspaceId: context.workspace.id,
     apply: body.apply === true,
     actor: context.user.name,
+    plateOverrides: body.plateOverrides,
   });
 
   return NextResponse.json({ applied: body.apply === true, ...outcome });

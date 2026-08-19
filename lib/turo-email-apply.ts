@@ -47,6 +47,10 @@ export type ApplyOutcome = {
   updated: number;
   /** Completed trips whose mail disagreed and was deliberately ignored. */
   skippedCompleted: number;
+  /** Overrides that named a plate no vehicle in this workspace has.
+   *  Reported rather than ignored: a typo here files nothing, and
+   *  silence would look identical to the trip not existing. */
+  unknownPlates: { reservationId: string; plate: string }[];
   /** Mail for a trip we have no order for, whose vehicle could not be
    *  pinned to exactly one car in the fleet. */
   ambiguousVehicle: {
@@ -110,6 +114,16 @@ export async function applyTuroEmailsToOrders(input: {
    *  have happened. */
   apply: boolean;
   actor?: string;
+  /** Reservation id -> plate, for trips the mail cannot resolve on its
+   *  own.
+   *
+   *  Turo names the model and never the plate, so a fleet running two
+   *  Ford Explorer 2014s has no way to tell which one a trip is on.
+   *  There is no signal in the email to reason from, so this is a
+   *  person answering the question rather than the code guessing at
+   *  it -- and it needs answering only once, because from then on the
+   *  order matches on its reservation id like any other. */
+  plateOverrides?: Record<string, string>;
 }): Promise<ApplyOutcome> {
   const emails = await prisma.inboundEmail.findMany({
     where: { workspaceId: input.workspaceId },
@@ -126,6 +140,7 @@ export async function applyTuroEmailsToOrders(input: {
     updated: 0,
     skippedCompleted: 0,
     ambiguousVehicle: [],
+    unknownPlates: [],
     byAccount: {},
     unchanged: 0,
   };
@@ -157,6 +172,7 @@ export async function applyTuroEmailsToOrders(input: {
         nickname: true,
         turoListingName: true,
         turoAccount: true,
+        plateNumber: true,
       },
     }),
   ]);
@@ -177,11 +193,26 @@ export async function applyTuroEmailsToOrders(input: {
         continue;
       }
 
-      // Scoped to the account the mail came from. This fleet runs four
-      // Tesla Model Y 2020s and two Ford Explorer 2014s across two
-      // accounts, so the account is often the only thing that turns an
-      // ambiguous model into one car.
-      const matches = matchVehicles(facts.vehicleText, fleet, facts.coHostAccount);
+      // A plate the operator supplied wins outright: they can see what
+      // the email cannot, and there is nothing here to second-guess
+      // them with.
+      const overridePlate = input.plateOverrides?.[reservationId]?.trim().toUpperCase();
+      const overrideVehicle = overridePlate
+        ? fleet.find((vehicle) => vehicle.plateNumber?.toUpperCase() === overridePlate)
+        : undefined;
+
+      if (overridePlate && !overrideVehicle) {
+        outcome.unknownPlates.push({ reservationId, plate: overridePlate });
+        continue;
+      }
+
+      // Otherwise scope to the account the mail came from. This fleet
+      // runs four Tesla Model Y 2020s and two Ford Explorer 2014s
+      // across two accounts, so the account is often the only thing
+      // that turns an ambiguous model into one car.
+      const matches = overrideVehicle
+        ? [overrideVehicle]
+        : matchVehicles(facts.vehicleText, fleet, facts.coHostAccount);
       if (matches.length !== 1) {
         // Several cars of one model is normal here, and the mail names
         // no plate. Guessing would file a real booking against the

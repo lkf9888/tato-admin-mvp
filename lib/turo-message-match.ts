@@ -46,6 +46,9 @@ export type VehicleForMatch = {
   turoListingName: string | null;
   /** Which Turo account the listing sits on; null is the main one. */
   turoAccount?: string | null;
+  /** Only used by the plate-override path, which resolves a vehicle
+   *  the email itself cannot name. */
+  plateNumber?: string | null;
 };
 
 /**

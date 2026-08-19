@@ -2,6 +2,7 @@ import "server-only";
 
 import { AssistantAlertSeverity, OrderStatus } from "@prisma/client";
 
+import { formatBytes, getDiskUsage } from "@/lib/disk";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -92,6 +93,53 @@ const CONFLICT_SAMPLE = 6;
  * already came and went is not an open problem — that conflict has
  * already resolved itself, however badly.
  */
+/** Warn here; act well before here. */
+const DISK_WARN_PERCENT = 75;
+const DISK_CRITICAL_PERCENT = 88;
+
+/**
+ * The volume filling up.
+ *
+ * This is the one failure on the list that has already happened: the
+ * disk filled, the pre-deploy `cp` hit ENOSPC, `set -eu` aborted the
+ * entrypoint before the server started, and the container crash-looped
+ * until someone noticed. The entrypoint tolerates that failure now,
+ * which means the next time it happens the site stays up and uploads
+ * simply start failing -- quieter, and in some ways worse.
+ *
+ * Nothing deletes files. Every photo, receipt and signed contract ever
+ * uploaded is still there, including ones an operator has "deleted",
+ * since that path only sets `isArchived`. So this number only goes up,
+ * and the only useful thing to do about it is say so early enough that
+ * there is time to decide.
+ *
+ * Not workspace-scoped: a full disk is a property of the machine, not
+ * of a tenant. On a single-tenant deployment that distinction costs
+ * nothing and keeps the alert honest.
+ */
+async function detectDiskPressure(): Promise<AlertDraft[]> {
+  const usage = await getDiskUsage();
+  if (!usage || usage.usedPercent < DISK_WARN_PERCENT) return [];
+
+  const critical = usage.usedPercent >= DISK_CRITICAL_PERCENT;
+
+  return [
+    {
+      dedupeKey: "disk_pressure",
+      severity: critical ? AssistantAlertSeverity.CRITICAL : AssistantAlertSeverity.WARNING,
+      title: `存储空间已用 ${usage.usedPercent}%`,
+      body: [
+        `已用 ${formatBytes(usage.usedBytes)} / 共 ${formatBytes(usage.totalBytes)}，剩余 ${formatBytes(usage.freeBytes)}。`,
+        "上传的照片、收据和合同不会被自动清理——界面上的删除只是隐藏，文件仍占用空间。",
+        critical
+          ? "磁盘写满会让上传失败，并可能导致部署中断。请尽快清理或扩容。"
+          : "现在还有余量，但这个数字只会上升。",
+      ].join("\n"),
+      href: "/documents",
+    },
+  ];
+}
+
 async function detectConflicts(workspaceId: string): Promise<AlertDraft[]> {
   const conflicts = await prisma.order.findMany({
     where: {
@@ -338,6 +386,7 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
       detectStaleInbox(workspaceId),
       detectFailedImports(workspaceId),
       detectStaleContracts(workspaceId),
+      detectDiskPressure(),
     ])
   ).flat();
 

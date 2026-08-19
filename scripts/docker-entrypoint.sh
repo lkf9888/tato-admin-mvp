@@ -52,13 +52,22 @@ fi
 if [ "$DB_PATH" != "$DATABASE_URL" ] && [ -f "$DB_PATH" ]; then
   # Pre-deploy DB snapshot. Two cleanups baked in:
   #
-  # 1. Prune BEFORE the new snapshot. Keep the 10 most recent backups
+  # 1. Prune BEFORE the new snapshot. Keep the 3 most recent backups
   #    and delete everything older. Without this the backups directory
   #    grew unbounded — by v0.22.x the Railway volume filled up, every
   #    deploy's `cp` failed with ENOSPC, and `set -eu` exited the
   #    script before `next start`, putting the container into a tight
-  #    crash loop. `ls -t` orders by mtime newest-first; `tail -n +11`
-  #    drops the first 10; `xargs -r rm -f` deletes the rest. The
+  #    crash loop.
+  #
+  #    That fix kept ten snapshots, which was right when the database
+  #    was small and became the next incarnation of the same problem
+  #    when it was not: measured at 90.6% full, backups were 332.6 MB
+  #    of a 433 MB volume -- 84% of everything used, against 19.6 MB
+  #    of actual uploads. Ten copies of a 30 MB database is not a
+  #    retention policy, it is the largest thing on the disk. Three is
+  #    what a rollback reaches for: the deploy that just broke, the one
+  #    before it, and one more for nerve. `ls -t` orders by mtime newest-first; `tail -n +4`
+  #    drops the first 3; `xargs -r rm -f` deletes the rest. The
   #    `2>/dev/null` and final `|| true` make the prune itself never
   #    abort the entrypoint, even if the directory doesn't exist or
   #    glob matches nothing.
@@ -70,7 +79,7 @@ if [ "$DB_PATH" != "$DATABASE_URL" ] && [ -f "$DB_PATH" ]; then
   #    than refuse to come up at all. Log the skip so it's visible in
   #    Railway's deploy logs.
   mkdir -p /app/data/backups || true
-  ls -t /app/data/backups/*.db 2>/dev/null | tail -n +11 | xargs -r rm -f -- || true
+  ls -t /app/data/backups/*.db 2>/dev/null | tail -n +4 | xargs -r rm -f -- || true
   if ! cp "$DB_PATH" "/app/data/backups/$(basename "$DB_PATH" .db)-predeploy-$(date +%Y%m%d%H%M%S).db"; then
     echo "[entrypoint] Pre-deploy DB snapshot failed (volume full?). Skipping snapshot and continuing."
   fi

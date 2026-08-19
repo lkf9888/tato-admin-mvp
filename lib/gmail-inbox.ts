@@ -166,28 +166,43 @@ Rules:
   It is false for pure notifications like payout confirmations.
 - Write "summary" in the same language as the email.`;
 
+/**
+ * How much of the body the model actually sees.
+ *
+ * The full 8k is kept in the database for display and search, but a
+ * Turo notification says what it has to say in the first paragraph --
+ * the rest is footer, legal text and unsubscribe links. Prompt length
+ * drives latency directly on a reasoning model, and latency is what
+ * decides how many messages fit in a sync run's budget.
+ */
+const MODEL_BODY_CHARS = 2_000;
+
 async function extractTuroEmail(input: {
   subject: string;
   fromName: string | null;
   bodyText: string;
-}): Promise<ParsedTuroEmail | null> {
-  if (!isKimiConfigured()) return null;
+}): Promise<{ ok: true; data: ParsedTuroEmail } | { ok: false; reason: string }> {
+  if (!isKimiConfigured()) return { ok: false, reason: "kimi_not_configured" };
 
-  const parsed = await kimiExtractJson<ParsedTuroEmail>({
+  const result = await kimiExtractJson<ParsedTuroEmail>({
     system: EXTRACTION_SYSTEM_PROMPT,
     user: [
       `Subject: ${input.subject}`,
       input.fromName ? `From: ${input.fromName}` : "",
       "",
-      input.bodyText,
+      input.bodyText.slice(0, MODEL_BODY_CHARS),
     ]
       .filter(Boolean)
       .join("\n"),
     maxTokens: 2048,
-    timeoutMs: 45_000,
+    // 45s cut off calls that were nearly done: two of them consumed an
+    // entire 90s enrichment budget and produced nothing. A reasoning
+    // model answering with JSON routinely needs longer than that.
+    timeoutMs: 90_000,
   });
 
-  if (!parsed) return null;
+  if (!result.ok) return result;
+  const parsed = result.data;
 
   // Trust the model's extraction but not its enum spelling.
   const kind = Object.values(InboundEmailKind).includes(parsed.kind)
@@ -195,10 +210,13 @@ async function extractTuroEmail(input: {
     : InboundEmailKind.OTHER;
 
   return {
-    ...parsed,
-    kind,
-    summary: typeof parsed.summary === "string" ? parsed.summary.slice(0, 400) : "",
-    needsAction: parsed.needsAction === true,
+    ok: true,
+    data: {
+      ...parsed,
+      kind,
+      summary: typeof parsed.summary === "string" ? parsed.summary.slice(0, 400) : "",
+      needsAction: parsed.needsAction === true,
+    },
   };
 }
 
@@ -215,6 +233,9 @@ export type GmailSyncResult = {
    *  out. Drains over subsequent runs; non-zero is normal after a
    *  burst, persistently large means the schedule is too slow. */
   enrichRemaining: number;
+  /** Distinct reasons extraction failed this run, verbatim from the
+   *  model client. Empty is the healthy state. */
+  enrichErrors: string[];
 };
 
 /**
@@ -243,6 +264,7 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
     parseFailed: 0,
     reclassified: 0,
     enrichRemaining: 0,
+    enrichErrors: [],
   };
 
   // Heal history before fetching anything new. Rows imported while the
@@ -377,7 +399,7 @@ const ENRICH_MAX_MESSAGES = 12;
  *  keeps the whole endpoint comfortably inside the limit no matter how
  *  slowly the model is answering today. Both bounds are needed: the
  *  count alone cannot cap duration when a single call can take 45s. */
-const ENRICH_TIME_BUDGET_MS = 90_000;
+const ENRICH_TIME_BUDGET_MS = 180_000;
 
 /**
  * Fill in what the subject cannot give us: summaries, guest names,
@@ -407,16 +429,25 @@ async function enrichPendingEmails(workspaceId: string, result: GmailSyncResult)
   for (const email of pending) {
     if (Date.now() - startedAt > ENRICH_TIME_BUDGET_MS) break;
 
-    const extracted = await extractTuroEmail({
+    const outcome = await extractTuroEmail({
       subject: email.subject ?? "",
       fromName: email.fromName,
       bodyText: email.bodyText ?? "",
     });
 
-    if (!extracted) {
+    if (!outcome.ok) {
       result.parseFailed += 1;
+      // Distinct reasons only, and a short list: this rides back in the
+      // sync response, which the scheduled workflow prints on every
+      // run. A silent parseFailed count says something is wrong but
+      // not what, which is how the last three of these took hours.
+      if (!result.enrichErrors.includes(outcome.reason) && result.enrichErrors.length < 5) {
+        result.enrichErrors.push(outcome.reason);
+      }
       continue;
     }
+
+    const extracted = outcome.data;
 
     // Link to the order this email is about, when the extractor found
     // a reservation id we already know.
@@ -502,5 +533,8 @@ export function summarizeGmailSyncResult(result: GmailSyncResult) {
     `parseFailed=${result.parseFailed}`,
     `reclassified=${result.reclassified}`,
     `enrichRemaining=${result.enrichRemaining}`,
-  ].join(" ");
+    result.enrichErrors.length > 0 ? `enrichErrors=${result.enrichErrors.join("|")}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }

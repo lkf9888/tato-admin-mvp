@@ -194,10 +194,18 @@ export async function kimiChat(input: {
   }
 }
 
+export type KimiJsonResult<T> = { ok: true; data: T } | { ok: false; reason: string };
+
 /**
  * Chat completion that must return a JSON object matching the caller's
- * shape. Returns `null` rather than throwing on any failure — malformed
- * model output is an expected condition, not an exception.
+ * shape. Returns a result rather than throwing — malformed model
+ * output is an expected condition, not an exception.
+ *
+ * The reason is carried out rather than swallowed. An earlier version
+ * returned a bare `null`, so a timeout, a bad key, and a model that
+ * answered in prose were indistinguishable to the caller, and the only
+ * record was a server log line nobody was reading. Callers surface
+ * this now.
  */
 export async function kimiExtractJson<T>(input: {
   system: string;
@@ -205,7 +213,7 @@ export async function kimiExtractJson<T>(input: {
   model?: string;
   maxTokens?: number;
   timeoutMs?: number;
-}): Promise<T | null> {
+}): Promise<KimiJsonResult<T>> {
   const result = await kimiChat({
     messages: [
       { role: "system", content: input.system },
@@ -217,20 +225,20 @@ export async function kimiExtractJson<T>(input: {
     jsonMode: true,
   });
 
-  if (!result.ok) return null;
+  if (!result.ok) return { ok: false, reason: result.reason };
 
   try {
-    return JSON.parse(result.content) as T;
+    return { ok: true, data: JSON.parse(result.content) as T };
   } catch {
     // Some models wrap JSON in a fenced block despite json mode.
     const fenced = result.content.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (fenced?.[1]) {
       try {
-        return JSON.parse(fenced[1]) as T;
+        return { ok: true, data: JSON.parse(fenced[1]) as T };
       } catch {
-        return null;
+        return { ok: false, reason: "malformed_json_in_fence" };
       }
     }
-    return null;
+    return { ok: false, reason: "malformed_json" };
   }
 }

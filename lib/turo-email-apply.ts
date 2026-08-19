@@ -2,6 +2,7 @@ import "server-only";
 
 import { OrderStatus } from "@prisma/client";
 
+import { reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { parseTuroOrderEmail, type TuroOrderFacts } from "@/lib/turo-email-order";
 import { matchVehicles } from "@/lib/turo-message-match";
@@ -64,6 +65,9 @@ export type ApplyOutcome = {
   /** How many reservations each account contributed, so a co-hosted
    *  account that has stopped arriving is visible. */
   byAccount: Record<string, number>;
+  /** Vehicles whose conflict flags were recomputed because this run
+   *  moved or added one of their bookings. */
+  conflictsRechecked: number;
   unchanged: number;
 };
 
@@ -142,10 +146,19 @@ export async function applyTuroEmailsToOrders(input: {
     ambiguousVehicle: [],
     unknownPlates: [],
     byAccount: {},
+    conflictsRechecked: 0,
     unchanged: 0,
   };
 
   if (folded.size === 0) return outcome;
+
+  // Vehicles whose bookings this run moved or added. `hasConflict` is a
+  // stored flag, recomputed per vehicle rather than derived on read, so
+  // a date this pass changes is invisible to the conflict detector
+  // until someone recomputes it. Writing an order without that step
+  // means the calendar can hold a real double-booking that nothing
+  // reports -- the exact failure the detector exists to prevent.
+  const touchedVehicles = new Set<string>();
 
   const [orders, fleet] = await Promise.all([
     prisma.order.findMany({
@@ -227,6 +240,8 @@ export async function applyTuroEmailsToOrders(input: {
         continue;
       }
 
+      touchedVehicles.add(matches[0].id);
+
       if (input.apply) {
         await prisma.order.create({
           data: {
@@ -285,11 +300,29 @@ export async function applyTuroEmailsToOrders(input: {
       continue;
     }
 
+    if (data.pickupDatetime || data.returnDatetime) {
+      const moved = await prisma.order.findUnique({
+        where: { id: order.id },
+        select: { vehicleId: true },
+      });
+      if (moved) touchedVehicles.add(moved.vehicleId);
+    }
+
     if (input.apply) {
       await prisma.order.update({ where: { id: order.id }, data });
     }
     outcome.updated += 1;
   }
+
+  // After the writes, not during: reconciliation reads every live
+  // booking on the vehicle, and doing it mid-loop would have it read a
+  // half-applied picture.
+  if (input.apply) {
+    for (const vehicleId of touchedVehicles) {
+      await reconcileVehicleConflicts(vehicleId);
+    }
+  }
+  outcome.conflictsRechecked = touchedVehicles.size;
 
   return outcome;
 }

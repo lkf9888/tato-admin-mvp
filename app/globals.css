@@ -527,3 +527,39 @@ a[class*="rounded-2xl"],
     align-items: center;
   }
 }
+
+/* ---------------------------------------------------------------
+   Minimum readable size on phones.
+
+   Measured on /dashboard at 375px: 204 text nodes below 12px, with 53
+   of them at 9–10px — metric labels, section eyebrows, the version
+   chip. Turo's own floor is 12px and there is a reason for it: at arm's
+   length on a phone, 10px is where reading becomes squinting, and the
+   fix a person reaches for is pinch-zoom, which breaks every sticky
+   header on the page.
+
+   Chinese makes it worse. A 10px hanzi carries the same strokes as a
+   10px Latin word carries letters, in a fraction of the width, so the
+   same number is meaningfully harder to read than the English mockups
+   suggest.
+
+   Scoped to the phone breakpoint on purpose: the desktop density pass
+   asked for exactly these compact sizes, and this must not undo it.
+   Applied to the utility classes rather than by sweeping the source,
+   so the intent stays visible in one place and reverts in one place.
+   --------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .text-\[9px\],
+  .text-\[10px\] {
+    font-size: 11px;
+  }
+
+  .text-\[10\.5px\] {
+    font-size: 11.5px;
+  }
+
+  .text-\[11px\],
+  .text-\[11\.5px\] {
+    font-size: 12px;
+  }
+}

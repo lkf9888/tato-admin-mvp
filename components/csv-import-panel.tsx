@@ -61,6 +61,12 @@ export function CsvImportPanel({
     Array<{ reason: string; count: number; sampleRows: number[] }>
   >([]);
   const [createMissingVehicles, setCreateMissingVehicles] = useState(true);
+  // Which Turo host account exported this file. Blank is the main one.
+  // An export only contains its own account's listings, so this is a
+  // property of the whole file rather than of any row -- and getting
+  // it wrong files a co-hosted car as a main-account vehicle, after
+  // which it stops matching its own notification mail.
+  const [turoAccount, setTuroAccount] = useState("");
   const [billingProjection, setBillingProjection] = useState<BillingProjection | null>(null);
   const [selectedVehicleKeys, setSelectedVehicleKeys] = useState<string[]>([]);
   const [billingNotice, setBillingNotice] = useState("");
@@ -121,6 +127,7 @@ export function CsvImportPanel({
             rows,
             mapping,
             createMissingVehicles,
+            turoAccount: turoAccount.trim() || null,
           }),
         });
 
@@ -154,6 +161,7 @@ export function CsvImportPanel({
     rows,
     mapping,
     createMissingVehicles,
+    turoAccount,
     missingRequired.length,
     panelMessages.billing.genericError,
   ]);
@@ -258,6 +266,7 @@ export function CsvImportPanel({
             mapping,
             rows,
             createMissingVehicles,
+            turoAccount: turoAccount.trim() || null,
             selectedVehicleKeys,
           }),
         });
@@ -559,6 +568,21 @@ export function CsvImportPanel({
             </div>
 
             <div className="mt-4 space-y-3 text-[13px] text-[color:var(--ink)]">
+              <label className="block rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2">
+                <span className="font-medium text-[color:var(--ink)]">
+                  {panelMessages.turoAccountTitle}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-[color:var(--ink-soft)]">
+                  {panelMessages.turoAccountHint}
+                </span>
+                <input
+                  value={turoAccount}
+                  onChange={(event) => setTuroAccount(event.target.value)}
+                  placeholder={panelMessages.turoAccountPlaceholder}
+                  className="mt-2 w-full rounded-md border border-[color:var(--line-strong)] bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--brand)]"
+                />
+              </label>
+
               <label className="flex items-start gap-3 rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px]">
                 <input
                   type="checkbox"

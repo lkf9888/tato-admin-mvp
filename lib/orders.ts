@@ -614,6 +614,11 @@ async function createVehicleFromCsvRow(input: {
   row: CsvImportRow;
   mapping: CsvFieldMapping;
   actor: string;
+  /** The host account whose export this row came from. Set on
+   *  creation and never overwritten afterwards: a car does not change
+   *  accounts, and if it somehow did, a CSV is the wrong place to
+   *  learn it. */
+  turoAccount?: string | null;
 }) {
   const vehicleLabel = safeString(input.row[input.mapping.vehicleLabel ?? ""]);
   const vehicleName = safeString(input.row[input.mapping.vehicleName ?? ""]);
@@ -658,6 +663,7 @@ async function createVehicleFromCsvRow(input: {
         data: {
           workspaceId: input.workspaceId,
           plateNumber,
+          turoAccount: input.turoAccount ?? null,
           ...sharedUpdateData,
         },
       });
@@ -824,6 +830,10 @@ export async function importTuroOrders(input: {
   rows: CsvImportRow[];
   createMissingVehicles?: boolean;
   selectedVehicleKeys?: string[];
+  /** Which Turo host account exported this file. Null is the main
+   *  account. An export only ever contains one account's listings, so
+   *  this applies to the whole batch. */
+  turoAccount?: string | null;
 }) {
   const mapping = normalizeCsvFieldMapping(input.mapping as Record<string, string>);
   const failures: Array<{ rowNumber: number; reason: string; row: CsvImportRow }> = [];
@@ -837,6 +847,7 @@ export async function importTuroOrders(input: {
       totalRows: input.rows.length,
       successRows: 0,
       failedRows: 0,
+      turoAccount: input.turoAccount ?? null,
       mapping: JSON.stringify(mapping),
     },
   });
@@ -900,6 +911,7 @@ export async function importTuroOrders(input: {
           row,
           mapping,
           actor: input.actor,
+          turoAccount: input.turoAccount ?? null,
         });
 
         if (createdVehicle) {

@@ -11,7 +11,21 @@ const importSchema = z.object({
   mapping: z.record(z.string(), z.string()),
   createMissingVehicles: z.boolean().optional(),
   selectedVehicleKeys: z.array(z.string()).optional(),
+  /** Which Turo host account exported this file. Blank is the main
+   *  account. Normalised so "Kevin's vehicle", "Kevin" and "kevin" all
+   *  land on the account the email parser derives from the same
+   *  prefix -- if these two disagree, a co-hosted car stops matching
+   *  its own mail and nothing says why. */
+  turoAccount: z.string().trim().max(80).nullish(),
 });
+
+function normalizeTuroAccount(value: string | null | undefined) {
+  const cleaned = (value ?? "")
+    .replace(/'s\s+vehicles?$/i, "")
+    .trim()
+    .toLowerCase();
+  return cleaned || null;
+}
 
 export async function POST(request: Request) {
   let context;
@@ -31,6 +45,8 @@ export async function POST(request: Request) {
       selectedVehicleKeys: parsed.selectedVehicleKeys ?? [],
     });
 
+    const turoAccount = normalizeTuroAccount(parsed.turoAccount);
+
     const result = await importTuroOrders({
       workspaceId: context.workspace.id,
       fileName: parsed.fileName,
@@ -38,6 +54,7 @@ export async function POST(request: Request) {
       mapping: parsed.mapping,
       actor: context.user.name,
       createMissingVehicles: parsed.createMissingVehicles ?? false,
+      turoAccount,
       selectedVehicleKeys: parsed.selectedVehicleKeys ?? [],
     });
 

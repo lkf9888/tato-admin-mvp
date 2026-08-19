@@ -304,6 +304,15 @@ model ImportBatch {
   notes       String?
   mapping     String?
   failures    String?
+  // Which Turo host account this export came from. An account only
+  // exports its own listings, so a batch is always about exactly one
+  // of them -- and a co-hosted car imported without this tag would be
+  // filed as a main-account vehicle and stop matching its own mail.
+  //
+  // Distinct from the vehicle's owner, which is who gets paid. A car
+  // listed on Kevin's account can belong to any of the owners; the two
+  // do not constrain each other.
+  turoAccount String?
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   orders      Order[]
 

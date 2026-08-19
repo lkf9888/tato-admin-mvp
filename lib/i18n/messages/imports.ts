@@ -55,6 +55,10 @@ export const importsMessages = {
         requiredMappingLeft: "Required mapping left",
         none: "none",
         oneVehicleIdentifier: "one vehicle identifier",
+        turoAccountTitle: "Turo host account for this file",
+        turoAccountHint:
+          "Leave blank for the main account. A co-hosted export must name its account, or its cars are filed as main-account vehicles and stop matching their own Turo mail.",
+        turoAccountPlaceholder: "e.g. kevin",
         autoCreateTitle: "Auto-create missing vehicles from CSV",
         autoCreateHint: "Recommended for first imports from a real Turo earnings export.",
         runImport: "Run import",
@@ -171,6 +175,10 @@ export const importsMessages = {
         requiredMappingLeft: "仍缺少的必填映射",
         none: "无",
         oneVehicleIdentifier: "至少一个车辆标识字段",
+        turoAccountTitle: "这份文件属于哪个 Turo 账户",
+        turoAccountHint:
+          "主账户留空。代管账户的导出必须填账户名，否则它的车会被当成主账户车辆，之后再也匹配不上自己的 Turo 邮件。",
+        turoAccountPlaceholder: "例如 kevin",
         autoCreateTitle: "自动从 CSV 创建缺失车辆",
         autoCreateHint: "首次导入真实 Turo earnings 导出时建议开启。",
         runImport: "执行导入",

@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import {
   classifyTuroSubject,
   extractGuestAvatar,
+  extractGuestMessageText,
   extractTuroLink,
 } from "@/lib/turo-subjects";
 import {
@@ -269,6 +270,7 @@ async function attributeEmail(input: {
 }) {
   const bySubject = classifyTuroSubject(input.subject);
   const turoLink = extractTuroLink(input.bodyText);
+  const guestText = extractGuestMessageText(input.bodyText, input.subject);
 
   const matchedVehicles = bySubject?.vehicleText
     ? matchVehicles(bySubject.vehicleText, input.fleet, bySubject.coHostAccount ?? null)
@@ -316,6 +318,7 @@ async function attributeEmail(input: {
   return {
     kind: bySubject?.kind ?? InboundEmailKind.OTHER,
     guestName: bySubject?.guestName ?? null,
+    guestText,
     turoAccount: bySubject?.coHostAccount ?? null,
     vehicleId,
     turoLink,
@@ -678,6 +681,7 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
         { turoLink: null },
         { orderId: null },
         { turoAccount: null },
+        { guestText: null },
       ],
     },
     select: {
@@ -687,6 +691,7 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
       receivedAt: true,
       kind: true,
       guestName: true,
+      guestText: true,
       turoAccount: true,
       vehicleId: true,
       turoLink: true,
@@ -712,6 +717,8 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
     const data: {
       kind?: InboundEmailKind;
       guestName?: string;
+      guestText?: string;
+      summaryZh?: string | null;
       turoAccount?: string;
       vehicleId?: string;
       turoLink?: string;
@@ -723,6 +730,13 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
     }
     if (!email.guestName && attribution.guestName) data.guestName = attribution.guestName;
     if (!email.turoAccount && attribution.turoAccount) data.turoAccount = attribution.turoAccount;
+    if (!email.guestText && attribution.guestText) {
+      data.guestText = attribution.guestText;
+      // Any Chinese already stored was translated from the summary,
+      // not from these words. Drop it so the next open retranslates
+      // what the guest actually said.
+      data.summaryZh = null;
+    }
     if (!email.vehicleId && attribution.vehicleId) data.vehicleId = attribution.vehicleId;
     if (!email.turoLink && attribution.turoLink) data.turoLink = attribution.turoLink;
     if (!email.orderId && attribution.orderId) data.orderId = attribution.orderId;

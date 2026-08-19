@@ -290,3 +290,64 @@ export function extractGuestAvatar(html: string): string | null {
   const profile = usable.find((url) => /driver|profile|avatar|user|people|face/i.test(url));
   return profile ? profile.slice(0, 500) : null;
 }
+
+/**
+ * What the guest actually wrote.
+ *
+ * Turo wraps the guest's words in a notification: a header line that
+ * restates the subject, then their message, then a "Reply <url>" call
+ * to action, then trip details and legal footer. Their text is the
+ * part between the header and the CTA, and it is sitting there in
+ * plain sight -- which matters, because the page had been showing a
+ * model's summary of it instead. A summary of one sentence is not a
+ * better version of that sentence; it is a paraphrase of the only
+ * thing on the screen the operator needs to read exactly.
+ *
+ * Deterministic. The model still writes the Chinese and still judges
+ * whether a reply is needed, but it no longer stands between the guest
+ * and the person reading them.
+ *
+ * Returns null when the shape is not recognised, so the caller can
+ * fall back rather than show a slice of boilerplate.
+ */
+export function extractGuestMessageText(bodyText: string, subject: string): string | null {
+  if (!bodyText) return null;
+
+  const normalized = bodyText.replace(/\r\n/g, "\n");
+
+  // The CTA marks the end of the quoted message in every template that
+  // carries one.
+  const ctaIndex = normalized.search(/\n\s*Reply\s+https?:\/\//i);
+  const head = ctaIndex >= 0 ? normalized.slice(0, ctaIndex) : normalized;
+
+  const lines = head
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return null;
+
+  // Drop the header line, which is the subject with a full stop. Match
+  // on the shared prefix rather than equality: Turo appends the car to
+  // one and not always the other.
+  const subjectStem = subject.replace(/[.!]$/, "").slice(0, 40).toLowerCase();
+  const body = lines.filter((line) => {
+    const lower = line.toLowerCase();
+    if (subjectStem && lower.startsWith(subjectStem.slice(0, Math.min(30, subjectStem.length)))) {
+      return false;
+    }
+    // Template furniture that survives when the CTA is worded
+    // differently.
+    return !/^(reply|view (trip|car) details|booked trip|cancelled trip)\b/i.test(line);
+  });
+
+  const text = body.join("\n").trim();
+  if (!text || text.length < 2) return null;
+
+  // Guard against grabbing the trip-details block when a notification
+  // carries no guest message at all: those start with the vehicle line
+  // and read as a spec sheet, never as a sentence.
+  if (/^[A-Z][\w-]* [\w-]+ (19|20)\d{2}$/.test(text.split("\n")[0] ?? "")) return null;
+
+  return text.slice(0, 2000);
+}

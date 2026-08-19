@@ -9,6 +9,7 @@ import { getMessages, type Locale } from "@/lib/i18n";
 type ThreadMessage = {
   id: string;
   subject: string;
+  guestText: string | null;
   receivedAt: string;
   acknowledgedAt: string | null;
   summary: string | null;
@@ -501,14 +502,16 @@ export function GuestMessagesView({
                       ) : null}
                     </div>
 
-                    {/* Original above, Chinese beneath. Showing one or
-                        the other behind a toggle meant deciding, per
-                        message, which language you were about to need
-                        -- and the answer is usually both: the English
-                        is what the guest actually wrote and what any
-                        reply has to line up with. */}
-                    <p className="mt-0.5 text-[12.5px] leading-5 text-[var(--ink)]">
-                      {message.summary ?? message.subject}
+                    {/* The guest's own words, then the Chinese under
+                        them. This showed a model's summary for a
+                        while, with the summary's translation beneath
+                        it -- two paraphrases and no sign of what the
+                        person actually said. A summary of one sentence
+                        is not a shorter version of that sentence.
+                        The summary survives only as a fallback, for
+                        notifications that carry no message at all. */}
+                    <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] leading-5 text-[var(--ink)]">
+                      {message.guestText ?? message.summary ?? message.subject}
                     </p>
                     {chinese(message) ? (
                       <p className="mt-1 border-l-2 border-[var(--brand-soft)] pl-2 text-[12.5px] leading-5 text-[var(--ink-mid)]">

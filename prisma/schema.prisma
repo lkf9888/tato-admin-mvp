@@ -886,6 +886,12 @@ model InboundEmail {
   // rather than a blank circle.
   avatarUrl   String?
 
+  // What the guest actually wrote, lifted out of the notification
+  // template. The page used to show a model's summary in its place,
+  // which is a paraphrase of the one thing on screen that has to be
+  // read exactly.
+  guestText   String?
+
   // The summary translated to Chinese, cached because the operator
   // reads the same thread more than once and a translation is a model
   // call. Null means "not translated yet", not "translation failed" --

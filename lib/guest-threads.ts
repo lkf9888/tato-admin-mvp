@@ -27,6 +27,8 @@ export type ThreadEmail = {
   acknowledgedAt: Date | null;
   turoLink: string | null;
   orderId: string | null;
+  /** What the guest actually wrote, when the template carried it. */
+  guestText: string | null;
   /** The model's one-line reading of the message, when it has run. */
   summary: string | null;
   /** That reading in Chinese, cached after the first translation. */
@@ -90,7 +92,7 @@ export function groupIntoThreads(emails: ThreadEmail[]): GuestThread[] {
       vehicleLabel: messages.find((m) => m.vehicleLabel)?.vehicleLabel ?? null,
       vehiclePlate: messages.find((m) => m.vehiclePlate)?.vehiclePlate ?? null,
       avatarUrl: messages.find((m) => m.avatarUrl)?.avatarUrl ?? null,
-      latestSummary: newest.summary,
+      latestSummary: newest.guestText ?? newest.summary,
       latestSummaryZh: newest.summaryZh,
       messages,
       latestAt: newest.receivedAt,

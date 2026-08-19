@@ -34,9 +34,9 @@ const translateSchema = z.object({
 });
 
 const SYSTEM_PROMPT = [
-  "你是翻译。把每条 Turo 客人消息的英文摘要翻译成简体中文。",
+  "你是翻译。把每条 Turo 客人消息翻译成简体中文。",
   "只输出译文，不要解释、不要引号、不要编号以外的任何前后缀。",
-  "保留 emoji、数字、日期、金额、车牌和人名。",
+  "保留 emoji、数字、日期、金额、车牌和人名。语气贴近原文，客人怎么说就怎么译，不要润色成客服腔。",
   "输入是带编号的多行，每行形如 `3. <英文>`。输出必须是同样数量、同样编号的行。",
 ].join("\n");
 
@@ -86,15 +86,19 @@ export async function POST(request: Request) {
       workspaceId: context.workspace.id,
       id: { in: parsed.data.emailIds },
       summaryZh: null,
-      parsed: { not: null },
     },
     orderBy: { receivedAt: "desc" },
     take: BATCH,
-    select: { id: true, parsed: true },
+    select: { id: true, guestText: true, parsed: true },
   });
 
+  // The guest's own words when we have them. The summary is the
+  // fallback for notifications that carry no message -- a cancellation,
+  // a payout -- where there is nothing of theirs to translate.
   const items = pending
     .map((email) => {
+      const own = email.guestText?.trim();
+      if (own) return { id: email.id, text: own.slice(0, 1200) };
       try {
         const summary = (JSON.parse(email.parsed ?? "{}") as { summary?: string }).summary;
         return summary?.trim() ? { id: email.id, text: summary.trim() } : null;

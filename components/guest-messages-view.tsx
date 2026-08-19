@@ -199,7 +199,12 @@ export function GuestMessagesView({
       {/* Detail */}
       {selected ? (
         <section className="space-y-3">
-          <header className="flex items-start justify-between gap-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 sm:px-4">
+          {/* Name above, actions below, on phones. Side by side, the
+              guest's name and two buttons each get about a third of a
+              375px screen, and the buttons stack into tall thin
+              columns -- the shape that is hardest to hit and reads as
+              broken. */}
+          <header className="flex flex-col gap-2.5 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between sm:px-4">
             <div className="min-w-0">
               <button
                 type="button"
@@ -215,26 +220,26 @@ export function GuestMessagesView({
                 {selected.vehicleLabel ?? t.noVehicle}
               </p>
             </div>
-            <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <div className="tap-row flex shrink-0 items-center gap-2 sm:flex-col sm:items-end sm:gap-1.5">
               {selected.turoLink ? (
                 <a
                   href={selected.turoLink}
                   target="_blank"
                   rel="noopener noreferrer"
                   title={t.replyOnTuroHint}
-                  className="tap-press rounded-full bg-[var(--accent)] px-3 py-1.5 text-[11.5px] font-semibold text-white transition hover:opacity-90"
+                  className="tap-press flex flex-1 items-center justify-center rounded-md bg-[var(--brand)] px-3 py-2 text-[12px] font-bold text-white transition hover:opacity-90 sm:flex-none"
                 >
                   {t.replyOnTuro} ↗
                 </a>
               ) : (
-                <span className="text-[10.5px] text-[var(--ink-soft)]">{t.noTuroLink}</span>
+                <span className="flex-1 text-[11px] text-[var(--ink-soft)] sm:flex-none">{t.noTuroLink}</span>
               )}
               {selected.openCount > 0 ? (
                 <button
                   type="button"
                   onClick={markHandled}
                   disabled={acknowledging}
-                  className="tap-press rounded-full border border-[var(--line)] bg-white px-2.5 py-1 text-[10.5px] font-semibold text-[var(--ink-soft)] transition hover:text-[var(--ink)] disabled:opacity-50"
+                  className="tap-press flex flex-1 items-center justify-center rounded-md border border-[var(--line-strong)] bg-white px-3 py-2 text-[12px] font-bold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] disabled:opacity-50 sm:flex-none"
                 >
                   {acknowledging ? t.markingHandled : t.markHandled}
                 </button>

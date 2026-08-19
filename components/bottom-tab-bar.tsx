@@ -1,5 +1,6 @@
 "use client";
 
+import { NAV_ICONS, type NavIconName } from "@/components/nav-icons";
 import {
   CalendarDays,
   ChevronRight,
@@ -8,7 +9,6 @@ import {
   MoreHorizontal,
   UsersRound,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
  * height plus the safe-area inset, applied in the AppShell `<main>`.
  */
 
-type SidebarItem = { href: string; label: string; icon?: LucideIcon };
+type SidebarItem = { href: string; label: string; icon?: NavIconName };
 
 export function BottomTabBar({
   labels,
@@ -210,6 +210,7 @@ export function BottomTabBar({
             <ul className="grid gap-1 px-3 pb-2">
               {moreItems.map((item) => {
                 const active = pathname.startsWith(item.href);
+                const Icon = item.icon ? NAV_ICONS[item.icon] : null;
                 return (
                   <li key={item.href}>
                     <Link
@@ -227,8 +228,8 @@ export function BottomTabBar({
                           : "bg-[var(--surface-muted)] text-[var(--ink)] hover:bg-[var(--accent-soft)]",
                       )}
                     >
-                      {item.icon ? (
-                        <item.icon
+                      {Icon ? (
+                        <Icon
                           className="size-[19px] shrink-0 opacity-70"
                           strokeWidth={1.75}
                           aria-hidden

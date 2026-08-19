@@ -1,12 +1,12 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
+import { NAV_ICONS, type NavIconName } from "@/components/nav-icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-type NavItem = { href: string; label: string; icon: LucideIcon };
+type NavItem = { href: string; label: string; icon: NavIconName };
 type NavGroup = { label: string; items: NavItem[] };
 
 function isActivePath(pathname: string, href: string) {
@@ -26,6 +26,7 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
           <div className="space-y-1">
             {group.items.map((item) => {
               const active = isActivePath(pathname, item.href);
+              const Icon = NAV_ICONS[item.icon];
               return (
                 <Link
                   key={item.href}
@@ -43,7 +44,7 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
                       : "text-[var(--ink-mid)] hover:bg-[var(--surface-muted)]",
                   )}
                 >
-                  <item.icon
+                  <Icon
                     className={cn("size-[18px] shrink-0", active ? "opacity-100" : "opacity-60")}
                     strokeWidth={active ? 2.25 : 1.75}
                     aria-hidden

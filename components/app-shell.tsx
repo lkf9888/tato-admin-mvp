@@ -1,24 +1,3 @@
-import {
-  Banknote,
-  CalendarDays,
-  Car,
-  CreditCard,
-  FileSignature,
-  FileText,
-  History,
-  Image,
-  LayoutGrid,
-  ListChecks,
-  MessageCircle,
-  Route,
-  Settings,
-  Sparkles,
-  Ticket,
-  TrendingUp,
-  Upload,
-  UsersRound,
-  type LucideIcon,
-} from "lucide-react";
 import { logoutAction } from "@/app/actions";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { ContactButton } from "@/components/contact-button";
@@ -27,6 +6,7 @@ import { MobileNav } from "@/components/mobile-nav";
 import { NavigationOptimizer } from "@/components/navigation-optimizer";
 import { SessionExpiryRedirect } from "@/components/session-expiry-redirect";
 import { SidebarNav } from "@/components/sidebar-nav";
+import type { NavIconName } from "@/components/nav-icons";
 import { getMessages, type Locale } from "@/lib/i18n";
 import { APP_VERSION_LABEL } from "@/lib/version";
 
@@ -63,56 +43,56 @@ export function AppShell({
   // operator switches between the two all day, so this matches it:
   // a chat bubble for messages, a car for vehicles, a bar chart for
   // the money pages.
-  type NavItem = { href: string; label: string; icon: LucideIcon };
+  type NavItem = { href: string; label: string; icon: NavIconName };
   type NavGroup = { label: string; items: NavItem[] };
 
   const navGroups: NavGroup[] = [
     {
       label: messages.shell.nav.groupOperations,
       items: [
-        { href: "/dashboard", label: messages.shell.nav.dashboard, icon: LayoutGrid },
-        { href: "/assistant", label: messages.shell.nav.assistant, icon: Sparkles },
-        { href: "/messages", label: messages.shell.nav.guestMessages, icon: MessageCircle },
-        { href: "/calendar", label: messages.shell.nav.calendar, icon: CalendarDays },
-        { href: "/orders", label: messages.shell.nav.orders, icon: Route },
-        { href: "/imports", label: messages.shell.nav.imports, icon: Upload },
+        { href: "/dashboard", label: messages.shell.nav.dashboard, icon: "dashboard" },
+        { href: "/assistant", label: messages.shell.nav.assistant, icon: "assistant" },
+        { href: "/messages", label: messages.shell.nav.guestMessages, icon: "messages" },
+        { href: "/calendar", label: messages.shell.nav.calendar, icon: "calendar" },
+        { href: "/orders", label: messages.shell.nav.orders, icon: "orders" },
+        { href: "/imports", label: messages.shell.nav.imports, icon: "imports" },
       ],
     },
     {
       label: messages.shell.nav.groupFleet,
       items: [
-        { href: "/vehicles", label: messages.shell.nav.vehicles, icon: Car },
-        { href: "/vehicle-roi", label: messages.shell.nav.vehicleRoi, icon: TrendingUp },
-        { href: "/owners", label: messages.shell.nav.owners, icon: UsersRound },
+        { href: "/vehicles", label: messages.shell.nav.vehicles, icon: "vehicles" },
+        { href: "/vehicle-roi", label: messages.shell.nav.vehicleRoi, icon: "vehicleRoi" },
+        { href: "/owners", label: messages.shell.nav.owners, icon: "owners" },
       ],
     },
     {
       label: messages.shell.nav.groupBookings,
       items: [
-        { href: "/direct-booking", label: messages.shell.nav.directBooking, icon: Ticket },
+        { href: "/direct-booking", label: messages.shell.nav.directBooking, icon: "directBooking" },
       ],
     },
     {
       label: messages.shell.nav.groupTeam,
       items: [
-        { href: "/staff-schedule", label: messages.shell.nav.staffSchedule, icon: ListChecks },
+        { href: "/staff-schedule", label: messages.shell.nav.staffSchedule, icon: "staffSchedule" },
       ],
     },
     {
       label: messages.shell.nav.groupFiles,
       items: [
-        { href: "/contracts", label: messages.shell.nav.contracts, icon: FileSignature },
-        { href: "/photos", label: messages.shell.nav.photos, icon: Image },
-        { href: "/documents", label: messages.shell.nav.documents, icon: FileText },
-        { href: "/activity", label: messages.shell.nav.activity, icon: History },
+        { href: "/contracts", label: messages.shell.nav.contracts, icon: "contracts" },
+        { href: "/photos", label: messages.shell.nav.photos, icon: "photos" },
+        { href: "/documents", label: messages.shell.nav.documents, icon: "documents" },
+        { href: "/activity", label: messages.shell.nav.activity, icon: "activity" },
       ],
     },
     {
       label: messages.shell.nav.groupBilling,
       items: [
-        { href: "/billing", label: messages.shell.nav.billing, icon: CreditCard },
-        { href: "/payouts", label: messages.shell.nav.payouts, icon: Banknote },
-        { href: "/account-settings", label: messages.shell.nav.accountSettings, icon: Settings },
+        { href: "/billing", label: messages.shell.nav.billing, icon: "billing" },
+        { href: "/payouts", label: messages.shell.nav.payouts, icon: "payouts" },
+        { href: "/account-settings", label: messages.shell.nav.accountSettings, icon: "accountSettings" },
       ],
     },
   ];

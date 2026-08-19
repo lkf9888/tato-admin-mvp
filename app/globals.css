@@ -494,3 +494,36 @@ a[class*="rounded-2xl"],
 .scroll-x::-webkit-scrollbar {
   display: none;
 }
+
+/* ---------------------------------------------------------------
+   Grid and flex items refuse to shrink below their content, because
+   `min-width` defaults to `auto` on them rather than `0`. One long
+   unbreakable string -- a plate number, an address, a guest name that
+   never wraps -- then widens its whole column, and the page overflows
+   the viewport by however much that child needed.
+
+   Measured on /dashboard at 375px: content width 398, viewport 375.
+   The body's `overflow-x: clip` hid the scrollbar but not the damage,
+   so cards simply ran off the right edge with their contents cut.
+
+   `:where()` keeps this at zero specificity, so any deliberate
+   `min-w-*` still wins. Items that must keep their intrinsic width use
+   `shrink-0`, which governs shrinking independently and is unaffected.
+   --------------------------------------------------------------- */
+:where(.grid) > *,
+:where(.flex) > * {
+  min-width: 0;
+}
+
+/* Inline action links -- "View orders →", "See full log →" -- sit at
+   the text's own line height, which measured 26px: readable, but half
+   a fingertip. They are laid out as flex/inline-flex, which separates
+   them from links inside prose, so the floor can be applied without
+   turning every sentence into a list of buttons. */
+@media (hover: none) {
+  a.inline-flex:not(.tap-compact),
+  a.flex:not(.tap-compact) {
+    min-height: 40px;
+    align-items: center;
+  }
+}

@@ -161,11 +161,14 @@ export async function POST(request: Request) {
         content: `Trip facts:\n${facts}\n\nConversation:\n${transcript}${focus}`,
       },
     ],
-    // Capped rather than generous. The budget bounds reasoning as well
-    // as output, and a two-sentence reply that needs more than this is
-    // a reply that has gone wrong. If it truncates, the error says so
-    // plainly rather than returning empty.
-    maxTokens: 1200,
+    // 1200 was tried and was wrong. The budget bounds reasoning *and*
+    // output, and this model reasons past 1200 before writing a word --
+    // so the cap did not shorten the wait, it truncated the answer and
+    // returned nothing after the same 12 seconds. Latency here is the
+    // reasoning pass; the only levers that touch it are a shorter
+    // prompt (done: 5 messages at 400 chars, from 8 at 800) and a
+    // model that reasons less.
+    maxTokens: 3000,
   });
 
   if (!result.ok) {

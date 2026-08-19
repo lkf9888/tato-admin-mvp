@@ -76,7 +76,19 @@ export default async function CalendarPage() {
   // the timeline. Both render the same data, so a host who pulls up
   // the page on a phone sees the same source of truth as on the
   // browser, just laid out for their thumb.
-  const scheduleOrders = orders.map((order) => ({
+  // The mobile list buckets into today / tomorrow / this week / later,
+  // and its own note says it assumes an active fleet rarely books more
+  // than ~30 days out. This fleet books six months out, so "later" was
+  // catching ~900 trips: a phone downloaded every one of them, then
+  // rendered a list nobody scrolls to the end of. Thirty days matches
+  // what the component was written for, and anything beyond it is a
+  // lookup that /orders answers better.
+  const scheduleHorizon = new Date();
+  scheduleHorizon.setDate(scheduleHorizon.getDate() + 30);
+
+  const scheduleOrders = orders
+    .filter((order) => order.pickupDatetime <= scheduleHorizon)
+    .map((order) => ({
     id: order.id,
     vehicleName: order.vehicle.nickname,
     vehiclePlateNumber: order.vehicle.plateNumber,
@@ -87,7 +99,7 @@ export default async function CalendarPage() {
     status: order.status,
     source: order.source,
     hasConflict: order.hasConflict,
-  }));
+    }));
 
   return (
     <>

@@ -266,45 +266,74 @@ export default async function VehiclesPage({
         ) : null}
         {filteredVehicles.map((vehicle) => (
           <article key={vehicle.id} className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-3.5">
-            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            {/* Turo's hierarchy: one bold name, one grey identity
+                line, then facts as labelled pairs. The previous card
+                stacked up to seven grey lines of equal weight, which
+                is a paragraph to read rather than a card to scan --
+                and on a phone it was most of a screen per vehicle. */}
+            <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="font-serif text-[0.95rem] font-semibold leading-tight text-[var(--ink)] sm:text-[1.05rem] lg:text-[1.1rem]">{vehicle.nickname}</h3>
-                <p className="mt-1 text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[12px]">
+                <h3 className="t-title truncate text-[var(--ink)]">{vehicle.nickname}</h3>
+                <p className="t-meta mt-1 truncate text-[var(--ink-soft)]">
                   {vehicle.brand} {vehicle.model} · {vehicle.year} · {vehicle.plateNumber}
                 </p>
-                <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[12px]">
-                  {vehicleMessages.ownerPrefix}:{" "}
-                  {vehicle.owner?.name ?? vehicleMessages.placeholders.unassignedOwner}
-                </p>
-                {vehicle.purchasePrice != null ? (
-                  <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[12px]">
-                    {vehicleMessages.placeholders.purchasePrice}: CA${vehicle.purchasePrice.toFixed(2)}
-                  </p>
-                ) : null}
-                {vehicle.ownerCommissionRate != null ? (
-                  <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[12px]">
-                    {vehicleMessages.commissionPrefix}: {(vehicle.ownerCommissionRate * 100).toFixed(2)}%
-                  </p>
-                ) : null}
-                {vehicle.cleaningFee != null && vehicle.cleaningFee > 0 ? (
-                  <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[12px]">
-                    {vehicleMessages.placeholders.cleaningFee}: CA${vehicle.cleaningFee.toFixed(2)}
-                  </p>
-                ) : null}
-                {vehicle.bookingTaxRate != null && vehicle.bookingTaxRate > 0 ? (
-                  <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[12px]">
-                    {vehicleMessages.placeholders.bookingTaxName}:{" "}
-                    {vehicle.bookingTaxName?.trim() || "Tax"} · {vehicle.bookingTaxRate.toFixed(3)}%
-                  </p>
-                ) : null}
               </div>
-              <div className="flex flex-wrap gap-1">
+              <div className="flex shrink-0 flex-wrap justify-end gap-1">
                 <StatusBadge value={vehicle.status} locale={locale} />
-                <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ink-mid)]">
+                <span className="chip chip-neutral">
                   {vehicleMessages.orderCount(vehicle.orders.length)}
                 </span>
               </div>
             </div>
+
+            <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-[var(--line)] pt-2.5">
+              <div className="min-w-0">
+                <dt className="t-eyebrow text-[var(--ink-soft)]">{vehicleMessages.ownerPrefix}</dt>
+                <dd className="mt-0.5 truncate text-[12.5px] font-bold text-[var(--ink)]">
+                  {vehicle.owner?.name ?? vehicleMessages.placeholders.unassignedOwner}
+                </dd>
+              </div>
+              {vehicle.ownerCommissionRate != null ? (
+                <div className="min-w-0">
+                  <dt className="t-eyebrow text-[var(--ink-soft)]">
+                    {vehicleMessages.commissionPrefix}
+                  </dt>
+                  <dd className="mt-0.5 text-[12.5px] font-bold tabular-nums text-[var(--ink)]">
+                    {(vehicle.ownerCommissionRate * 100).toFixed(2)}%
+                  </dd>
+                </div>
+              ) : null}
+              {vehicle.purchasePrice != null ? (
+                <div className="min-w-0">
+                  <dt className="t-eyebrow text-[var(--ink-soft)]">
+                    {vehicleMessages.placeholders.purchasePrice}
+                  </dt>
+                  <dd className="mt-0.5 text-[12.5px] font-bold tabular-nums text-[var(--ink)]">
+                    CA${vehicle.purchasePrice.toFixed(2)}
+                  </dd>
+                </div>
+              ) : null}
+              {vehicle.cleaningFee != null && vehicle.cleaningFee > 0 ? (
+                <div className="min-w-0">
+                  <dt className="t-eyebrow text-[var(--ink-soft)]">
+                    {vehicleMessages.placeholders.cleaningFee}
+                  </dt>
+                  <dd className="mt-0.5 text-[12.5px] font-bold tabular-nums text-[var(--ink)]">
+                    CA${vehicle.cleaningFee.toFixed(2)}
+                  </dd>
+                </div>
+              ) : null}
+              {vehicle.bookingTaxRate != null && vehicle.bookingTaxRate > 0 ? (
+                <div className="min-w-0">
+                  <dt className="t-eyebrow truncate text-[var(--ink-soft)]">
+                    {vehicle.bookingTaxName?.trim() || vehicleMessages.placeholders.bookingTaxName}
+                  </dt>
+                  <dd className="mt-0.5 text-[12.5px] font-bold tabular-nums text-[var(--ink)]">
+                    {vehicle.bookingTaxRate.toFixed(3)}%
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
 
             <div className="mt-3 flex flex-wrap gap-2">
               <VehicleEditDialog

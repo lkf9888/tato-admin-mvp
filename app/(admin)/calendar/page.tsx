@@ -5,8 +5,40 @@ import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getDisplayOrderNote, getOrderNetEarning } from "@/lib/utils";
 
+/**
+ * How far either side of today the calendar loads.
+ *
+ * It used to load every non-cancelled order the workspace had ever
+ * imported. Measured on production: 5,013 orders, 14.9 MB of HTML,
+ * 9,998 script tags -- Next streams the RSC payload in chunks and
+ * emits one `<script>` per chunk -- and three seconds of server time.
+ * On a laptop that reads as "a bit slow". On a phone over cellular it
+ * is tens of seconds and tens of megabytes of the operator's data, for
+ * a screen that shows a few weeks.
+ *
+ * Nine months of window covers what this page is for: what is out now,
+ * what is coming, and enough of the recent past to reconcile against.
+ * Anything older is a lookup, and /orders does lookups properly with
+ * search and filters.
+ */
+const CALENDAR_PAST_MONTHS = 3;
+const CALENDAR_FUTURE_MONTHS = 6;
+
+function calendarWindow() {
+  const from = new Date();
+  from.setMonth(from.getMonth() - CALENDAR_PAST_MONTHS);
+  from.setHours(0, 0, 0, 0);
+
+  const to = new Date();
+  to.setMonth(to.getMonth() + CALENDAR_FUTURE_MONTHS);
+  to.setHours(23, 59, 59, 999);
+
+  return { from, to };
+}
+
 export default async function CalendarPage() {
   const workspace = await requireCurrentWorkspace();
+  const { from, to } = calendarWindow();
   const [{ locale, messages }, vehicles, owners, orders] = await Promise.all([
     getI18n(),
     prisma.vehicle.findMany({
@@ -25,6 +57,12 @@ export default async function CalendarPage() {
         status: {
           not: "cancelled",
         },
+        // Overlap, not containment: a trip that started before the
+        // window and ends inside it is still on the calendar, and a
+        // long rental spanning the whole window must not vanish
+        // because neither of its endpoints falls in range.
+        pickupDatetime: { lte: to },
+        returnDatetime: { gte: from },
       },
       include: { vehicle: { include: { owner: true } } },
       orderBy: { pickupDatetime: "asc" },

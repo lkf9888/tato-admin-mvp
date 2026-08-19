@@ -11,6 +11,8 @@ import { formatDate } from "@/lib/utils";
 
 export default async function DirectBookingPage() {
   const workspace = await requireCurrentWorkspace();
+  const bookableFrom = new Date();
+  bookableFrom.setDate(bookableFrom.getDate() - 1);
   const [headerStore, { locale, messages }, vehicles] = await Promise.all([
     headers(),
     getI18n(),
@@ -24,6 +26,14 @@ export default async function DirectBookingPage() {
             status: {
               not: "cancelled",
             },
+            // Only trips that can still block a booking. This page
+            // feeds `getBlockedBookingWindows`, which asks "when is
+            // this car unavailable" -- a question about now and
+            // ahead. It was loading every trip since 2016 to answer
+            // it, which is where 1.6 MB of this page came from.
+            // A day of slack on the near side keeps a trip that ends
+            // today from disappearing mid-afternoon.
+            returnDatetime: { gte: bookableFrom },
           },
           orderBy: {
             pickupDatetime: "asc",

@@ -194,10 +194,15 @@ async function extractTuroEmail(input: {
     ]
       .filter(Boolean)
       .join("\n"),
-    maxTokens: 2048,
-    // 45s cut off calls that were nearly done: two of them consumed an
-    // entire 90s enrichment budget and produced nothing. A reasoning
-    // model answering with JSON routinely needs longer than that.
+    // 2048 was enough for most notifications and not for all: the
+    // reasoning pass spent the whole budget on the harder ones and
+    // returned empty, the same failure v0.27.1 hit at 600. Reasoning
+    // length varies per message, so the budget has to clear the worst
+    // case, not the median. Only tokens actually emitted are billed,
+    // so headroom is close to free.
+    maxTokens: 8192,
+    // 45s cut off calls that were nearly done. A reasoning model
+    // answering with JSON routinely needs longer than that.
     timeoutMs: 90_000,
   });
 
@@ -392,14 +397,29 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
 /** Model calls per sync run. */
 const ENRICH_MAX_MESSAGES = 12;
 
-/** Wall-clock ceiling for the enrichment pass, in milliseconds.
+/**
+ * Extractions in flight at once.
  *
- *  Railway's gateway cuts a request off at 300s. Ingestion itself is
- *  IMAP and SQLite, so it is measured in seconds; this budget is what
- *  keeps the whole endpoint comfortably inside the limit no matter how
- *  slowly the model is answering today. Both bounds are needed: the
- *  count alone cannot cap duration when a single call can take 45s. */
-const ENRICH_TIME_BUDGET_MS = 180_000;
+ * Each call is ~45s of mostly waiting, so running them one at a time
+ * wasted the budget: 4 messages per run could not keep up with a
+ * mailbox that receives more than that in a quarter hour, and the
+ * backlog would grow forever. Three at a time fits ~12 into the same
+ * window. Kept deliberately low -- this is a background catch-up, not
+ * a reason to collect a rate limit.
+ */
+const ENRICH_CONCURRENCY = 3;
+
+/**
+ * Wall-clock ceiling for the enrichment pass, in milliseconds.
+ *
+ * Railway's gateway cuts a request off at 300s, and losing the request
+ * loses the whole sync. The budget is checked between chunks, so the
+ * true worst case is this value plus one full per-call timeout:
+ * 150 + 90 = 240s, plus ~5s of ingestion, leaving about a minute of
+ * margin. Both bounds are needed -- a message count cannot cap
+ * duration when one call may take 90s.
+ */
+const ENRICH_TIME_BUDGET_MS = 150_000;
 
 /**
  * Fill in what the subject cannot give us: summaries, guest names,
@@ -426,53 +446,66 @@ async function enrichPendingEmails(workspaceId: string, result: GmailSyncResult)
 
   const startedAt = Date.now();
 
-  for (const email of pending) {
+  // Chunked rather than a queue: the batch is at most 12 and every
+  // item costs about the same, so the tail-end idling a worker is
+  // worth less than the simplicity. The budget is checked between
+  // chunks, so one slow chunk can overrun by at most its own duration
+  // -- bounded by the per-call timeout, which is why both limits exist.
+  for (let index = 0; index < pending.length; index += ENRICH_CONCURRENCY) {
     if (Date.now() - startedAt > ENRICH_TIME_BUDGET_MS) break;
 
-    const outcome = await extractTuroEmail({
-      subject: email.subject ?? "",
-      fromName: email.fromName,
-      bodyText: email.bodyText ?? "",
-    });
+    const chunk = pending.slice(index, index + ENRICH_CONCURRENCY);
 
-    if (!outcome.ok) {
-      result.parseFailed += 1;
-      // Distinct reasons only, and a short list: this rides back in the
-      // sync response, which the scheduled workflow prints on every
-      // run. A silent parseFailed count says something is wrong but
-      // not what, which is how the last three of these took hours.
-      if (!result.enrichErrors.includes(outcome.reason) && result.enrichErrors.length < 5) {
-        result.enrichErrors.push(outcome.reason);
-      }
-      continue;
-    }
+    await Promise.all(
+      chunk.map(async (email) => {
+        const outcome = await extractTuroEmail({
+          subject: email.subject ?? "",
+          fromName: email.fromName,
+          bodyText: email.bodyText ?? "",
+        });
 
-    const extracted = outcome.data;
+        if (!outcome.ok) {
+          result.parseFailed += 1;
+          // Distinct reasons only, and a short list: this rides back in
+          // the sync response, which the scheduled workflow prints on
+          // every run. A silent parseFailed count says something is
+          // wrong but not what, which is how the last three of these
+          // took hours.
+          if (!result.enrichErrors.includes(outcome.reason) && result.enrichErrors.length < 5) {
+            result.enrichErrors.push(outcome.reason);
+          }
+          return;
+        }
 
-    // Link to the order this email is about, when the extractor found
-    // a reservation id we already know.
-    let orderId: string | null = null;
-    if (extracted.reservationId) {
-      const order = await prisma.order.findFirst({
-        where: { workspaceId, externalOrderId: extracted.reservationId.trim() },
-        select: { id: true },
-      });
-      orderId = order?.id ?? null;
-    }
+        const extracted = outcome.data;
 
-    await prisma.inboundEmail.update({
-      where: { id: email.id },
-      data: {
-        // The subject classifier already had its say at ingest. Only
-        // let the model name the kind where the patterns declined to.
-        kind: email.kind === InboundEmailKind.OTHER ? extracted.kind : email.kind,
-        parsed: JSON.stringify(extracted),
-        parsedAt: new Date(),
-        orderId,
-      },
-    });
+        // Link to the order this email is about, when the extractor
+        // found a reservation id we already know.
+        let orderId: string | null = null;
+        if (extracted.reservationId) {
+          const order = await prisma.order.findFirst({
+            where: { workspaceId, externalOrderId: extracted.reservationId.trim() },
+            select: { id: true },
+          });
+          orderId = order?.id ?? null;
+        }
 
-    result.parsed += 1;
+        await prisma.inboundEmail.update({
+          where: { id: email.id },
+          data: {
+            // The subject classifier already had its say at ingest.
+            // Only let the model name the kind where the patterns
+            // declined to.
+            kind: email.kind === InboundEmailKind.OTHER ? extracted.kind : email.kind,
+            parsed: JSON.stringify(extracted),
+            parsedAt: new Date(),
+            orderId,
+          },
+        });
+
+        result.parsed += 1;
+      }),
+    );
   }
 
   result.enrichRemaining = await prisma.inboundEmail.count({

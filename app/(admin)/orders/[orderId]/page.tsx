@@ -110,7 +110,7 @@ export default async function OrderDetailPage({
         </div>
         <Link
           href={`/vehicles?q=${encodeURIComponent(order.vehicle.plateNumber)}`}
-          className="t-meta shrink-0 text-[var(--brand)] underline underline-offset-2"
+          className="t-meta inline-flex shrink-0 items-center text-[var(--brand)] underline underline-offset-2"
         >
           {order.vehicle.year} {order.vehicle.brand} {order.vehicle.model} ·{" "}
           {order.vehicle.plateNumber}
@@ -136,7 +136,7 @@ export default async function OrderDetailPage({
                     href={`https://maps.google.com/?q=${encodeURIComponent(order.pickupLocation)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 block text-[12px] font-bold text-[var(--brand)] underline underline-offset-2"
+                    className="mt-1 inline-flex items-center text-[12px] font-bold text-[var(--brand)] underline underline-offset-2"
                   >
                     {t.directions}
                   </a>

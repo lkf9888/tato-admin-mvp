@@ -562,4 +562,11 @@ a[class*="rounded-2xl"],
   .text-\[11\.5px\] {
     font-size: 12px;
   }
+
+  /* The eyebrow is defined here rather than as a utility, so the floor
+     above misses it. It is the label above every fact on the trip
+     page -- the last thing that should be unreadable. */
+  .t-eyebrow {
+    font-size: 11px;
+  }
 }

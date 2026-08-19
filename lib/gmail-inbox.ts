@@ -267,7 +267,7 @@ async function attributeEmail(input: {
   const turoLink = extractTuroLink(input.bodyText);
 
   const matchedVehicles = bySubject?.vehicleText
-    ? matchVehicles(bySubject.vehicleText, input.fleet)
+    ? matchVehicles(bySubject.vehicleText, input.fleet, bySubject.coHostAccount ?? null)
     : [];
 
   // One vehicle is an identification; several is only a narrowing, and
@@ -312,6 +312,7 @@ async function attributeEmail(input: {
   return {
     kind: bySubject?.kind ?? InboundEmailKind.OTHER,
     guestName: bySubject?.guestName ?? null,
+    turoAccount: bySubject?.coHostAccount ?? null,
     vehicleId,
     turoLink,
     orderId,
@@ -375,6 +376,7 @@ export async function runGmailSync(input: {
       year: true,
       nickname: true,
       turoListingName: true,
+      turoAccount: true,
     },
   });
 
@@ -666,6 +668,7 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
         { guestName: null },
         { turoLink: null },
         { orderId: null },
+        { turoAccount: null },
       ],
     },
     select: {
@@ -675,6 +678,7 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
       receivedAt: true,
       kind: true,
       guestName: true,
+      turoAccount: true,
       vehicleId: true,
       turoLink: true,
       orderId: true,
@@ -699,6 +703,7 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
     const data: {
       kind?: InboundEmailKind;
       guestName?: string;
+      turoAccount?: string;
       vehicleId?: string;
       turoLink?: string;
       orderId?: string;
@@ -708,6 +713,7 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
       data.kind = attribution.kind;
     }
     if (!email.guestName && attribution.guestName) data.guestName = attribution.guestName;
+    if (!email.turoAccount && attribution.turoAccount) data.turoAccount = attribution.turoAccount;
     if (!email.vehicleId && attribution.vehicleId) data.vehicleId = attribution.vehicleId;
     if (!email.turoLink && attribution.turoLink) data.turoLink = attribution.turoLink;
     if (!email.orderId && attribution.orderId) data.orderId = attribution.orderId;

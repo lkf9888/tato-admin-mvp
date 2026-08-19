@@ -51,6 +51,11 @@ export type TuroOrderFacts = {
   /** Who cancelled, when the subject says. Turo cancels differently
    *  from a guest, and a host cancelling is different again. */
   cancelledBy: "guest" | "host" | "turo" | null;
+  /** Which Turo account the listing sits on -- read from the co-host
+   *  prefix, normalised. Null is the main account. This is the only
+   *  field in the feed that crosses the account boundary a CSV export
+   *  cannot. */
+  coHostAccount: string | null;
 };
 
 function normalize(text: string) {
@@ -125,6 +130,14 @@ function parseMoney(value: string | undefined): number | null {
   return Number.isFinite(amount) ? amount : null;
 }
 
+/** "(Kevin's vehicle) - ..." -> { account: "kevin", rest: "..." } */
+function splitCoHost(subject: string) {
+  const match = subject.match(/^\(([^)]*)\)\s*[-–—]\s*/);
+  if (!match) return { account: null as string | null, rest: subject };
+  const account = match[1].replace(/'s\s+vehicles?$/i, "").trim().toLowerCase();
+  return { account: account || null, rest: subject.slice(match[0].length) };
+}
+
 function detectIntent(subject: string): TuroEmailIntent | null {
   const s = normalize(subject).toLowerCase();
   if (/is booked/.test(s)) return "created";
@@ -156,7 +169,8 @@ export function parseTuroOrderEmail(input: {
   subject: string;
   bodyText: string;
 }): TuroOrderFacts | null {
-  const subject = normalize(input.subject ?? "");
+  const raw = normalize(input.subject ?? "");
+  const { account: coHostAccount, rest: subject } = splitCoHost(raw);
   const body = normalize(input.bodyText ?? "");
 
   const intent = detectIntent(subject);
@@ -212,5 +226,6 @@ export function parseTuroOrderEmail(input: {
     location,
     conversationUrl,
     cancelledBy: detectCanceller(subject),
+    coHostAccount,
   };
 }

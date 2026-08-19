@@ -350,6 +350,7 @@ export default async function VehiclesPage({
                   vin: vehicle.vin,
                   status: vehicle.status,
                   turoListingName: vehicle.turoListingName,
+                  turoAccount: vehicle.turoAccount,
                   turoVehicleCode: vehicle.turoVehicleCode,
                   purchasePrice: vehicle.purchasePrice,
                   ownerCommissionRate: vehicle.ownerCommissionRate,

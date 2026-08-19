@@ -49,7 +49,17 @@ export type ApplyOutcome = {
   skippedCompleted: number;
   /** Mail for a trip we have no order for, whose vehicle could not be
    *  pinned to exactly one car in the fleet. */
-  ambiguousVehicle: { reservationId: string; vehicleText: string | null; matches: number }[];
+  ambiguousVehicle: {
+    reservationId: string;
+    vehicleText: string | null;
+    matches: number;
+    /** Null is the main account; a name means a co-hosted listing whose
+     *  cars may simply not be in the fleet table yet. */
+    turoAccount: string | null;
+  }[];
+  /** How many reservations each account contributed, so a co-hosted
+   *  account that has stopped arriving is visible. */
+  byAccount: Record<string, number>;
   unchanged: number;
 };
 
@@ -116,6 +126,7 @@ export async function applyTuroEmailsToOrders(input: {
     updated: 0,
     skippedCompleted: 0,
     ambiguousVehicle: [],
+    byAccount: {},
     unchanged: 0,
   };
 
@@ -145,6 +156,7 @@ export async function applyTuroEmailsToOrders(input: {
         year: true,
         nickname: true,
         turoListingName: true,
+        turoAccount: true,
       },
     }),
   ]);
@@ -152,6 +164,9 @@ export async function applyTuroEmailsToOrders(input: {
   const byExternalId = new Map(orders.map((order) => [order.externalOrderId ?? "", order]));
 
   for (const [reservationId, facts] of folded) {
+    const accountKey = facts.coHostAccount ?? "(main)";
+    outcome.byAccount[accountKey] = (outcome.byAccount[accountKey] ?? 0) + 1;
+
     const order = byExternalId.get(reservationId);
 
     if (!order) {
@@ -162,7 +177,11 @@ export async function applyTuroEmailsToOrders(input: {
         continue;
       }
 
-      const matches = matchVehicles(facts.vehicleText, fleet);
+      // Scoped to the account the mail came from. This fleet runs four
+      // Tesla Model Y 2020s and two Ford Explorer 2014s across two
+      // accounts, so the account is often the only thing that turns an
+      // ambiguous model into one car.
+      const matches = matchVehicles(facts.vehicleText, fleet, facts.coHostAccount);
       if (matches.length !== 1) {
         // Several cars of one model is normal here, and the mail names
         // no plate. Guessing would file a real booking against the
@@ -172,6 +191,7 @@ export async function applyTuroEmailsToOrders(input: {
           reservationId,
           vehicleText: facts.vehicleText,
           matches: matches.length,
+          turoAccount: facts.coHostAccount,
         });
         continue;
       }

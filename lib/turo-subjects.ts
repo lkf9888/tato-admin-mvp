@@ -36,12 +36,36 @@ function normalize(subject: string) {
 }
 
 /**
- * Co-hosted cars carry a bracketed owner prefix that sits in front of
- * the guest's name: "(Kevin's vehicle) - Guillaume has sent you...".
- * Strip it so name capture starts at the name.
+ * The co-host prefix: "(Kevin's vehicle) - Guillaume has sent you...".
+ *
+ * Turo puts this in front of every notification for a listing that
+ * lives on someone else's account and is managed from this one. It was
+ * being stripped as noise. It is not noise -- it is the only thing in
+ * the entire feed that says which Turo account a trip belongs to.
+ *
+ * That matters because a CSV export cannot cross accounts, so the
+ * co-hosted cars were invisible to every import; the mailbox is the
+ * one place both accounts arrive together. It also disambiguates:
+ * "Tesla Model Y 2020" matches four cars in this fleet, and knowing
+ * which account the mail came from can be what narrows it to one.
+ *
+ * Normalised to a key -- "(Kevin's vehicle)" becomes "kevin" -- so the
+ * label's punctuation and wording cannot fork the same account into
+ * two.
  */
-function stripCoHostPrefix(subject: string) {
-  return subject.replace(/^\([^)]*\)\s*[-–—]\s*/, "");
+function splitCoHostPrefix(subject: string) {
+  const match = subject.match(/^\(([^)]*)\)\s*[-–—]\s*/);
+  if (!match) return { account: null as string | null, rest: subject };
+
+  const account = match[1]
+    .replace(/'s\s+vehicles?$/i, "")
+    .trim()
+    .toLowerCase();
+
+  return {
+    account: account || null,
+    rest: subject.slice(match[0].length),
+  };
 }
 
 type Rule = {
@@ -148,6 +172,10 @@ const RULES: Rule[] = [
 export type TuroSubjectMatch = {
   kind: InboundEmailKind;
   needsAction: boolean;
+  /** Which Turo account this listing sits on. Null is the main
+   *  account; anything else is a co-hosted listing whose trips never
+   *  appear in this account's CSV export. */
+  coHostAccount: string | null;
   /** As written by Turo, for display and for matching against orders. */
   guestName: string | null;
   /** The listing text, e.g. "Tesla Model 3" or "Toyota 4Runner 2022". */
@@ -155,7 +183,8 @@ export type TuroSubjectMatch = {
 };
 
 export function classifyTuroSubject(subject: string): TuroSubjectMatch | null {
-  const normalized = stripCoHostPrefix(normalize(subject));
+  const { account, rest } = splitCoHostPrefix(normalize(subject));
+  const normalized = rest.trim();
   if (!normalized) return null;
 
   for (const rule of RULES) {
@@ -167,7 +196,13 @@ export function classifyTuroSubject(subject: string): TuroSubjectMatch | null {
       ? (match[rule.vehicleGroup]?.replace(/[!.]+$/, "").trim() || null)
       : null;
 
-    return { kind: rule.kind, needsAction: rule.needsAction, guestName, vehicleText };
+    return {
+      kind: rule.kind,
+      needsAction: rule.needsAction,
+      coHostAccount: account,
+      guestName,
+      vehicleText,
+    };
   }
 
   return null;

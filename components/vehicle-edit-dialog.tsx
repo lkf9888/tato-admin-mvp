@@ -20,6 +20,7 @@ export type VehicleEditDialogVehicle = {
   vin?: string | null;
   status: string;
   turoListingName?: string | null;
+  turoAccount?: string | null;
   turoVehicleCode?: string | null;
   purchasePrice?: number | null;
   ownerCommissionRate?: number | null;
@@ -214,6 +215,14 @@ export function VehicleEditDialog({
           </DialogSection>
 
           <DialogSection title={locale === "en" ? "Turo and notes" : locale === "zh-Hant" ? "Turo 與備註" : "Turo 与备注"}>
+            <DialogField label={messages.placeholders.turoAccount}>
+              <input
+                name="turoAccount"
+                defaultValue={vehicle.turoAccount ?? ""}
+                placeholder={messages.placeholders.turoAccountHint}
+                className={fieldClass}
+              />
+            </DialogField>
             <DialogField label={messages.placeholders.turoListingName}>
               <input name="turoListingName" defaultValue={vehicle.turoListingName ?? ""} className={fieldClass} />
             </DialogField>

@@ -217,6 +217,11 @@ model Vehicle {
   vin                    String?
   status                 VehicleStatus           @default(available)
   turoListingName        String?
+  // Which Turo account this car is listed on. Null is the main
+  // account. A co-hosted listing lives on someone else's account, so
+  // its trips never appear in this account's CSV export -- the mailbox
+  // is the only place both accounts arrive together.
+  turoAccount            String?
   turoVehicleCode        String?
   purchasePrice          Float?
   ownerCommissionRate    Float?
@@ -860,6 +865,10 @@ model InboundEmail {
   // template. Present long before the model pass runs, so a message is
   // attributable to a guest and a car the moment it lands.
   guestName   String?
+  // The co-host prefix, normalised: "(Kevin's vehicle) - ..." becomes
+  // "kevin". Null is the main account. This is the only field in the
+  // whole feed that says which Turo account a trip belongs to.
+  turoAccount String?
   // The vehicle the subject named, when exactly one in the fleet
   // matched. Null when the listing text matched several -- several
   // cars of one model is normal here, and guessing between them would

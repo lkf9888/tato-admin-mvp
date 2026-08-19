@@ -44,6 +44,8 @@ export type VehicleForMatch = {
   year: number;
   nickname: string;
   turoListingName: string | null;
+  /** Which Turo account the listing sits on; null is the main one. */
+  turoAccount?: string | null;
 };
 
 /**
@@ -56,11 +58,22 @@ export type VehicleForMatch = {
 export function matchVehicles(
   vehicleText: string,
   vehicles: VehicleForMatch[],
+  /** The account the notification came from, when known. Two Turo
+   *  accounts can list the same model, and this fleet runs four Tesla
+   *  Model Y 2020s across them -- so the account is often the only
+   *  thing that narrows a match to one car. Undefined means "do not
+   *  filter"; null means the main account, which is a real value. */
+  coHostAccount?: string | null,
 ): VehicleForMatch[] {
   const wanted = normalizeVehicle(vehicleText);
   if (!wanted) return [];
 
-  return vehicles.filter((vehicle) => {
+  const scoped =
+    coHostAccount === undefined
+      ? vehicles
+      : vehicles.filter((vehicle) => (vehicle.turoAccount ?? null) === coHostAccount);
+
+  return scoped.filter((vehicle) => {
     const candidates = [
       `${vehicle.brand} ${vehicle.model}`,
       `${vehicle.brand} ${vehicle.model} ${vehicle.year}`,

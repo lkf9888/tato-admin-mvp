@@ -81,6 +81,7 @@ const vehicleSchema = z.object({
   vin: z.string().optional(),
   status: z.nativeEnum(VehicleStatus),
   turoListingName: z.string().optional(),
+  turoAccount: z.string().optional(),
   turoVehicleCode: z.string().optional(),
   purchasePrice: z.coerce.number().nonnegative().optional(),
   ownerCommissionRate: z.coerce.number().min(0).max(100).optional(),
@@ -969,6 +970,14 @@ export async function saveVehicleAction(formData: FormData) {
     vin: cleanOptional(formData.get("vin")),
     status: formData.get("status"),
     turoListingName: cleanOptional(formData.get("turoListingName")),
+    // Normalised the same way the email parser normalises the co-host
+    // prefix, so "Kevin's vehicle", "Kevin" and "kevin" all land on the
+    // same account rather than forking it into three.
+    turoAccount:
+      cleanOptional(formData.get("turoAccount"))
+        ?.replace(/'s\s+vehicles?$/i, "")
+        .trim()
+        .toLowerCase() || null,
     turoVehicleCode: cleanOptional(formData.get("turoVehicleCode")),
     purchasePrice: cleanOptional(formData.get("purchasePrice")),
     ownerCommissionRate: cleanOptional(formData.get("ownerCommissionRate")),

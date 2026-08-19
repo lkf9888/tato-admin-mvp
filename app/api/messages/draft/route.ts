@@ -35,6 +35,11 @@ const SYSTEM_PROMPT = [
   "Never invent details you were not given: pickup addresses, lockbox codes, prices, or times. If the guest asks for something not in the context, say you will confirm shortly.",
   "The trip facts you are given are the only facts you have. Do not add to them.",
   "Output only the reply text — no preamble, no quotes, no explanation.",
+  // These models reason before answering and the reasoning dominates
+  // the wait: measured at 14.4s for a 70-character reply. The reply is
+  // one or two sentences read off facts that are already in the
+  // prompt, so there is nothing here worth deliberating about.
+  "Answer directly from the facts given. Do not deliberate, plan, or weigh options.",
 ].join("\n");
 
 /**
@@ -82,7 +87,10 @@ export async function POST(request: Request) {
       kind: { in: ["GUEST_MESSAGE", "SUPPORT"] },
     },
     orderBy: { receivedAt: "desc" },
-    take: 8,
+    // Five, not eight. A guest's question is answered by the last
+    // exchange, not by the whole history, and every extra message is
+    // prompt the model reads before it starts.
+    take: 5,
     select: { id: true, subject: true, bodyText: true, receivedAt: true, parsed: true, order: true },
   });
 
@@ -120,7 +128,7 @@ export async function POST(request: Request) {
       return [
         `[${email.receivedAt.toISOString().slice(0, 16).replace("T", " ")}]`,
         summary ? `Summary: ${summary}` : "",
-        email.bodyText.slice(0, 800),
+        email.bodyText.slice(0, 400),
       ]
         .filter(Boolean)
         .join("\n");
@@ -140,7 +148,7 @@ export async function POST(request: Request) {
     .join("\n");
 
   const focus = target
-    ? `\n\nReply to this message specifically:\n${target.bodyText.slice(0, 800)}`
+    ? `\n\nReply to this message specifically:\n${target.bodyText.slice(0, 600)}`
     : "";
 
   const result = await kimiChat({
@@ -151,7 +159,11 @@ export async function POST(request: Request) {
         content: `Trip facts:\n${facts}\n\nConversation:\n${transcript}${focus}`,
       },
     ],
-    maxTokens: 3000,
+    // Capped rather than generous. The budget bounds reasoning as well
+    // as output, and a two-sentence reply that needs more than this is
+    // a reply that has gone wrong. If it truncates, the error says so
+    // plainly rather than returning empty.
+    maxTokens: 1200,
   });
 
   if (!result.ok) {

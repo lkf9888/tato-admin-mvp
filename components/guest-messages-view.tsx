@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getMessages, type Locale } from "@/lib/i18n";
 
@@ -49,13 +49,25 @@ type Order = {
 };
 
 function formatWhen(iso: string, locale: Locale) {
-  return new Date(iso).toLocaleString(locale === "en" ? "en-CA" : "zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const d = new Date(iso);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  if (locale === "en") {
+    return `${d.toLocaleString("en-CA", { month: "short", day: "numeric" })} ${hh}:${mm}`;
+  }
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}`;
 }
+
+/** Hours from now, negative in the past. */
+function hoursUntil(iso: string) {
+  return (new Date(iso).getTime() - Date.now()) / 3_600_000;
+}
+
+/** How close a handover has to be before it earns a place on the list
+ *  row. Twelve hours is "today or first thing tomorrow" -- near enough
+ *  that a message about it is probably about that, and far enough that
+ *  the tag is not on every row at once. */
+const IMMINENT_HOURS = 12;
 
 /**
  * Initials, coloured from the name.
@@ -135,13 +147,33 @@ export function GuestMessagesView({
 
   const [zh, setZh] = useState<Record<string, string>>({});
   const [translating, setTranslating] = useState(false);
-  const [showZh, setShowZh] = useState(true);
   const [translateError, setTranslateError] = useState<string | null>(null);
+  // Threads already asked for, so re-selecting one does not re-request
+  // a translation that is already on screen.
+  const [translatedKeys, setTranslatedKeys] = useState<Set<string>>(new Set());
 
   const ordersById = useMemo(() => new Map(orders.map((o) => [o.id, o])), [orders]);
 
   const selected = threads.find((thread) => thread.key === selectedKey) ?? null;
   const order = selected?.orderId ? (ordersById.get(selected.orderId) ?? null) : null;
+
+  // Translate on open rather than on request. The operator reads
+  // Chinese and the guests write English; making that a button meant
+  // pressing it every single time, which is not a choice, it is a
+  // chore. Cached rows render immediately and only the untranslated
+  // ones cost a call.
+  useEffect(() => {
+    if (!selected || !canDraft) return;
+    if (translatedKeys.has(selected.key)) return;
+    const missing = selected.messages.some(
+      (message) => !zh[message.id] && !message.summaryZh && message.summary,
+    );
+    if (!missing) return;
+    void translateThread(selected);
+    // translateThread is stable enough for this: it only reads state
+    // through setters, and the key guard stops a re-run loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.key, canDraft]);
 
   function selectThread(key: string) {
     setSelectedKey(key);
@@ -156,21 +188,15 @@ export function GuestMessagesView({
     return zh[message.id] ?? message.summaryZh ?? null;
   }
 
-  function bodyOf(message: ThreadMessage) {
-    const original = message.summary ?? message.subject;
-    if (!showZh) return original;
-    return chinese(message) ?? original;
-  }
-
-  async function translateThread() {
-    if (!selected || translating) return;
+  async function translateThread(thread: Thread) {
+    if (translating) return;
     setTranslating(true);
     setTranslateError(null);
     try {
       const response = await fetch("/api/messages/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestName: selected.guestName, vehicleId: selected.vehicleId }),
+        body: JSON.stringify({ guestName: thread.guestName, vehicleId: thread.vehicleId }),
       });
       const data = (await response.json().catch(() => ({}))) as {
         translations?: Record<string, string>;
@@ -184,7 +210,7 @@ export function GuestMessagesView({
         return;
       }
       setZh((current) => ({ ...current, ...(data.translations ?? {}) }));
-      setShowZh(true);
+      setTranslatedKeys((current) => new Set(current).add(thread.key));
     } catch {
       setTranslateError(t.translateFailed);
     } finally {
@@ -274,11 +300,15 @@ export function GuestMessagesView({
     : [];
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+    // The lists fill whatever height the browser gives them instead of
+    // a fixed vh guess, so a tall screen shows more conversation and a
+    // short one still scrolls inside its own pane rather than pushing
+    // the page. 13rem is the shell chrome above this grid.
+    <div className="grid gap-3 lg:h-[calc(100dvh-13rem)] lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
       <section
-        className={`rounded-lg border border-[var(--line)] bg-[var(--surface)] ${selected ? "hidden lg:block" : ""}`}
+        className={`flex min-h-0 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)] ${selected ? "hidden lg:flex" : ""}`}
       >
-        <ul className="max-h-[70vh] divide-y divide-[var(--line)] overflow-y-auto">
+        <ul className="min-h-0 flex-1 divide-y divide-[var(--line)] overflow-y-auto max-lg:max-h-[60dvh]">
           {threads.map((thread) => (
             <li key={thread.key}>
               <button
@@ -308,16 +338,40 @@ export function GuestMessagesView({
                     {thread.vehiclePlate ? ` · ${thread.vehiclePlate}` : ""}
                   </span>
                   <span className="mt-0.5 block truncate text-[11.5px] leading-4 text-[var(--ink)]">
-                    {(showZh ? thread.latestSummaryZh : null) ??
-                      thread.latestSummary ??
-                      thread.messages[0]?.subject}
+                    {thread.latestSummaryZh ?? thread.latestSummary ?? thread.messages[0]?.subject}
                   </span>
 
-                  {thread.openCount > 0 ? (
-                    <span className="mt-1 inline-flex rounded-[var(--radius-pill)] bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
-                      {t.openBadge} {thread.openCount}
-                    </span>
-                  ) : null}
+                  {(() => {
+                    // A handover inside the next twelve hours is almost
+                    // certainly what the message is about, and it is the
+                    // thing that decides whether this thread can wait.
+                    const trip = thread.orderId ? ordersById.get(thread.orderId) : null;
+                    const pickupIn = trip ? hoursUntil(trip.pickupDatetime) : null;
+                    const returnIn = trip ? hoursUntil(trip.returnDatetime) : null;
+                    const imminent =
+                      pickupIn !== null && pickupIn >= 0 && pickupIn <= IMMINENT_HOURS
+                        ? { label: t.pickupSoon, at: trip!.pickupDatetime }
+                        : returnIn !== null && returnIn >= 0 && returnIn <= IMMINENT_HOURS
+                          ? { label: t.returnSoon, at: trip!.returnDatetime }
+                          : null;
+
+                    if (thread.openCount === 0 && !imminent) return null;
+
+                    return (
+                      <span className="mt-1 flex flex-wrap items-center gap-1">
+                        {thread.openCount > 0 ? (
+                          <span className="inline-flex rounded-[var(--radius-pill)] bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
+                            {t.openBadge} {thread.openCount}
+                          </span>
+                        ) : null}
+                        {imminent ? (
+                          <span className="inline-flex rounded-[var(--radius-pill)] bg-[var(--brand-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--brand)]">
+                            {imminent.label} {formatWhen(imminent.at, locale)}
+                          </span>
+                        ) : null}
+                      </span>
+                    );
+                  })()}
                 </span>
               </button>
             </li>
@@ -326,8 +380,13 @@ export function GuestMessagesView({
       </section>
 
       {selected ? (
-        <section className="space-y-3">
-          <header className="flex flex-col gap-2.5 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between sm:px-4">
+        <section className="flex min-h-0 flex-col gap-3">
+          {/* Guest and trip in one card. They were two, stacked, and
+              the split was arbitrary: the name, the car and the
+              handover time are one answer to "who is this and what is
+              it about", read together. */}
+          <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+          <header className="flex flex-col gap-2.5 px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between sm:px-4">
             <div className="flex min-w-0 items-center gap-2.5">
               <Avatar name={selected.guestName} src={selected.avatarUrl} size={40} />
               <div className="min-w-0">
@@ -377,7 +436,7 @@ export function GuestMessagesView({
             </div>
           </header>
 
-          <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 sm:px-4">
+          <div className="border-t border-[var(--line)] px-3 py-2.5 sm:px-4">
             <h3 className="text-[12px] font-bold text-[var(--ink)]">
               {order ? t.tripTitle : t.tripNone}
             </h3>
@@ -403,30 +462,17 @@ export function GuestMessagesView({
             ) : (
               <p className="mt-1 text-[11.5px] leading-5 text-[var(--ink-soft)]">{t.tripNoneCopy}</p>
             )}
-          </section>
+          </div>
+          </div>
 
-          <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+          <section className="flex min-h-0 flex-1 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)]">
             <header className="tap-row flex items-center justify-between gap-2 border-b border-[var(--line)] px-3 py-2 sm:px-4">
               <span className="t-eyebrow text-[var(--ink-soft)]">
                 {t.messageCount(selected.messages.length)}
               </span>
-              <span className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={translateThread}
-                  disabled={!canDraft || translating}
-                  className="tap-press rounded-md border border-[var(--line-strong)] bg-white px-2.5 py-1.5 text-[11.5px] font-bold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] disabled:opacity-50"
-                >
-                  {translating ? t.translating : t.translate}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowZh((v) => !v)}
-                  className="tap-press rounded-md px-2 py-1.5 text-[11.5px] font-bold text-[var(--brand)]"
-                >
-                  {showZh ? t.showOriginal : t.showChinese}
-                </button>
-              </span>
+              {translating ? (
+                <span className="text-[11px] text-[var(--ink-soft)]">{t.autoTranslating}</span>
+              ) : null}
             </header>
 
             {translateError ? (
@@ -436,7 +482,7 @@ export function GuestMessagesView({
               <p className="px-3 pt-2 text-[11.5px] text-rose-600 sm:px-4">{draftError}</p>
             ) : null}
 
-            <ul className="max-h-[52vh] divide-y divide-[var(--line)] overflow-y-auto">
+            <ul className="min-h-0 flex-1 divide-y divide-[var(--line)] overflow-y-auto max-lg:max-h-[60dvh]">
               {selected.messages.map((message) => {
                 const draft = drafts[message.id];
                 return (
@@ -452,24 +498,29 @@ export function GuestMessagesView({
                       ) : null}
                     </div>
 
+                    {/* Original above, Chinese beneath. Showing one or
+                        the other behind a toggle meant deciding, per
+                        message, which language you were about to need
+                        -- and the answer is usually both: the English
+                        is what the guest actually wrote and what any
+                        reply has to line up with. */}
                     <p className="mt-0.5 text-[12.5px] leading-5 text-[var(--ink)]">
-                      {bodyOf(message)}
+                      {message.summary ?? message.subject}
                     </p>
+                    {chinese(message) ? (
+                      <p className="mt-1 border-l-2 border-[var(--brand-soft)] pl-2 text-[12.5px] leading-5 text-[var(--ink-mid)]">
+                        {chinese(message)}
+                      </p>
+                    ) : null}
 
                     {/* Drafting sits on the message it answers rather
                         than at the bottom of the page: the operator
                         reads one message and replies to it, and a box
                         two screens away is a box they scroll back to
                         lose their place in. */}
-                    <div className="tap-row mt-1.5 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => draftFor(message)}
-                        disabled={!canDraft || draftingId !== null}
-                        className="tap-press rounded-md bg-[var(--ink)] px-2.5 py-1.5 text-[11.5px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
-                      >
-                        {draftingId === message.id ? t.draftingOne : t.draftOne}
-                      </button>
+                    {/* Bottom-right: the reply is what you do after
+                        reading, so it sits where reading ends. */}
+                    <div className="tap-row mt-1.5 flex items-center justify-end gap-2">
                       {draft ? (
                         <button
                           type="button"
@@ -479,6 +530,14 @@ export function GuestMessagesView({
                           {copiedId === message.id ? t.draftCopied : t.draftCopyButton}
                         </button>
                       ) : null}
+                      <button
+                        type="button"
+                        onClick={() => draftFor(message)}
+                        disabled={!canDraft || draftingId !== null}
+                        className="tap-press rounded-md bg-[var(--ink)] px-2.5 py-1.5 text-[11.5px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                      >
+                        {draftingId === message.id ? t.draftingOne : t.draftOne}
+                      </button>
                     </div>
 
                     {draft ? (

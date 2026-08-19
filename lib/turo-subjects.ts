@@ -1,7 +1,7 @@
 import { InboundEmailKind } from "@prisma/client";
 
 /**
- * Deterministic classification of Turo notification emails by subject.
+ * Deterministic parsing of Turo notification emails by subject.
  *
  * Turo's host notifications are generated from a small set of fixed
  * templates, so a pattern match on the subject is exact where a model
@@ -15,22 +15,33 @@ import { InboundEmailKind } from "@prisma/client";
  *
  * Same principle as the alert detectors: the classification a person
  * acts on is computed, not guessed. The model still runs, and still
- * supplies the things patterns cannot -- reservation ids, guest names,
- * a readable summary -- but it no longer decides what a message *is*.
+ * supplies the things patterns cannot -- reservation ids, a readable
+ * summary -- but it no longer decides what a message *is*, and it is
+ * no longer on the path between an email arriving and it being
+ * attributed to a guest and a car.
  *
  * Returns null for subjects that match nothing, which defers to the
  * model rather than forcing a wrong bucket.
  */
 
 /** Turo renders possessives with a curly apostrophe; operators pasting
- *  subjects use a straight one. Normalise both, plus case and runs of
- *  whitespace, before matching. */
+ *  subjects use a straight one. Normalise both, and collapse runs of
+ *  whitespace. Case is deliberately preserved -- the guest's name is
+ *  read out of this string and shown to a person. */
 function normalize(subject: string) {
   return subject
     .replace(/[‘’ʼ]/g, "'")
     .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+    .trim();
+}
+
+/**
+ * Co-hosted cars carry a bracketed owner prefix that sits in front of
+ * the guest's name: "(Kevin's vehicle) - Guillaume has sent you...".
+ * Strip it so name capture starts at the name.
+ */
+function stripCoHostPrefix(subject: string) {
+  return subject.replace(/^\([^)]*\)\s*[-–—]\s*/, "");
 }
 
 type Rule = {
@@ -39,6 +50,11 @@ type Rule = {
    *  to answer; everything else is a notification to read. */
   needsAction: boolean;
   test: RegExp;
+  /** Capture groups for the guest name and the vehicle, when the
+   *  template carries them. Both optional -- a payout email names
+   *  neither. */
+  guestGroup?: number;
+  vehicleGroup?: number;
 };
 
 /**
@@ -49,61 +65,153 @@ const RULES: Rule[] = [
   // "Re: Following up on your vehicle swap Reservation - 60123362"
   // Turo support replies keep the mail-client Re:/Fwd: prefix; the
   // templated notifications never do.
-  { kind: InboundEmailKind.SUPPORT, needsAction: true, test: /^(re|fwd|fw)\s*:/ },
+  { kind: InboundEmailKind.SUPPORT, needsAction: true, test: /^(?:re|fwd|fw)\s*:/i },
 
   // "yuechao has sent you a message about your Tesla Model 3"
-  // Also "(Kevin's vehicle) - Guillaume has sent you a message ..." --
-  // co-hosted cars carry a bracketed prefix, so this is not anchored.
   {
     kind: InboundEmailKind.GUEST_MESSAGE,
     needsAction: true,
-    test: /has sent you a message about your /,
+    test: /^(.+?) has sent you a message about your (.+?)$/i,
+    guestGroup: 1,
+    vehicleGroup: 2,
   },
 
   {
     kind: InboundEmailKind.BOOKING_CANCELLED,
     needsAction: false,
-    test: /\b(cancell?ed|has been cancell?ed)\b/,
+    test: /^(.+?)'s trip with your (.+?) (?:has been |was )?cancell?ed/i,
+    guestGroup: 1,
+    vehicleGroup: 2,
   },
 
+  // Catch-all cancellation for phrasings the pair above misses.
+  { kind: InboundEmailKind.BOOKING_CANCELLED, needsAction: false, test: /\bcancell?ed\b/i },
+
   // "Anna's trip with your Honda CR-V is booked!"
-  { kind: InboundEmailKind.BOOKING_CREATED, needsAction: false, test: /trip with your .+ is booked/ },
+  {
+    kind: InboundEmailKind.BOOKING_CREATED,
+    needsAction: false,
+    test: /^(.+?)'s trip with your (.+?) is booked/i,
+    guestGroup: 1,
+    vehicleGroup: 2,
+  },
 
   // "Jouber has added another driver to their trip with your Toyota bZ4X"
   {
     kind: InboundEmailKind.BOOKING_MODIFIED,
     needsAction: false,
-    test: /(has added another driver|has been (changed|modified|extended)|trip (change|extension))/,
+    test: /^(.+?) has added another driver to their trip with your (.+?)$/i,
+    guestGroup: 1,
+    vehicleGroup: 2,
+  },
+  {
+    kind: InboundEmailKind.BOOKING_MODIFIED,
+    needsAction: false,
+    test: /(?:has been (?:changed|modified|extended)|trip (?:change|extension))/i,
   },
 
   // "Katherine has returned your Toyota 4Runner 2022"
-  { kind: InboundEmailKind.TRIP_ENDED, needsAction: false, test: /has returned your /},
+  {
+    kind: InboundEmailKind.TRIP_ENDED,
+    needsAction: false,
+    test: /^(.+?) has returned your (.+?)$/i,
+    guestGroup: 1,
+    vehicleGroup: 2,
+  },
 
-  // "X has picked up your Y"
-  { kind: InboundEmailKind.TRIP_STARTED, needsAction: false, test: /has picked up your /},
+  // "Katherine has picked up your Toyota 4Runner 2022"
+  {
+    kind: InboundEmailKind.TRIP_STARTED,
+    needsAction: false,
+    test: /^(.+?) has picked up your (.+?)$/i,
+    guestGroup: 1,
+    vehicleGroup: 2,
+  },
+
+  // "Paul has an upcoming trip with your Buick Verano"
+  {
+    kind: InboundEmailKind.BOOKING_MODIFIED,
+    needsAction: false,
+    test: /^(.+?) has an upcoming trip with your (.+?)$/i,
+    guestGroup: 1,
+    vehicleGroup: 2,
+  },
 
   // "Your earnings are on the way!" / reimbursement invoice charges
   {
     kind: InboundEmailKind.PAYOUT,
     needsAction: false,
-    test: /(your earnings are on the way|has been charged for your reimbursement invoice)/,
+    test: /(?:your earnings are on the way|has been charged for your reimbursement invoice)/i,
   },
 ];
 
 export type TuroSubjectMatch = {
   kind: InboundEmailKind;
   needsAction: boolean;
+  /** As written by Turo, for display and for matching against orders. */
+  guestName: string | null;
+  /** The listing text, e.g. "Tesla Model 3" or "Toyota 4Runner 2022". */
+  vehicleText: string | null;
 };
 
 export function classifyTuroSubject(subject: string): TuroSubjectMatch | null {
-  const normalized = normalize(subject);
+  const normalized = stripCoHostPrefix(normalize(subject));
   if (!normalized) return null;
 
   for (const rule of RULES) {
-    if (rule.test.test(normalized)) {
-      return { kind: rule.kind, needsAction: rule.needsAction };
-    }
+    const match = normalized.match(rule.test);
+    if (!match) continue;
+
+    const guestName = rule.guestGroup ? (match[rule.guestGroup]?.trim() || null) : null;
+    const vehicleText = rule.vehicleGroup
+      ? (match[rule.vehicleGroup]?.replace(/[!.]+$/, "").trim() || null)
+      : null;
+
+    return { kind: rule.kind, needsAction: rule.needsAction, guestName, vehicleText };
   }
 
   return null;
+}
+
+/**
+ * The link Turo itself put in the notification.
+ *
+ * Extracted rather than constructed. Building a URL from a reservation
+ * id would mean hard-coding Turo's routing and re-learning it every
+ * time they change it; the email already contains a link that Turo
+ * guarantees works, including whatever tracking wrapper they route it
+ * through. Tracking hosts still sit under turo.com, so the host test
+ * catches them and the redirect lands in the right place.
+ *
+ * Returns null when the body carries no Turo link, which is a normal
+ * outcome for a plain-text digest.
+ */
+export function extractTuroLink(bodyText: string): string | null {
+  const urls = bodyText.match(/https?:\/\/[^\s<>()[\]"']+/gi);
+  if (!urls) return null;
+
+  const turoUrls = urls
+    // Trailing punctuation from prose wrapping ("...trips/123.") is not
+    // part of the URL.
+    .map((url) => url.replace(/[.,;:!?]+$/, ""))
+    .filter((url) => {
+      try {
+        const host = new URL(url).hostname.toLowerCase();
+        return host === "turo.com" || host.endsWith(".turo.com");
+      } catch {
+        return false;
+      }
+    });
+
+  if (turoUrls.length === 0) return null;
+
+  // Prefer a link that goes somewhere useful. Turo footers carry help
+  // centre and unsubscribe links on the same domain, and opening the
+  // help centre when the operator wanted the conversation is worse
+  // than offering nothing.
+  const meaningful = turoUrls.find((url) =>
+    /\/(trips?|reservations?|inbox|messages?|conversations?)\b/i.test(url),
+  );
+
+  return (meaningful ?? turoUrls[0]).slice(0, 1_000);
 }

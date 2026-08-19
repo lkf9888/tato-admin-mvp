@@ -241,6 +241,7 @@ model Vehicle {
   directBookingDocuments DirectBookingDocument[]
 
   @@index([workspaceId])
+  inboundEmails          InboundEmail[]
 }
 
 model Order {
@@ -855,20 +856,42 @@ model InboundEmail {
   // Set once the assistant has surfaced this to the operator.
   acknowledgedAt DateTime?
 
-  // Best-effort link back to the order this email is about, matched on
-  // the reservation id the extractor pulls out. Null when the email
-  // predates the order's import or carries no reservation id.
+  // Read straight off the subject, which Turo generates from a fixed
+  // template. Present long before the model pass runs, so a message is
+  // attributable to a guest and a car the moment it lands.
+  guestName   String?
+  // The vehicle the subject named, when exactly one in the fleet
+  // matched. Null when the listing text matched several -- several
+  // cars of one model is normal here, and guessing between them would
+  // put the message against the wrong car.
+  vehicleId   String?
+
+  // The link Turo put in the notification body. Kept as sent rather
+  // than constructed from an id, so a routing change on their side
+  // does not silently produce dead links on ours.
+  turoLink    String?
+
+  // Best-effort link back to the order this email is about: an exact
+  // join on the reservation id for booking mail, and a name + vehicle
+  // + date-window match for guest messages, which carry no id. Null
+  // when the email predates the order's import or when the match was
+  // ambiguous -- showing a message against the wrong trip is worse
+  // than showing it against none.
   orderId     String?
 
   createdAt   DateTime         @default(now())
 
   workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   order       Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  vehicle     Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, messageId])
   @@index([workspaceId, receivedAt])
   @@index([workspaceId, kind, acknowledgedAt])
   @@index([orderId])
+  @@index([vehicleId])
+  // The guest-message page groups by guest; this is the index it reads.
+  @@index([workspaceId, kind, guestName])
 }
 
 model AssistantThread {

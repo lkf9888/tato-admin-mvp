@@ -6,7 +6,12 @@ import { simpleParser, type ParsedMail } from "mailparser";
 
 import { kimiExtractJson, isKimiConfigured } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
-import { classifyTuroSubject } from "@/lib/turo-subjects";
+import { classifyTuroSubject, extractTuroLink } from "@/lib/turo-subjects";
+import {
+  matchVehicles,
+  pickOrderForMessage,
+  type VehicleForMatch,
+} from "@/lib/turo-message-match";
 
 /**
  * Turo → TATO event ingestion over Gmail IMAP.
@@ -244,6 +249,76 @@ export type GmailSyncResult = {
 };
 
 /**
+ * Everything a notification can be attributed to without asking a
+ * model: who wrote it, which car it is about, which trip, and the link
+ * back to Turo.
+ *
+ * Runs at ingest and again over stored rows, so history and new mail
+ * are attributed by identical logic rather than two versions of it.
+ */
+async function attributeEmail(input: {
+  workspaceId: string;
+  subject: string;
+  bodyText: string;
+  receivedAt: Date;
+  fleet: VehicleForMatch[];
+}) {
+  const bySubject = classifyTuroSubject(input.subject);
+  const turoLink = extractTuroLink(input.bodyText);
+
+  const matchedVehicles = bySubject?.vehicleText
+    ? matchVehicles(bySubject.vehicleText, input.fleet)
+    : [];
+
+  // One vehicle is an identification; several is only a narrowing, and
+  // is left null rather than guessed. The order match still uses the
+  // full set to filter candidates.
+  const vehicleId = matchedVehicles.length === 1 ? matchedVehicles[0].id : null;
+
+  let orderId: string | null = null;
+
+  if (bySubject?.guestName) {
+    // SQLite's LIKE is case-insensitive for ASCII, which is what
+    // `contains` compiles to -- enough to shortlist before the real
+    // comparison runs in `pickOrderForMessage`. The first token only,
+    // since Turo shows "Fatima" where the CSV may hold "Fatima Zahra".
+    const firstToken = bySubject.guestName.split(/\s+/)[0] ?? "";
+    if (firstToken.length >= 2) {
+      const candidates = await prisma.order.findMany({
+        where: {
+          workspaceId: input.workspaceId,
+          isArchived: false,
+          renterName: { contains: firstToken },
+        },
+        select: {
+          id: true,
+          renterName: true,
+          vehicleId: true,
+          pickupDatetime: true,
+          returnDatetime: true,
+        },
+        take: 100,
+      });
+
+      orderId = pickOrderForMessage({
+        guestName: bySubject.guestName,
+        vehicleIds: matchedVehicles.map((vehicle) => vehicle.id),
+        receivedAt: input.receivedAt,
+        candidates,
+      });
+    }
+  }
+
+  return {
+    kind: bySubject?.kind ?? InboundEmailKind.OTHER,
+    guestName: bySubject?.guestName ?? null,
+    vehicleId,
+    turoLink,
+    orderId,
+  };
+}
+
+/**
  * Pull recent Turo mail into `InboundEmail`.
  *
  * Idempotent: dedupes on (workspaceId, Message-ID), so overlapping runs
@@ -277,7 +352,21 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
   // alert detector -- it selects on kind -- report an empty fleet while
   // guests were waiting. The classifier needs no network and no model,
   // so this is a cheap pass that runs even when there is no new mail.
-  result.reclassified = await reclassifyBySubject(input.workspaceId);
+  // Loaded once and reused for every message: the fleet is ~100 rows
+  // and does not change during a sync.
+  const fleet = await prisma.vehicle.findMany({
+    where: { workspaceId: input.workspaceId },
+    select: {
+      id: true,
+      brand: true,
+      model: true,
+      year: true,
+      nickname: true,
+      turoListingName: true,
+    },
+  });
+
+  result.reclassified = await reclassifyBySubject(input.workspaceId, fleet);
 
   const client = new ImapFlow({
     host: config.host,
@@ -355,13 +444,19 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
       const fromName = envelope?.from?.[0]?.name?.trim() || null;
       const receivedAt = envelope?.date ?? parsedMail.date ?? new Date();
 
-      // No model call on this path. Classification comes from the
-      // subject, which is exact for Turo's templates and costs
-      // nothing; summaries and reservation ids are filled in by the
-      // bounded enrichment pass after the mailbox is drained. Calling
-      // the model here is what made this endpoint exceed the 300s
-      // gateway timeout and fail the whole sync.
-      const bySubject = classifyTuroSubject(subject);
+      // No model call on this path. Attribution comes from the subject
+      // and the body, which are exact for Turo's templates and cost
+      // nothing; summaries are filled in by the bounded enrichment
+      // pass after the mailbox is drained. Calling the model here is
+      // what made this endpoint exceed the 300s gateway timeout and
+      // fail the whole sync.
+      const attribution = await attributeEmail({
+        workspaceId: input.workspaceId,
+        subject,
+        bodyText,
+        receivedAt,
+        fleet,
+      });
 
       await prisma.inboundEmail.create({
         data: {
@@ -372,10 +467,9 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
           subject,
           receivedAt,
           bodyText,
-          kind: bySubject?.kind ?? InboundEmailKind.OTHER,
+          ...attribution,
           parsedAt: null,
           parsed: null,
-          orderId: null,
         },
       });
 
@@ -519,38 +613,87 @@ async function enrichPendingEmails(workspaceId: string, result: GmailSyncResult)
 }
 
 /**
- * Re-classify stored messages the model left as OTHER.
+ * Re-attribute stored messages.
  *
- * Only touches rows whose subject the classifier recognises, and only
- * rows currently sitting in OTHER -- a kind the model or an earlier
- * pass already decided is left alone. `parsed` is deliberately not
- * written: the extractor's structured fields (reservation id, guest
- * name, summary) are still missing, and the alert detector treats a
- * null `parsed` as "surface it" rather than "ignore it", which is the
- * safe side for a message that may need a reply.
+ * Rows imported while the model was failing all landed as OTHER, which
+ * made the guest-message alert detector -- it selects on kind --
+ * report an empty fleet while guests were waiting. Rows imported
+ * before attribution existed carry no guest, vehicle, trip or link.
+ * Both are healed here, using the same function the ingest path uses,
+ * so history and new mail are never attributed by two different rules.
+ *
+ * No network and no model: this is string matching and indexed
+ * queries, cheap enough to run on every sync.
+ *
+ * A row is touched only where it is still empty. `kind` is the one
+ * exception -- OTHER is the "we did not know" value, so a subject that
+ * now parses is allowed to replace it, while a kind already decided is
+ * left alone.
  */
-async function reclassifyBySubject(workspaceId: string) {
+async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]) {
   const stale = await prisma.inboundEmail.findMany({
-    where: { workspaceId, kind: InboundEmailKind.OTHER },
-    select: { id: true, subject: true },
+    where: {
+      workspaceId,
+      OR: [
+        { kind: InboundEmailKind.OTHER },
+        { guestName: null },
+        { turoLink: null },
+        { orderId: null },
+      ],
+    },
+    select: {
+      id: true,
+      subject: true,
+      bodyText: true,
+      receivedAt: true,
+      kind: true,
+      guestName: true,
+      vehicleId: true,
+      turoLink: true,
+      orderId: true,
+    },
+    // Bounded so a mailbox with years of history cannot turn one sync
+    // into a full-table rewrite. The rest heal on later runs.
+    orderBy: { receivedAt: "desc" },
+    take: 200,
   });
 
   let updated = 0;
 
   for (const email of stale) {
-    const match = classifyTuroSubject(email.subject ?? "");
-    if (!match || match.kind === InboundEmailKind.OTHER) continue;
-
-    await prisma.inboundEmail.update({
-      where: { id: email.id },
-      data: { kind: match.kind },
+    const attribution = await attributeEmail({
+      workspaceId,
+      subject: email.subject ?? "",
+      bodyText: email.bodyText ?? "",
+      receivedAt: email.receivedAt,
+      fleet,
     });
+
+    const data: {
+      kind?: InboundEmailKind;
+      guestName?: string;
+      vehicleId?: string;
+      turoLink?: string;
+      orderId?: string;
+    } = {};
+
+    if (email.kind === InboundEmailKind.OTHER && attribution.kind !== InboundEmailKind.OTHER) {
+      data.kind = attribution.kind;
+    }
+    if (!email.guestName && attribution.guestName) data.guestName = attribution.guestName;
+    if (!email.vehicleId && attribution.vehicleId) data.vehicleId = attribution.vehicleId;
+    if (!email.turoLink && attribution.turoLink) data.turoLink = attribution.turoLink;
+    if (!email.orderId && attribution.orderId) data.orderId = attribution.orderId;
+
+    if (Object.keys(data).length === 0) continue;
+
+    await prisma.inboundEmail.update({ where: { id: email.id }, data });
     updated += 1;
   }
 
   if (updated > 0) {
     // eslint-disable-next-line no-console
-    console.log(`[gmail-sync] reclassified ${updated} stored message(s) by subject`);
+    console.log(`[gmail-sync] re-attributed ${updated} stored message(s)`);
   }
 
   return updated;

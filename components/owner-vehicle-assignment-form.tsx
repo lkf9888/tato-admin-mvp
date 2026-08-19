@@ -98,7 +98,7 @@ export function OwnerVehicleAssignmentForm({
       ))}
 
       {vehicles.length === 0 ? (
-        <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-500">
+        <div className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[12px] text-[var(--ink-soft)]">
           {messages.noVehicles}
         </div>
       ) : (
@@ -109,16 +109,16 @@ export function OwnerVehicleAssignmentForm({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={messages.searchPlaceholder}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[12px] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[12px] outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
             />
-            <p className="text-[10.5px] text-slate-500">
+            <p className="text-[10.5px] text-[var(--ink-soft)]">
               {resultCount}
             </p>
           </div>
 
-          <div className="max-h-52 space-y-1.5 overflow-y-auto rounded-md border border-slate-200 bg-white p-2">
+          <div className="max-h-52 space-y-1.5 overflow-y-auto rounded-md border border-[var(--line)] bg-white p-2">
             {filteredVehicles.length === 0 ? (
-              <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-[12px] text-slate-500">
+              <div className="rounded-md border border-dashed border-[var(--line)] bg-[var(--surface-muted)] px-3 py-3 text-[12px] text-[var(--ink-soft)]">
                 {messages.noSearchResults}
               </div>
             ) : (
@@ -129,19 +129,19 @@ export function OwnerVehicleAssignmentForm({
                 return (
                   <label
                     key={vehicle.id}
-                    className="flex cursor-pointer items-start gap-2 rounded-md border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-[12px] text-slate-700"
+                    className="flex cursor-pointer items-start gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-1.5 text-[12px] text-[var(--ink-mid)]"
                   >
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleVehicle(vehicle.id)}
-                      className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300"
+                      className="mt-0.5 h-3.5 w-3.5 rounded border-[var(--line-strong)]"
                     />
                     <span className="min-w-0">
-                      <span className="block font-semibold text-slate-900">
+                      <span className="block font-semibold text-[var(--ink)]">
                         {vehicle.plateNumber} · {vehicle.nickname}
                       </span>
-                      <span className="block text-[10.5px] text-slate-500">
+                      <span className="block text-[10.5px] text-[var(--ink-soft)]">
                         {vehicle.brand} {vehicle.model} {vehicle.year}
                         {assignedElsewhere && vehicle.ownerName
                           ? ` · ${formatAssignedOwner(vehicle.ownerName)}`
@@ -156,7 +156,7 @@ export function OwnerVehicleAssignmentForm({
         </>
       )}
 
-      <button className="rounded-md bg-slate-950 px-3 py-2 text-[12px] font-medium text-white">
+      <button className="rounded-md bg-[var(--ink)] px-3 py-2 text-[12px] font-medium text-white">
         {messages.saveVehicleAssignments}
       </button>
     </form>

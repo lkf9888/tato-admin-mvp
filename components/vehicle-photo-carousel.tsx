@@ -43,13 +43,13 @@ export function VehiclePhotoCarousel({
     return (
       <div
         className={cn(
-          "flex aspect-[16/10] min-h-[20rem] items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-center",
+          "flex aspect-[16/10] min-h-[20rem] items-center justify-center rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] text-center",
           className,
         )}
       >
         <div>
-          <p className="text-[11px] uppercase tracking-[0.34em] text-slate-400">TATO</p>
-          <p className="mt-3 text-2xl font-semibold text-slate-950">{fallbackLabel}</p>
+          <p className="text-[11px] uppercase tracking-[0.34em] text-[var(--ink-soft)]">TATO</p>
+          <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">{fallbackLabel}</p>
         </div>
       </div>
     );
@@ -58,7 +58,7 @@ export function VehiclePhotoCarousel({
   return (
     <div
       className={cn(
-        "relative aspect-[16/10] min-h-[20rem] overflow-hidden rounded-lg border border-slate-200 bg-slate-100",
+        "relative aspect-[16/10] min-h-[20rem] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-muted)]",
         className,
       )}
     >
@@ -76,7 +76,7 @@ export function VehiclePhotoCarousel({
             onClick={() =>
               setActiveIndex((current) => (current - 1 + safePhotos.length) % safePhotos.length)
             }
-            className="absolute left-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-md border border-white/70 bg-white/90 text-slate-950 shadow-sm backdrop-blur transition hover:bg-white"
+            className="absolute left-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] backdrop-blur transition hover:bg-white"
             aria-label="Previous photo"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -84,7 +84,7 @@ export function VehiclePhotoCarousel({
           <button
             type="button"
             onClick={() => setActiveIndex((current) => (current + 1) % safePhotos.length)}
-            className="absolute right-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-md border border-white/70 bg-white/90 text-slate-950 shadow-sm backdrop-blur transition hover:bg-white"
+            className="absolute right-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] backdrop-blur transition hover:bg-white"
             aria-label="Next photo"
           >
             <ChevronRight className="h-5 w-5" />
@@ -96,8 +96,8 @@ export function VehiclePhotoCarousel({
                 type="button"
                 onClick={() => setActiveIndex(index)}
                 className={cn(
-                  "h-2.5 rounded-md border border-white/70 transition",
-                  index === activeIndex ? "w-7 bg-white" : "w-2.5 bg-white/50 hover:bg-white/80",
+                  "h-2.5 rounded-md border border-[var(--line)] transition",
+                  index === activeIndex ? "w-7 bg-white" : "w-2.5 bg-white/50 hover:bg-[var(--surface)]",
                 )}
                 aria-label={`Show photo ${index + 1}`}
               />

@@ -157,8 +157,8 @@ export function AssistantChat({
             <div
               className={
                 message.role === "USER"
-                  ? "max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-[var(--ink)] px-3.5 py-2.5 text-[13.5px] leading-6 text-white"
-                  : "max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-[var(--line)] bg-[var(--surface-muted)] px-3.5 py-2.5 text-[13.5px] leading-6 text-[var(--ink)]"
+                  ? "max-w-[85%] whitespace-pre-wrap rounded-lg rounded-br-sm bg-[var(--ink)] px-3.5 py-2.5 text-[13.5px] leading-6 text-white"
+                  : "max-w-[85%] whitespace-pre-wrap rounded-lg rounded-bl-sm border border-[var(--line)] bg-[var(--surface-muted)] px-3.5 py-2.5 text-[13.5px] leading-6 text-[var(--ink)]"
               }
             >
               {message.content}
@@ -168,7 +168,7 @@ export function AssistantChat({
 
         {sending ? (
           <div className="flex justify-start">
-            <div className="rounded-2xl rounded-bl-sm border border-[var(--line)] bg-[var(--surface-muted)] px-3.5 py-2.5 text-[13px] text-[var(--ink-soft)]">
+            <div className="rounded-lg rounded-bl-sm border border-[var(--line)] bg-[var(--surface-muted)] px-3.5 py-2.5 text-[13px] text-[var(--ink-soft)]">
               {t.thinking}
             </div>
           </div>

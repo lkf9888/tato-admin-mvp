@@ -1,11 +1,12 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-type NavItem = { href: string; label: string; icon: string };
+type NavItem = { href: string; label: string; icon: LucideIcon };
 type NavGroup = { label: string; items: NavItem[] };
 
 function isActivePath(pathname: string, href: string) {
@@ -19,7 +20,7 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
     <nav className="flex-1 space-y-4 overflow-y-auto p-3">
       {groups.map((group) => (
         <section key={group.label} className="space-y-1.5">
-          <div className="px-3 text-[11px] font-semibold text-neutral-400">
+          <div className="px-3 text-[11px] font-semibold text-[var(--ink-soft)]">
             {group.label}
           </div>
           <div className="space-y-1">
@@ -33,17 +34,20 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "tap-press flex min-h-9 items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors active:scale-[0.98]",
+                    // Tinted, not inverted. Turo marks the current
+                    // section with its purple on a pale ground; a solid
+                    // black bar reads as a pressed button and fights
+                    // the flat cards next to it.
                     active
-                      ? "bg-neutral-900 text-white shadow-sm"
-                      : "text-neutral-700 hover:bg-neutral-100",
+                      ? "bg-[var(--brand-soft)] font-bold text-[var(--brand)]"
+                      : "text-[var(--ink-mid)] hover:bg-[var(--surface-muted)]",
                   )}
                 >
-                  <span
-                    className={cn("w-5 shrink-0 text-center text-[15px]", active ? "opacity-100" : "opacity-70")}
+                  <item.icon
+                    className={cn("size-[18px] shrink-0", active ? "opacity-100" : "opacity-60")}
+                    strokeWidth={active ? 2.25 : 1.75}
                     aria-hidden
-                  >
-                    {item.icon}
-                  </span>
+                  />
                   <span className="min-w-0 truncate">{item.label}</span>
                 </Link>
               );

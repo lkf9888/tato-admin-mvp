@@ -124,7 +124,7 @@ export function VehicleOrdersExportButton({
   // module for buttons yet (when there are 3+ duplicates we should
   // promote them to `components/ui/button.tsx`).
   const triggerClass =
-    "inline-flex h-9 items-center justify-center rounded-md border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] shadow-sm transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex h-9 items-center justify-center rounded-md border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
   const secondaryDialogClass =
     "inline-flex h-10 items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)]";
   const primaryDialogClass =
@@ -142,7 +142,7 @@ export function VehicleOrdersExportButton({
       </button>
 
       {isOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/35 p-4">
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-[var(--ink)]/35 p-4">
           <div className="w-full max-w-xl rounded-lg border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
             <div className="flex items-start justify-between gap-4">
               <div>

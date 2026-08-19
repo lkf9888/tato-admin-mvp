@@ -275,8 +275,8 @@ export default function SignContractClient({ token }: { token: string }) {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-neutral-50 p-6 text-neutral-900">
-        <div className="mx-auto max-w-3xl rounded-2xl border bg-white p-8 shadow-sm">
+      <main className="min-h-screen bg-[var(--surface-muted)] p-6 text-[var(--ink)]">
+        <div className="mx-auto max-w-3xl rounded-lg border bg-white p-8">
           {copy.loading}
         </div>
       </main>
@@ -285,8 +285,8 @@ export default function SignContractClient({ token }: { token: string }) {
 
   if (error && !data) {
     return (
-      <main className="min-h-screen bg-neutral-50 p-6 text-neutral-900">
-        <div className="mx-auto max-w-3xl rounded-2xl border border-red-200 bg-white p-8 text-red-700 shadow-sm">
+      <main className="min-h-screen bg-[var(--surface-muted)] p-6 text-[var(--ink)]">
+        <div className="mx-auto max-w-3xl rounded-lg border border-red-200 bg-white p-8 text-red-700">
           {error}
         </div>
       </main>
@@ -302,28 +302,28 @@ export default function SignContractClient({ token }: { token: string }) {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 p-3 text-neutral-900 sm:p-6">
+    <main className="min-h-screen bg-[var(--surface-muted)] p-3 text-[var(--ink)] sm:p-6">
       <div className="mx-auto max-w-7xl space-y-4">
-        <section className="rounded-2xl border bg-white p-4 shadow-sm">
+        <section className="rounded-lg border bg-white p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-bold uppercase tracking-[0.16em] text-neutral-900">TATO eSignature</div>
+              <div className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--ink)]">TATO eSignature</div>
               <h1 className="mt-2 text-2xl font-semibold">{data.envelope.title}</h1>
-              <p className="mt-1 text-sm text-neutral-500">
+              <p className="mt-1 text-sm text-[var(--ink-soft)]">
                 {copy.document}: {data.template.name} · {copy.signer} {data.recipient.signingOrder}:{" "}
                 {data.recipient.name}
               </p>
               {data.envelope.message && (
-                <div className="mt-3 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-600">
+                <div className="mt-3 rounded-lg bg-[var(--surface-muted)] p-3 text-sm text-[var(--ink-mid)]">
                   {data.envelope.message}
                 </div>
               )}
             </div>
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-              <label className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm text-neutral-600">
+              <label className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm text-[var(--ink-mid)]">
                 <span>{copy.language}</span>
                 <select
-                  className="rounded-lg border border-neutral-200 bg-white px-2 py-1 font-semibold text-neutral-900"
+                  className="rounded-lg border border-[var(--line)] bg-white px-2 py-1 font-semibold text-[var(--ink)]"
                   value={locale}
                   onChange={(event) => setLocale(event.target.value as SignLocale)}
                 >
@@ -334,7 +334,7 @@ export default function SignContractClient({ token }: { token: string }) {
                   ))}
                 </select>
               </label>
-              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
                 {copy.instruction}
               </div>
             </div>
@@ -358,18 +358,18 @@ export default function SignContractClient({ token }: { token: string }) {
           )}
         </section>
 
-        <section className="rounded-2xl border bg-white p-3 shadow-sm sm:p-4">
-          <div className="max-h-[calc(100vh-220px)] overflow-auto rounded-xl bg-neutral-100 p-3">
+        <section className="rounded-lg border bg-white p-3 sm:p-4">
+          <div className="max-h-[calc(100vh-220px)] overflow-auto rounded-lg bg-[var(--surface-muted)] p-3">
             <div className="space-y-5">
               {pageSizes.map((page) => (
                 <div key={page.page} className="mx-auto max-w-[920px]">
-                  <div className="mb-1 text-xs font-medium text-neutral-500">
+                  <div className="mb-1 text-xs font-medium text-[var(--ink-soft)]">
                     {locale === "en"
                       ? `${copy.page} ${page.page}`
                       : `${copy.page} ${page.page} ${copy.pageSuffix}`}
                   </div>
                   <div
-                    className="relative w-full overflow-hidden rounded-xl border border-neutral-300 bg-white shadow-sm"
+                    className="relative w-full overflow-hidden rounded-lg border border-[var(--line-strong)] bg-white"
                     style={{ aspectRatio: `${page.width} / ${page.height}` }}
                   >
                     <PdfPageCanvas
@@ -407,7 +407,7 @@ export default function SignContractClient({ token }: { token: string }) {
         </section>
 
         {!alreadySigned && (
-          <section className="sticky bottom-3 z-20 rounded-2xl border bg-white p-4 shadow-lg">
+          <section className="sticky bottom-3 z-20 rounded-lg border bg-white p-4 shadow-lg">
             <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <input
                 type="checkbox"
@@ -419,7 +419,7 @@ export default function SignContractClient({ token }: { token: string }) {
             </label>
             <button
               type="button"
-              className="mt-3 w-full rounded-lg bg-neutral-900 px-4 py-3 font-semibold text-white disabled:opacity-50"
+              className="mt-3 w-full rounded-lg bg-[var(--ink)] px-4 py-3 font-semibold text-white disabled:opacity-50"
               disabled={submitting}
               onClick={submit}
             >
@@ -460,7 +460,7 @@ function DocumentField({
 
   return (
     <div
-      className="absolute box-border rounded-md border-2 border-blue-500 bg-white/90 shadow-sm ring-2 ring-white/80 focus-within:ring-blue-300"
+      className="absolute box-border rounded-md border-2 border-blue-500 bg-[var(--surface)] ring-2 ring-white/80 focus-within:ring-blue-300"
       style={style}
       title={field.label}
     >
@@ -487,7 +487,7 @@ function DocumentField({
         </label>
       ) : (
         <input
-          className="h-full w-full rounded-[3px] border-0 bg-white/95 px-1.5 text-sm outline-none disabled:bg-neutral-100"
+          className="h-full w-full rounded-[3px] border-0 bg-white/95 px-1.5 text-sm outline-none disabled:bg-[var(--surface-muted)]"
           style={inputStyle}
           type={field.type === "DATE" ? "date" : "text"}
           disabled={disabled}
@@ -589,8 +589,8 @@ function SignaturePad({
         height={180}
         className={
           compact
-            ? "h-full w-full touch-none rounded border border-neutral-300 bg-white disabled:opacity-70"
-            : "h-32 w-full touch-none rounded-lg border border-neutral-300 bg-white"
+            ? "h-full w-full touch-none rounded border border-[var(--line-strong)] bg-white disabled:opacity-70"
+            : "h-32 w-full touch-none rounded-lg border border-[var(--line-strong)] bg-white"
         }
         onPointerDown={start}
         onPointerMove={move}
@@ -601,8 +601,8 @@ function SignaturePad({
         type="button"
         className={
           compact
-            ? "absolute bottom-1 right-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-600 shadow"
-            : "mt-2 text-sm text-neutral-500 underline"
+            ? "absolute bottom-1 right-1 rounded bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-mid)] shadow"
+            : "mt-2 text-sm text-[var(--ink-soft)] underline"
         }
         onClick={clear}
         disabled={disabled}

@@ -58,9 +58,9 @@ export default async function SharePage({
   if (!shareLink || !shareLink.isActive) {
     return (
       <main className="min-h-screen bg-[var(--page)] px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-lg bg-white p-8 shadow-sm">
-          <h1 className="font-serif text-4xl text-slate-950">{shareMessages.unavailableTitle}</h1>
-          <p className="mt-4 text-sm text-slate-600">{shareMessages.unavailableCopy}</p>
+        <div className="mx-auto max-w-xl rounded-lg bg-white p-8">
+          <h1 className="font-serif text-4xl text-[var(--ink)]">{shareMessages.unavailableTitle}</h1>
+          <p className="mt-4 text-sm text-[var(--ink-mid)]">{shareMessages.unavailableCopy}</p>
         </div>
       </main>
     );
@@ -69,9 +69,9 @@ export default async function SharePage({
   if (shareLink.expiresAt && shareLink.expiresAt < new Date()) {
     return (
       <main className="min-h-screen bg-[var(--page)] px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-lg bg-white p-8 shadow-sm">
-          <h1 className="font-serif text-4xl text-slate-950">{shareMessages.expiredTitle}</h1>
-          <p className="mt-4 text-sm text-slate-600">{shareMessages.expiredCopy}</p>
+        <div className="mx-auto max-w-xl rounded-lg bg-white p-8">
+          <h1 className="font-serif text-4xl text-[var(--ink)]">{shareMessages.expiredTitle}</h1>
+          <p className="mt-4 text-sm text-[var(--ink-mid)]">{shareMessages.expiredCopy}</p>
         </div>
       </main>
     );
@@ -84,12 +84,12 @@ export default async function SharePage({
   if (shareLink.passwordHash && !unlocked) {
     return (
       <main className="min-h-screen bg-[var(--page)] px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-lg bg-white p-8 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">
+        <div className="mx-auto max-w-xl rounded-lg bg-white p-8">
+          <p className="text-xs uppercase tracking-[0.35em] text-[var(--ink-soft)]">
             {shareMessages.ownerCalendarKicker}
           </p>
-          <h1 className="mt-3 font-serif text-4xl text-slate-950">{shareLink.owner.name}</h1>
-          <p className="mt-3 text-sm text-slate-600">{shareMessages.passwordProtectedCopy}</p>
+          <h1 className="mt-3 font-serif text-4xl text-[var(--ink)]">{shareLink.owner.name}</h1>
+          <p className="mt-3 text-sm text-[var(--ink-mid)]">{shareMessages.passwordProtectedCopy}</p>
 
           <form action={unlockShareLinkAction} className="mt-8 space-y-4">
             <input type="hidden" name="token" value={token} />
@@ -97,7 +97,7 @@ export default async function SharePage({
               name="password"
               type="password"
               placeholder={shareMessages.sharePassword}
-              className="w-full rounded-md border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+              className="w-full rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3 outline-none"
             />
             {query.error === "throttled" ? (
               <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -108,7 +108,7 @@ export default async function SharePage({
                 {shareMessages.incorrectPassword}
               </p>
             ) : null}
-            <button className="w-full rounded-md bg-slate-950 px-4 py-3 font-medium text-white">
+            <button className="w-full rounded-md bg-[var(--ink)] px-4 py-3 font-medium text-white">
               {shareMessages.unlockCalendar}
             </button>
           </form>

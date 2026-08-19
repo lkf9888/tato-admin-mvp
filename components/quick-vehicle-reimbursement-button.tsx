@@ -220,11 +220,11 @@ function QuickVehicleReimbursementModal({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold">{labels.title}</h3>
-            <p className="mt-1 text-sm text-neutral-500">{labels.subtitle}</p>
+            <p className="mt-1 text-sm text-[var(--ink-soft)]">{labels.subtitle}</p>
           </div>
           <button
             type="button"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-2xl leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-2xl leading-none text-[var(--ink-soft)] hover:bg-[var(--surface-muted)] hover:text-[var(--ink-mid)]"
             onClick={onClose}
             aria-label={labels.close}
           >
@@ -237,7 +237,7 @@ function QuickVehicleReimbursementModal({
         ) : null}
 
         {vehicles.length === 0 ? (
-          <div className="mt-4 rounded-md border border-dashed border-neutral-300 p-4 text-sm text-neutral-500">
+          <div className="mt-4 rounded-md border border-dashed border-[var(--line-strong)] p-4 text-sm text-[var(--ink-soft)]">
             {labels.noVehicles}
           </div>
         ) : (
@@ -293,7 +293,7 @@ function QuickVehicleReimbursementModal({
               <label className="label">{labels.receipts}</label>
               <div
                 className={`rounded-lg border-2 border-dashed px-3 py-3 transition-colors ${
-                  dragDepth > 0 ? "border-blue-500 bg-blue-50" : "border-neutral-300 hover:border-neutral-400"
+                  dragDepth > 0 ? "border-blue-500 bg-blue-50" : "border-[var(--line-strong)] hover:border-[var(--line-strong)]"
                 }`}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
@@ -317,18 +317,18 @@ function QuickVehicleReimbursementModal({
                   >
                     {labels.upload}
                   </button>
-                  <span className="text-xs text-neutral-500">
+                  <span className="text-xs text-[var(--ink-soft)]">
                     {dragDepth > 0 ? labels.dropHere : labels.dragHint}
                   </span>
                 </div>
               </div>
               {files.length > 0 ? (
                 <div className="mt-3 space-y-1">
-                  <p className="text-xs text-neutral-500">{labels.fileCount(files.length)}</p>
+                  <p className="text-xs text-[var(--ink-soft)]">{labels.fileCount(files.length)}</p>
                   {files.map((file, index) => (
                     <div
                       key={`${file.name}-${file.size}-${index}`}
-                      className="flex items-center justify-between gap-2 rounded border border-neutral-200 px-2 py-1 text-xs"
+                      className="flex items-center justify-between gap-2 rounded border border-[var(--line)] px-2 py-1 text-xs"
                     >
                       <span className="min-w-0 truncate">{file.name}</span>
                       <button
@@ -456,7 +456,7 @@ function VehicleCombobox({
         />
         <button
           type="button"
-          className="absolute right-1 top-1/2 -translate-y-1/2 px-2 text-lg leading-none text-neutral-500 hover:text-neutral-800"
+          className="absolute right-1 top-1/2 -translate-y-1/2 px-2 text-lg leading-none text-[var(--ink-soft)] hover:text-[var(--ink)]"
           aria-label="Toggle dropdown"
           tabIndex={-1}
           onClick={() => {
@@ -476,9 +476,9 @@ function VehicleCombobox({
       </div>
 
       {open ? (
-        <div className="absolute left-0 right-0 z-[80] mt-1 max-h-64 overflow-y-auto rounded-md border border-neutral-200 bg-white shadow-lg">
+        <div className="absolute left-0 right-0 z-[80] mt-1 max-h-64 overflow-y-auto rounded-md border border-[var(--line)] bg-white shadow-lg">
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-neutral-500">{labels.noMatch}</div>
+            <div className="px-3 py-2 text-sm text-[var(--ink-soft)]">{labels.noMatch}</div>
           ) : (
             filtered.map((vehicle, index) => {
               const isSelected = vehicle.id === value;
@@ -488,7 +488,7 @@ function VehicleCombobox({
                   key={vehicle.id}
                   type="button"
                   className={`block w-full px-3 py-2 text-left text-sm ${
-                    isHighlighted ? "bg-blue-50" : "hover:bg-neutral-50"
+                    isHighlighted ? "bg-blue-50" : "hover:bg-[var(--surface-muted)]"
                   }`}
                   onMouseEnter={() => setHighlightIndex(index)}
                   onClick={() => choose(vehicle)}
@@ -497,7 +497,7 @@ function VehicleCombobox({
                     <span className="truncate font-medium">{vehicle.label}</span>
                     {isSelected ? <span className="shrink-0 text-blue-600">✓</span> : null}
                   </span>
-                  <span className="mt-0.5 block truncate text-xs text-neutral-500">{vehicle.ownerName}</span>
+                  <span className="mt-0.5 block truncate text-xs text-[var(--ink-soft)]">{vehicle.ownerName}</span>
                 </button>
               );
             })

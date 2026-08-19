@@ -187,7 +187,7 @@ function ledgerRowsWithBalance(items: PublicLedgerItem[]) {
 function amountClass(amount: number) {
   if (amount > 0) return "text-emerald-700";
   if (amount < 0) return "text-amber-700";
-  return "text-neutral-500";
+  return "text-[var(--ink-soft)]";
 }
 
 function signedCurrency(amount: number, locale: Locale) {
@@ -266,7 +266,7 @@ export function OwnerPublicShareView({
         <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-3xl font-semibold tracking-tight text-[var(--ink)]">{owner.name}</h1>
-            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-neutral-500">
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-[var(--ink-soft)]">
               {vehicles.length > 0 ? (
                 vehicles.map((vehicle) => (
                   <span key={vehicle.id} className="inline-flex items-center gap-1.5">
@@ -300,7 +300,7 @@ export function OwnerPublicShareView({
           </div>
         </header>
 
-        <nav className="flex gap-6 border-b border-neutral-200 text-sm font-medium">
+        <nav className="flex gap-6 border-b border-[var(--line)] text-sm font-medium">
           {(["ledger", "statements", "calendar"] as ShareTab[]).map((tab) => (
             <Link
               key={tab}
@@ -308,8 +308,8 @@ export function OwnerPublicShareView({
               className={cn(
                 "border-b-2 px-1 pb-3 pt-1",
                 activeTab === tab
-                  ? "border-neutral-950 text-neutral-950"
-                  : "border-transparent text-neutral-500 hover:text-neutral-950",
+                  ? "border-neutral-950 text-[var(--ink)]"
+                  : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]",
               )}
             >
               {labels.tabs[tab]}
@@ -355,7 +355,7 @@ export function OwnerPublicShareView({
             ) : (
               <>
                 <section className="card flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="text-sm text-neutral-500">
+                  <label className="text-sm text-[var(--ink-soft)]">
                     {labels.month}
                     <div className="mt-1 w-48">
                       <SearchableSelect
@@ -406,14 +406,14 @@ function BalancePanel({
     <section
       className={cn(
         "card border-yellow-200 bg-yellow-50 p-5",
-        Math.abs(totalBalance) < 0.005 ? "border-neutral-200 bg-white" : "",
+        Math.abs(totalBalance) < 0.005 ? "border-[var(--line)] bg-white" : "",
       )}
     >
-      <div className="text-sm text-neutral-500">{labels.currentBalance}</div>
+      <div className="text-sm text-[var(--ink-soft)]">{labels.currentBalance}</div>
       <div className="mt-1 text-4xl font-semibold tabular-nums">
         {formatCurrency(Math.abs(totalBalance), locale)}
       </div>
-      <div className="mt-2 text-sm text-neutral-700">
+      <div className="mt-2 text-sm text-[var(--ink-mid)]">
         {totalBalance > 0 ? labels.tatoOwesOwner : totalBalance < 0 ? labels.ownerOwesTato : labels.settled}
       </div>
     </section>
@@ -436,7 +436,7 @@ function DateFilters({
   const active = Boolean(dateFrom || dateTo);
   return (
     <section className="card flex flex-wrap items-center gap-2 p-3">
-      <label className="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <label className="inline-flex items-center gap-2 text-sm text-[var(--ink-soft)]">
         {labels.dateFrom}
         <input
           type="date"
@@ -446,7 +446,7 @@ function DateFilters({
           onChange={(event) => onDateFrom(event.target.value)}
         />
       </label>
-      <label className="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <label className="inline-flex items-center gap-2 text-sm text-[var(--ink-soft)]">
         {labels.dateTo}
         <input
           type="date"
@@ -482,13 +482,13 @@ function LedgerTable({
   rows: Array<PublicLedgerItem & { runningBalance: number }>;
 }) {
   if (rows.length === 0) {
-    return <div className="card p-10 text-center text-neutral-500">{labels.noLedger}</div>;
+    return <div className="card p-10 text-center text-[var(--ink-soft)]">{labels.noLedger}</div>;
   }
 
   return (
     <section className="card overflow-x-auto">
       <table className="w-full min-w-[900px] text-sm">
-        <thead className="bg-neutral-50">
+        <thead className="bg-[var(--surface-muted)]">
           <tr className="text-left">
             <th className="px-4 py-3 font-medium">{labels.date}</th>
             <th className="px-4 py-3 font-medium">{labels.description}</th>
@@ -497,10 +497,10 @@ function LedgerTable({
             <th className="px-4 py-3 text-right font-medium">{labels.balance}</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-neutral-100">
+        <tbody className="divide-y divide-[var(--line)]">
           {rows.map((item) => (
             <tr key={item.id} className="align-top">
-              <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
+              <td className="whitespace-nowrap px-4 py-3 text-[var(--ink-mid)]">
                 {formatDate(item.occurredAt, locale)}
               </td>
               <td className="px-4 py-3">
@@ -512,7 +512,7 @@ function LedgerTable({
               <td className={cn("whitespace-nowrap px-4 py-3 text-right font-medium", amountClass(item.amount))}>
                 {item.amount < 0 ? signedCurrency(item.amount, locale) : null}
               </td>
-              <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-neutral-600">
+              <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-[var(--ink-mid)]">
                 {formatCurrency(item.runningBalance, locale)}
               </td>
             </tr>
@@ -541,7 +541,7 @@ function MonthlyStatement({
   netTotal: number;
 }) {
   if (rows.length === 0) {
-    return <div className="card p-10 text-center text-neutral-500">{labels.noStatement}</div>;
+    return <div className="card p-10 text-center text-[var(--ink-soft)]">{labels.noStatement}</div>;
   }
 
   const incomeRows = rows.filter((item) => item.amount > 0);
@@ -549,9 +549,9 @@ function MonthlyStatement({
 
   return (
     <section className="card p-4">
-      <div className="mb-4 flex flex-col gap-2 border-b border-neutral-100 pb-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-4 flex flex-col gap-2 border-b border-[var(--line)] pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-sm text-neutral-500">{labels.tabs.statements}</div>
+          <div className="text-sm text-[var(--ink-soft)]">{labels.tabs.statements}</div>
           <h2 className="text-2xl font-semibold">{monthLabel(month, locale)}</h2>
         </div>
         <div className="grid grid-cols-3 gap-3 text-right text-sm">
@@ -582,7 +582,7 @@ function SummaryValue({
 }) {
   return (
     <div>
-      <div className="text-xs text-neutral-500">{label}</div>
+      <div className="text-xs text-[var(--ink-soft)]">{label}</div>
       <div className={cn("tabular-nums", amountClass(value), strong ? "text-lg font-semibold" : "font-medium")}>
         {formatCurrency(value, locale)}
       </div>
@@ -602,12 +602,12 @@ function StatementColumn({
   locale: Locale;
 }) {
   return (
-    <div className="border border-neutral-200">
-      <div className="border-b border-neutral-200 bg-neutral-50 px-3 py-2 text-sm font-semibold">{title}</div>
+    <div className="border border-[var(--line)]">
+      <div className="border-b border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-semibold">{title}</div>
       {rows.length === 0 ? (
-        <div className="px-3 py-6 text-sm text-neutral-500">{labels.noStatement}</div>
+        <div className="px-3 py-6 text-sm text-[var(--ink-soft)]">{labels.noStatement}</div>
       ) : (
-        <div className="divide-y divide-neutral-100">
+        <div className="divide-y divide-[var(--line)]">
           {rows.map((item) => (
             <div key={item.id} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-3 text-sm">
               <LedgerDescription labels={labels} locale={locale} item={item} compact />
@@ -636,24 +636,24 @@ function LedgerDescription({
   return (
     <div className="min-w-0">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700">
+        <span className="rounded bg-[var(--surface-muted)] px-2 py-0.5 text-xs text-[var(--ink-mid)]">
           {labels.kindLabels[item.kind]}
         </span>
         {item.vehicle ? (
-          <span className="inline-flex items-center gap-1 text-neutral-500">
+          <span className="inline-flex items-center gap-1 text-[var(--ink-soft)]">
             <span className="h-2 w-2 rounded-full bg-blue-600" />
             {item.vehicle.plateNumber}
           </span>
         ) : null}
         {item.order ? (
-          <span className="text-neutral-500">
+          <span className="text-[var(--ink-soft)]">
             {item.order.renterName} · {formatDate(item.order.pickupDatetime, locale)} →{" "}
             {formatDate(item.order.returnDatetime, locale)}
           </span>
         ) : null}
       </div>
       {item.note ? (
-        <div className={cn("whitespace-pre-wrap text-neutral-700", compact ? "mt-1 text-sm" : "mt-2")}>
+        <div className={cn("whitespace-pre-wrap text-[var(--ink-mid)]", compact ? "mt-1 text-sm" : "mt-2")}>
           {item.note}
         </div>
       ) : null}
@@ -682,7 +682,7 @@ function ReceiptPreviewList({
             <button
               key={receipt.id}
               type="button"
-              className="h-14 w-14 overflow-hidden border border-neutral-200 bg-neutral-100 hover:opacity-90"
+              className="h-14 w-14 overflow-hidden border border-[var(--line)] bg-[var(--surface-muted)] hover:opacity-90"
               onClick={() => setPreview(receipt)}
               title={receipt.filename || label}
             >

@@ -141,7 +141,7 @@ export function SearchableSelect({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={searchPlaceholder}
-            className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-[12px] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            className="h-9 w-full rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 text-[12px] outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
           />
           <div className="mt-2 max-h-60 overflow-y-auto" role="listbox">
             {filteredOptions.length === 0 ? (
@@ -156,8 +156,8 @@ export function SearchableSelect({
                   aria-selected={option.value === selectedValue}
                   onClick={() => commitValue(option.value)}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50",
-                    option.value === selectedValue ? "bg-slate-100 font-semibold text-slate-950" : "",
+                    "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] text-[var(--ink-mid)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50",
+                    option.value === selectedValue ? "bg-[var(--surface-muted)] font-semibold text-[var(--ink)]" : "",
                   )}
                 >
                   <span className="min-w-0 flex-1 truncate">{option.label}</span>

@@ -47,7 +47,7 @@ export default async function AssistantPage() {
 
   return (
     <div className="space-y-3">
-      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 shadow-sm sm:px-4">
+      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
         <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">{t.kicker}</p>
         <h1 className="mt-1 font-serif text-[1.35rem] leading-tight text-[var(--ink)] sm:text-[1.6rem]">
           {t.title}

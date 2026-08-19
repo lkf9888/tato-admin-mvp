@@ -148,7 +148,7 @@ export default async function OwnersPage({
       <div className="mb-4 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div>
           <h1 className="text-2xl font-semibold">{labels.title}</h1>
-          <p className="text-sm text-neutral-500">{labels.subtitle}</p>
+          <p className="text-sm text-[var(--ink-soft)]">{labels.subtitle}</p>
         </div>
         <div className="grid grid-cols-1 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
           <QuickVehicleReimbursementButton
@@ -192,10 +192,10 @@ export default async function OwnersPage({
       </div>
 
       {owners.length === 0 && q ? (
-        <div className="card p-10 text-center text-neutral-500">{labels.noSearchResults}</div>
+        <div className="card p-10 text-center text-[var(--ink-soft)]">{labels.noSearchResults}</div>
       ) : owners.length === 0 ? (
         <div className="card p-10 text-center">
-          <p className="mb-3 text-neutral-600">{labels.emptyTitle}</p>
+          <p className="mb-3 text-[var(--ink-mid)]">{labels.emptyTitle}</p>
           <Link href="/owners/new" className="btn-primary">
             {labels.emptyCta}
           </Link>
@@ -206,19 +206,19 @@ export default async function OwnersPage({
             <Link
               key={owner.id}
               href={`/owners/${owner.id}`}
-              className="card block px-3 py-2.5 transition-shadow hover:shadow-sm"
+              className="card block px-3 py-2.5 transition-shadow hover:"
             >
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{owner.name}</div>
-                  <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-neutral-500">
+                  <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-[var(--ink-soft)]">
                     {owner.email ? <span>{owner.email}</span> : null}
                     {owner.phone ? <span>{owner.phone}</span> : null}
                     {owner.companyName ? <span>{owner.companyName}</span> : null}
                   </div>
                 </div>
-                <div className="shrink-0 text-left text-xs text-neutral-500 sm:text-right">
-                  <div className="font-medium text-neutral-600">
+                <div className="shrink-0 text-left text-xs text-[var(--ink-soft)] sm:text-right">
+                  <div className="font-medium text-[var(--ink-mid)]">
                     {labels.vehicleCount(owner._count.vehicles)}
                   </div>
                   <div
@@ -228,7 +228,7 @@ export default async function OwnersPage({
                         ? "text-emerald-700"
                         : balance < 0
                           ? "text-amber-700"
-                          : "text-neutral-500",
+                          : "text-[var(--ink-soft)]",
                     )}
                   >
                     {labels.balance}: {formatCurrency(balance, locale)}

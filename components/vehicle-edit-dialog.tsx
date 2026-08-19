@@ -69,7 +69,7 @@ export function VehicleEditDialog({
     value: option.value,
     label: option.label,
   }));
-  const fieldClass = "min-h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5";
+  const fieldClass = "min-h-9 w-full rounded-md border border-[var(--line)] bg-white px-2.5 py-1.5";
 
   function setOpen(nextOpen: boolean) {
     setInternalOpen(nextOpen);
@@ -91,21 +91,21 @@ export function VehicleEditDialog({
     <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
       <button
         type="button"
-        className="absolute inset-0 bg-slate-950/40"
+        className="absolute inset-0 bg-[var(--ink)]/40"
         onClick={() => setOpen(false)}
         aria-label={closeLabel}
       />
-      <div className="relative max-h-[90vh] w-[min(58rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-2xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+      <div className="relative max-h-[90vh] w-[min(58rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-[var(--line)] bg-white shadow-2xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-slate-950">{messages.editVehicle}</h2>
-            <p className="mt-0.5 truncate text-xs text-slate-500">
+            <h2 className="truncate text-base font-semibold text-[var(--ink)]">{messages.editVehicle}</h2>
+            <p className="mt-0.5 truncate text-xs text-[var(--ink-soft)]">
               {vehicle.plateNumber} · {vehicle.nickname}
             </p>
           </div>
           <button
             type="button"
-            className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            className="inline-flex min-h-8 items-center justify-center rounded-md border border-[var(--line)] bg-white px-2.5 text-sm font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)]"
             onClick={() => setOpen(false)}
           >
             ×
@@ -225,16 +225,16 @@ export function VehicleEditDialog({
             </DialogField>
           </DialogSection>
 
-          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3">
+          <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--line)] pt-3">
             <button
               type="button"
-              className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="inline-flex min-h-9 items-center justify-center rounded-md border border-[var(--line)] bg-white px-3 text-[12px] font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)]"
               onClick={() => setOpen(false)}
             >
               {closeLabel}
             </button>
             <button
-              className="inline-flex min-h-9 items-center justify-center rounded-md bg-slate-950 px-3 text-[12px] font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-9 items-center justify-center rounded-md bg-[var(--ink)] px-3 text-[12px] font-semibold text-white transition hover:bg-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isSaving}
             >
               {isSaving ? savingLabel : messages.saveChanges}
@@ -242,7 +242,7 @@ export function VehicleEditDialog({
           </div>
         </form>
 
-        <div className="border-t border-slate-200 p-4">
+        <div className="border-t border-[var(--line)] p-4">
           <VehicleAttachments vehicleId={vehicle.id} locale={locale} compact />
         </div>
       </div>
@@ -265,7 +265,7 @@ export function VehicleEditDialog({
 function DialogField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block min-w-0">
-      <span className="mb-1 block truncate text-[10px] font-semibold leading-4 text-slate-500">
+      <span className="mb-1 block truncate text-[10px] font-semibold leading-4 text-[var(--ink-soft)]">
         {label}
       </span>
       {children}
@@ -281,8 +281,8 @@ function DialogSection({
   children: ReactNode;
 }) {
   return (
-    <fieldset className="border-t border-slate-200 pt-3 first:border-t-0 first:pt-0">
-      <legend className="px-0 text-[11px] font-semibold tracking-[0.08em] text-slate-600">
+    <fieldset className="border-t border-[var(--line)] pt-3 first:border-t-0 first:pt-0">
+      <legend className="px-0 text-[11px] font-semibold tracking-[0.08em] text-[var(--ink-mid)]">
         {title}
       </legend>
       <div className="mt-2 grid gap-2 md:grid-cols-3">{children}</div>

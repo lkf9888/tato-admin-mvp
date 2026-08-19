@@ -918,7 +918,7 @@ export default function ContractsClient({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">电子合约签约</h1>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            <p className="text-sm text-[var(--ink-soft)] dark:text-[var(--ink-soft)]">
               管理合约模板，发送给一个或多个租客在线签署。
             </p>
           </div>
@@ -934,17 +934,17 @@ export default function ContractsClient({
           <h2 className="text-lg font-semibold">合约模板</h2>
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {templates.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500">
+              <div className="rounded-lg border border-dashed border-[var(--line-strong)] p-4 text-sm text-[var(--ink-soft)]">
                 还没有模板。点击右上角创建合约模板。
               </div>
             ) : templates.map((template) => (
-              <div key={template.id} className="rounded-xl border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+              <div key={template.id} className="rounded-lg border border-[var(--line)] p-3 text-sm dark:border-neutral-800">
                 <div className="font-semibold">{template.name}</div>
-                <div className="mt-1 text-xs text-neutral-500">
+                <div className="mt-1 text-xs text-[var(--ink-soft)]">
                   {template.pageCount} 页 · {template.fields.length} 个字段 · {template.recipients?.length || 0} 位签署人
                 </div>
                 {template.recipients?.length ? (
-                  <div className="mt-2 space-y-1 text-xs text-neutral-500">
+                  <div className="mt-2 space-y-1 text-xs text-[var(--ink-soft)]">
                     {template.recipients.map((recipient) => (
                       <div key={`${template.id}-${recipient.signingOrder}`}>
                         {recipient.signingOrder}. {recipient.name} · {recipient.email}
@@ -1009,7 +1009,7 @@ export default function ContractsClient({
             <div className="font-medium">租客 / 签署人</div>
             {recipients.map((recipient, index) => (
               <div key={index} className="grid gap-2 sm:grid-cols-[80px_1fr_1fr_auto]">
-                <div className="flex items-center text-sm text-neutral-500">第 {index + 1} 位</div>
+                <div className="flex items-center text-sm text-[var(--ink-soft)]">第 {index + 1} 位</div>
                 <input className="input" value={recipient.name} onChange={(e) => updateRecipient(index, { name: e.target.value })} placeholder="姓名" />
                 <input className="input" value={recipient.email} onChange={(e) => updateRecipient(index, { email: e.target.value })} placeholder="Email" />
                 <button type="button" className="btn-secondary text-sm" onClick={() => setRecipients((prev) => prev.filter((_, i) => i !== index))} disabled={recipients.length === 1}>
@@ -1030,7 +1030,7 @@ export default function ContractsClient({
           <h2 className="text-lg font-semibold">签约记录</h2>
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="text-left text-neutral-500">
+              <thead className="text-left text-[var(--ink-soft)]">
                 <tr className="border-b">
                   <th className="py-2 pr-4">合约</th>
                   <th className="py-2 pr-4">状态</th>
@@ -1041,10 +1041,10 @@ export default function ContractsClient({
               </thead>
               <tbody>
                 {envelopes.map((envelope) => (
-                  <tr key={envelope.id} className="border-b border-neutral-100 dark:border-neutral-800">
+                  <tr key={envelope.id} className="border-b border-[var(--line)] dark:border-neutral-800">
                     <td className="py-2 pr-4">
                       <div className="font-medium">{envelope.title}</div>
-                      <div className="text-xs text-neutral-500">{envelope.template?.name}</div>
+                      <div className="text-xs text-[var(--ink-soft)]">{envelope.template?.name}</div>
                     </td>
                     <td className="py-2 pr-4">{envelope.status}</td>
                     <td className="py-2 pr-4">
@@ -1071,14 +1071,14 @@ export default function ContractsClient({
                           </button>
                         </div>
                       ) : (
-                        <span className="text-neutral-400">未完成</span>
+                        <span className="text-[var(--ink-soft)]">未完成</span>
                       )}
                     </td>
                   </tr>
                 ))}
                 {envelopes.length === 0 && (
                   <tr>
-                    <td className="py-8 text-center text-neutral-500" colSpan={5}>暂无签约记录。</td>
+                    <td className="py-8 text-center text-[var(--ink-soft)]" colSpan={5}>暂无签约记录。</td>
                   </tr>
                 )}
               </tbody>
@@ -1090,20 +1090,20 @@ export default function ContractsClient({
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">历史文档</h2>
-              <p className="text-sm text-neutral-500">已完成签署的合约 PDF，可下载或删除。</p>
+              <p className="text-sm text-[var(--ink-soft)]">已完成签署的合约 PDF，可下载或删除。</p>
             </div>
-            <div className="text-sm text-neutral-500">共 {completedEnvelopes.length} 份</div>
+            <div className="text-sm text-[var(--ink-soft)]">共 {completedEnvelopes.length} 份</div>
           </div>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             {completedEnvelopes.map((envelope) => (
-              <div key={envelope.id} className="rounded-xl border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+              <div key={envelope.id} className="rounded-lg border border-[var(--line)] p-3 text-sm dark:border-neutral-800">
                 <div className="font-semibold">{envelope.title}</div>
-                <div className="mt-1 text-xs text-neutral-500">
+                <div className="mt-1 text-xs text-[var(--ink-soft)]">
                   {envelope.template?.name} · 完成于 {formatDate(envelope.completedAt || envelope.createdAt)}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1 text-xs text-neutral-500">
+                <div className="mt-2 flex flex-wrap gap-1 text-xs text-[var(--ink-soft)]">
                   {envelope.recipients.map((recipient) => (
-                    <span key={recipient.id} className="rounded-full bg-neutral-100 px-2 py-1 dark:bg-neutral-800">
+                    <span key={recipient.id} className="rounded-full bg-[var(--surface-muted)] px-2 py-1 dark:bg-neutral-800">
                       {recipient.signingOrder}. {recipient.name}
                     </span>
                   ))}
@@ -1124,7 +1124,7 @@ export default function ContractsClient({
               </div>
             ))}
             {completedEnvelopes.length === 0 && (
-              <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700">
+              <div className="rounded-lg border border-dashed border-[var(--line-strong)] p-4 text-sm text-[var(--ink-soft)] dark:border-neutral-700">
                 暂无已完成签约文件。
               </div>
             )}
@@ -1139,7 +1139,7 @@ export default function ContractsClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{isEditMode ? "编辑合约模板" : "创建合约模板"}</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="text-sm text-[var(--ink-soft)] dark:text-[var(--ink-soft)]">
             按 DocuSign 式流程：上传 PDF，设置签署人顺序，再把字段放到对应签署人的位置。
           </p>
         </div>
@@ -1155,23 +1155,23 @@ export default function ContractsClient({
         <div className={isEditMode ? "grid gap-4" : "grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]"}>
           <div>
             <h2 className="text-lg font-semibold">{isEditMode ? "1. 当前模板" : "1. 合约模板"}</h2>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            <p className="text-sm text-[var(--ink-soft)] dark:text-[var(--ink-soft)]">
               {isEditMode ? "继续调整签署人和 PDF 字段。" : "支持 PDF / Word。上传后可在字段编辑器设置签署区域。"}
             </p>
             {isEditMode && selectedTemplate ? (
-              <div className="mt-3 grid gap-3 rounded-lg border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+              <div className="mt-3 grid gap-3 rounded-lg border border-[var(--line)] p-3 text-sm dark:border-neutral-800">
                 <div>
                   <div className="font-semibold">{selectedTemplate.name}</div>
-                  <div className="mt-1 text-neutral-500">
+                  <div className="mt-1 text-[var(--ink-soft)]">
                     {selectedTemplate.pageCount} 页 · {fields.length} 个字段 · {templateRecipients.length} 位签署人
                   </div>
                   <a className="mt-3 inline-flex text-blue-600 hover:underline" href={selectedTemplate.pdfUrl} target="_blank" rel="noreferrer">
                     打开当前签署 PDF
                   </a>
                 </div>
-                <div className="rounded-lg border border-dashed border-neutral-300 p-3 dark:border-neutral-700">
+                <div className="rounded-lg border border-dashed border-[var(--line-strong)] p-3 dark:border-neutral-700">
                   <div className="font-medium">追加 PDF / Word 文件</div>
-                  <p className="mt-1 text-xs text-neutral-500">
+                  <p className="mt-1 text-xs text-[var(--ink-soft)]">
                     上传后会合并到当前模板 PDF 的末尾，可继续在新增页面上添加签名框、文本框和日期框。
                   </p>
                   <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
@@ -1219,18 +1219,18 @@ export default function ContractsClient({
               </>
             )}
           </div>
-          {!isEditMode && <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
+          {!isEditMode && <div className="rounded-lg border border-[var(--line)] p-3 dark:border-neutral-800">
             <div className="mb-2 text-sm font-medium">已有模板</div>
             <div className="max-h-52 space-y-2 overflow-auto">
               {templates.length === 0 ? (
-                <div className="text-sm text-neutral-500">还没有模板。</div>
+                <div className="text-sm text-[var(--ink-soft)]">还没有模板。</div>
               ) : templates.map((template) => (
                 <div
                   key={template.id}
                   className={`rounded-lg border p-2 text-sm ${
                     template.id === selectedTemplateId
-                      ? "border-neutral-900 bg-neutral-100 dark:border-neutral-100 dark:bg-neutral-800"
-                      : "border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800"
+                      ? "border-neutral-900 bg-[var(--surface-muted)] dark:border-[var(--line)] dark:bg-neutral-800"
+                      : "border-[var(--line)] hover:bg-[var(--surface-muted)] dark:border-neutral-800 dark:hover:bg-neutral-800"
                   }`}
                 >
                   <button
@@ -1253,7 +1253,7 @@ export default function ContractsClient({
                     }}
                   >
                     <div className="font-medium">{template.name}</div>
-                    <div className="text-xs text-neutral-500">
+                    <div className="text-xs text-[var(--ink-soft)]">
                       {template.pageCount} 页 · {template.fields.length} 个字段
                     </div>
                   </button>
@@ -1276,18 +1276,18 @@ export default function ContractsClient({
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold">2. 签署人信息</h2>
           {isEditMode && recipientSaveStatus !== "idle" && (
-            <span className={`text-xs ${recipientSaveStatus === "error" ? "text-red-600" : "text-neutral-500 dark:text-neutral-400"}`}>
+            <span className={`text-xs ${recipientSaveStatus === "error" ? "text-red-600" : "text-[var(--ink-soft)] dark:text-[var(--ink-soft)]"}`}>
               {recipientSaveStatus === "saving" ? "签署人自动保存中…" : recipientSaveStatus === "saved" ? "签署人已自动保存" : "签署人自动保存失败"}
             </span>
           )}
         </div>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <p className="text-sm text-[var(--ink-soft)] dark:text-[var(--ink-soft)]">
           按顺序填写每位签署人的姓名和 email。字段编辑器会按这里的顺序分配填写责任。
         </p>
         <div className="mt-3 space-y-2">
           {templateRecipients.map((recipient, index) => (
-            <div key={index} className="grid gap-2 rounded-lg border border-neutral-200 p-2 sm:grid-cols-[90px_1fr_1fr_auto] dark:border-neutral-800">
-              <div className="flex items-center text-sm font-medium text-neutral-600 dark:text-neutral-300">
+            <div key={index} className="grid gap-2 rounded-lg border border-[var(--line)] p-2 sm:grid-cols-[90px_1fr_1fr_auto] dark:border-neutral-800">
+              <div className="flex items-center text-sm font-medium text-[var(--ink-mid)] dark:text-neutral-300">
                 第 {index + 1} 位
               </div>
               <input
@@ -1338,7 +1338,7 @@ export default function ContractsClient({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">3. Word 合约内容</h2>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              <p className="text-sm text-[var(--ink-soft)] dark:text-[var(--ink-soft)]">
                 上传 Word 后系统会提取正文。这里修改内容并保存后，会重新生成用于签署的 PDF。
               </p>
             </div>
@@ -1355,7 +1355,7 @@ export default function ContractsClient({
             placeholder="在这里编辑合约正文。保存后会重新生成 PDF。"
           />
           <div className="mt-3 flex items-center justify-between gap-3">
-            <div className="text-xs text-neutral-500">
+            <div className="text-xs text-[var(--ink-soft)]">
               Word 转 PDF 为签署底稿；签名框、日期框、文本框仍在下方字段编辑器中添加。
             </div>
             <button type="button" className="btn-primary" disabled={busy === "editable-content"} onClick={saveEditableContent}>
@@ -1369,7 +1369,7 @@ export default function ContractsClient({
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">{selectedTemplate?.sourceType === "WORD" ? "4" : "3"}. PDF 字段编辑器</h2>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            <p className="text-sm text-[var(--ink-soft)] dark:text-[var(--ink-soft)]">
               字段按 PDF 页面的百分比坐标保存。拖动字段可修改位置；拖拽右下角可调整大小。
             </p>
           </div>
@@ -1380,14 +1380,14 @@ export default function ContractsClient({
           )}
         </div>
         {!selectedTemplate ? (
-          <div className="rounded-lg border border-dashed border-neutral-300 p-8 text-center text-neutral-500">
+          <div className="rounded-lg border border-dashed border-[var(--line-strong)] p-8 text-center text-[var(--ink-soft)]">
             请先上传或选择一个模板。
           </div>
         ) : (
           <div className="grid gap-4">
-            <div className="order-2 max-h-[calc(100vh-220px)] min-h-[70vh] overflow-auto rounded-xl bg-neutral-100 p-3 dark:bg-neutral-950">
-              <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-white/90 p-2 text-sm shadow-sm backdrop-blur dark:bg-neutral-900/90">
-                <span className="font-medium text-neutral-700 dark:text-neutral-200">PDF 缩放</span>
+            <div className="order-2 max-h-[calc(100vh-220px)] min-h-[70vh] overflow-auto rounded-lg bg-[var(--surface-muted)] p-3 dark:bg-neutral-950">
+              <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface)] p-2 text-sm backdrop-blur dark:bg-[var(--ink)]/90">
+                <span className="font-medium text-[var(--ink-mid)] dark:text-neutral-200">PDF 缩放</span>
                 <button
                   type="button"
                   className="btn-secondary px-3 py-1 text-xs"
@@ -1424,9 +1424,9 @@ export default function ContractsClient({
                       minWidth: pdfZoom > 1 ? `${Math.round(pdfZoom * 100)}%` : undefined,
                     }}
                   >
-                    <div className="mb-1 text-xs text-neutral-500">Page {page.page}</div>
+                    <div className="mb-1 text-xs text-[var(--ink-soft)]">Page {page.page}</div>
                     <div
-                      className="relative w-full overflow-hidden rounded-lg border border-neutral-300 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
+                      className="relative w-full overflow-hidden rounded-lg border border-[var(--line-strong)] bg-white dark:border-neutral-700 dark:bg-[var(--ink)]"
                       style={{ aspectRatio: `${page.width} / ${page.height}` }}
                     >
                       <PdfPageCanvas
@@ -1435,7 +1435,7 @@ export default function ContractsClient({
                         className="absolute inset-0 h-full w-full bg-white"
                         onPageMeasured={handlePdfPageMeasured}
                       />
-                      <div className="absolute left-2 top-2 rounded bg-white/90 px-2 py-1 text-[11px] font-medium text-neutral-500 shadow-sm">
+                      <div className="absolute left-2 top-2 rounded bg-[var(--surface)] px-2 py-1 text-[11px] font-medium text-[var(--ink-soft)]">
                         PDF Page {page.page} · {Math.round(page.width)}×{Math.round(page.height)}
                       </div>
                       {fields.filter((field) => field.page === page.page).map((field) => {
@@ -1446,7 +1446,7 @@ export default function ContractsClient({
                           key={field.id}
                           role="button"
                           tabIndex={0}
-                          className={`absolute box-border select-none rounded border px-1 text-left text-[11px] font-semibold shadow-sm transition ${
+                          className={`absolute box-border select-none rounded border px-1 text-left text-[11px] font-semibold transition ${
                             isSelected ? "ring-2 ring-neutral-900 ring-offset-1 dark:ring-neutral-100" : ""
                           }`}
                           style={{
@@ -1538,9 +1538,9 @@ export default function ContractsClient({
                 ))}
               </div>
             </div>
-            <div className="order-1 space-y-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
+            <div className="order-1 space-y-3 rounded-lg border border-[var(--line)] p-3 dark:border-neutral-800">
               <div className="flex flex-wrap items-center gap-2">
-                <label className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
+                <label className="flex items-center gap-2 rounded-lg border border-[var(--line)] px-3 py-2 text-sm dark:border-neutral-800">
                   <span className="font-medium">添加到</span>
                   <select
                     className="input w-24 py-1 text-sm"
@@ -1568,9 +1568,9 @@ export default function ContractsClient({
                   复制选中字段
                 </button>
               </div>
-              <div className="rounded-lg border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+              <div className="rounded-lg border border-[var(--line)] p-3 text-sm dark:border-neutral-800">
                 <div className="font-semibold">预存文本</div>
-                <p className="mt-1 text-xs text-neutral-500">
+                <p className="mt-1 text-xs text-[var(--ink-soft)]">
                   保存常用条款后，可在文本框/日期框字段里快速选择填入默认内容。
                 </p>
                 <div className="mt-2 grid gap-2 sm:grid-cols-[0.7fr_1fr_auto]">
@@ -1598,7 +1598,7 @@ export default function ContractsClient({
                 {textPresets.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {textPresets.slice(0, 8).map((preset) => (
-                      <span key={preset.id} className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-1 text-xs dark:bg-neutral-800">
+                      <span key={preset.id} className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-muted)] px-2 py-1 text-xs dark:bg-neutral-800">
                         {preset.label}
                         <button
                           type="button"
@@ -1614,7 +1614,7 @@ export default function ContractsClient({
                   </div>
                 )}
               </div>
-              <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700">
+              <div className="rounded-lg border border-dashed border-[var(--line-strong)] p-4 text-sm text-[var(--ink-soft)] dark:border-neutral-700">
                 {fields.length === 0 ? (
                   <span>还没有字段。先添加签名框、文本框或文字涂改。</span>
                 ) : (
@@ -1815,9 +1815,9 @@ function UnsavedChangesModal({
 }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl dark:bg-neutral-950">
+      <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-2xl dark:bg-neutral-950">
         <div className="text-xl font-semibold">保存合约模板更改？</div>
-        <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+        <p className="mt-2 text-sm leading-6 text-[var(--ink-mid)] dark:text-neutral-300">
           当前模板还有未保存的字段、签署人或 Word 内容。离开前可以先保存，也可以放弃本次更改。
         </p>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -1880,11 +1880,11 @@ function FieldEditModal({
   const canHaveText = field.type !== "SIGNATURE" && field.type !== "CHECKBOX" && field.type !== "REDACTION";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl dark:bg-neutral-950">
+      <div className="w-full max-w-3xl rounded-lg bg-white p-5 shadow-2xl dark:bg-neutral-950">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <div className="text-xl font-semibold">编辑字段参数</div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-neutral-500">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--ink-soft)]">
               <span
                 className="inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold"
                 style={{ borderColor: color.border, color: color.text, backgroundColor: color.bg }}
@@ -1895,12 +1895,12 @@ function FieldEditModal({
               {field.type === "REDACTION" ? "覆盖 PDF 上不需要显示的原文字" : signerLabel(templateRecipients, field.recipientIndex ?? 1)}
             </div>
           </div>
-          <button type="button" className="text-2xl leading-none text-neutral-500 hover:text-neutral-900" onClick={onClose}>
+          <button type="button" className="text-2xl leading-none text-[var(--ink-soft)] hover:text-[var(--ink)]" onClick={onClose}>
             ×
           </button>
         </div>
 
-        <div className="grid gap-4 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+        <div className="grid gap-4 rounded-lg border border-[var(--line)] p-4 dark:border-neutral-800">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-sm">
               <span className="font-medium">标签</span>
@@ -1910,7 +1910,7 @@ function FieldEditModal({
                 onChange={(event) => onChange({ label: event.target.value })}
                 placeholder={FIELD_TYPE_LABELS[field.type]}
               />
-              <span className="mt-1 block text-xs text-neutral-500">
+              <span className="mt-1 block text-xs text-[var(--ink-soft)]">
                 这里会同步显示为 PDF 字段上的 tag。
               </span>
             </label>
@@ -1944,16 +1944,16 @@ function FieldEditModal({
             </label>
           )}
           {field.type !== "REDACTION" && field.type !== "CHECKBOX" ? (
-            <label className="flex items-center gap-2 self-end rounded-lg border border-neutral-200 px-3 py-3 text-sm dark:border-neutral-800">
+            <label className="flex items-center gap-2 self-end rounded-lg border border-[var(--line)] px-3 py-3 text-sm dark:border-neutral-800">
               <input type="checkbox" checked={field.required} onChange={(event) => onChange({ required: event.target.checked })} />
               必填
             </label>
           ) : field.type === "CHECKBOX" ? (
-            <div className="rounded-lg border border-neutral-200 px-3 py-3 text-sm text-neutral-500 dark:border-neutral-800">
+            <div className="rounded-lg border border-[var(--line)] px-3 py-3 text-sm text-[var(--ink-soft)] dark:border-neutral-800">
               勾选框为 Optional，租客可不勾选也能提交。
             </div>
           ) : (
-            <div className="rounded-lg border border-neutral-200 px-3 py-3 text-sm text-neutral-500 dark:border-neutral-800">
+            <div className="rounded-lg border border-[var(--line)] px-3 py-3 text-sm text-[var(--ink-soft)] dark:border-neutral-800">
               涂改字段只会覆盖 PDF 原文字，不会出现在租客填写表单里。
             </div>
           )}
@@ -1961,7 +1961,7 @@ function FieldEditModal({
         </div>
 
         {canHaveText && (
-          <div className="mt-4 grid gap-3 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+          <div className="mt-4 grid gap-3 rounded-lg border border-[var(--line)] p-4 dark:border-neutral-800">
             <label className="block text-sm sm:col-span-2">
               <span className="font-medium">选择预存文本</span>
               <select

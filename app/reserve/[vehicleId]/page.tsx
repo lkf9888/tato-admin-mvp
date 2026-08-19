@@ -65,7 +65,7 @@ export default async function ReserveVehiclePage({
   if (!vehicle || !vehicle.directBookingEnabled || (vehicle.bookingDailyRate ?? 0) <= 0) {
     return (
       <main className="min-h-screen bg-[var(--page)] px-4 py-8 sm:px-6">
-        <div className="mx-auto max-w-4xl rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.92)] p-10 shadow-[0_30px_90px_rgba(17,19,24,0.08)]">
+        <div className="mx-auto max-w-4xl rounded-lg border border-[var(--line)] bg-[rgba(255,255,255,0.92)] p-10 shadow-[0_30px_90px_rgba(17,19,24,0.08)]">
           <p className="text-[11px] uppercase tracking-[0.34em] text-[var(--ink-soft)]">
             {reserveMessages.heroKicker}
           </p>
@@ -107,14 +107,14 @@ export default async function ReserveVehiclePage({
   return (
     <main className="min-h-screen bg-[var(--page)] px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[92rem] space-y-5">
-        <header className="flex flex-col gap-4 rounded-lg border border-[var(--line)] bg-white/90 px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <header className="flex flex-col gap-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-slate-950 text-xl font-semibold text-white">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-[var(--ink)] text-xl font-semibold text-white">
               T
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.32em] text-slate-500">TATO</p>
-              <h1 className="truncate text-2xl font-semibold text-slate-950 sm:text-3xl">
+              <p className="text-[11px] uppercase tracking-[0.32em] text-[var(--ink-soft)]">TATO</p>
+              <h1 className="truncate text-2xl font-semibold text-[var(--ink)] sm:text-3xl">
                 {vehicle.nickname}
               </h1>
             </div>
@@ -129,54 +129,54 @@ export default async function ReserveVehiclePage({
               fallbackLabel={vehicle.nickname}
             />
 
-            <section className="rounded-lg border border-[var(--line)] bg-white/90 p-5 shadow-sm">
-              <p className="text-[11px] uppercase tracking-[0.32em] text-slate-500">
+            <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5">
+              <p className="text-[11px] uppercase tracking-[0.32em] text-[var(--ink-soft)]">
                 {reserveMessages.heroKicker}
               </p>
-              <h2 className="mt-3 text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">
+              <h2 className="mt-3 text-3xl font-semibold leading-tight text-[var(--ink)] sm:text-4xl">
                 {vehicle.plateNumber} · {vehicle.brand} {vehicle.model} {vehicle.year}
               </h2>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--ink-mid)]">
                 {vehicle.bookingIntro?.trim() || reserveMessages.introFallback}
               </p>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-4">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
                     {reserveMessages.rateLabel}
                   </p>
-                  <p className="mt-3 text-2xl font-semibold text-slate-950">
+                  <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
                     {formatCurrency(vehicle.bookingDailyRate, locale)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
                     {reserveMessages.insuranceLabel}
                   </p>
-                  <p className="mt-3 text-2xl font-semibold text-slate-950">
+                  <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
                     {formatCurrency(vehicle.bookingInsuranceFee, locale)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
                     {reserveMessages.depositLabel}
                   </p>
-                  <p className="mt-3 text-2xl font-semibold text-slate-950">
+                  <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
                     {formatCurrency(vehicle.bookingDepositAmount, locale)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
                     {reserveMessages.ownerLabel}
                   </p>
-                  <p className="mt-3 truncate text-lg font-semibold text-slate-950">
+                  <p className="mt-3 truncate text-lg font-semibold text-[var(--ink)]">
                     {vehicle.owner?.name ?? "TATO"}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-6 border-t border-slate-200 pt-5">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+              <div className="mt-6 border-t border-[var(--line)] pt-5">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
                   {reserveMessages.blockedDates}
                 </p>
                 {blockedWindows.length > 0 ? (
@@ -184,7 +184,7 @@ export default async function ReserveVehiclePage({
                     {blockedWindows.map((window) => (
                       <span
                         key={`${window.pickupDatetime.toISOString()}-${window.returnDatetime.toISOString()}`}
-                        className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600"
+                        className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs text-[var(--ink-mid)]"
                       >
                         {formatDate(window.pickupDatetime, locale)} -{" "}
                         {formatDate(window.returnDatetime, locale)}
@@ -192,7 +192,7 @@ export default async function ReserveVehiclePage({
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-slate-500">
+                  <p className="mt-3 text-sm text-[var(--ink-soft)]">
                     {reserveMessages.blockedDatesEmpty}
                   </p>
                 )}

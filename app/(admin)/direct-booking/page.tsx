@@ -71,19 +71,19 @@ export default async function DirectBookingPage() {
         </div>
 
         <div className="mt-3 grid gap-2.5 md:grid-cols-3">
-          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-white/80 px-3 py-2.5 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
+          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[var(--surface)] px-3 py-2.5 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
             <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
               {directMessages.enabledCount}
             </p>
             <p className="mt-1.5 text-[1.35rem] font-semibold text-[color:var(--ink)]">{enabledCount}</p>
           </div>
-          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-white/80 px-3 py-2.5 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
+          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[var(--surface)] px-3 py-2.5 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
             <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
               {directMessages.readyCount}
             </p>
             <p className="mt-1.5 text-[1.35rem] font-semibold text-[color:var(--ink)]">{readyCount}</p>
           </div>
-          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-white/80 px-3 py-2.5 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
+          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[var(--surface)] px-3 py-2.5 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
             <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
               {directMessages.stripeStatus}
             </p>
@@ -122,7 +122,7 @@ export default async function DirectBookingPage() {
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-[0.08em] ${
                         isLive
                           ? "border border-[rgba(89,60,251,0.18)] bg-[var(--accent-soft)] text-[var(--ink)]"
-                          : "border border-slate-900/8 bg-slate-200 text-slate-700"
+                          : "border border-[var(--ink)]/8 bg-[var(--accent-soft-strong)] text-[var(--ink-mid)]"
                       }`}
                     >
                       {isLive ? directMessages.liveLabel : directMessages.draftLabel}

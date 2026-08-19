@@ -45,16 +45,16 @@ export function DeleteShareLinkButton({
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4">
-          <div className="w-full max-w-md rounded-lg border border-white/70 bg-white p-4 shadow-2xl">
-            <h4 className="text-lg font-semibold text-slate-950">{confirmTitle}</h4>
-            <p className="mt-2 text-[12px] leading-5 text-slate-600">{confirmDescription}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ink)]/30 px-4">
+          <div className="w-full max-w-md rounded-lg border border-[var(--line)] bg-white p-4 shadow-2xl">
+            <h4 className="text-lg font-semibold text-[var(--ink)]">{confirmTitle}</h4>
+            <p className="mt-2 text-[12px] leading-5 text-[var(--ink-mid)]">{confirmDescription}</p>
 
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-[12px] font-medium text-slate-700"
+                className="flex-1 rounded-md border border-[var(--line)] px-3 py-2 text-[12px] font-medium text-[var(--ink-mid)]"
               >
                 {confirmNoLabel}
               </button>

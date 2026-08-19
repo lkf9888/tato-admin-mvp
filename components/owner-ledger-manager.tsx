@@ -267,7 +267,7 @@ export function OwnerLedgerManager({
   return (
     <div className="max-w-5xl p-3 sm:p-6">
       <div className="mb-4">
-        <Link href={`/owners/${selectedOwner.id}`} className="text-sm text-neutral-500 hover:text-neutral-900">
+        <Link href={`/owners/${selectedOwner.id}`} className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]">
           &lt; {selectedOwner.name}
         </Link>
         <div className="mt-2 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between sm:gap-2">
@@ -296,11 +296,11 @@ export function OwnerLedgerManager({
         )}
       >
         <div>
-          <div className="text-xs uppercase tracking-wide text-neutral-500">{labels.currentBalance}</div>
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">{labels.currentBalance}</div>
           <div className="mt-1 text-2xl font-semibold tabular-nums">
             {formatCurrency(Math.abs(totalBalance), locale)}
           </div>
-          <div className="mt-1 text-sm text-neutral-600">
+          <div className="mt-1 text-sm text-[var(--ink-mid)]">
             {totalBalance > 0
               ? labels.tatoOwesOwner
               : totalBalance < 0
@@ -308,8 +308,8 @@ export function OwnerLedgerManager({
                 : labels.zeroBalance}
           </div>
           {filterActive ? (
-            <div className="mt-3 border-t border-neutral-200/70 pt-3">
-              <div className="text-xs uppercase tracking-wide text-neutral-500">{labels.periodSubtotal}</div>
+            <div className="mt-3 border-t border-[var(--line)]/70 pt-3">
+              <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">{labels.periodSubtotal}</div>
               <div className="text-lg font-semibold tabular-nums">
                 {periodSubtotal >= 0 ? "+" : "-"}
                 {formatCurrency(Math.abs(periodSubtotal), locale)}
@@ -344,7 +344,7 @@ export function OwnerLedgerManager({
       </section>
 
       <section className="card mb-4 grid grid-cols-2 gap-2 p-2 sm:flex sm:flex-wrap sm:items-center">
-        <label className="inline-flex flex-col gap-1 text-xs text-neutral-500 sm:flex-row sm:items-center sm:gap-2">
+        <label className="inline-flex flex-col gap-1 text-xs text-[var(--ink-soft)] sm:flex-row sm:items-center sm:gap-2">
           {labels.dateFrom}
           <input
             type="date"
@@ -354,7 +354,7 @@ export function OwnerLedgerManager({
             onChange={(event) => setDateFrom(event.target.value)}
           />
         </label>
-        <label className="inline-flex flex-col gap-1 text-xs text-neutral-500 sm:flex-row sm:items-center sm:gap-2">
+        <label className="inline-flex flex-col gap-1 text-xs text-[var(--ink-soft)] sm:flex-row sm:items-center sm:gap-2">
           {labels.dateTo}
           <input
             type="date"
@@ -430,7 +430,7 @@ function LedgerRows({
   onDelete: (item: LedgerItem) => void;
 }) {
   if (rows.length === 0) {
-    return <div className="card p-10 text-center text-neutral-500">{labels.empty}</div>;
+    return <div className="card p-10 text-center text-[var(--ink-soft)]">{labels.empty}</div>;
   }
 
   return (
@@ -440,7 +440,7 @@ function LedgerRows({
           <article key={item.id} className="card p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs tabular-nums text-neutral-500">
+                <div className="text-xs tabular-nums text-[var(--ink-soft)]">
                   {formatDate(item.occurredAt, locale)}
                 </div>
                 <KindBadge labels={labels} item={item} />
@@ -448,8 +448,8 @@ function LedgerRows({
               <SignedAmount amount={item.amount} locale={locale} />
             </div>
             <ItemDetail labels={labels} locale={locale} item={item} />
-            <div className="mt-3 flex justify-end gap-3 border-t border-neutral-100 pt-3 text-sm">
-              <button className="text-neutral-600 hover:text-neutral-900" onClick={() => onEdit(item)}>
+            <div className="mt-3 flex justify-end gap-3 border-t border-[var(--line)] pt-3 text-sm">
+              <button className="text-[var(--ink-mid)] hover:text-[var(--ink)]" onClick={() => onEdit(item)}>
                 {labels.edit}
               </button>
               <button className="text-red-600 hover:text-red-800" onClick={() => onDelete(item)}>
@@ -462,7 +462,7 @@ function LedgerRows({
 
       <div className="card hidden overflow-x-auto md:block">
         <table className="w-full min-w-[760px] text-sm">
-          <thead className="bg-neutral-50">
+          <thead className="bg-[var(--surface-muted)]">
             <tr className="text-left">
               <th className="px-3 py-2 font-medium">{labels.date}</th>
               <th className="px-3 py-2 font-medium">{labels.type}</th>
@@ -472,10 +472,10 @@ function LedgerRows({
               <th className="px-3 py-2" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100">
+          <tbody className="divide-y divide-[var(--line)]">
             {rows.map((item) => (
-              <tr key={item.id} className="group align-top hover:bg-neutral-50">
-                <td className="whitespace-nowrap px-3 py-3 text-neutral-600">
+              <tr key={item.id} className="group align-top hover:bg-[var(--surface-muted)]">
+                <td className="whitespace-nowrap px-3 py-3 text-[var(--ink-mid)]">
                   {formatDate(item.occurredAt, locale)}
                 </td>
                 <td className="px-3 py-3">
@@ -492,7 +492,7 @@ function LedgerRows({
                 </td>
                 <td className="whitespace-nowrap px-3 py-3 text-right">
                   <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100">
-                    <button className="text-xs font-semibold text-neutral-600" onClick={() => onEdit(item)}>
+                    <button className="text-xs font-semibold text-[var(--ink-mid)]" onClick={() => onEdit(item)}>
                       {labels.edit}
                     </button>
                     <button className="text-xs font-semibold text-red-600" onClick={() => onDelete(item)}>
@@ -512,8 +512,8 @@ function LedgerRows({
 function KindBadge({ labels, item }: { labels: ReturnType<typeof copy>; item: LedgerItem }) {
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1.5">
-      <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs">{labels.kindLabels[item.kind]}</span>
-      {item.isAuto ? <span className="text-[10px] text-neutral-400">{labels.auto}</span> : null}
+      <span className="rounded bg-[var(--surface-muted)] px-2 py-0.5 text-xs">{labels.kindLabels[item.kind]}</span>
+      {item.isAuto ? <span className="text-[10px] text-[var(--ink-soft)]">{labels.auto}</span> : null}
     </div>
   );
 }
@@ -544,7 +544,7 @@ function ItemDetail({
 }) {
   return (
     <div className={compact ? "" : "mt-3"}>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--ink-soft)]">
         {item.vehicle ? (
           <span className="inline-flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-blue-600" />
@@ -559,7 +559,7 @@ function ItemDetail({
         ) : null}
       </div>
       {item.note ? (
-        <div className="mt-1 whitespace-pre-wrap text-neutral-700">{item.note}</div>
+        <div className="mt-1 whitespace-pre-wrap text-[var(--ink-mid)]">{item.note}</div>
       ) : null}
       <ReceiptPreviewList receipts={item.receipts ?? []} label={labels.receipts} />
     </div>
@@ -586,7 +586,7 @@ function ReceiptPreviewList({
             <div key={receipt.id} className="group relative">
               <button
                 type="button"
-                className="h-14 w-14 overflow-hidden rounded border border-neutral-200 bg-neutral-100 hover:opacity-90"
+                className="h-14 w-14 overflow-hidden rounded border border-[var(--line)] bg-[var(--surface-muted)] hover:opacity-90"
                 onClick={() => setPreview(receipt)}
                 title={receipt.filename || label}
               >
@@ -769,7 +769,7 @@ function LedgerModal({
           <h3 className="text-lg font-semibold">{isEdit ? labels.editTitle : labels.createTitle}</h3>
           <button
             type="button"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-2xl leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-2xl leading-none text-[var(--ink-soft)] hover:bg-[var(--surface-muted)] hover:text-[var(--ink-mid)]"
             onClick={onClose}
             aria-label={labels.cancel}
           >
@@ -839,18 +839,18 @@ function LedgerModal({
               className="hidden"
               onChange={(event) => appendFiles(event.target.files)}
             />
-            <div className="rounded-lg border-2 border-dashed border-neutral-300 px-3 py-3">
+            <div className="rounded-lg border-2 border-dashed border-[var(--line-strong)] px-3 py-3">
               <button type="button" className="btn-secondary text-sm" disabled={saving} onClick={() => fileInputRef.current?.click()}>
                 {labels.uploadReceipts}
               </button>
-              <span className="ml-2 text-xs text-neutral-500">{labels.dragHint}</span>
+              <span className="ml-2 text-xs text-[var(--ink-soft)]">{labels.dragHint}</span>
             </div>
             <ReceiptPreviewList receipts={existingReceipts} label={labels.receipts} />
             {receiptFiles.length > 0 ? (
-              <div className="mt-2 space-y-1 text-xs text-neutral-500">
+              <div className="mt-2 space-y-1 text-xs text-[var(--ink-soft)]">
                 <p>{labels.fileCount(receiptFiles.length)}</p>
                 {receiptFiles.map((file, index) => (
-                  <div key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between rounded bg-neutral-50 px-2 py-1">
+                  <div key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between rounded bg-[var(--surface-muted)] px-2 py-1">
                     <span className="min-w-0 truncate">{file.name}</span>
                     <button
                       type="button"

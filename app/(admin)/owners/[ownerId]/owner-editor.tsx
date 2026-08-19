@@ -226,7 +226,7 @@ export function OwnerEditor({
   return (
     <div className="max-w-3xl space-y-6 p-4 sm:p-6">
       <div>
-        <Link href="/owners" className="text-sm text-neutral-500 hover:text-neutral-900">
+        <Link href="/owners" className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]">
           &lt; {labels.back}
         </Link>
         <h1 className="mt-2 text-2xl font-semibold">{owner.name}</h1>
@@ -291,11 +291,11 @@ export function OwnerEditor({
 
       <section className="card space-y-3 p-6">
         <h2 className="text-lg font-semibold">{labels.sections.share}</h2>
-        <p className="text-sm text-neutral-500">{labels.shareHint}</p>
+        <p className="text-sm text-[var(--ink-soft)]">{labels.shareHint}</p>
         {shareToken ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <code className="flex-1 break-all rounded bg-neutral-100 px-3 py-2 text-xs">
+              <code className="flex-1 break-all rounded bg-[var(--surface-muted)] px-3 py-2 text-xs">
                 /share/{shareToken}
               </code>
               <button className="btn-secondary text-sm" onClick={copyShareLink}>
@@ -315,9 +315,9 @@ export function OwnerEditor({
 
       <section className="card space-y-3 p-6">
         <h2 className="text-lg font-semibold">{labels.sections.vehicles}</h2>
-        <p className="text-sm text-neutral-500">{labels.vehiclesHint}</p>
+        <p className="text-sm text-[var(--ink-soft)]">{labels.vehiclesHint}</p>
         {allVehicles.length === 0 ? (
-          <p className="text-sm text-neutral-400">{labels.noVehicles}</p>
+          <p className="text-sm text-[var(--ink-soft)]">{labels.noVehicles}</p>
         ) : (
           <VehiclePicker
             ownerId={owner.id}
@@ -336,7 +336,7 @@ export function OwnerEditor({
 
       <section className="card space-y-2 p-6">
         <h2 className="text-lg font-semibold">{labels.sections.ledger}</h2>
-        <p className="text-sm text-neutral-500">{labels.ledgerHint}</p>
+        <p className="text-sm text-[var(--ink-soft)]">{labels.ledgerHint}</p>
         <div className="flex flex-wrap gap-2 pt-2">
           <Link href={`/owners/${owner.id}/ledger`} className="btn-secondary">
             {labels.openLedger}
@@ -432,11 +432,11 @@ function VehiclePicker({
           className="input flex w-full items-center justify-between text-left"
         >
           <span className="truncate">{triggerLabel}</span>
-          <span className="ml-2 text-xs text-neutral-400">v</span>
+          <span className="ml-2 text-xs text-[var(--ink-soft)]">v</span>
         </button>
         {open ? (
-          <div className="absolute left-0 right-0 z-20 mt-1 flex max-h-80 flex-col rounded-md border border-neutral-200 bg-white shadow-lg">
-            <div className="border-b border-neutral-200 p-2">
+          <div className="absolute left-0 right-0 z-20 mt-1 flex max-h-80 flex-col rounded-md border border-[var(--line)] bg-white shadow-lg">
+            <div className="border-b border-[var(--line)] p-2">
               <input
                 type="text"
                 placeholder={labels.pickerSearchPlaceholder}
@@ -448,7 +448,7 @@ function VehiclePicker({
             </div>
             <div className="flex-1 overflow-y-auto py-1">
               {filtered.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs text-neutral-400">{labels.pickerNoMatch}</div>
+                <div className="px-3 py-4 text-center text-xs text-[var(--ink-soft)]">{labels.pickerNoMatch}</div>
               ) : (
                 filtered.map((vehicle) => {
                   const checked = assigned.has(vehicle.id);
@@ -456,7 +456,7 @@ function VehiclePicker({
                   return (
                     <label
                       key={vehicle.id}
-                      className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-neutral-50"
+                      className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-[var(--surface-muted)]"
                     >
                       <input
                         type="checkbox"
@@ -466,7 +466,7 @@ function VehiclePicker({
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate">{vehicle.label}</span>
-                        <span className="block truncate text-xs text-neutral-500">{vehicle.subLabel}</span>
+                        <span className="block truncate text-xs text-[var(--ink-soft)]">{vehicle.subLabel}</span>
                       </span>
                       {otherOwner ? (
                         <span className="shrink-0 text-[10px] text-amber-600">
@@ -486,13 +486,13 @@ function VehiclePicker({
           {selectedVehicles.map((vehicle) => (
             <span
               key={vehicle.id}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-neutral-100 py-1 pl-2.5 pr-1 text-xs"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-[var(--surface-muted)] py-1 pl-2.5 pr-1 text-xs"
             >
               <span className="truncate">{vehicle.label}</span>
               <button
                 type="button"
                 onClick={() => onToggle(vehicle.id)}
-                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-200 hover:text-neutral-900"
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--ink-soft)] hover:bg-[var(--accent-soft-strong)] hover:text-[var(--ink)]"
                 aria-label={labels.remove}
               >
                 x

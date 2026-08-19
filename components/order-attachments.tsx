@@ -153,7 +153,7 @@ export function OrderAttachments({
   const documents = attachments.filter((attachment) => attachment.kind === "document");
 
   return (
-    <section className={cn("rounded-lg border border-[var(--line)] bg-white/80", compact ? "p-3" : "p-4")}>
+    <section className={cn("rounded-lg border border-[var(--line)] bg-[var(--surface)]", compact ? "p-3" : "p-4")}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
@@ -240,18 +240,18 @@ function AttachmentGroup({
   onDelete: (attachment: OrderAttachment) => void;
 }) {
   return (
-    <div className="rounded-lg bg-slate-50 p-3">
+    <div className="rounded-lg bg-[var(--surface-muted)] p-3">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-soft)]">
         {title}
       </p>
       {attachments.length === 0 ? (
-        <p className="mt-2 rounded-md border border-dashed border-slate-200 bg-white px-3 py-4 text-[12px] text-[var(--ink-soft)]">
+        <p className="mt-2 rounded-md border border-dashed border-[var(--line)] bg-white px-3 py-4 text-[12px] text-[var(--ink-soft)]">
           {empty}
         </p>
       ) : (
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {attachments.map((attachment) => (
-            <article key={attachment.id} className="overflow-hidden rounded-md border border-slate-200 bg-white">
+            <article key={attachment.id} className="overflow-hidden rounded-md border border-[var(--line)] bg-white">
               <a href={attachment.url} target="_blank" rel="noreferrer" className="block">
                 {isImage(attachment) ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -261,9 +261,9 @@ function AttachmentGroup({
                     className="h-28 w-full object-cover"
                   />
                 ) : isVideo(attachment) ? (
-                  <video src={attachment.url} className="h-28 w-full bg-slate-950 object-cover" controls />
+                  <video src={attachment.url} className="h-28 w-full bg-[var(--ink)] object-cover" controls />
                 ) : (
-                  <div className="flex h-28 items-center justify-center bg-slate-100 text-[12px] font-semibold text-[var(--ink-soft)]">
+                  <div className="flex h-28 items-center justify-center bg-[var(--surface-muted)] text-[12px] font-semibold text-[var(--ink-soft)]">
                     FILE
                   </div>
                 )}

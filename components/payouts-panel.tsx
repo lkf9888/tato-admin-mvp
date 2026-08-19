@@ -29,8 +29,8 @@ const STATUS_TONE: Record<
   }
 > = {
   not_started: {
-    dot: "bg-slate-400",
-    card: "border-slate-200 bg-slate-50/60",
+    dot: "bg-[var(--ink-soft)]",
+    card: "border-[var(--line)] bg-[var(--surface-muted)]/60",
   },
   pending: {
     dot: "bg-amber-500",

@@ -317,15 +317,15 @@ export function StaffShareClient({
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 text-neutral-950">
-      <header className="sticky top-0 z-20 border-b border-neutral-800 bg-neutral-950 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] text-white">
+    <main className="min-h-screen bg-[var(--surface-muted)] text-[var(--ink)]">
+      <header className="sticky top-0 z-20 border-b border-neutral-800 bg-[var(--ink)] px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] text-white">
         <div className="mx-auto max-w-2xl">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold text-neutral-400">{labels.kicker}</p>
+            <p className="text-xs font-semibold text-[var(--ink-soft)]">{labels.kicker}</p>
             <div className="flex shrink-0 overflow-hidden rounded-md border border-white/15 bg-white/5 p-0.5" aria-label={labels.language}>
               <button
                 type="button"
-                className={`min-h-7 px-2 text-xs font-semibold ${activeLocale === "en" ? "bg-white text-neutral-950" : "text-neutral-300"}`}
+                className={`min-h-7 px-2 text-xs font-semibold ${activeLocale === "en" ? "bg-white text-[var(--ink)]" : "text-neutral-300"}`}
                 aria-pressed={activeLocale === "en"}
                 onClick={() => chooseLocale("en")}
               >
@@ -333,7 +333,7 @@ export function StaffShareClient({
               </button>
               <button
                 type="button"
-                className={`min-h-7 px-2 text-xs font-semibold ${activeLocale === "zh" ? "bg-white text-neutral-950" : "text-neutral-300"}`}
+                className={`min-h-7 px-2 text-xs font-semibold ${activeLocale === "zh" ? "bg-white text-[var(--ink)]" : "text-neutral-300"}`}
                 aria-pressed={activeLocale === "zh"}
                 onClick={() => chooseLocale("zh")}
               >
@@ -382,13 +382,13 @@ export function StaffShareClient({
 
       <div className="mx-auto max-w-2xl space-y-4 px-3 py-4">
         {notice ? (
-          <div className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 shadow-sm">
+          <div className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink-mid)]">
             {notice}
           </div>
         ) : null}
 
         {activeTaskGroups.length === 0 && historyTasks.length === 0 ? (
-          <div className="rounded-md bg-white px-4 py-6 text-sm text-neutral-500">{labels.noTasks}</div>
+          <div className="rounded-md bg-white px-4 py-6 text-sm text-[var(--ink-soft)]">{labels.noTasks}</div>
         ) : null}
 
         {activeTaskGroups.map((group) => (
@@ -411,7 +411,7 @@ export function StaffShareClient({
         ))}
 
         {historyTasks.length > 0 ? (
-          <section className="rounded-md border border-neutral-200 bg-white shadow-sm">
+          <section className="rounded-md border border-[var(--line)] bg-white">
             <button
               type="button"
               className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
@@ -419,22 +419,22 @@ export function StaffShareClient({
               aria-expanded={historyOpen}
             >
               <span>
-                <span className="block text-sm font-semibold text-neutral-900">
+                <span className="block text-sm font-semibold text-[var(--ink)]">
                   {labels.historySummary(historyTasks.length)}
                 </span>
                 {!historyOpen ? (
-                  <span className="mt-0.5 block text-xs text-neutral-500">
+                  <span className="mt-0.5 block text-xs text-[var(--ink-soft)]">
                     {labels.showHistory}
                   </span>
                 ) : null}
               </span>
-              <span className="rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-700">
+              <span className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-semibold text-[var(--ink-mid)]">
                 {historyOpen ? labels.hideHistory : labels.showHistory}
               </span>
             </button>
 
             {historyOpen ? (
-              <div className="space-y-3 border-t border-neutral-200 bg-neutral-50/70 px-2 py-3">
+              <div className="space-y-3 border-t border-[var(--line)] bg-[var(--surface-muted)]/70 px-2 py-3">
                 {historyTaskGroups.map((group) => (
                   <TaskDateGroup key={`history-${group.key}`} label={group.label}>
                     {group.tasks.map((task) => (
@@ -455,21 +455,21 @@ export function StaffShareClient({
                 ))}
 
                 {historyPageCount > 1 ? (
-                  <div className="flex items-center justify-between gap-2 rounded-md border border-neutral-200 bg-white px-2 py-2">
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-[var(--line)] bg-white px-2 py-2">
                     <button
                       type="button"
-                      className="min-h-9 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 disabled:opacity-40"
+                      className="min-h-9 rounded-md border border-[var(--line)] bg-white px-3 text-xs font-semibold text-[var(--ink-mid)] disabled:opacity-40"
                       disabled={historyPage <= 1}
                       onClick={() => setHistoryPage((current) => Math.max(1, current - 1))}
                     >
                       {labels.previousPage}
                     </button>
-                    <span className="text-xs font-semibold text-neutral-500">
+                    <span className="text-xs font-semibold text-[var(--ink-soft)]">
                       {labels.pageStatus(historyPage, historyPageCount)}
                     </span>
                     <button
                       type="button"
-                      className="min-h-9 rounded-md border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 disabled:opacity-40"
+                      className="min-h-9 rounded-md border border-[var(--line)] bg-white px-3 text-xs font-semibold text-[var(--ink-mid)] disabled:opacity-40"
                       disabled={historyPage >= historyPageCount}
                       onClick={() => setHistoryPage((current) => Math.min(historyPageCount, current + 1))}
                     >
@@ -518,7 +518,7 @@ function TaskDateGroup({
 }) {
   return (
     <div className="space-y-2">
-      <h3 className="px-1 text-xs font-semibold text-neutral-500">{label}</h3>
+      <h3 className="px-1 text-xs font-semibold text-[var(--ink-soft)]">{label}</h3>
       {children}
     </div>
   );
@@ -549,7 +549,7 @@ function TaskCard({
   const closed = task.status === "done" || task.status === "cancelled";
   const cancelled = task.status === "cancelled";
   return (
-    <article className="rounded-md border border-neutral-200 bg-white p-3 shadow-sm">
+    <article className="rounded-md border border-[var(--line)] bg-white p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -558,15 +558,15 @@ function TaskCard({
               {getDisplayTaskTitle(task, labels)}
             </h3>
           </div>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-[var(--ink-soft)]">
             {formatTaskDue(task.dueDatetime, locale, labels.noDue)}
             {task.timeWindow ? ` · ${task.timeWindow}` : ""}
           </p>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-[var(--ink-soft)]">
             {[getVehicleLabel(labels, task), getOrderLabel(labels, task)].filter(Boolean).join(" · ")}
           </p>
           {task.details ? (
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-5 text-neutral-700">
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-5 text-[var(--ink-mid)]">
               {task.details}
             </p>
           ) : null}
@@ -585,7 +585,7 @@ function TaskCard({
       </div>
       <div className="mt-3 grid grid-cols-4 gap-1.5">
         {!closed ? (
-          <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-neutral-300 bg-neutral-50 text-neutral-700" onClick={() => onUnassign(task)}>
+          <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-[var(--line-strong)] bg-[var(--surface-muted)] text-[var(--ink-mid)]" onClick={() => onUnassign(task)}>
             <RotateCcw className="h-4 w-4" />
             <span className="text-center">{labels.unassign}</span>
           </button>
@@ -654,14 +654,14 @@ function StaffShareSubtasks({
       {subtasks.map((subtask) => {
         const closed = subtask.status === "done" || subtask.status === "cancelled";
         return (
-          <div key={subtask.id} className="rounded border border-neutral-200 bg-neutral-50 px-2 py-2">
+          <div key={subtask.id} className="rounded border border-[var(--line)] bg-[var(--surface-muted)] px-2 py-2">
             <div className="flex items-start gap-2">
-              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ink-soft)]" />
               <div className="min-w-0 flex-1">
-                <p className={`break-words text-xs font-semibold leading-4 text-neutral-800 ${closed ? "line-through" : ""}`}>
+                <p className={`break-words text-xs font-semibold leading-4 text-[var(--ink)] ${closed ? "line-through" : ""}`}>
                   {subtask.title}
                 </p>
-                <p className="mt-0.5 text-[11px] text-neutral-500">
+                <p className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
                   {formatTaskDue(subtask.dueDatetime, locale, labels.noDue)}
                   {subtask.timeWindow ? ` · ${subtask.timeWindow}` : ""}
                 </p>
@@ -671,7 +671,7 @@ function StaffShareSubtasks({
             {subtask.status !== "cancelled" ? (
               <div className="mt-2 grid grid-cols-4 gap-1">
                 {!closed ? (
-                  <button className="mobile-action !min-h-7 flex-col !gap-0.5 !px-0.5 !py-0.5 !text-[9px] leading-tight border-neutral-300 bg-white text-neutral-700" onClick={() => onUnassign(subtask)}>
+                  <button className="mobile-action !min-h-7 flex-col !gap-0.5 !px-0.5 !py-0.5 !text-[9px] leading-tight border-[var(--line-strong)] bg-white text-[var(--ink-mid)]" onClick={() => onUnassign(subtask)}>
                     <RotateCcw className="h-3 w-3" />
                     {labels.unassign}
                   </button>
@@ -777,10 +777,10 @@ function EditTaskModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/50 sm:items-center sm:justify-center">
-      <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-xl bg-white p-4 shadow-2xl sm:max-w-lg sm:rounded-xl">
+      <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-xl bg-white p-4 shadow-2xl sm:max-w-lg sm:rounded-lg">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{labels.edit}</h2>
-          <button className="flex h-9 w-9 items-center justify-center rounded-md border border-neutral-200" onClick={onClose}>
+          <button className="flex h-9 w-9 items-center justify-center rounded-md border border-[var(--line)]" onClick={onClose}>
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -805,7 +805,7 @@ function EditTaskModal({
           </label>
           <div>
             <span className="share-label">{labels.photos}</span>
-            <label className="flex min-h-20 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-neutral-300 bg-neutral-50 px-3 py-4 text-sm text-neutral-600">
+            <label className="flex min-h-20 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-[var(--line-strong)] bg-[var(--surface-muted)] px-3 py-4 text-sm text-[var(--ink-mid)]">
               <Upload className="h-5 w-5" />
               <span>{labels.uploadPhotos}</span>
               <input
@@ -831,11 +831,11 @@ function EditTaskModal({
             />
           </div>
         </div>
-        <div className="sticky bottom-0 -mx-4 mt-4 grid grid-cols-2 gap-2 border-t border-neutral-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
-          <button className="h-11 rounded-md border border-neutral-200 bg-white font-medium" onClick={onClose}>
+        <div className="sticky bottom-0 -mx-4 mt-4 grid grid-cols-2 gap-2 border-t border-[var(--line)] bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+          <button className="h-11 rounded-md border border-[var(--line)] bg-white font-medium" onClick={onClose}>
             {labels.cancel}
           </button>
-          <button className="h-11 rounded-md bg-neutral-950 font-medium text-white" disabled={saving} onClick={save}>
+          <button className="h-11 rounded-md bg-[var(--ink)] font-medium text-white" disabled={saving} onClick={save}>
             {saving ? labels.saving : labels.save}
           </button>
         </div>
@@ -865,14 +865,14 @@ function PhotoGrid({
           key={attachment.id}
           type="button"
           onClick={() => onPreview(attachment)}
-          className="aspect-square overflow-hidden rounded border border-neutral-200 bg-neutral-100"
+          className="aspect-square overflow-hidden rounded border border-[var(--line)] bg-[var(--surface-muted)]"
         >
           <img src={attachment.url} alt={attachment.filename || labels.photos} className="h-full w-full object-cover" />
         </button>
       ))}
       {pendingFiles.map((file, index) => (
-        <div key={`${file.name}-${index}`} className="relative aspect-square rounded border border-dashed border-neutral-300 bg-neutral-50 p-1">
-          <div className="flex h-full items-center justify-center text-center text-[10px] text-neutral-500">
+        <div key={`${file.name}-${index}`} className="relative aspect-square rounded border border-dashed border-[var(--line-strong)] bg-[var(--surface-muted)] p-1">
+          <div className="flex h-full items-center justify-center text-center text-[10px] text-[var(--ink-soft)]">
             <ImagePlus className="h-4 w-4" />
           </div>
           <button
@@ -906,7 +906,7 @@ function AttachmentStrip({
           key={attachment.id}
           type="button"
           onClick={() => onPreview(attachment)}
-          className={`${compact ? "h-10 w-10" : "h-16 w-16"} shrink-0 overflow-hidden rounded border border-neutral-200 bg-neutral-100`}
+          className={`${compact ? "h-10 w-10" : "h-16 w-16"} shrink-0 overflow-hidden rounded border border-[var(--line)] bg-[var(--surface-muted)]`}
         >
           <img src={attachment.url} alt={attachment.filename || labels.photos} className="h-full w-full object-cover" />
         </button>
@@ -984,7 +984,7 @@ function DueBadge({ labels, task }: { labels: ReturnType<typeof copy>; task: Sta
     return <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">{labels.complete}</span>;
   }
   if (task.status === "cancelled") {
-    return <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-600">{labels.delete}</span>;
+    return <span className="rounded bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold text-[var(--ink-mid)]">{labels.delete}</span>;
   }
   const dayOffset = getTaskDueDayOffset(task.dueDatetime);
   if (dayOffset == null) return null;

@@ -42,8 +42,8 @@ export function LanguageSwitcher({
   ];
 
   return (
-    <div className={cn("rounded-md border border-slate-200 bg-white/70 p-3", className)}>
-      <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{label}</p>
+    <div className={cn("rounded-md border border-[var(--line)] bg-white/70 p-3", className)}>
+      <p className="text-xs uppercase tracking-[0.25em] text-[var(--ink-soft)]">{label}</p>
       <div className="mt-2 grid grid-cols-4 gap-1.5">
         {options.map((option) => {
           const active = option.value === preference;
@@ -68,8 +68,8 @@ export function LanguageSwitcher({
               className={cn(
                 "rounded-md px-2 py-2 text-xs font-semibold transition",
                 active
-                  ? "bg-slate-950 text-white"
-                  : "border border-slate-200 bg-white text-slate-700 hover:border-slate-900 hover:text-slate-950",
+                  ? "bg-[var(--ink)] text-white"
+                  : "border border-[var(--line)] bg-white text-[var(--ink-mid)] hover:border-[var(--ink)] hover:text-[var(--ink)]",
                 isPending && !active ? "opacity-70" : "",
               )}
             >
@@ -78,7 +78,7 @@ export function LanguageSwitcher({
           );
         })}
       </div>
-      <p className="mt-2 text-[11px] text-slate-500">
+      <p className="mt-2 text-[11px] text-[var(--ink-soft)]">
         {hint}
         {preference === "auto" ? ` ${followingHint(locale)}` : ""}
       </p>
@@ -105,7 +105,7 @@ export function CompactLanguageSwitcher({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white/80 p-1 shadow-sm backdrop-blur",
+        "inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface)] p-1 backdrop-blur",
         className,
       )}
     >
@@ -129,8 +129,8 @@ export function CompactLanguageSwitcher({
             className={cn(
               "rounded-md px-3 py-1.5 text-xs font-semibold transition",
               active
-                ? "bg-slate-950 text-white"
-                : "text-slate-700 hover:bg-slate-100",
+                ? "bg-[var(--ink)] text-white"
+                : "text-[var(--ink-mid)] hover:bg-[var(--surface-muted)]",
               isPending && !active ? "opacity-60" : "",
             )}
           >

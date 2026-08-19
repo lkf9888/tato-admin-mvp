@@ -84,7 +84,7 @@ export function NewOwnerForm({ locale }: { locale: Locale }) {
   return (
     <div className="max-w-2xl p-4 sm:p-6">
       <div className="mb-6">
-        <Link href="/owners" className="text-sm text-neutral-500 hover:text-neutral-900">
+        <Link href="/owners" className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]">
           &lt; {labels.back}
         </Link>
         <h1 className="mt-2 text-2xl font-semibold">{labels.title}</h1>

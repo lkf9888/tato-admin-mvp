@@ -819,9 +819,9 @@ export function StaffScheduleClient({
     <div className="staff-schedule-surface mx-auto max-w-7xl space-y-4">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold text-neutral-400">{c.kicker}</p>
-          <h1 className="text-2xl font-semibold text-neutral-950">{c.title}</h1>
-          <p className="mt-1 max-w-3xl text-sm text-neutral-500">{c.subtitle}</p>
+          <p className="text-[11px] font-semibold text-[var(--ink-soft)]">{c.kicker}</p>
+          <h1 className="text-2xl font-semibold text-[var(--ink)]">{c.title}</h1>
+          <p className="mt-1 max-w-3xl text-sm text-[var(--ink-soft)]">{c.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button className="btn-secondary min-h-11 px-4 py-2 text-sm" onClick={() => setNotificationTemplateOpen(true)}>
@@ -838,10 +838,10 @@ export function StaffScheduleClient({
         </div>
       </section>
 
-      <p className="text-xs text-neutral-500">{c.dragHint}</p>
+      <p className="text-xs text-[var(--ink-soft)]">{c.dragHint}</p>
 
       {notice ? (
-        <div className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700">
+        <div className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink-mid)]">
           {notice}
         </div>
       ) : null}
@@ -872,7 +872,7 @@ export function StaffScheduleClient({
 
         <div className="min-w-0 space-y-2.5">
           {activeStaff.length === 0 ? (
-            <section className="card p-10 text-center text-sm text-neutral-500">{c.noStaff}</section>
+            <section className="card p-10 text-center text-sm text-[var(--ink-soft)]">{c.noStaff}</section>
           ) : (
             <section className="grid gap-2.5 2xl:grid-cols-2">
           {activeStaff.map((member) => (
@@ -911,7 +911,7 @@ export function StaffScheduleClient({
               )}
               style={{ backgroundColor: colorWithAlpha(member.color, 0.5) }}
             >
-              <div className="flex flex-col gap-2 border-b border-neutral-200 px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex flex-col gap-2 border-b border-[var(--line)] px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span
@@ -940,7 +940,7 @@ export function StaffScheduleClient({
                       <Pencil className="h-3 w-3" />
                     </button>
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-neutral-500">
+                  <p className="mt-0.5 truncate text-xs text-[var(--ink-soft)]">
                     {[member.role, member.phone, member.email].filter(Boolean).join(" · ") || c.staff}
                   </p>
                 </div>
@@ -958,24 +958,24 @@ export function StaffScheduleClient({
                   ) : null}
                 </div>
               </div>
-              <div className="border-b border-neutral-200 bg-white/35">
+              <div className="border-b border-[var(--line)] bg-white/35">
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-xs font-semibold text-neutral-800"
+                  className="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-xs font-semibold text-[var(--ink)]"
                   onClick={() => toggleStaffInfo(member.id)}
                   aria-expanded={openStaffInfoIds.has(member.id)}
                 >
                   <span>{c.staffInfo}</span>
-                  <span className="text-[11px] font-medium text-neutral-500">
+                  <span className="text-[11px] font-medium text-[var(--ink-soft)]">
                     {openStaffInfoIds.has(member.id) ? c.hideHistory : c.showHistory}
                   </span>
                 </button>
                 {openStaffInfoIds.has(member.id) ? (
-                  <div className="space-y-1 border-t border-neutral-200 bg-white/45 px-3 py-2 text-[11px] leading-5 text-neutral-600">
+                  <div className="space-y-1 border-t border-[var(--line)] bg-white/45 px-3 py-2 text-[11px] leading-5 text-[var(--ink-mid)]">
                     {member.miniProgramCode ? (
                       <p>
-                        <span className="font-semibold text-neutral-900">{c.miniProgramCode}: </span>
-                        <span className="font-mono tracking-[0.18em] text-neutral-950">{member.miniProgramCode}</span>
+                        <span className="font-semibold text-[var(--ink)]">{c.miniProgramCode}: </span>
+                        <span className="font-mono tracking-[0.18em] text-[var(--ink)]">{member.miniProgramCode}</span>
                         <span className="mx-1.5 text-neutral-300">·</span>
                         <span>{member.wechatOpenId ? c.wechatBound : c.wechatNotBound}</span>
                         <span className="mx-1.5 text-neutral-300">·</span>
@@ -983,14 +983,14 @@ export function StaffScheduleClient({
                       </p>
                     ) : null}
                     <p>
-                      <span className="font-semibold text-neutral-900">{c.pinned}: </span>
+                      <span className="font-semibold text-[var(--ink)]">{c.pinned}: </span>
                       {member.pinnedMessage || c.noPinned}
                     </p>
                   </div>
                 ) : null}
               </div>
               {dragOverTarget === member.id ? (
-                <div className="border-b border-neutral-200 bg-neutral-950 px-4 py-2 text-xs font-medium text-white">
+                <div className="border-b border-[var(--line)] bg-[var(--ink)] px-4 py-2 text-xs font-medium text-white">
                   {c.dropToAssign}
                 </div>
               ) : null}
@@ -1050,13 +1050,13 @@ export function StaffScheduleClient({
           }}
           className={cn(
             "card overflow-hidden transition",
-            dragOverTarget === "unassigned" ? "border-neutral-900 bg-neutral-50" : "",
+            dragOverTarget === "unassigned" ? "border-neutral-900 bg-[var(--surface-muted)]" : "",
           )}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-neutral-200 px-3 py-2.5">
+          <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-3 py-2.5">
             <div className="min-w-0">
               <h2 className="text-base font-semibold">{c.unassigned}</h2>
-              <p className="text-xs text-neutral-500">{c.unassignedHint}</p>
+              <p className="text-xs text-[var(--ink-soft)]">{c.unassignedHint}</p>
             </div>
             <button className="btn-primary min-h-7 shrink-0 px-2 py-1 text-[11px]" onClick={() => setTaskModal({ kind: "new" })}>
               <Plus className="h-3 w-3" />
@@ -1064,7 +1064,7 @@ export function StaffScheduleClient({
             </button>
           </div>
           {dragOverTarget === "unassigned" ? (
-            <div className="border-b border-neutral-200 bg-neutral-950 px-4 py-2 text-xs font-medium text-white">
+            <div className="border-b border-[var(--line)] bg-[var(--ink)] px-4 py-2 text-xs font-medium text-white">
               {c.dropToAssign}
             </div>
           ) : null}
@@ -1095,17 +1095,17 @@ export function StaffScheduleClient({
         <article className="card overflow-hidden">
           <button
             type="button"
-            className="flex w-full items-center justify-between gap-3 border-b border-neutral-200 px-3 py-2.5 text-left"
+            className="flex w-full items-center justify-between gap-3 border-b border-[var(--line)] px-3 py-2.5 text-left"
             onClick={() => setHistoryOpen((open) => !open)}
           >
             <h2 className="text-base font-semibold">{c.history}</h2>
-            <span className="text-xs font-medium text-neutral-500">
+            <span className="text-xs font-medium text-[var(--ink-soft)]">
               {historyOpen ? c.hideHistory : c.showHistory} · {c.historyCount(completedTasks.length)}
             </span>
           </button>
           {historyOpen ? (
             <>
-              <div className="border-b border-neutral-200 px-3 py-2">
+              <div className="border-b border-[var(--line)] px-3 py-2">
                 <label className="block">
                   <span className="sr-only">{c.historySearch}</span>
                   <input
@@ -1136,7 +1136,7 @@ export function StaffScheduleClient({
                 onAddSubtask={createSubtask}
                 onUploadPhotos={uploadTaskPhotos}
               />
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] px-3 py-2">
                 <button
                   type="button"
                   className="btn-secondary min-h-8 px-2 py-1 text-[11px]"
@@ -1145,7 +1145,7 @@ export function StaffScheduleClient({
                 >
                   {c.previousPage}
                 </button>
-                <span className="text-xs font-medium text-neutral-500">
+                <span className="text-xs font-medium text-[var(--ink-soft)]">
                   {c.pageStatus(normalizedHistoryPage, historyPageCount)}
                 </span>
                 <button
@@ -1159,7 +1159,7 @@ export function StaffScheduleClient({
               </div>
             </>
           ) : (
-            <div className="px-3 py-4 text-sm text-neutral-500">{c.historyCount(completedTasks.length)}</div>
+            <div className="px-3 py-4 text-sm text-[var(--ink-soft)]">{c.historyCount(completedTasks.length)}</div>
           )}
         </article>
           </section>
@@ -1248,7 +1248,7 @@ function UpcomingOrderPanel({
         <div className="flex items-center justify-between gap-2 px-3 py-2 xl:hidden">
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold">{copy.upcomingOrders}</h2>
-            <p className="text-xs text-neutral-500">{orderEvents.length}</p>
+            <p className="text-xs text-[var(--ink-soft)]">{orderEvents.length}</p>
           </div>
           <button className="btn-secondary min-h-7 min-w-7 px-1 py-1 text-[11px]" onClick={onToggleCollapsed}>
             <ChevronRight className="h-3.5 w-3.5" />
@@ -1257,13 +1257,13 @@ function UpcomingOrderPanel({
         </div>
         <button
           type="button"
-          className="hidden min-h-[14rem] w-full flex-col items-center gap-3 px-2 py-3 text-center text-neutral-700 transition hover:bg-neutral-50 xl:flex"
+          className="hidden min-h-[14rem] w-full flex-col items-center gap-3 px-2 py-3 text-center text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] xl:flex"
           onClick={onToggleCollapsed}
           aria-label={copy.showHistory}
         >
           <ChevronRight className="h-4 w-4" />
           <span className="text-xs font-semibold [writing-mode:vertical-rl]">{copy.upcomingOrders}</span>
-          <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] font-semibold">{orderEvents.length}</span>
+          <span className="rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[11px] font-semibold">{orderEvents.length}</span>
         </button>
       </section>
     );
@@ -1271,22 +1271,22 @@ function UpcomingOrderPanel({
 
   return (
     <section className="card overflow-hidden xl:sticky xl:top-4">
-      <div className="flex items-start justify-between gap-2 border-b border-neutral-200 px-3 py-2">
+      <div className="flex items-start justify-between gap-2 border-b border-[var(--line)] px-3 py-2">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold">{copy.upcomingOrders}</h2>
-          <p className="line-clamp-2 text-[11px] leading-4 text-neutral-500">{copy.upcomingOrdersHint}</p>
+          <p className="line-clamp-2 text-[11px] leading-4 text-[var(--ink-soft)]">{copy.upcomingOrdersHint}</p>
         </div>
         <button className="btn-secondary min-h-7 min-w-7 shrink-0 px-1 py-1 text-[11px]" onClick={onToggleCollapsed}>
           <ChevronLeft className="h-3.5 w-3.5" />
         </button>
       </div>
       {orderEvents.length === 0 ? (
-        <div className="px-3 py-3 text-xs text-neutral-500">{copy.noUpcomingOrders}</div>
+        <div className="px-3 py-3 text-xs text-[var(--ink-soft)]">{copy.noUpcomingOrders}</div>
       ) : (
         <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
           {groups.map((group) => (
-            <div key={group.key} className="min-w-0 border-b border-neutral-100 last:border-b-0">
-              <div className="bg-neutral-50 px-2.5 py-1.5 text-[11px] font-semibold text-neutral-600">
+            <div key={group.key} className="min-w-0 border-b border-[var(--line)] last:border-b-0">
+              <div className="bg-[var(--surface-muted)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--ink-mid)]">
                 {group.label}
               </div>
               <div className="space-y-1.5 p-1.5">
@@ -1304,7 +1304,7 @@ function UpcomingOrderPanel({
                     />
                   ))
                 ) : (
-                  <div className="px-2 py-4 text-xs text-neutral-400">{copy.noTasks}</div>
+                  <div className="px-2 py-4 text-xs text-[var(--ink-soft)]">{copy.noTasks}</div>
                 )}
               </div>
             </div>
@@ -1341,7 +1341,7 @@ function OrderEventCard({
         onDragStart(orderEvent);
       }}
       onDragEnd={onDragEnd}
-      className="cursor-grab border border-neutral-200 bg-neutral-50 p-1.5 active:cursor-grabbing"
+      className="cursor-grab border border-[var(--line)] bg-[var(--surface-muted)] p-1.5 active:cursor-grabbing"
     >
       <div className="flex items-center gap-1.5">
         <div className="min-w-0 flex-1">
@@ -1356,15 +1356,15 @@ function OrderEventCard({
             >
               {orderEvent.kind === "pickup" ? copy.pickup : copy.returnCar}
             </span>
-            <span className="shrink-0 text-[10px] font-semibold text-neutral-600">
+            <span className="shrink-0 text-[10px] font-semibold text-[var(--ink-mid)]">
               {formatOrderEventTime(orderEvent.datetime, locale)}
             </span>
           </div>
-          <p className="mt-0.5 truncate text-[11px] font-semibold leading-4 text-neutral-950">
+          <p className="mt-0.5 truncate text-[11px] font-semibold leading-4 text-[var(--ink)]">
             {orderEvent.vehicleLabel} · {orderEvent.renterName}
           </p>
           {orderEvent.location ? (
-            <p className="mt-0.5 truncate text-[10px] leading-3 text-neutral-500">
+            <p className="mt-0.5 truncate text-[10px] leading-3 text-[var(--ink-soft)]">
               {getOrderEventAddressLabel(orderEvent, copy)}: {orderEvent.location}
             </p>
           ) : null}
@@ -1451,11 +1451,11 @@ function TaskList({
   deleteLabel?: string;
 }) {
   if (tasks.length === 0) {
-    return <div className="px-3 py-4 text-sm text-neutral-500">{copy.noTasks}</div>;
+    return <div className="px-3 py-4 text-sm text-[var(--ink-soft)]">{copy.noTasks}</div>;
   }
 
   return (
-    <div className="divide-y divide-neutral-200">
+    <div className="divide-y divide-[var(--line)]">
       {tasks.map((task) => (
         <TaskListItem
           key={task.id}
@@ -1552,7 +1552,7 @@ function TaskListItem({
       className={cn(
         "px-3 py-2 transition",
         task.status !== "done" && task.status !== "cancelled" ? "cursor-grab active:cursor-grabbing" : "",
-        dragTaskId === task.id ? "bg-neutral-50 opacity-60" : "",
+        dragTaskId === task.id ? "bg-[var(--surface-muted)] opacity-60" : "",
         dragOverTaskId === task.id ? "bg-amber-50" : "",
       )}
     >
@@ -1575,24 +1575,24 @@ function TaskListItem({
                 </span>
               ) : null}
               {task.attachments.length > 0 ? (
-                <span className="badge bg-neutral-100 text-neutral-600">
+                <span className="badge bg-[var(--surface-muted)] text-[var(--ink-mid)]">
                   <ImagePlus className="h-3 w-3" />
                   {task.attachments.length}
                 </span>
               ) : null}
-              <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-950">
+              <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ink)]">
                 {getDisplayTaskTitle(task, copy)}
               </h3>
             </div>
-            <p className="mt-0.5 text-xs leading-4 text-neutral-500">
+            <p className="mt-0.5 text-xs leading-4 text-[var(--ink-soft)]">
               {formatTaskDue(task.dueDatetime, locale, copy.noDue)}
               {task.timeWindow ? ` · ${task.timeWindow}` : ""}
             </p>
             {contextText ? (
-              <p className="mt-0.5 truncate text-xs leading-4 text-neutral-500">{contextText}</p>
+              <p className="mt-0.5 truncate text-xs leading-4 text-[var(--ink-soft)]">{contextText}</p>
             ) : null}
             {detailsText ? (
-              <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-neutral-600">{detailsText}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[var(--ink-mid)]">{detailsText}</p>
             ) : null}
           </div>
           <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
@@ -1600,7 +1600,7 @@ function TaskListItem({
         <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
           {canAddSubtask && !isAddingSubtask ? (
             <button
-              className="btn-secondary min-h-7 px-2 py-1 text-[11px] text-neutral-700"
+              className="btn-secondary min-h-7 px-2 py-1 text-[11px] text-[var(--ink-mid)]"
               type="button"
               onClick={() => setIsAddingSubtask(true)}
             >
@@ -1706,22 +1706,22 @@ function SubtaskList({
             }}
             onDragEnd={onDragEnd}
             className={cn(
-              "border border-neutral-200 bg-white/60 px-2 py-1.5 text-[11px] transition",
+              "border border-[var(--line)] bg-white/60 px-2 py-1.5 text-[11px] transition",
               !closed ? "cursor-grab active:cursor-grabbing" : "opacity-70",
-              dragTaskId === subtask.id ? "bg-neutral-50 opacity-60" : "",
+              dragTaskId === subtask.id ? "bg-[var(--surface-muted)] opacity-60" : "",
             )}
           >
             <div className="flex items-start gap-2">
               <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-300" />
               <div className="min-w-0 flex-1">
-                <p className={cn("break-words font-medium leading-4 text-neutral-800", closed ? "line-through" : "")}>
+                <p className={cn("break-words font-medium leading-4 text-[var(--ink)]", closed ? "line-through" : "")}>
                   {subtask.title}
                 </p>
-                <p className="mt-0.5 text-[10px] leading-3 text-neutral-500">
+                <p className="mt-0.5 text-[10px] leading-3 text-[var(--ink-soft)]">
                   {formatTaskDue(subtask.dueDatetime ?? parentTask.dueDatetime, locale, copy.noDue)}
                   {subtask.timeWindow ? ` · ${subtask.timeWindow}` : ""}
                 </p>
-                <p className="mt-0.5 text-[10px] leading-3 text-neutral-400">{copy.subtaskPromoteHint}</p>
+                <p className="mt-0.5 text-[10px] leading-3 text-[var(--ink-soft)]">{copy.subtaskPromoteHint}</p>
                 <TaskAttachmentStrip attachments={subtask.attachments} copy={copy} compact />
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -1775,30 +1775,30 @@ function ArchivedStaffPanel({
 }) {
   return (
     <section className="card overflow-hidden">
-      <div className="border-b border-neutral-200 px-3 py-2.5">
+      <div className="border-b border-[var(--line)] px-3 py-2.5">
         <h2 className="text-base font-semibold">{copy.archivedStaffTitle}</h2>
-        <p className="text-xs text-neutral-500">{copy.archivedStaffHint}</p>
+        <p className="text-xs text-[var(--ink-soft)]">{copy.archivedStaffHint}</p>
       </div>
       {members.length === 0 ? (
-        <div className="px-3 py-4 text-sm text-neutral-500">{copy.noArchivedStaff}</div>
+        <div className="px-3 py-4 text-sm text-[var(--ink-soft)]">{copy.noArchivedStaff}</div>
       ) : (
-        <div className="divide-y divide-neutral-200">
+        <div className="divide-y divide-[var(--line)]">
           {members.map((member) => (
             <article key={member.id} className="px-3 py-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: member.color }} />
-                    <h3 className="truncate text-sm font-semibold text-neutral-950">{member.name}</h3>
-                    <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-600">
+                    <h3 className="truncate text-sm font-semibold text-[var(--ink)]">{member.name}</h3>
+                    <span className="shrink-0 rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-mid)]">
                       {copy.archived}
                     </span>
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-neutral-500">
+                  <p className="mt-0.5 truncate text-xs text-[var(--ink-soft)]">
                     {[member.role, member.phone, member.email].filter(Boolean).join(" · ") || copy.staff}
                   </p>
                 </div>
-                <span className="text-xs text-neutral-500">
+                <span className="text-xs text-[var(--ink-soft)]">
                   {copy.historyCount(tasksByStaff.get(member.id)?.length ?? 0)}
                 </span>
               </div>
@@ -1825,11 +1825,11 @@ function ArchivedTaskList({
   tasks: StaffTask[];
 }) {
   if (tasks.length === 0) {
-    return <div className="mt-2 text-sm text-neutral-500">{copy.noTasks}</div>;
+    return <div className="mt-2 text-sm text-[var(--ink-soft)]">{copy.noTasks}</div>;
   }
 
   return (
-    <div className="mt-2 divide-y divide-neutral-100 border-t border-neutral-100">
+    <div className="mt-2 divide-y divide-[var(--line)] border-t border-[var(--line)]">
       {tasks.map((task) => (
         <ArchivedTaskRow key={task.id} copy={copy} locale={locale} task={task} />
       ))}
@@ -1854,17 +1854,17 @@ function ArchivedTaskRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-600">
+            <span className="shrink-0 rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-mid)]">
               {copy.statusLabels[task.status]}
             </span>
-            <p className="truncate text-sm font-semibold text-neutral-900">{getDisplayTaskTitle(task, copy)}</p>
+            <p className="truncate text-sm font-semibold text-[var(--ink)]">{getDisplayTaskTitle(task, copy)}</p>
           </div>
-          <p className="mt-0.5 text-xs leading-4 text-neutral-500">
+          <p className="mt-0.5 text-xs leading-4 text-[var(--ink-soft)]">
             {formatTaskDue(task.dueDatetime, locale, copy.noDue)}
             {task.timeWindow ? ` · ${task.timeWindow}` : ""}
           </p>
-          {contextText ? <p className="mt-0.5 truncate text-xs leading-4 text-neutral-500">{contextText}</p> : null}
-          {detailsText ? <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-neutral-600">{detailsText}</p> : null}
+          {contextText ? <p className="mt-0.5 truncate text-xs leading-4 text-[var(--ink-soft)]">{contextText}</p> : null}
+          {detailsText ? <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[var(--ink-mid)]">{detailsText}</p> : null}
         </div>
         <TaskAttachmentStrip attachments={task.attachments} copy={copy} />
       </div>
@@ -1951,12 +1951,12 @@ function StaffModal({
           <textarea className="input min-h-24" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
         </Field>
         {staff?.miniProgramCode ? (
-          <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+          <div className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-sm text-[var(--ink-mid)]">
             <div>
-              <p className="text-xs font-semibold text-neutral-500">{copy.miniProgramCode}</p>
-              <p className="font-mono text-base font-semibold tracking-[0.22em] text-neutral-950">{staff.miniProgramCode}</p>
+              <p className="text-xs font-semibold text-[var(--ink-soft)]">{copy.miniProgramCode}</p>
+              <p className="font-mono text-base font-semibold tracking-[0.22em] text-[var(--ink)]">{staff.miniProgramCode}</p>
             </div>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-xs text-[var(--ink-soft)]">
               {staff.wechatOpenId ? copy.wechatBound : copy.wechatNotBound} ·{" "}
               {staff.wechatNotificationEnabled ? copy.wechatNotifyOn : copy.wechatNotifyOff}
             </p>
@@ -2020,7 +2020,7 @@ function NotificationTemplateModal({
   return (
     <Modal title={copy.notificationTemplateTitle} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
-        <p className="text-sm leading-5 text-neutral-500">{copy.notificationTemplateHint}</p>
+        <p className="text-sm leading-5 text-[var(--ink-soft)]">{copy.notificationTemplateHint}</p>
         <Field label={copy.emailSubjectTemplate}>
           <input
             className="input"
@@ -2042,13 +2042,13 @@ function NotificationTemplateModal({
             onChange={(event) => setForm({ ...form, smsBodyTemplate: event.target.value })}
           />
         </Field>
-        <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2">
-          <p className="text-xs font-semibold text-neutral-500">{copy.templateVariables}</p>
+        <div className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2">
+          <p className="text-xs font-semibold text-[var(--ink-soft)]">{copy.templateVariables}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {STAFF_TASK_TEMPLATE_VARIABLES.map((variable) => (
               <span
                 key={variable}
-                className="border border-neutral-200 bg-white px-2 py-1 font-mono text-[11px] text-neutral-700"
+                className="border border-[var(--line)] bg-white px-2 py-1 font-mono text-[11px] text-[var(--ink-mid)]"
               >
                 {`{${variable}}`}
               </span>
@@ -2297,15 +2297,15 @@ function TaskModal({
             }}
             className={cn(
               "flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-4 text-center text-sm transition",
-              isDraggingPhotos ? "border-neutral-900 bg-neutral-50" : "border-neutral-300 bg-white",
+              isDraggingPhotos ? "border-neutral-900 bg-[var(--surface-muted)]" : "border-[var(--line-strong)] bg-white",
             )}
           >
-            <ImagePlus className="h-5 w-5 text-neutral-500" />
-            <span className="font-medium text-neutral-800">
+            <ImagePlus className="h-5 w-5 text-[var(--ink-soft)]" />
+            <span className="font-medium text-[var(--ink)]">
               {uploading ? copy.compressingPhotos : copy.uploadPhotos}
             </span>
             {!task && pendingFiles.length > 0 ? (
-              <span className="text-xs text-neutral-500">
+              <span className="text-xs text-[var(--ink-soft)]">
                 {pendingFiles.length} · {copy.pendingPhotos}
               </span>
             ) : null}
@@ -2346,7 +2346,7 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button className="staff-modal-backdrop absolute inset-0 bg-black/40" onClick={onClose} aria-label="Close" />
       <div className="relative max-h-[88vh] w-[min(42rem,calc(100vw-2rem))] overflow-y-auto rounded-lg bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
           <h2 className="text-base font-semibold">{title}</h2>
           <button className="btn-secondary px-2 py-1 text-xs" onClick={onClose}>×</button>
         </div>
@@ -2402,7 +2402,7 @@ function SearchTextField({
           <option key={option.id} value={option.label} />
         ))}
       </datalist>
-      <p className="mt-1 text-[11px] leading-4 text-neutral-500">{hint}</p>
+      <p className="mt-1 text-[11px] leading-4 text-[var(--ink-soft)]">{hint}</p>
     </Field>
   );
 }
@@ -2427,8 +2427,8 @@ function TaskPhotoGrid({
   return (
     <div className="mt-3 grid gap-2 sm:grid-cols-3">
       {attachments.map((attachment) => (
-        <div key={attachment.id} className="group relative overflow-hidden border border-neutral-200 bg-neutral-50">
-          <div className="aspect-[4/3] bg-neutral-100">
+        <div key={attachment.id} className="group relative overflow-hidden border border-[var(--line)] bg-[var(--surface-muted)]">
+          <div className="aspect-[4/3] bg-[var(--surface-muted)]">
             <img
               src={attachment.url}
               alt={attachment.filename || copy.photos}
@@ -2436,15 +2436,15 @@ function TaskPhotoGrid({
             />
           </div>
           <div className="min-w-0 px-2 py-1.5">
-            <p className="truncate text-[11px] font-medium text-neutral-700">
+            <p className="truncate text-[11px] font-medium text-[var(--ink-mid)]">
               {attachment.filename || copy.photos}
             </p>
-            <p className="text-[10px] text-neutral-500">{formatFileSize(attachment.size)}</p>
+            <p className="text-[10px] text-[var(--ink-soft)]">{formatFileSize(attachment.size)}</p>
           </div>
           {taskId ? (
             <button
               type="button"
-              className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center border border-neutral-200 bg-white text-neutral-700 shadow-sm"
+              className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center border border-[var(--line)] bg-white text-[var(--ink-mid)]"
               aria-label={copy.removePhoto}
               onClick={() => onDeleteUploaded(attachment)}
             >
@@ -2454,15 +2454,15 @@ function TaskPhotoGrid({
         </div>
       ))}
       {pendingFiles.map((file, index) => (
-        <div key={`${file.name}-${index}`} className="relative border border-dashed border-neutral-300 bg-neutral-50 p-3">
-          <div className="flex min-h-20 flex-col items-center justify-center gap-2 text-center text-xs text-neutral-600">
-            <ImagePlus className="h-5 w-5 text-neutral-400" />
-            <span className="line-clamp-2 break-all font-medium text-neutral-800">{file.name}</span>
+        <div key={`${file.name}-${index}`} className="relative border border-dashed border-[var(--line-strong)] bg-[var(--surface-muted)] p-3">
+          <div className="flex min-h-20 flex-col items-center justify-center gap-2 text-center text-xs text-[var(--ink-mid)]">
+            <ImagePlus className="h-5 w-5 text-[var(--ink-soft)]" />
+            <span className="line-clamp-2 break-all font-medium text-[var(--ink)]">{file.name}</span>
             <span>{copy.pendingPhotos}</span>
           </div>
           <button
             type="button"
-            className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center border border-neutral-200 bg-white text-neutral-700 shadow-sm"
+            className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center border border-[var(--line)] bg-white text-[var(--ink-mid)]"
             aria-label={copy.removePhoto}
             onClick={() => onDeletePending(index)}
           >
@@ -2493,7 +2493,7 @@ function TaskAttachmentStrip({
       {visibleAttachments.map((attachment) => (
         <div
           key={attachment.id}
-          className={cn("overflow-hidden border border-neutral-200 bg-neutral-100", compact ? "h-8 w-8" : "h-12 w-12")}
+          className={cn("overflow-hidden border border-[var(--line)] bg-[var(--surface-muted)]", compact ? "h-8 w-8" : "h-12 w-12")}
         >
           <img
             src={attachment.url}
@@ -2506,7 +2506,7 @@ function TaskAttachmentStrip({
       {hiddenCount > 0 ? (
         <div
           className={cn(
-            "flex items-center justify-center border border-neutral-200 bg-neutral-50 text-xs font-semibold text-neutral-600",
+            "flex items-center justify-center border border-[var(--line)] bg-[var(--surface-muted)] text-xs font-semibold text-[var(--ink-mid)]",
             compact ? "h-8 w-8" : "h-12 w-12",
           )}
         >

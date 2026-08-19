@@ -37,15 +37,15 @@ export default async function ImportsPage({
 
   return (
     <div className="space-y-3">
-      <section className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
         <div className="flex flex-col gap-1">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
             {turoSyncMessages.kicker}
           </p>
-          <h3 className="font-serif text-[1.05rem] text-slate-950 sm:text-[1.25rem]">
+          <h3 className="font-serif text-[1.05rem] text-[var(--ink)] sm:text-[1.25rem]">
             {turoSyncMessages.title}
           </h3>
-          <p className="max-w-3xl text-[12px] leading-5 text-slate-500">
+          <p className="max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
             {turoSyncMessages.copy}
           </p>
         </div>
@@ -59,51 +59,51 @@ export default async function ImportsPage({
         <form action={saveTuroSyncSettingsAction} className="mt-3 grid gap-2 text-[12px] sm:gap-2.5">
           <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px]">
             <label className="grid gap-1">
-              <span className="font-medium text-slate-700">{turoSyncMessages.csvUrl}</span>
+              <span className="font-medium text-[var(--ink-mid)]">{turoSyncMessages.csvUrl}</span>
               <input
                 name="csvUrl"
                 type="text"
                 inputMode="url"
                 defaultValue={turoSyncConfig?.csvUrl ?? ""}
                 placeholder="https://turo.com/api/earnings/download?year={year}"
-                className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                className="min-h-9 border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
               />
             </label>
             <label className="grid gap-1">
-              <span className="font-medium text-slate-700">{turoSyncMessages.csvYear}</span>
+              <span className="font-medium text-[var(--ink-mid)]">{turoSyncMessages.csvYear}</span>
               <SearchableSelect
                 name="csvYear"
                 defaultValue={String(turoSyncYear)}
                 options={turoYearOptions.map((year) => ({ value: String(year), label: String(year) }))}
                 placeholder={turoSyncMessages.csvYear}
                 searchPlaceholder={turoSyncMessages.csvYear}
-                className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                className="min-h-9 border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
               />
             </label>
           </div>
 
-          <div className="border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-4 text-slate-500">
-            <span className="font-medium text-slate-700">{turoSyncMessages.discoveredEndpointLabel}</span>{" "}
-            <code className="break-all text-slate-700">
+          <div className="border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[11px] leading-4 text-[var(--ink-soft)]">
+            <span className="font-medium text-[var(--ink-mid)]">{turoSyncMessages.discoveredEndpointLabel}</span>{" "}
+            <code className="break-all text-[var(--ink-mid)]">
               https://turo.com/api/earnings/download?year={"{year}"}
             </code>
             <span className="block pt-1">{turoSyncMessages.discoveredEndpointHint}</span>
           </div>
 
           <label className="grid gap-1">
-            <span className="font-medium text-slate-700">{turoSyncMessages.curlLabel}</span>
+            <span className="font-medium text-[var(--ink-mid)]">{turoSyncMessages.curlLabel}</span>
             <textarea
               name="csvCurl"
               placeholder="curl 'https://turo.com/api/earnings/download?year=2026' -H 'cookie: ...'"
               rows={4}
-              className="border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-[11px] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 font-mono text-[11px] outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
             />
-            <span className="text-[11px] leading-4 text-slate-500">{turoSyncMessages.curlHint}</span>
+            <span className="text-[11px] leading-4 text-[var(--ink-soft)]">{turoSyncMessages.curlHint}</span>
           </label>
 
           <div className="grid gap-2 md:grid-cols-2">
             <label className="grid gap-1">
-              <span className="font-medium text-slate-700">{turoSyncMessages.authHeader}</span>
+              <span className="font-medium text-[var(--ink-mid)]">{turoSyncMessages.authHeader}</span>
               <input
                 name="csvAuthHeader"
                 placeholder={
@@ -111,11 +111,11 @@ export default async function ImportsPage({
                     ? turoSyncMessages.savedSecretPlaceholder
                     : "Bearer ..."
                 }
-                className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                className="min-h-9 border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
               />
             </label>
             <label className="grid gap-1">
-              <span className="font-medium text-slate-700">{turoSyncMessages.headers}</span>
+              <span className="font-medium text-[var(--ink-mid)]">{turoSyncMessages.headers}</span>
               <input
                 name="csvHeaders"
                 placeholder={
@@ -123,34 +123,34 @@ export default async function ImportsPage({
                     ? turoSyncMessages.savedSecretPlaceholder
                     : '{"x-api-key":"..."}'
                 }
-                className="min-h-9 border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                className="min-h-9 border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
               />
             </label>
           </div>
 
           {hasSavedRequestHeaders ? (
-            <label className="flex items-start gap-2 border border-slate-200 bg-slate-50 px-3 py-2">
+            <label className="flex items-start gap-2 border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2">
               <input name="clearSyncHeaders" type="checkbox" className="mt-0.5" />
               <span>
-                <span className="block font-medium text-slate-700">{turoSyncMessages.clearHeaders}</span>
-                <span className="text-[11px] leading-4 text-slate-500">{turoSyncMessages.clearHeadersHint}</span>
+                <span className="block font-medium text-[var(--ink-mid)]">{turoSyncMessages.clearHeaders}</span>
+                <span className="text-[11px] leading-4 text-[var(--ink-soft)]">{turoSyncMessages.clearHeadersHint}</span>
               </span>
             </label>
           ) : null}
 
           <label className="grid gap-1">
-            <span className="font-medium text-slate-700">{turoSyncMessages.mapping}</span>
+            <span className="font-medium text-[var(--ink-mid)]">{turoSyncMessages.mapping}</span>
             <textarea
               name="csvMapping"
               defaultValue={turoSyncConfig?.csvMapping ?? ""}
               placeholder='{"Reservation ID":"externalOrderId"}'
               rows={3}
-              className="border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
             />
           </label>
 
           <div className="grid gap-2">
-            <label className="flex items-start gap-2 border border-slate-200 bg-slate-50 px-3 py-2">
+            <label className="flex items-start gap-2 border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2">
               <input
                 name="createMissingVehicles"
                 type="checkbox"
@@ -158,15 +158,15 @@ export default async function ImportsPage({
                 className="mt-0.5"
               />
               <span>
-                <span className="block font-medium text-slate-700">{turoSyncMessages.createMissing}</span>
-                <span className="text-slate-500">{turoSyncMessages.createMissingHint}</span>
+                <span className="block font-medium text-[var(--ink-mid)]">{turoSyncMessages.createMissing}</span>
+                <span className="text-[var(--ink-soft)]">{turoSyncMessages.createMissingHint}</span>
               </span>
             </label>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[11px] leading-4 text-slate-500">{turoSyncMessages.note}</p>
-            <button className="min-h-9 bg-slate-950 px-4 py-2 font-medium text-white">
+            <p className="text-[11px] leading-4 text-[var(--ink-soft)]">{turoSyncMessages.note}</p>
+            <button className="min-h-9 bg-[var(--ink)] px-4 py-2 font-medium text-white">
               {turoSyncMessages.save}
             </button>
           </div>
@@ -191,44 +191,44 @@ export default async function ImportsPage({
         billingState={params.billing ?? null}
       />
 
-      <section className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
               {importMessages.logKicker}
             </p>
-            <h3 className="mt-1 font-serif text-[1.05rem] text-slate-950 sm:text-[1.25rem]">{importMessages.logTitle}</h3>
+            <h3 className="mt-1 font-serif text-[1.05rem] text-[var(--ink)] sm:text-[1.25rem]">{importMessages.logTitle}</h3>
           </div>
-          <p className="text-[12px] text-slate-500">{importMessages.sampleFile}</p>
+          <p className="text-[12px] text-[var(--ink-soft)]">{importMessages.sampleFile}</p>
         </div>
 
-        <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
-          <table className="min-w-full divide-y divide-slate-200 text-left text-[12px]">
-            <thead className="bg-slate-50">
+        <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--line)]">
+          <table className="min-w-full divide-y divide-[var(--line)] text-left text-[12px]">
+            <thead className="bg-[var(--surface-muted)]">
               <tr>
-                <th className="px-3 py-2 font-semibold text-slate-700">{importMessages.table.file}</th>
-                <th className="px-3 py-2 font-semibold text-slate-700">
+                <th className="px-3 py-2 font-semibold text-[var(--ink-mid)]">{importMessages.table.file}</th>
+                <th className="px-3 py-2 font-semibold text-[var(--ink-mid)]">
                   {importMessages.table.importedBy}
                 </th>
-                <th className="px-3 py-2 font-semibold text-slate-700">
+                <th className="px-3 py-2 font-semibold text-[var(--ink-mid)]">
                   {importMessages.table.importedAt}
                 </th>
-                <th className="px-3 py-2 font-semibold text-slate-700">{importMessages.table.rows}</th>
-                <th className="px-3 py-2 font-semibold text-slate-700">
+                <th className="px-3 py-2 font-semibold text-[var(--ink-mid)]">{importMessages.table.rows}</th>
+                <th className="px-3 py-2 font-semibold text-[var(--ink-mid)]">
                   {importMessages.table.result}
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-[var(--line)] bg-white">
               {batches.map((batch) => (
                 <tr key={batch.id}>
-                  <td className="px-3 py-2 text-slate-700">{batch.fileName}</td>
-                  <td className="px-3 py-2 text-slate-600">{batch.importedBy}</td>
-                  <td className="px-3 py-2 text-slate-600">
+                  <td className="px-3 py-2 text-[var(--ink-mid)]">{batch.fileName}</td>
+                  <td className="px-3 py-2 text-[var(--ink-mid)]">{batch.importedBy}</td>
+                  <td className="px-3 py-2 text-[var(--ink-mid)]">
                     {formatDateTime(batch.importedAt, locale)}
                   </td>
-                  <td className="px-3 py-2 text-slate-600">{batch.totalRows}</td>
-                  <td className="px-3 py-2 text-slate-600">
+                  <td className="px-3 py-2 text-[var(--ink-mid)]">{batch.totalRows}</td>
+                  <td className="px-3 py-2 text-[var(--ink-mid)]">
                     {importMessages.table.batchResult(batch.successRows, batch.failedRows)}
                   </td>
                 </tr>

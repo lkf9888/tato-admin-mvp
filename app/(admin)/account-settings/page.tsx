@@ -46,7 +46,7 @@ export default async function AccountSettingsPage({
 
   return (
     <div className="space-y-3">
-      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 shadow-sm sm:px-4">
+      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
         <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
           {t.kicker}
         </p>
@@ -259,7 +259,7 @@ export default async function AccountSettingsPage({
         </SettingsCard>
       </div>
 
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 shadow-sm sm:px-4">
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
         <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
           {t.optionalTitle}
         </p>
@@ -273,7 +273,7 @@ export default async function AccountSettingsPage({
         </ul>
       </section>
 
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 shadow-sm sm:px-4">
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
           {t.ledgerTitle}
         </p>
@@ -346,7 +346,7 @@ function SettingsCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 shadow-sm sm:px-4">
+    <section className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
       <h2 className="text-[1rem] font-semibold text-[var(--ink)]">{title}</h2>
       <p className="mt-1.5 text-[12px] leading-5 text-[var(--ink-soft)]">{copy}</p>
       <div className="mt-3">{children}</div>

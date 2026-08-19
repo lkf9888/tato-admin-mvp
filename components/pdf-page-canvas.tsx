@@ -140,7 +140,7 @@ export function PdfPageCanvas({
     <div ref={wrapperRef} className={className} aria-hidden="true">
       <canvas ref={canvasRef} className="block h-full w-full bg-white" />
       {failed ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-white text-xs text-neutral-500">
+        <div className="absolute inset-0 flex items-center justify-center bg-white text-xs text-[var(--ink-soft)]">
           PDF 预览加载失败
         </div>
       ) : null}

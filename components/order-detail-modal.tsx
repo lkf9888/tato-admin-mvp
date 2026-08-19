@@ -228,7 +228,7 @@ export function OrderDetailModal({
   const primaryButtonClass =
     "inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3.5 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] disabled:cursor-not-allowed disabled:opacity-50";
   const secondaryButtonClass =
-    "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] shadow-sm transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
 
   const selectedVehicle = vehicleOptions.find((vehicle) => vehicle.id === draft.vehicleId);
   const displayPhone = maskSensitive ? maskPhone(currentOrder.renterPhone) : currentOrder.renterPhone || "-";
@@ -385,7 +385,7 @@ export function OrderDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 p-3 backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--ink)]/35 p-3 backdrop-blur-sm sm:p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -476,7 +476,7 @@ export function OrderDetailModal({
                   type="button"
                   onClick={syncOwnerShare}
                   disabled={!selectedOwnerId || isSaving || isSyncingOwner || isDeleting}
-                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-[var(--ink)] bg-[var(--ink)] px-3.5 text-[12px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[var(--surface-muted)] disabled:text-[color:var(--ink-soft)]"
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-[var(--ink)] bg-[var(--ink)] px-3.5 text-[12px] font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[var(--surface-muted)] disabled:text-[color:var(--ink-soft)]"
                 >
                   <Share2 className="h-3.5 w-3.5" aria-hidden />
                   {isSyncingOwner

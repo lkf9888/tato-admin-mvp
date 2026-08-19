@@ -218,7 +218,7 @@ export function ContactButton({
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           />
 
-          <div className="relative max-h-[85vh] w-[min(34rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl bg-[var(--surface)] pb-safe shadow-[0_30px_80px_rgba(0,0,0,0.25)] sm:pb-0">
+          <div className="relative max-h-[85vh] w-[min(34rem,calc(100vw-2rem))] overflow-y-auto rounded-lg bg-[var(--surface)] pb-safe shadow-[0_30px_80px_rgba(0,0,0,0.25)] sm:pb-0">
             <div className="flex items-start justify-between gap-3 px-5 pb-2 pt-3 sm:px-6 sm:pt-5">
               <div className="min-w-0">
                 <p className="text-[10px] uppercase tracking-[0.32em] text-[var(--ink-soft)]">
@@ -241,7 +241,7 @@ export function ContactButton({
 
             {submitted ? (
               <div className="px-5 pb-6 pt-4 sm:px-6 sm:pb-7">
-                <div className="flex flex-col items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-7 text-center text-emerald-900">
+                <div className="flex flex-col items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-7 text-center text-emerald-900">
                   <CheckCircle2 className="h-10 w-10" />
                   <h3 className="font-semibold">{labels.successTitle}</h3>
                   <p className="text-sm leading-relaxed text-emerald-900/80">

@@ -743,48 +743,48 @@ export function CsvImportPanel({
       </div>
 
       {showBillingModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
-          <div className="w-full max-w-xl rounded-lg border border-white/70 bg-white p-4 shadow-2xl">
-            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ink)]/45 px-4">
+          <div className="w-full max-w-xl rounded-lg border border-[var(--line)] bg-white p-4 shadow-2xl">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
               {panelMessages.billing.modalKicker}
             </p>
-            <h3 className="mt-1 font-serif text-[1.35rem] text-slate-950">
+            <h3 className="mt-1 font-serif text-[1.35rem] text-[var(--ink)]">
               {panelMessages.billing.modalTitle}
             </h3>
-            <p className="mt-2 text-[12px] leading-5 text-slate-600">
+            <p className="mt-2 text-[12px] leading-5 text-[var(--ink-mid)]">
               {panelMessages.billing.modalCopy(
                 activeProjection.projectedVehicleCount,
                 activeProjection.allowedVehicleCount,
               )}
             </p>
 
-            <div className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 text-[12px] text-slate-700">
+            <div className="mt-3 grid gap-2 rounded-lg bg-[var(--surface-muted)] p-3 text-[12px] text-[var(--ink-mid)]">
               <div className="flex items-center justify-between">
                 <span>{panelMessages.billing.currentVehicles}</span>
-                <span className="font-semibold text-slate-950">{billingSnapshot.currentVehicleCount}</span>
+                <span className="font-semibold text-[var(--ink)]">{billingSnapshot.currentVehicleCount}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>{panelMessages.billing.projectedVehiclesLabel}</span>
-                <span className="font-semibold text-slate-950">{activeProjection.projectedVehicleCount}</span>
+                <span className="font-semibold text-[var(--ink)]">{activeProjection.projectedVehicleCount}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>{panelMessages.billing.additionalNeededLabel}</span>
-                <span className="font-semibold text-slate-950">{activeProjection.additionalPaidSlotsNeeded}</span>
+                <span className="font-semibold text-[var(--ink)]">{activeProjection.additionalPaidSlotsNeeded}</span>
               </div>
             </div>
 
             {activeProjection.selectableVehicleOptions.length > 0 ? (
-              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
+              <div className="mt-3 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
                   {panelMessages.chooseVehiclesLabel}
                 </p>
-                <h4 className="mt-1 text-[13px] font-semibold text-slate-950">
+                <h4 className="mt-1 text-[13px] font-semibold text-[var(--ink)]">
                   {panelMessages.chooseVehiclesTitle}
                 </h4>
-                <p className="mt-1.5 text-[12px] leading-5 text-slate-600">
+                <p className="mt-1.5 text-[12px] leading-5 text-[var(--ink-mid)]">
                   {panelMessages.chooseVehiclesCopy(activeProjection.availableNewVehicleSlots)}
                 </p>
-                <p className="mt-2 text-[11px] text-slate-500">
+                <p className="mt-2 text-[11px] text-[var(--ink-soft)]">
                   {panelMessages.selectionLimitNotice(activeProjection.availableNewVehicleSlots)}
                 </p>
 
@@ -799,8 +799,8 @@ export function CsvImportPanel({
                         key={vehicle.key}
                         className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 transition ${
                           checked
-                            ? "border-slate-950 bg-white"
-                            : "border-slate-200 bg-white/75"
+                            ? "border-[var(--ink)] bg-white"
+                            : "border-[var(--line)] bg-white/75"
                         } ${disableUnchecked ? "opacity-60" : ""}`}
                       >
                         <input
@@ -808,11 +808,11 @@ export function CsvImportPanel({
                           checked={checked}
                           disabled={disableUnchecked}
                           onChange={() => toggleVehicleSelection(vehicle.key)}
-                          className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300"
+                          className="mt-0.5 h-3.5 w-3.5 rounded border-[var(--line-strong)]"
                         />
                         <span className="block min-w-0">
-                          <span className="block text-[12px] font-medium text-slate-950">{vehicle.label}</span>
-                          <span className="mt-0.5 block text-[10.5px] text-slate-500">
+                          <span className="block text-[12px] font-medium text-[var(--ink)]">{vehicle.label}</span>
+                          <span className="mt-0.5 block text-[10.5px] text-[var(--ink-soft)]">
                             {vehicle.secondaryLabel || "—"} · {vehicle.rowCount} row(s)
                           </span>
                         </span>
@@ -822,7 +822,7 @@ export function CsvImportPanel({
                 </div>
 
                 {activeProjection.availableNewVehicleSlots < 1 ? (
-                  <p className="mt-3 rounded-md bg-white px-3 py-2 text-[12px] text-slate-600">
+                  <p className="mt-3 rounded-md bg-white px-3 py-2 text-[12px] text-[var(--ink-mid)]">
                     {panelMessages.selectionNoneAvailable}
                   </p>
                 ) : null}
@@ -833,13 +833,13 @@ export function CsvImportPanel({
               <button
                 type="button"
                 onClick={() => setShowBillingModal(false)}
-                className="rounded-md border border-slate-200 px-3 py-2 text-[12px] font-medium text-slate-700"
+                className="rounded-md border border-[var(--line)] px-3 py-2 text-[12px] font-medium text-[var(--ink-mid)]"
               >
                 {panelMessages.billing.closeModal}
               </button>
               <Link
                 href={billingPageHref}
-                className="flex-1 rounded-md bg-slate-950 px-3 py-2 text-center text-[12px] font-medium text-white transition hover:bg-slate-800"
+                className="flex-1 rounded-md bg-[var(--ink)] px-3 py-2 text-center text-[12px] font-medium text-white transition hover:bg-[var(--ink)]"
               >
                 {panelMessages.billing.openBillingPage}
               </Link>
@@ -848,7 +848,7 @@ export function CsvImportPanel({
                   type="button"
                   disabled={isImporting || selectedVehicleKeys.length === 0}
                   onClick={() => submitImport({ skipLimitGuard: true })}
-                  className="flex-1 rounded-md bg-white px-3 py-2 text-center text-[12px] font-medium text-slate-950 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  className="flex-1 rounded-md bg-white px-3 py-2 text-center text-[12px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:text-[var(--ink-soft)]"
                 >
                   {panelMessages.importSelectedAction}
                 </button>
@@ -859,8 +859,8 @@ export function CsvImportPanel({
       ) : null}
 
       {importAlert ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 px-4">
-          <div className="w-full max-w-lg rounded-lg border border-white/70 bg-white p-5 shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--ink)]/45 px-4">
+          <div className="w-full max-w-lg rounded-lg border border-[var(--line)] bg-white p-5 shadow-2xl">
             <p
               className={`text-[10px] font-semibold uppercase tracking-[0.22em] ${
                 importAlert.type === "success" ? "text-emerald-600" : "text-rose-600"
@@ -868,17 +868,17 @@ export function CsvImportPanel({
             >
               {importAlert.type === "success" ? "CSV" : "Error"}
             </p>
-            <h3 className="mt-2 font-serif text-[1.45rem] text-slate-950">
+            <h3 className="mt-2 font-serif text-[1.45rem] text-[var(--ink)]">
               {importAlert.title}
             </h3>
-            <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-slate-600">
+            <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-[var(--ink-mid)]">
               {importAlert.message}
             </p>
             <div className="mt-5 flex justify-end">
               <button
                 type="button"
                 onClick={() => setImportAlert(null)}
-                className="rounded-md bg-slate-950 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-slate-800"
+                className="rounded-md bg-[var(--ink)] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[var(--ink)]"
               >
                 {panelMessages.importAlertClose}
               </button>

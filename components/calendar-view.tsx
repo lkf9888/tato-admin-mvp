@@ -165,7 +165,7 @@ function getTimelineBarClasses(order: CalendarOrder, clippedStart: boolean, clip
     order.hasConflict
       ? "border-[#c61e22] bg-[#e5484d]"
       : order.status === "cancelled"
-        ? "border-slate-500 bg-slate-400"
+        ? "border-slate-500 bg-[var(--ink-soft)]"
         : order.source === "turo"
           ? "border-[#1f3aa8] bg-[#3456df]"
           : "border-[#1f5b48] bg-[#2f7f67]",
@@ -390,7 +390,7 @@ function SearchableFilterDropdown({
               onQueryChange(event.target.value);
             }}
             placeholder={searchPlaceholder}
-            className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-[12px] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            className="h-9 w-full rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 text-[12px] outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
             autoFocus
           />
           <div className="mt-2 max-h-56 overflow-y-auto">
@@ -401,7 +401,7 @@ function SearchableFilterDropdown({
                 onQueryChange("");
                 setOpen(false);
               }}
-              className="w-full rounded-md px-2.5 py-2 text-left text-[12px] font-semibold text-slate-900 hover:bg-slate-50"
+              className="w-full rounded-md px-2.5 py-2 text-left text-[12px] font-semibold text-[var(--ink)] hover:bg-[var(--surface-muted)]"
             >
               {allLabel}
             </button>
@@ -415,8 +415,8 @@ function SearchableFilterDropdown({
                   setOpen(false);
                 }}
                 className={cn(
-                  "w-full rounded-md px-2.5 py-2 text-left text-[12px] text-slate-700 hover:bg-slate-50",
-                  value === option.value ? "bg-slate-100 font-semibold text-slate-950" : "",
+                  "w-full rounded-md px-2.5 py-2 text-left text-[12px] text-[var(--ink-mid)] hover:bg-[var(--surface-muted)]",
+                  value === option.value ? "bg-[var(--surface-muted)] font-semibold text-[var(--ink)]" : "",
                 )}
               >
                 {highlightText(option.label, query)}
@@ -729,7 +729,7 @@ export function CalendarView({
   // on `bg-accent` was dark-on-dark) and drops the bizarre orange
   // `#ff7b67` hover that looked like a different brand.
   const secondaryActionClass =
-    "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] shadow-sm transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50";
   const primaryActionClass =
     "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md bg-[var(--accent)] px-3.5 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -871,7 +871,7 @@ export function CalendarView({
            * the relationship reads at a glance; everything else stands
            * on its own with the standard chip look. */}
           <div className="flex flex-wrap items-center gap-1.5 2xl:flex-nowrap">
-            <div className="inline-flex rounded-md border border-[var(--line)] bg-white p-0.5 shadow-sm">
+            <div className="inline-flex rounded-md border border-[var(--line)] bg-white p-0.5">
               <button
                 type="button"
                 aria-label="Previous range"
@@ -1008,7 +1008,7 @@ export function CalendarView({
         {/* Scrubber + range title combined into one compact row. The
          * full date title was redundant when the scrubber thumb +
          * range buttons already convey the same info. */}
-        <div className="mt-2 rounded-xl border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.78)] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+        <div className="mt-2 rounded-lg border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.78)] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
           <div className="grid gap-x-3 gap-y-1.5 xl:grid-cols-[minmax(18rem,auto)_minmax(24rem,1fr)_minmax(14rem,auto)] xl:items-center">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
               <h3 className="font-serif text-[1.05rem] font-semibold leading-none text-[color:var(--ink)] md:text-[1.2rem]">
@@ -1268,7 +1268,7 @@ export function CalendarView({
       ) : null}
 
       {!readOnly && isOrderDialogOpen ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 p-4">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--ink)]/35 p-4">
           <div className="w-full max-w-2xl rounded-lg border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
             <div className="flex items-start justify-between gap-4">
               <div>

@@ -2,11 +2,13 @@
 
 import {
   CalendarDays,
+  ChevronRight,
   LayoutGrid,
   ListChecks,
   MoreHorizontal,
   UsersRound,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -29,7 +31,7 @@ import { cn } from "@/lib/utils";
  * height plus the safe-area inset, applied in the AppShell `<main>`.
  */
 
-type SidebarItem = { href: string; label: string };
+type SidebarItem = { href: string; label: string; icon?: LucideIcon };
 
 export function BottomTabBar({
   labels,
@@ -190,7 +192,7 @@ export function BottomTabBar({
             onClick={() => setMoreOpen(false)}
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
           />
-          <div className="relative max-h-[85vh] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl bg-[var(--surface)] pb-safe shadow-[0_30px_80px_rgba(0,0,0,0.25)]">
+          <div className="relative max-h-[85vh] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-lg bg-[var(--surface)] pb-safe shadow-[0_30px_80px_rgba(0,0,0,0.25)]">
             <div className="flex items-center justify-between px-5 pb-3 pt-3">
               <h2 className="font-serif text-lg font-semibold text-[var(--ink)]">
                 {labels.moreTitle}
@@ -214,19 +216,29 @@ export function BottomTabBar({
                       href={item.href}
                       prefetch
                       className={cn(
-                        "tap-press flex items-center justify-between rounded-md px-4 py-3.5 text-[15px] font-medium",
+                        // 52px tall rather than the 44px floor: this
+                        // sheet is a one-handed list scrolled with a
+                        // thumb, and the extra height is what stops a
+                        // reach to the top of the screen landing on
+                        // the neighbouring row.
+                        "tap-press flex min-h-[52px] items-center gap-3 rounded-md px-4 py-3 text-[15px] font-medium",
                         active
-                          ? "bg-[var(--accent-soft)] text-[var(--ink)]"
+                          ? "bg-[var(--brand-soft)] font-bold text-[var(--brand)]"
                           : "bg-[var(--surface-muted)] text-[var(--ink)] hover:bg-[var(--accent-soft)]",
                       )}
                     >
-                      <span>{item.label}</span>
-                      <span
+                      {item.icon ? (
+                        <item.icon
+                          className="size-[19px] shrink-0 opacity-70"
+                          strokeWidth={1.75}
+                          aria-hidden
+                        />
+                      ) : null}
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      <ChevronRight
                         aria-hidden
-                        className="text-[var(--ink-soft)]"
-                      >
-                        →
-                      </span>
+                        className="size-4 shrink-0 text-[var(--ink-soft)]"
+                      />
                     </Link>
                   </li>
                 );

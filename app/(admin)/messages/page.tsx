@@ -97,7 +97,7 @@ export default async function GuestMessagesPage() {
 
   return (
     <div className="space-y-3">
-      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 shadow-sm sm:px-4">
+      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
           {t.kicker}
         </p>

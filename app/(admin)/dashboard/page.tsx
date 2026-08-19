@@ -252,7 +252,7 @@ export default async function DashboardPage() {
       <Link
         key={`${order.id}-${event.kind}`}
         href="/orders"
-        className="tap-press flex flex-col gap-1.5 rounded-lg border border-slate-200 px-3 py-2 hover:border-slate-300 hover:bg-slate-50/50 sm:flex-row sm:items-start sm:justify-between sm:gap-2.5 sm:px-3.5 sm:py-2.5"
+        className="tap-press flex flex-col gap-1.5 rounded-lg border border-[var(--line)] px-3 py-2 hover:border-[var(--line-strong)] hover:bg-[var(--surface-muted)]/50 sm:flex-row sm:items-start sm:justify-between sm:gap-2.5 sm:px-3.5 sm:py-2.5"
       >
         <div className="min-w-0">
           <div className="flex items-baseline gap-2">
@@ -261,25 +261,25 @@ export default async function DashboardPage() {
                 "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em]",
                 isPickup
                   ? "bg-[var(--accent-soft)] text-[var(--ink)]"
-                  : "bg-slate-900 text-white",
+                  : "bg-[var(--ink)] text-white",
               )}
             >
               {isPickup ? eventMessages.pickupBadge : eventMessages.returnBadge}
             </span>
-            <span className="text-[12px] font-semibold tabular-nums text-slate-900 sm:text-[13px]">
+            <span className="text-[12px] font-semibold tabular-nums text-[var(--ink)] sm:text-[13px]">
               {formatTimeOnly(event.time)}
             </span>
           </div>
-          <p className="mt-0.5 truncate text-[13px] font-semibold text-slate-900 sm:text-[13.5px]">
+          <p className="mt-0.5 truncate text-[13px] font-semibold text-[var(--ink)] sm:text-[13.5px]">
             {order.vehicle.plateNumber
               ? `${order.vehicle.plateNumber} · ${order.vehicle.nickname}`
               : order.vehicle.nickname}
             {" · "}
             {order.renterName}
           </p>
-          <p className="mt-0.5 text-[11px] leading-snug text-slate-500 sm:text-[12px]">
-            <span className="text-slate-400">{locationPrefix}:</span>{" "}
-            <span className="text-slate-700">{locationValue}</span>
+          <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[12px]">
+            <span className="text-[var(--ink-soft)]">{locationPrefix}:</span>{" "}
+            <span className="text-[var(--ink-mid)]">{locationValue}</span>
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1 sm:flex-nowrap sm:gap-1.5">
@@ -296,7 +296,7 @@ export default async function DashboardPage() {
   // `px-3 py-1.5` to `px-2.5 py-1` and the text from `text-xs` to
   // `text-[11px]` so the link doesn't dominate the card header.
   const panelLinkClass =
-    "tap-press inline-flex w-fit items-center gap-1 self-start rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 sm:self-auto";
+    "tap-press inline-flex w-fit items-center gap-1 self-start rounded-md border border-[var(--line)] bg-white px-2.5 py-1 text-[11px] font-medium text-[var(--ink-mid)] sm:self-auto";
 
   const renderDayPanel = (
     kicker: string,
@@ -304,13 +304,13 @@ export default async function DashboardPage() {
     events: DayEvent[],
     emptyMessage: string,
   ) => (
-    <div className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
+    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
       <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="min-w-0">
-          <p className="text-[9px] uppercase tracking-[0.22em] text-slate-500 sm:text-[10px] sm:tracking-[0.24em]">
+          <p className="text-[9px] uppercase tracking-[0.22em] text-[var(--ink-soft)] sm:text-[10px] sm:tracking-[0.24em]">
             {kicker}
           </p>
-          <h3 className="mt-0.5 font-serif text-[0.95rem] font-semibold leading-tight text-slate-950 sm:text-[1.15rem]">
+          <h3 className="mt-0.5 font-serif text-[0.95rem] font-semibold leading-tight text-[var(--ink)] sm:text-[1.15rem]">
             {title}
           </h3>
         </div>
@@ -322,7 +322,7 @@ export default async function DashboardPage() {
 
       <div className="mt-2 space-y-1.5 sm:mt-2.5">
         {events.length === 0 ? (
-          <p className="rounded-lg bg-slate-50 px-3 py-3.5 text-center text-[12px] text-slate-500">
+          <p className="rounded-lg bg-[var(--surface-muted)] px-3 py-3.5 text-center text-[12px] text-[var(--ink-soft)]">
             {emptyMessage}
           </p>
         ) : (
@@ -466,13 +466,13 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        <div className="rounded-lg border border-white/70 bg-white/90 p-3 shadow-sm sm:p-4">
+        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
           <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="min-w-0">
-              <p className="text-[9px] uppercase tracking-[0.22em] text-slate-500 sm:text-[10px] sm:tracking-[0.24em]">
+              <p className="text-[9px] uppercase tracking-[0.22em] text-[var(--ink-soft)] sm:text-[10px] sm:tracking-[0.24em]">
                 {dashboardMessages.activityKicker}
               </p>
-              <h3 className="mt-0.5 font-serif text-[0.95rem] font-semibold leading-tight text-slate-950 sm:text-[1.15rem]">
+              <h3 className="mt-0.5 font-serif text-[0.95rem] font-semibold leading-tight text-[var(--ink)] sm:text-[1.15rem]">
                 {dashboardMessages.activityTitle}
               </h3>
             </div>
@@ -483,16 +483,16 @@ export default async function DashboardPage() {
           </div>
           <div className="mt-2 space-y-1.5 sm:mt-2.5">
             {latestLogs.length === 0 ? (
-              <p className="rounded-lg bg-slate-50 px-3 py-3.5 text-center text-[12px] text-slate-500">
+              <p className="rounded-lg bg-[var(--surface-muted)] px-3 py-3.5 text-center text-[12px] text-[var(--ink-soft)]">
                 {dashboardMessages.activityEmpty}
               </p>
             ) : null}
             {latestLogs.map((log) => (
-              <div key={log.id} className="rounded-lg bg-slate-50 px-3 py-1.5 sm:py-2">
-                <p className="text-[12.5px] font-medium text-slate-900 sm:text-[13px]">
+              <div key={log.id} className="rounded-lg bg-[var(--surface-muted)] px-3 py-1.5 sm:py-2">
+                <p className="text-[12.5px] font-medium text-[var(--ink)] sm:text-[13px]">
                   {getActivityActionLabel(log.action, locale)}
                 </p>
-                <p className="mt-0.5 text-[11px] leading-snug text-slate-500 sm:text-[11.5px]">
+                <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[11.5px]">
                   {log.actor} · {log.entityType} · {formatDateTime(log.createdAt, locale)}
                 </p>
               </div>

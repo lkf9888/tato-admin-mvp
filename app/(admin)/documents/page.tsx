@@ -122,7 +122,7 @@ export default async function DocumentsPage({
 
   return (
     <div className="space-y-3">
-      <section className="rounded-lg border border-[var(--line)] bg-white/90 p-3 shadow-sm sm:p-4">
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
         <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
           {copy.kicker}
         </p>
@@ -152,12 +152,12 @@ export default async function DocumentsPage({
       </form>
 
       {attachments.length === 0 ? (
-        <div className="card border-dashed p-10 text-center text-sm text-neutral-500">
+        <div className="card border-dashed p-10 text-center text-sm text-[var(--ink-soft)]">
           {copy.empty}
         </div>
       ) : (
-        <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-white shadow-sm">
-          <div className="grid grid-cols-[1.35fr_1.2fr_0.8fr_0.55fr] gap-2 border-b border-[var(--line)] bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-soft)]">
+        <section className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
+          <div className="grid grid-cols-[1.35fr_1.2fr_0.8fr_0.55fr] gap-2 border-b border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-soft)]">
             <span>{copy.file}</span>
             <span>{copy.order}</span>
             <span>{copy.uploaded}</span>

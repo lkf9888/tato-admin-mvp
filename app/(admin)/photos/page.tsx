@@ -110,7 +110,7 @@ export default async function PhotosPage({
 
   return (
     <div className="space-y-3">
-      <section className="rounded-lg border border-[var(--line)] bg-white/90 p-3 shadow-sm sm:p-4">
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
         <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
           {copy.kicker}
         </p>
@@ -140,7 +140,7 @@ export default async function PhotosPage({
       </form>
 
       {attachments.length === 0 ? (
-        <div className="card border-dashed p-10 text-center text-sm text-neutral-500">
+        <div className="card border-dashed p-10 text-center text-sm text-[var(--ink-soft)]">
           {copy.empty}
         </div>
       ) : (
@@ -153,10 +153,10 @@ export default async function PhotosPage({
               ? `/api/vehicles/${attachment.vehicleId}/attachments/file?attachmentId=${attachment.id}`
               : `/api/orders/${attachment.orderId}/attachments/file?attachmentId=${attachment.id}`;
             return (
-              <article key={attachment.id} className="overflow-hidden rounded-lg border border-[var(--line)] bg-white/90 shadow-sm">
+              <article key={attachment.id} className="overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)]">
                 <a href={url} target="_blank" rel="noreferrer" className="block">
                   {isVideo(attachment.contentType, attachment.filename) ? (
-                    <video src={url} className="h-36 w-full bg-slate-950 object-cover" controls />
+                    <video src={url} className="h-36 w-full bg-[var(--ink)] object-cover" controls />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img

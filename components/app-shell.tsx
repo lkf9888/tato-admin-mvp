@@ -1,3 +1,24 @@
+import {
+  Banknote,
+  CalendarDays,
+  Car,
+  CreditCard,
+  FileSignature,
+  FileText,
+  History,
+  Image,
+  LayoutGrid,
+  ListChecks,
+  MessageCircle,
+  Route,
+  Settings,
+  Sparkles,
+  Ticket,
+  TrendingUp,
+  Upload,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
 import { logoutAction } from "@/app/actions";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { ContactButton } from "@/components/contact-button";
@@ -35,56 +56,63 @@ export function AppShell({
   // down would fail to unify the four groups (the labels are different
   // literal types per group). Annotate as `NavItem`/`NavGroup` so the
   // labels widen to `string` and flatMap composes cleanly.
-  type NavItem = { href: string; label: string; icon: string };
+  // Icons are components, not glyphs. The previous set was typographic
+  // characters (◐ ✦ ▦ ◈), which render at whatever weight the font
+  // decides, sit off the optical centre, and have no relationship to
+  // what they label. Turo's console uses a line-icon set and the
+  // operator switches between the two all day, so this matches it:
+  // a chat bubble for messages, a car for vehicles, a bar chart for
+  // the money pages.
+  type NavItem = { href: string; label: string; icon: LucideIcon };
   type NavGroup = { label: string; items: NavItem[] };
 
   const navGroups: NavGroup[] = [
     {
       label: messages.shell.nav.groupOperations,
       items: [
-        { href: "/dashboard", label: messages.shell.nav.dashboard, icon: "◐" },
-        { href: "/assistant", label: messages.shell.nav.assistant, icon: "✦" },
-        { href: "/messages", label: messages.shell.nav.guestMessages, icon: "✉" },
-        { href: "/calendar", label: messages.shell.nav.calendar, icon: "▦" },
-        { href: "/orders", label: messages.shell.nav.orders, icon: "◈" },
-        { href: "/imports", label: messages.shell.nav.imports, icon: "⇧" },
+        { href: "/dashboard", label: messages.shell.nav.dashboard, icon: LayoutGrid },
+        { href: "/assistant", label: messages.shell.nav.assistant, icon: Sparkles },
+        { href: "/messages", label: messages.shell.nav.guestMessages, icon: MessageCircle },
+        { href: "/calendar", label: messages.shell.nav.calendar, icon: CalendarDays },
+        { href: "/orders", label: messages.shell.nav.orders, icon: Route },
+        { href: "/imports", label: messages.shell.nav.imports, icon: Upload },
       ],
     },
     {
       label: messages.shell.nav.groupFleet,
       items: [
-        { href: "/vehicles", label: messages.shell.nav.vehicles, icon: "▣" },
-        { href: "/vehicle-roi", label: messages.shell.nav.vehicleRoi, icon: "◇" },
-        { href: "/owners", label: messages.shell.nav.owners, icon: "♔" },
+        { href: "/vehicles", label: messages.shell.nav.vehicles, icon: Car },
+        { href: "/vehicle-roi", label: messages.shell.nav.vehicleRoi, icon: TrendingUp },
+        { href: "/owners", label: messages.shell.nav.owners, icon: UsersRound },
       ],
     },
     {
       label: messages.shell.nav.groupBookings,
       items: [
-        { href: "/direct-booking", label: messages.shell.nav.directBooking, icon: "◎" },
+        { href: "/direct-booking", label: messages.shell.nav.directBooking, icon: Ticket },
       ],
     },
     {
       label: messages.shell.nav.groupTeam,
       items: [
-        { href: "/staff-schedule", label: messages.shell.nav.staffSchedule, icon: "☷" },
+        { href: "/staff-schedule", label: messages.shell.nav.staffSchedule, icon: ListChecks },
       ],
     },
     {
       label: messages.shell.nav.groupFiles,
       items: [
-        { href: "/contracts", label: messages.shell.nav.contracts, icon: "✎" },
-        { href: "/photos", label: messages.shell.nav.photos, icon: "▤" },
-        { href: "/documents", label: messages.shell.nav.documents, icon: "▥" },
-        { href: "/activity", label: messages.shell.nav.activity, icon: "♺" },
+        { href: "/contracts", label: messages.shell.nav.contracts, icon: FileSignature },
+        { href: "/photos", label: messages.shell.nav.photos, icon: Image },
+        { href: "/documents", label: messages.shell.nav.documents, icon: FileText },
+        { href: "/activity", label: messages.shell.nav.activity, icon: History },
       ],
     },
     {
       label: messages.shell.nav.groupBilling,
       items: [
-        { href: "/billing", label: messages.shell.nav.billing, icon: "$" },
-        { href: "/payouts", label: messages.shell.nav.payouts, icon: "↗" },
-        { href: "/account-settings", label: messages.shell.nav.accountSettings, icon: "⚙" },
+        { href: "/billing", label: messages.shell.nav.billing, icon: CreditCard },
+        { href: "/payouts", label: messages.shell.nav.payouts, icon: Banknote },
+        { href: "/account-settings", label: messages.shell.nav.accountSettings, icon: Settings },
       ],
     },
   ];
@@ -123,15 +151,15 @@ export function AppShell({
 
   const sidebarContent = (
     <>
-      <div className="flex items-center gap-2.5 border-b border-neutral-200 px-4 py-5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-neutral-900 text-sm font-semibold text-white">
+      <div className="flex items-center gap-2.5 border-b border-[var(--line)] px-4 py-5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-[var(--ink)] text-sm font-semibold text-white">
           T
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-lg font-semibold leading-tight text-neutral-950">
+          <div className="truncate text-lg font-semibold leading-tight text-[var(--ink)]">
             {messages.shell.brandTitle}
           </div>
-          <div className="truncate text-xs text-neutral-500">
+          <div className="truncate text-xs text-[var(--ink-soft)]">
             {messages.shell.brandCopy}
           </div>
         </div>
@@ -139,7 +167,7 @@ export function AppShell({
 
       <SidebarNav groups={navGroups} />
 
-      <div className="border-t border-neutral-200 p-3 pb-16">
+      <div className="border-t border-[var(--line)] p-3 pb-16">
         <LanguageSwitcher
           locale={locale}
           preference={localePreference}
@@ -148,17 +176,17 @@ export function AppShell({
           autoLabel={messages.shell.languageAutoLabel}
         />
         <div
-          className="mt-2 truncate text-xs text-neutral-500"
+          className="mt-2 truncate text-xs text-[var(--ink-soft)]"
           title={currentUserEmail}
         >
           {currentUserName || currentUserEmail}
         </div>
         <form action={logoutAction} className="mt-2">
-        <button className="text-xs text-neutral-500 transition hover:text-neutral-950">
+        <button className="text-xs text-[var(--ink-soft)] transition hover:text-[var(--ink)]">
           {messages.shell.signOut}
         </button>
         </form>
-        <div className="pt-2 text-[10px] text-neutral-400">
+        <div className="pt-2 text-[10px] text-[var(--ink-soft)]">
           {APP_VERSION_LABEL}
         </div>
       </div>
@@ -166,14 +194,14 @@ export function AppShell({
   );
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-950">
+    <div className="min-h-screen bg-[var(--surface-muted)] text-[var(--ink)]">
       <MobileNav
         brandTitle={messages.shell.brandTitle}
         brandKicker={messages.shell.brandKicker}
       />
 
       <div className="flex min-h-screen w-full">
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-56 shrink-0 flex-col border-r border-neutral-200 bg-white lg:flex">
+        <aside className="fixed inset-y-0 left-0 z-40 hidden w-56 shrink-0 flex-col border-r border-[var(--line)] bg-white lg:flex">
           {sidebarContent}
         </aside>
 

@@ -37,7 +37,7 @@ const SYSTEM_PROMPT = [
   "你是翻译。把每条 Turo 客人消息翻译成简体中文。",
   "只输出译文，不要解释、不要引号、不要编号以外的任何前后缀。",
   "保留 emoji、数字、日期、金额、车牌和人名。语气贴近原文，客人怎么说就怎么译，不要润色成客服腔。",
-  "输入是带编号的多行，每行形如 `3. <英文>`。输出必须是同样数量、同样编号的行。",
+  "输入是带编号的多行，每行形如 `3. <原文>`。输出必须是同样数量、同样编号的行，每条译文只占一行，不要换行。",
 ].join("\n");
 
 /**
@@ -98,7 +98,13 @@ export async function POST(request: Request) {
   const items = pending
     .map((email) => {
       const own = email.guestText?.trim();
-      if (own) return { id: email.id, text: own.slice(0, 1200) };
+      // Newlines collapsed before sending. The protocol below is one
+      // numbered line per message, and a guest who pressed Enter would
+      // otherwise contribute unnumbered lines that the parser drops --
+      // which is exactly what happened: "Good day! / Just confirming
+      // the vehicle will be ready..." came back translated as "你好!"
+      // and nothing else.
+      if (own) return { id: email.id, text: own.replace(/\s*\n+\s*/g, " ").slice(0, 1200) };
       try {
         const summary = (JSON.parse(email.parsed ?? "{}") as { summary?: string }).summary;
         return summary?.trim() ? { id: email.id, text: summary.trim() } : null;

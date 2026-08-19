@@ -446,7 +446,13 @@ a[class*="rounded-2xl"],
   a[role="button"]:not(.tap-compact),
   [role="button"]:not(.tap-compact),
   select:not(.tap-compact),
-  summary:not(.tap-compact) {
+  summary:not(.tap-compact),
+  /* Text fields were missed the first time: the rule listed the things
+     you press and forgot the things you tap into. Measured at 35px on
+     the vehicle form, which is a miss waiting to happen when the next
+     field is 8px below it. */
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not(.tap-compact),
+  textarea:not(.tap-compact) {
     min-height: var(--tap-min);
   }
 

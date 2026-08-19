@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { applyTuroEmailsToOrders } from "@/lib/turo-email-apply";
 import { parseTuroOrderEmail, type TuroOrderFacts } from "@/lib/turo-email-order";
 
 export const runtime = "nodejs";
@@ -67,6 +68,32 @@ function fold(all: { subject: string; bodyText: string; receivedAt: Date }[]) {
 }
 
 const TOLERANCE_MS = 60 * 1000;
+
+/**
+ * Write the folded mail into orders.
+ *
+ * POST rather than a query flag on GET, and `apply` has to be sent
+ * explicitly: this edits real bookings, and a URL that mutates on
+ * being opened is a URL that mutates when something prefetches it.
+ */
+export async function POST(request: Request) {
+  let context;
+  try {
+    context = await requireCurrentAdminContext();
+  } catch {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+
+  const body = (await request.json().catch(() => ({}))) as { apply?: boolean };
+
+  const outcome = await applyTuroEmailsToOrders({
+    workspaceId: context.workspace.id,
+    apply: body.apply === true,
+    actor: context.user.name,
+  });
+
+  return NextResponse.json({ applied: body.apply === true, ...outcome });
+}
 
 export async function GET() {
   let context;

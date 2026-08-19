@@ -17,6 +17,7 @@ import { convertMessagesScToTc, convertScToTc } from "@/lib/sc-to-tc";
 import { accountSettingsMessages } from "@/lib/i18n/messages/account-settings";
 import { assistantMessages } from "@/lib/i18n/messages/assistant";
 import { guestMessagesMessages } from "@/lib/i18n/messages/guest-messages";
+import { orderDetailMessages } from "@/lib/i18n/messages/order-detail";
 import { authMessages } from "@/lib/i18n/messages/auth";
 import { billingMessages } from "@/lib/i18n/messages/billing";
 import { calendarMessages } from "@/lib/i18n/messages/calendar";
@@ -301,6 +302,7 @@ const messages = {
     ...contactMessages.en,
     ...assistantMessages.en,
     ...guestMessagesMessages.en,
+    ...orderDetailMessages.en,
     ...authMessages.en,
     ...dashboardMessages.en,
     ...fleetMessages.en,
@@ -317,6 +319,7 @@ const messages = {
     ...contactMessages.zh,
     ...assistantMessages.zh,
     ...guestMessagesMessages.zh,
+    ...orderDetailMessages.zh,
     ...authMessages.zh,
     ...dashboardMessages.zh,
     ...fleetMessages.zh,

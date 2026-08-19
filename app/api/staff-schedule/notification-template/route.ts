@@ -19,8 +19,15 @@ function nullable(value?: string | null) {
 
 export async function PATCH(request: NextRequest) {
   const { workspace } = await requireCurrentAdminContext();
-  const parsed = templateSchema.parse(await request.json());
-
+  // `.parse()` throws, and so does `request.json()` on a body that
+  // is not JSON. Uncaught, both leave the handler as a 500 -- which
+  // is a crash report where a validation error belongs, and on the
+  // staff routes it is reached from a phone on a bad connection.
+  const parsedResult = templateSchema.safeParse(await request.json().catch(() => null));
+  if (!parsedResult.success) {
+    return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
+  }
+  const parsed = parsedResult.data;
   const template = await prisma.staffTaskNotificationTemplate.upsert({
     where: { workspaceId: workspace.id },
     create: {

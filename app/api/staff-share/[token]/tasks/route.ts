@@ -51,7 +51,23 @@ export async function POST(request: NextRequest, { params }: { params: Params })
     return NextResponse.json({ error: "STAFF_SHARE_NOT_FOUND" }, { status: 404 });
   }
 
-  const parsed = taskSchema.parse(await request.json());
+  // `.parse()` throws, and so does `request.json()` on a body that
+
+  // is not JSON. Uncaught, both leave the handler as a 500 -- which
+
+  // is a crash report where a validation error belongs, and on the
+
+  // staff routes it is reached from a phone on a bad connection.
+
+  const parsedResult = taskSchema.safeParse(await request.json().catch(() => null));
+
+  if (!parsedResult.success) {
+
+    return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
+
+  }
+
+  const parsed = parsedResult.data;
   const parentTaskId = nullable(parsed.parentTaskId);
   if (parentTaskId) {
     const parentTask = await prisma.staffTask.findFirst({

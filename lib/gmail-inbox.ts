@@ -325,7 +325,14 @@ async function attributeEmail(input: {
  * and IMAP replays are harmless. Safe to schedule as often as the
  * operator wants fresh data.
  */
-export async function runGmailSync(input: { workspaceId: string }): Promise<GmailSyncResult> {
+export async function runGmailSync(input: {
+  workspaceId: string;
+  /** One-off deeper reach for the historical backfill. The scheduled
+   *  runs stay on the short default: scanning ten years of mailbox
+   *  every fifteen minutes would spend most of its time re-reading
+   *  messages it already has. */
+  lookbackDays?: number;
+}): Promise<GmailSyncResult> {
   const config = getGmailConfig();
   if (!config.user || !config.password) {
     throw new GmailInboxError(
@@ -389,7 +396,7 @@ export async function runGmailSync(input: { workspaceId: string }): Promise<Gmai
   const lock = await client.getMailboxLock(config.mailbox);
   try {
     const since = new Date();
-    since.setDate(since.getDate() - getLookbackDays());
+    since.setDate(since.getDate() - (input.lookbackDays ?? getLookbackDays()));
 
     const uids = await client.search({ since }, { uid: true });
     if (!uids || uids.length === 0) {

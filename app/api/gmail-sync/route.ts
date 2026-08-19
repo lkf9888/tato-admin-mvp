@@ -74,7 +74,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await runGmailSync({ workspaceId: context.workspaceId });
+    // `?days=` is the historical backfill switch, admin-session only:
+    // a scheduler holding the shared secret must not be able to turn
+    // a fifteen-minute job into a ten-year mailbox scan.
+    const requestedDays = Number.parseInt(
+      new URL(request.url).searchParams.get("days") ?? "",
+      10,
+    );
+    const lookbackDays =
+      context.actor && Number.isFinite(requestedDays) && requestedDays > 0
+        ? Math.min(requestedDays, 3650)
+        : undefined;
+
+    const result = await runGmailSync({ workspaceId: context.workspaceId, lookbackDays });
 
     // Only log when something actually happened. A poll that finds
     // nothing new is the common case and would otherwise bury the

@@ -2,7 +2,7 @@ import { InboundEmailKind } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
-import { getDiskUsage } from "@/lib/disk";
+import { getDiskBreakdown, getDiskUsage } from "@/lib/disk";
 import { prisma } from "@/lib/prisma";
 import { resolveTuroSyncWorkspace } from "@/lib/turo-sync";
 import { getGmailConfig, isGmailInboxConfigured } from "@/lib/gmail-inbox";
@@ -106,13 +106,14 @@ export async function GET() {
     };
   })();
 
-  const disk = await getDiskUsage();
+  const [disk, diskBreakdown] = await Promise.all([getDiskUsage(), getDiskBreakdown()]);
 
   const diagnostics: Record<string, unknown> = {
     // Which build answered. Without this, "the fix didn't work" and
     // "the fix isn't deployed yet" look identical from the outside.
     version: APP_VERSION,
     disk,
+    diskBreakdown,
     workspaces,
     inbox,
     kimi: {

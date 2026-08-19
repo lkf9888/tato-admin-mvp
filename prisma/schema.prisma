@@ -878,6 +878,20 @@ model InboundEmail {
   // "kevin". Null is the main account. This is the only field in the
   // whole feed that says which Turo account a trip belongs to.
   turoAccount String?
+
+  // The guest's profile photo, lifted from the HTML part of the
+  // notification. Only new mail can carry one: the archive was
+  // ingested storing the plain-text alternative alone, and the photo
+  // never appears there. A thread without one falls back to initials
+  // rather than a blank circle.
+  avatarUrl   String?
+
+  // The summary translated to Chinese, cached because the operator
+  // reads the same thread more than once and a translation is a model
+  // call. Null means "not translated yet", not "translation failed" --
+  // the two look identical from the page and only one is worth
+  // retrying.
+  summaryZh   String?
   // The vehicle the subject named, when exactly one in the fleet
   // matched. Null when the listing text matched several -- several
   // cars of one model is normal here, and guessing between them would

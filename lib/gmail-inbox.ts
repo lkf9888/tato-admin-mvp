@@ -6,7 +6,11 @@ import { simpleParser, type ParsedMail } from "mailparser";
 
 import { kimiExtractJson, isKimiConfigured } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
-import { classifyTuroSubject, extractTuroLink } from "@/lib/turo-subjects";
+import {
+  classifyTuroSubject,
+  extractGuestAvatar,
+  extractTuroLink,
+} from "@/lib/turo-subjects";
 import {
   matchVehicles,
   pickOrderForMessage,
@@ -459,6 +463,11 @@ export async function runGmailSync(input: {
 
       const parsedMail: ParsedMail = await simpleParser(message.source);
       const bodyText = condenseBody(parsedMail.text ?? "");
+      // The HTML part is read for the avatar and then dropped. Storing
+      // it would multiply this table's size for one URL.
+      const avatarUrl = extractGuestAvatar(
+        typeof parsedMail.html === "string" ? parsedMail.html : "",
+      );
       const subject = (envelope?.subject ?? parsedMail.subject ?? "").slice(0, 500);
       const fromName = envelope?.from?.[0]?.name?.trim() || null;
       const receivedAt = envelope?.date ?? parsedMail.date ?? new Date();

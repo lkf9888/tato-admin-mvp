@@ -21,12 +21,16 @@ export type ThreadEmail = {
   guestName: string | null;
   vehicleId: string | null;
   vehicleLabel: string | null;
+  vehiclePlate: string | null;
+  avatarUrl: string | null;
   receivedAt: Date;
   acknowledgedAt: Date | null;
   turoLink: string | null;
   orderId: string | null;
   /** The model's one-line reading of the message, when it has run. */
   summary: string | null;
+  /** That reading in Chinese, cached after the first translation. */
+  summaryZh: string | null;
   needsAction: boolean;
 };
 
@@ -36,6 +40,12 @@ export type GuestThread = {
   guestName: string;
   vehicleId: string | null;
   vehicleLabel: string | null;
+  vehiclePlate: string | null;
+  /** Newest photo Turo sent for this guest, when any message carried one. */
+  avatarUrl: string | null;
+  /** Newest message's summary, for the list row. */
+  latestSummary: string | null;
+  latestSummaryZh: string | null;
   /** Newest first — the reason someone opens this page is the last message. */
   messages: ThreadEmail[];
   latestAt: Date;
@@ -78,6 +88,10 @@ export function groupIntoThreads(emails: ThreadEmail[]): GuestThread[] {
       // Read off whichever message actually resolved a vehicle: an
       // older message may have matched where the newest did not.
       vehicleLabel: messages.find((m) => m.vehicleLabel)?.vehicleLabel ?? null,
+      vehiclePlate: messages.find((m) => m.vehiclePlate)?.vehiclePlate ?? null,
+      avatarUrl: messages.find((m) => m.avatarUrl)?.avatarUrl ?? null,
+      latestSummary: newest.summary,
+      latestSummaryZh: newest.summaryZh,
       messages,
       latestAt: newest.receivedAt,
       openCount: messages.filter((m) => !m.acknowledgedAt).length,

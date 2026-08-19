@@ -21,6 +21,11 @@ const draftSchema = z.object({
   vehicleId: z.string().trim().min(1).nullish(),
   /** Optional steer from the operator, e.g. "tell them 4pm works". */
   instruction: z.string().trim().max(500).nullish(),
+  /** Draft a reply to this message specifically. The thread is still
+   *  read for context -- a guest's question rarely stands alone -- but
+   *  the reply answers this one, which is what the operator pressed
+   *  the button next to. */
+  emailId: z.string().trim().min(1).nullish(),
 });
 
 const SYSTEM_PROMPT = [
@@ -78,7 +83,7 @@ export async function POST(request: Request) {
     },
     orderBy: { receivedAt: "desc" },
     take: 8,
-    select: { subject: true, bodyText: true, receivedAt: true, parsed: true, order: true },
+    select: { id: true, subject: true, bodyText: true, receivedAt: true, parsed: true, order: true },
   });
 
   if (emails.length === 0) {
@@ -97,6 +102,10 @@ export async function POST(request: Request) {
   // happened. Bodies are trimmed hard: Turo wraps each message in a
   // long notification template, and the guest's actual words are near
   // the top.
+  const target = parsed.data.emailId
+    ? emails.find((email) => email.id === parsed.data.emailId)
+    : null;
+
   const transcript = [...emails]
     .reverse()
     .map((email) => {
@@ -130,10 +139,17 @@ export async function POST(request: Request) {
     .filter(Boolean)
     .join("\n");
 
+  const focus = target
+    ? `\n\nReply to this message specifically:\n${target.bodyText.slice(0, 800)}`
+    : "";
+
   const result = await kimiChat({
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Trip facts:\n${facts}\n\nConversation:\n${transcript}` },
+      {
+        role: "user",
+        content: `Trip facts:\n${facts}\n\nConversation:\n${transcript}${focus}`,
+      },
     ],
     maxTokens: 3000,
   });

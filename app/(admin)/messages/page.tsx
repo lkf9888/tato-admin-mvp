@@ -40,7 +40,19 @@ export default async function GuestMessagesPage() {
       turoLink: true,
       orderId: true,
       parsed: true,
+      summaryZh: true,
+      avatarUrl: true,
       vehicle: { select: { brand: true, model: true, year: true, plateNumber: true } },
+      // The order knows exactly which car; the subject only knows the
+      // model. Three Honda Odysseys in this fleet means "Honda Odyssey"
+      // identifies none of them, and the message showed "car not
+      // identified" while its own matched trip named the plate.
+      order: {
+        select: {
+          vehicleId: true,
+          vehicle: { select: { brand: true, model: true, year: true, plateNumber: true } },
+        },
+      },
     },
   });
 
@@ -55,19 +67,26 @@ export default async function GuestMessagesPage() {
         }
       })();
 
+      // The subject names a model; the trip names a car. Prefer the
+      // trip -- it is an exact join on the reservation id, where the
+      // subject match is a model that several cars share.
+      const vehicle = email.vehicle ?? email.order?.vehicle ?? null;
+      const vehicleId = email.vehicleId ?? email.order?.vehicleId ?? null;
+
       return {
         id: email.id,
         subject: email.subject,
         guestName: email.guestName,
-        vehicleId: email.vehicleId,
-        vehicleLabel: email.vehicle
-          ? `${email.vehicle.year} ${email.vehicle.brand} ${email.vehicle.model}`
-          : null,
+        vehicleId,
+        vehicleLabel: vehicle ? `${vehicle.year} ${vehicle.brand} ${vehicle.model}` : null,
+        vehiclePlate: vehicle?.plateNumber ?? null,
+        avatarUrl: email.avatarUrl,
         receivedAt: email.receivedAt,
         acknowledgedAt: email.acknowledgedAt,
         turoLink: email.turoLink,
         orderId: email.orderId,
         summary: extracted?.summary ?? null,
+        summaryZh: email.summaryZh,
         needsAction: extracted?.needsAction === true,
       };
     }),
@@ -85,6 +104,9 @@ export default async function GuestMessagesPage() {
           pickupDatetime: true,
           returnDatetime: true,
           pickupLocation: true,
+          returnLocation: true,
+          renterPhone: true,
+          externalOrderId: true,
           status: true,
           totalPrice: true,
           sourceMetadata: true,
@@ -135,6 +157,10 @@ export default async function GuestMessagesPage() {
             pickupDatetime: order.pickupDatetime.toISOString(),
             returnDatetime: order.returnDatetime.toISOString(),
             pickupLocation: order.pickupLocation,
+            returnLocation: order.returnLocation,
+            renterPhone: order.renterPhone,
+            externalOrderId: order.externalOrderId,
+            plateNumber: order.vehicle?.plateNumber ?? null,
             status: order.status,
             netEarning: getNetEarningFromFinancials(financials, order.totalPrice),
             vehicleLabel: order.vehicle

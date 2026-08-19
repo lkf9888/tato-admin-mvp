@@ -12,6 +12,7 @@ type ThreadMessage = {
   receivedAt: string;
   acknowledgedAt: string | null;
   summary: string | null;
+  summaryZh: string | null;
   needsAction: boolean;
   turoLink: string | null;
 };
@@ -21,6 +22,10 @@ type Thread = {
   guestName: string;
   vehicleId: string | null;
   vehicleLabel: string | null;
+  vehiclePlate: string | null;
+  avatarUrl: string | null;
+  latestSummary: string | null;
+  latestSummaryZh: string | null;
   messages: ThreadMessage[];
   latestAt: string;
   openCount: number;
@@ -31,22 +36,76 @@ type Thread = {
 type Order = {
   id: string;
   renterName: string;
+  renterPhone: string | null;
+  externalOrderId: string | null;
+  plateNumber: string | null;
   pickupDatetime: string;
   returnDatetime: string;
   pickupLocation: string | null;
+  returnLocation: string | null;
   status: string;
   netEarning: number | null;
   vehicleLabel: string | null;
 };
 
 function formatWhen(iso: string, locale: Locale) {
-  const date = new Date(iso);
-  return date.toLocaleString(locale === "en" ? "en-CA" : "zh-CN", {
+  return new Date(iso).toLocaleString(locale === "en" ? "en-CA" : "zh-CN", {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/**
+ * Initials, coloured from the name.
+ *
+ * Turo only puts a guest's photo in the HTML part of a notification,
+ * and the archive was ingested keeping the plain text alone — so most
+ * threads have no photo and never will. A lettered disc is a better
+ * answer than an empty circle: it is stable per guest, so the eye
+ * still uses it to tell one row from another while scrolling.
+ */
+function Avatar({ name, src, size = 36 }: { name: string; src?: string | null; size?: number }) {
+  const initials = name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0] ?? "")
+    .join("")
+    .toUpperCase();
+
+  // Hue from the name, so the same guest keeps the same colour.
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) % 360;
+
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
+  return (
+    <span
+      aria-hidden
+      className="flex shrink-0 items-center justify-center rounded-full font-bold text-white"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.36,
+        background: `hsl(${hash} 55% 45%)`,
+      }}
+    >
+      {initials || "?"}
+    </span>
+  );
 }
 
 export function GuestMessagesView({
@@ -56,8 +115,6 @@ export function GuestMessagesView({
   orders,
 }: {
   locale: Locale;
-  /** False when KIMI_API_KEY is unset — the draft box explains itself
-   *  rather than failing on click. */
   canDraft: boolean;
   threads: Thread[];
   orders: Order[];
@@ -66,36 +123,79 @@ export function GuestMessagesView({
   const router = useRouter();
 
   const [selectedKey, setSelectedKey] = useState<string | null>(threads[0]?.key ?? null);
-  const [draft, setDraft] = useState("");
-  const [instruction, setInstruction] = useState("");
-  const [drafting, setDrafting] = useState(false);
-  const [draftError, setDraftError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
 
-  const ordersById = useMemo(
-    () => new Map(orders.map((order) => [order.id, order])),
-    [orders],
-  );
+  // Per-message drafts, keyed by message id: the operator answers one
+  // message, not a thread, and a single shared box would silently
+  // replace the draft they were about to copy.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [draftingId, setDraftingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
+  const [zh, setZh] = useState<Record<string, string>>({});
+  const [translating, setTranslating] = useState(false);
+  const [showZh, setShowZh] = useState(true);
+  const [translateError, setTranslateError] = useState<string | null>(null);
+
+  const ordersById = useMemo(() => new Map(orders.map((o) => [o.id, o])), [orders]);
 
   const selected = threads.find((thread) => thread.key === selectedKey) ?? null;
   const order = selected?.orderId ? (ordersById.get(selected.orderId) ?? null) : null;
 
   function selectThread(key: string) {
     setSelectedKey(key);
-    // A draft belongs to the conversation it was written for; carrying
-    // it across would invite pasting one guest's reply to another.
-    setDraft("");
-    setInstruction("");
+    setDrafts({});
     setDraftError(null);
-    setCopied(false);
+    setTranslateError(null);
+    setCopiedId(null);
   }
 
-  async function generateDraft() {
-    if (!selected || drafting) return;
-    setDrafting(true);
+  /** The Chinese reading of a message, from this session or the cache. */
+  function chinese(message: ThreadMessage) {
+    return zh[message.id] ?? message.summaryZh ?? null;
+  }
+
+  function bodyOf(message: ThreadMessage) {
+    const original = message.summary ?? message.subject;
+    if (!showZh) return original;
+    return chinese(message) ?? original;
+  }
+
+  async function translateThread() {
+    if (!selected || translating) return;
+    setTranslating(true);
+    setTranslateError(null);
+    try {
+      const response = await fetch("/api/messages/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guestName: selected.guestName, vehicleId: selected.vehicleId }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        translations?: Record<string, string>;
+        error?: string;
+        reason?: string;
+      };
+      if (!response.ok) {
+        setTranslateError(
+          `${t.translateFailed}${data.reason ? ` (${data.reason})` : data.error ? ` (${data.error})` : ""}`,
+        );
+        return;
+      }
+      setZh((current) => ({ ...current, ...(data.translations ?? {}) }));
+      setShowZh(true);
+    } catch {
+      setTranslateError(t.translateFailed);
+    } finally {
+      setTranslating(false);
+    }
+  }
+
+  async function draftFor(message: ThreadMessage) {
+    if (!selected || draftingId) return;
+    setDraftingId(message.id);
     setDraftError(null);
-    setCopied(false);
     try {
       const response = await fetch("/api/messages/draft", {
         method: "POST",
@@ -103,7 +203,7 @@ export function GuestMessagesView({
         body: JSON.stringify({
           guestName: selected.guestName,
           vehicleId: selected.vehicleId,
-          instruction: instruction.trim() || null,
+          emailId: message.id,
         }),
       });
       const data = (await response.json().catch(() => ({}))) as {
@@ -112,15 +212,22 @@ export function GuestMessagesView({
         reason?: string;
       };
       if (!response.ok || !data.draft) {
-        setDraftError(`${t.draftFailed}${data.reason ? ` (${data.reason})` : data.error ? ` (${data.error})` : ""}`);
+        setDraftError(
+          `${t.draftFailed}${data.reason ? ` (${data.reason})` : data.error ? ` (${data.error})` : ""}`,
+        );
         return;
       }
-      setDraft(data.draft);
+      setDrafts((current) => ({ ...current, [message.id]: data.draft as string }));
     } catch {
       setDraftError(t.draftFailed);
     } finally {
-      setDrafting(false);
+      setDraftingId(null);
     }
+  }
+
+  async function copy(id: string, text: string) {
+    await navigator.clipboard.writeText(text).catch(() => null);
+    setCopiedId(id);
   }
 
   async function markHandled() {
@@ -138,12 +245,6 @@ export function GuestMessagesView({
     }
   }
 
-  async function copyDraft() {
-    if (!draft) return;
-    await navigator.clipboard.writeText(draft).catch(() => null);
-    setCopied(true);
-  }
-
   if (threads.length === 0) {
     return (
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-10 text-center">
@@ -152,10 +253,28 @@ export function GuestMessagesView({
     );
   }
 
+  const facts: { label: string; value: string | null }[] = order
+    ? [
+        {
+          label: t.tripDates,
+          value: `${formatWhen(order.pickupDatetime, locale)} → ${formatWhen(order.returnDatetime, locale)}`,
+        },
+        { label: t.tripVehicle, value: order.vehicleLabel },
+        { label: t.tripPlate, value: order.plateNumber },
+        { label: t.tripStatus, value: order.status },
+        {
+          label: t.tripTotal,
+          value: order.netEarning == null ? null : `CA$${order.netEarning.toFixed(2)}`,
+        },
+        { label: t.tripPhone, value: order.renterPhone },
+        { label: t.tripReservation, value: order.externalOrderId },
+        { label: t.tripPickupAddress, value: order.pickupLocation },
+        { label: t.tripReturnAddress, value: order.returnLocation },
+      ]
+    : [];
+
   return (
-    <div className="grid gap-3 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-      {/* Conversation list. On mobile it collapses to the list only once
-          something is selected, so the detail gets the full screen. */}
+    <div className="grid gap-3 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
       <section
         className={`rounded-lg border border-[var(--line)] bg-[var(--surface)] ${selected ? "hidden lg:block" : ""}`}
       >
@@ -165,61 +284,70 @@ export function GuestMessagesView({
               <button
                 type="button"
                 onClick={() => selectThread(thread.key)}
-                className={`tap-press w-full px-3 py-2.5 text-left transition hover:bg-[var(--surface-muted)] ${
+                className={`tap-press flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition hover:bg-[var(--surface-muted)] ${
                   thread.key === selectedKey ? "bg-[var(--surface-muted)]" : ""
                 }`}
               >
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-[13px] font-semibold text-[var(--ink)]">
-                    {thread.guestName}
+                <Avatar name={thread.guestName} src={thread.avatarUrl} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-[13px] font-bold text-[var(--ink)]">
+                      {thread.guestName}
+                    </span>
+                    <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--ink-soft)]">
+                      {formatWhen(thread.latestAt, locale)}
+                    </span>
                   </span>
-                  <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--ink-soft)]">
-                    {formatWhen(thread.latestAt, locale)}
+
+                  {/* Model and plate, then what the last message said.
+                      A row that only carries a name makes the operator
+                      open threads to find out which car they are
+                      about. */}
+                  <span className="mt-0.5 block truncate text-[11.5px] text-[var(--ink-soft)]">
+                    {thread.vehicleLabel ?? t.noVehicle}
+                    {thread.vehiclePlate ? ` · ${thread.vehiclePlate}` : ""}
                   </span>
-                </div>
-                <p className="mt-0.5 truncate text-[11.5px] text-[var(--ink-soft)]">
-                  {thread.vehicleLabel ?? t.noVehicle}
-                </p>
-                <div className="mt-1 flex items-center gap-1.5">
+                  <span className="mt-0.5 block truncate text-[11.5px] leading-4 text-[var(--ink)]">
+                    {(showZh ? thread.latestSummaryZh : null) ??
+                      thread.latestSummary ??
+                      thread.messages[0]?.subject}
+                  </span>
+
                   {thread.openCount > 0 ? (
-                    <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
+                    <span className="mt-1 inline-flex rounded-[var(--radius-pill)] bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
                       {t.openBadge} {thread.openCount}
                     </span>
                   ) : null}
-                  <span className="text-[10.5px] text-[var(--ink-soft)]">
-                    {t.messageCount(thread.messages.length)}
-                  </span>
-                </div>
+                </span>
               </button>
             </li>
           ))}
         </ul>
       </section>
 
-      {/* Detail */}
       {selected ? (
         <section className="space-y-3">
-          {/* Name above, actions below, on phones. Side by side, the
-              guest's name and two buttons each get about a third of a
-              375px screen, and the buttons stack into tall thin
-              columns -- the shape that is hardest to hit and reads as
-              broken. */}
           <header className="flex flex-col gap-2.5 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between sm:px-4">
-            <div className="min-w-0">
-              <button
-                type="button"
-                onClick={() => setSelectedKey(null)}
-                className="tap-press mb-1 text-[11.5px] font-semibold text-[var(--accent)] lg:hidden"
-              >
-                ← {t.kicker}
-              </button>
-              <h2 className="truncate text-[15px] font-semibold text-[var(--ink)]">
-                {selected.guestName}
-              </h2>
-              <p className="truncate text-[11.5px] text-[var(--ink-soft)]">
-                {selected.vehicleLabel ?? t.noVehicle}
-              </p>
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Avatar name={selected.guestName} src={selected.avatarUrl} size={40} />
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedKey(null)}
+                  className="tap-press mb-0.5 text-[11.5px] font-bold text-[var(--brand)] lg:hidden"
+                >
+                  ← {t.kicker}
+                </button>
+                <h2 className="truncate text-[15px] font-bold text-[var(--ink)]">
+                  {selected.guestName}
+                </h2>
+                <p className="truncate text-[11.5px] text-[var(--ink-soft)]">
+                  {selected.vehicleLabel ?? t.noVehicle}
+                  {selected.vehiclePlate ? ` · ${selected.vehiclePlate}` : ""}
+                </p>
+              </div>
             </div>
+
             <div className="tap-row flex shrink-0 items-center gap-2 sm:flex-col sm:items-end sm:gap-1.5">
               {selected.turoLink ? (
                 <a
@@ -232,7 +360,9 @@ export function GuestMessagesView({
                   {t.replyOnTuro} ↗
                 </a>
               ) : (
-                <span className="flex-1 text-[11px] text-[var(--ink-soft)] sm:flex-none">{t.noTuroLink}</span>
+                <span className="flex-1 text-[11px] text-[var(--ink-soft)] sm:flex-none">
+                  {t.noTuroLink}
+                </span>
               )}
               {selected.openCount > 0 ? (
                 <button
@@ -247,119 +377,124 @@ export function GuestMessagesView({
             </div>
           </header>
 
-          {/* Matching trip */}
           <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 sm:px-4">
-            <h3 className="text-[12px] font-semibold text-[var(--ink)]">
+            <h3 className="text-[12px] font-bold text-[var(--ink)]">
               {order ? t.tripTitle : t.tripNone}
             </h3>
             {order ? (
-              <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11.5px] sm:grid-cols-4">
-                <div>
-                  <dt className="text-[var(--ink-soft)]">{t.tripDates}</dt>
-                  <dd className="font-medium tabular-nums text-[var(--ink)]">
-                    {formatWhen(order.pickupDatetime, locale)} →{" "}
-                    {formatWhen(order.returnDatetime, locale)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--ink-soft)]">{t.tripVehicle}</dt>
-                  <dd className="truncate font-medium text-[var(--ink)]">
-                    {order.vehicleLabel ?? "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--ink-soft)]">{t.tripStatus}</dt>
-                  <dd className="font-medium text-[var(--ink)]">{order.status}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--ink-soft)]">{t.tripTotal}</dt>
-                  <dd className="font-medium tabular-nums text-[var(--ink)]">
-                    {order.netEarning == null ? "—" : `$${order.netEarning.toFixed(2)}`}
-                  </dd>
-                </div>
-                <div className="col-span-2 sm:col-span-4">
-                  <Link
-                    href={`/orders/${order.id}`}
-                    className="text-[11.5px] font-semibold text-[var(--accent)] underline underline-offset-2"
-                  >
-                    {t.tripOpen}
-                  </Link>
-                </div>
-              </dl>
+              <>
+                <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
+                  {facts.map((fact) => (
+                    <div key={fact.label} className="min-w-0">
+                      <dt className="t-eyebrow text-[var(--ink-soft)]">{fact.label}</dt>
+                      <dd className="mt-0.5 break-words text-[12px] font-bold leading-4 text-[var(--ink)]">
+                        {fact.value ?? t.noValue}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                <Link
+                  href={`/orders/${order.id}`}
+                  className="mt-2 inline-flex items-center text-[12px] font-bold text-[var(--brand)] underline underline-offset-2"
+                >
+                  {t.tripOpen}
+                </Link>
+              </>
             ) : (
               <p className="mt-1 text-[11.5px] leading-5 text-[var(--ink-soft)]">{t.tripNoneCopy}</p>
             )}
           </section>
 
-          {/* Messages */}
           <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)]">
-            <ul className="max-h-[40vh] divide-y divide-[var(--line)] overflow-y-auto">
-              {selected.messages.map((message) => (
-                <li key={message.id} className="px-3 py-2.5 sm:px-4">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-[10.5px] tabular-nums text-[var(--ink-soft)]">
-                      {formatWhen(message.receivedAt, locale)}
-                    </span>
-                    {!message.acknowledgedAt ? (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
-                        {t.openBadge}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-0.5 text-[12.5px] leading-5 text-[var(--ink)]">
-                    {message.summary ?? message.subject}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* Draft */}
-          <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 sm:px-4">
-            <h3 className="text-[12px] font-semibold text-[var(--ink)]">{t.draftTitle}</h3>
-            <p className="mt-0.5 text-[11px] leading-5 text-[var(--ink-soft)]">{t.draftCopy}</p>
-
-            <textarea
-              value={instruction}
-              onChange={(event) => setInstruction(event.target.value)}
-              placeholder={t.draftPlaceholder}
-              rows={2}
-              disabled={!canDraft || drafting}
-              className="mt-2 w-full resize-none rounded-md border border-[var(--line)] bg-white px-2.5 py-1.5 text-[12px] text-[var(--ink)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
-            />
-
-            <div className="mt-1.5 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={generateDraft}
-                disabled={!canDraft || drafting}
-                className="tap-press rounded-full bg-[var(--ink)] px-3 py-1.5 text-[11.5px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-              >
-                {drafting ? t.draftting : t.draftButton}
-              </button>
-              {draft ? (
+            <header className="tap-row flex items-center justify-between gap-2 border-b border-[var(--line)] px-3 py-2 sm:px-4">
+              <span className="t-eyebrow text-[var(--ink-soft)]">
+                {t.messageCount(selected.messages.length)}
+              </span>
+              <span className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={copyDraft}
-                  className="tap-press rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--ink)] transition hover:bg-[var(--surface-muted)]"
+                  onClick={translateThread}
+                  disabled={!canDraft || translating}
+                  className="tap-press rounded-md border border-[var(--line-strong)] bg-white px-2.5 py-1.5 text-[11.5px] font-bold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] disabled:opacity-50"
                 >
-                  {copied ? t.draftCopied : t.draftCopyButton}
+                  {translating ? t.translating : t.translate}
                 </button>
-              ) : null}
-            </div>
+                <button
+                  type="button"
+                  onClick={() => setShowZh((v) => !v)}
+                  className="tap-press rounded-md px-2 py-1.5 text-[11.5px] font-bold text-[var(--brand)]"
+                >
+                  {showZh ? t.showOriginal : t.showChinese}
+                </button>
+              </span>
+            </header>
 
+            {translateError ? (
+              <p className="px-3 pt-2 text-[11.5px] text-rose-600 sm:px-4">{translateError}</p>
+            ) : null}
             {draftError ? (
-              <p className="mt-1.5 text-[11.5px] text-rose-600">{draftError}</p>
+              <p className="px-3 pt-2 text-[11.5px] text-rose-600 sm:px-4">{draftError}</p>
             ) : null}
 
-            {draft ? (
-              <textarea
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                rows={4}
-                className="mt-2 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-1.5 text-[12.5px] leading-5 text-[var(--ink)] outline-none focus:border-[var(--accent)]"
-              />
-            ) : null}
+            <ul className="max-h-[52vh] divide-y divide-[var(--line)] overflow-y-auto">
+              {selected.messages.map((message) => {
+                const draft = drafts[message.id];
+                return (
+                  <li key={message.id} className="px-3 py-2.5 sm:px-4">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-[10.5px] tabular-nums text-[var(--ink-soft)]">
+                        {formatWhen(message.receivedAt, locale)}
+                      </span>
+                      {!message.acknowledgedAt ? (
+                        <span className="shrink-0 rounded-[var(--radius-pill)] bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                          {t.openBadge}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <p className="mt-0.5 text-[12.5px] leading-5 text-[var(--ink)]">
+                      {bodyOf(message)}
+                    </p>
+
+                    {/* Drafting sits on the message it answers rather
+                        than at the bottom of the page: the operator
+                        reads one message and replies to it, and a box
+                        two screens away is a box they scroll back to
+                        lose their place in. */}
+                    <div className="tap-row mt-1.5 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => draftFor(message)}
+                        disabled={!canDraft || draftingId !== null}
+                        className="tap-press rounded-md bg-[var(--ink)] px-2.5 py-1.5 text-[11.5px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                      >
+                        {draftingId === message.id ? t.draftingOne : t.draftOne}
+                      </button>
+                      {draft ? (
+                        <button
+                          type="button"
+                          onClick={() => copy(message.id, draft)}
+                          className="tap-press rounded-md border border-[var(--line-strong)] bg-white px-2.5 py-1.5 text-[11.5px] font-bold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)]"
+                        >
+                          {copiedId === message.id ? t.draftCopied : t.draftCopyButton}
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {draft ? (
+                      <textarea
+                        value={draft}
+                        onChange={(event) =>
+                          setDrafts((current) => ({ ...current, [message.id]: event.target.value }))
+                        }
+                        rows={3}
+                        className="mt-1.5 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-1.5 text-[12.5px] leading-5 text-[var(--ink)] outline-none focus:border-[var(--brand)]"
+                      />
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         </section>
       ) : (

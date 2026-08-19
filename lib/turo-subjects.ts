@@ -250,3 +250,43 @@ export function extractTuroLink(bodyText: string): string | null {
 
   return (meaningful ?? turoUrls[0]).slice(0, 1_000);
 }
+
+/**
+ * The guest's profile photo, from the HTML part of a notification.
+ *
+ * Turo's message emails lay out three images in a fixed order: the
+ * wordmark, the guest's avatar, then the vehicle. The avatar is the
+ * one served from their user-content bucket, so that is what this
+ * looks for rather than counting positions -- a template change that
+ * adds a banner would break counting and leave the operator looking at
+ * a picture of a car where a person should be.
+ *
+ * Returns null for anything it is not confident about. An initials
+ * avatar is a fine outcome; the wrong person's face is not.
+ */
+export function extractGuestAvatar(html: string): string | null {
+  if (!html) return null;
+
+  const candidates: string[] = [];
+  for (const match of html.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)) {
+    candidates.push(match[1]);
+  }
+
+  const usable = candidates.filter((url) => {
+    if (!/^https?:\/\//i.test(url)) return false;
+    // Layout chrome: spacers, wordmarks, icons, tracking pixels.
+    if (/logo|wordmark|icon|spacer|pixel|footer|social|badge|star/i.test(url)) return false;
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return host.endsWith("turo.com") || host.includes("turo");
+    } catch {
+      return false;
+    }
+  });
+
+  // Turo serves guest photos from a driver/profile path and vehicle
+  // shots from a vehicle path. Prefer an explicit profile hit; take
+  // nothing rather than guess between two unlabelled images.
+  const profile = usable.find((url) => /driver|profile|avatar|user|people|face/i.test(url));
+  return profile ? profile.slice(0, 500) : null;
+}

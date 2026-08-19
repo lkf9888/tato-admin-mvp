@@ -1,6 +1,8 @@
+import { InboundEmailKind } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { getGmailConfig, isGmailInboxConfigured } from "@/lib/gmail-inbox";
 import { getChatModel, getExtractionModel, getKimiApiKey, kimiChat } from "@/lib/kimi";
 import { APP_VERSION } from "@/lib/version";
@@ -30,8 +32,10 @@ function describeSecret(value: string) {
 }
 
 export async function GET() {
+  let workspaceId: string | null = null;
   try {
-    await requireCurrentAdminContext();
+    const context = await requireCurrentAdminContext();
+    workspaceId = context.workspace.id;
   } catch {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
@@ -43,10 +47,36 @@ export async function GET() {
   );
   const gmail = getGmailConfig();
 
+  // Inbox attribution — the match rate the guest-messages page runs on.
+  // A message with no guestName never becomes a conversation at all,
+  // and one with no orderId shows without its trip. Reported here
+  // because "the page is empty" and "attribution never ran" look
+  // identical from outside, and because the rate is worth watching
+  // after any change to the subject patterns.
+  const inbox = workspaceId
+    ? await (async () => {
+        const guestWhere = {
+          workspaceId,
+          kind: { in: [InboundEmailKind.GUEST_MESSAGE, InboundEmailKind.SUPPORT] },
+        };
+        const [total, guestMessages, withGuestName, withVehicle, withOrder, withTuroLink] =
+          await Promise.all([
+            prisma.inboundEmail.count({ where: { workspaceId } }),
+            prisma.inboundEmail.count({ where: guestWhere }),
+            prisma.inboundEmail.count({ where: { ...guestWhere, guestName: { not: null } } }),
+            prisma.inboundEmail.count({ where: { ...guestWhere, vehicleId: { not: null } } }),
+            prisma.inboundEmail.count({ where: { ...guestWhere, orderId: { not: null } } }),
+            prisma.inboundEmail.count({ where: { ...guestWhere, turoLink: { not: null } } }),
+          ]);
+        return { total, guestMessages, withGuestName, withVehicle, withOrder, withTuroLink };
+      })()
+    : null;
+
   const diagnostics: Record<string, unknown> = {
     // Which build answered. Without this, "the fix didn't work" and
     // "the fix isn't deployed yet" look identical from the outside.
     version: APP_VERSION,
+    inbox,
     kimi: {
       apiKey: describeSecret(apiKey),
       baseUrl,

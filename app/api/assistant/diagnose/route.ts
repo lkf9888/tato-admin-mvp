@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveTuroSyncWorkspace } from "@/lib/turo-sync";
 import { getGmailConfig, isGmailInboxConfigured } from "@/lib/gmail-inbox";
 import { getChatModel, getExtractionModel, getKimiApiKey, kimiChat } from "@/lib/kimi";
 import { APP_VERSION } from "@/lib/version";
@@ -72,10 +73,43 @@ export async function GET() {
       })()
     : null;
 
+  // Which workspace the scheduled jobs actually write to, next to the
+  // one the signed-in operator reads. A mismatch is invisible from
+  // every screen in the app and produces exactly the symptom that
+  // found it: the scheduled sync reports importing mail for hours
+  // while the pages stay empty, because the rows are landing in a
+  // workspace nobody opens. The alert scan resolves the same way, so
+  // the digests would describe that workspace too.
+  const workspaces = await (async () => {
+    if (!workspaceId) return null;
+    const [mine, scheduled] = await Promise.all([
+      prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { id: true, slug: true, name: true },
+      }),
+      resolveTuroSyncWorkspace()
+        .then((workspace) => ({
+          id: workspace.id,
+          slug: workspace.slug,
+          name: workspace.name,
+        }))
+        .catch((error: unknown) => ({
+          error: error instanceof Error ? error.message : "unresolved",
+        })),
+    ]);
+    return {
+      signedInAs: mine,
+      scheduledJobsUse: scheduled,
+      match: !!mine && "id" in scheduled && scheduled.id === mine.id,
+      envSlug: process.env.TURO_SYNC_WORKSPACE_SLUG?.trim() || null,
+    };
+  })();
+
   const diagnostics: Record<string, unknown> = {
     // Which build answered. Without this, "the fix didn't work" and
     // "the fix isn't deployed yet" look identical from the outside.
     version: APP_VERSION,
+    workspaces,
     inbox,
     kimi: {
       apiKey: describeSecret(apiKey),

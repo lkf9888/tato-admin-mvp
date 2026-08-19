@@ -892,6 +892,15 @@ model InboundEmail {
   // read exactly.
   guestText   String?
 
+  // The guest's own words in Chinese. Separate from summaryZh rather
+  // than replacing it: the two are translations of different source
+  // text, and the rows translated before guestText existed hold a
+  // rendering of the summary. Giving the new thing its own column
+  // means every row retranslates once, from the right source, without
+  // deleting anything or needing a heuristic to guess which cached
+  // translations went stale.
+  guestTextZh String?
+
   // The summary translated to Chinese, cached because the operator
   // reads the same thread more than once and a translation is a model
   // call. Null means "not translated yet", not "translation failed" --

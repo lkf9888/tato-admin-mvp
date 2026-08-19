@@ -718,7 +718,6 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
       kind?: InboundEmailKind;
       guestName?: string;
       guestText?: string;
-      summaryZh?: string | null;
       turoAccount?: string;
       vehicleId?: string;
       turoLink?: string;
@@ -730,13 +729,10 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
     }
     if (!email.guestName && attribution.guestName) data.guestName = attribution.guestName;
     if (!email.turoAccount && attribution.turoAccount) data.turoAccount = attribution.turoAccount;
-    if (!email.guestText && attribution.guestText) {
-      data.guestText = attribution.guestText;
-      // Any Chinese already stored was translated from the summary,
-      // not from these words. Drop it so the next open retranslates
-      // what the guest actually said.
-      data.summaryZh = null;
-    }
+    // No need to touch any cached Chinese: a translation of the guest's
+    // words lives in its own column, so a row gaining guestText simply
+    // has nothing there yet and translates on next open.
+    if (!email.guestText && attribution.guestText) data.guestText = attribution.guestText;
     if (!email.vehicleId && attribution.vehicleId) data.vehicleId = attribution.vehicleId;
     if (!email.turoLink && attribution.turoLink) data.turoLink = attribution.turoLink;
     if (!email.orderId && attribution.orderId) data.orderId = attribution.orderId;

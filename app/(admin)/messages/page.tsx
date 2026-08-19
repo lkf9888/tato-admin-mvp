@@ -41,6 +41,7 @@ export default async function GuestMessagesPage() {
       orderId: true,
       parsed: true,
       guestText: true,
+      guestTextZh: true,
       summaryZh: true,
       avatarUrl: true,
       vehicle: { select: { brand: true, model: true, year: true, plateNumber: true } },
@@ -88,7 +89,9 @@ export default async function GuestMessagesPage() {
         orderId: email.orderId,
         guestText: email.guestText,
         summary: extracted?.summary ?? null,
-        summaryZh: email.summaryZh,
+        // One Chinese line per message, from whichever source it was
+        // made of. The guest's words win when we have them.
+        summaryZh: email.guestTextZh ?? email.summaryZh,
         needsAction: extracted?.needsAction === true,
       };
     }),

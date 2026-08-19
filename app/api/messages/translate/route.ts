@@ -85,11 +85,14 @@ export async function POST(request: Request) {
     where: {
       workspaceId: context.workspace.id,
       id: { in: parsed.data.emailIds },
-      summaryZh: null,
+      OR: [
+        { guestText: { not: null }, guestTextZh: null },
+        { guestText: null, summaryZh: null },
+      ],
     },
     orderBy: { receivedAt: "desc" },
     take: BATCH,
-    select: { id: true, guestText: true, parsed: true },
+    select: { id: true, guestText: true, guestTextZh: true, parsed: true },
   });
 
   // The guest's own words when we have them. The summary is the
@@ -104,15 +107,23 @@ export async function POST(request: Request) {
       // which is exactly what happened: "Good day! / Just confirming
       // the vehicle will be ready..." came back translated as "你好!"
       // and nothing else.
-      if (own) return { id: email.id, text: own.replace(/\s*\n+\s*/g, " ").slice(0, 1200) };
+      if (own) {
+        return {
+          id: email.id,
+          fromGuest: true,
+          text: own.replace(/\s*\n+\s*/g, " ").slice(0, 1200),
+        };
+      }
       try {
         const summary = (JSON.parse(email.parsed ?? "{}") as { summary?: string }).summary;
-        return summary?.trim() ? { id: email.id, text: summary.trim() } : null;
+        return summary?.trim()
+          ? { id: email.id, fromGuest: false, text: summary.trim() }
+          : null;
       } catch {
         return null;
       }
     })
-    .filter((item): item is { id: string; text: string } => item !== null);
+    .filter((item): item is { id: string; fromGuest: boolean; text: string } => item !== null);
 
   if (items.length === 0) {
     return NextResponse.json({ translated: 0, translations: {} });
@@ -150,7 +161,12 @@ export async function POST(request: Request) {
     translations[item.id] = text;
     await prisma.inboundEmail.update({
       where: { id: item.id },
-      data: { summaryZh: text.slice(0, 600) },
+      // Stored beside the source it came from, so a later change to
+      // either one cannot leave a translation attributed to text it
+      // was never made from.
+      data: item.fromGuest
+        ? { guestTextZh: text.slice(0, 1200) }
+        : { summaryZh: text.slice(0, 600) },
     });
   }
 

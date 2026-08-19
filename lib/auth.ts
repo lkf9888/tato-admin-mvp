@@ -58,6 +58,10 @@ export async function setAdminSession(value = "admin") {
   store.set(ADMIN_COOKIE, createSignedPayload(value), {
     httpOnly: true,
     sameSite: "lax",
+    // Refuse to travel over plain HTTP. The deployment is HTTPS-only,
+    // so this costs nothing in production and would only get in the
+    // way of local development over http://localhost.
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
   });
@@ -165,6 +169,7 @@ export async function grantShareAccess(token: string, passwordHash: string) {
   store.set(`${SHARE_COOKIE_PREFIX}${token}`, createSignedPayload(fingerprint), {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 12,
   });

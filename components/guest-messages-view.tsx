@@ -35,6 +35,15 @@ type Thread = {
   turoLink: string | null;
 };
 
+type ConversationMessage = {
+  id: string;
+  direction: "inbound" | "outbound";
+  authorName: string | null;
+  body: string;
+  bodyZh: string | null;
+  sentAt: string;
+};
+
 type Order = {
   id: string;
   renterName: string;
@@ -127,11 +136,17 @@ export function GuestMessagesView({
   canDraft,
   threads,
   orders,
+  conversations,
 }: {
   locale: Locale;
   canDraft: boolean;
   threads: Thread[];
   orders: Order[];
+  /** Full conversations read off Turo by the browser agent, keyed by
+   *  reservation. Present only where the agent has run; a thread
+   *  without one falls back to the email-derived view, which shows
+   *  what the guest said and nothing of what we replied. */
+  conversations: Record<string, ConversationMessage[]>;
 }) {
   const t = getMessages(locale).guestMessagesPage;
   const router = useRouter();
@@ -172,6 +187,9 @@ export function GuestMessagesView({
 
   const selected = threads.find((thread) => thread.key === selectedKey) ?? null;
   const order = selected?.orderId ? (ordersById.get(selected.orderId) ?? null) : null;
+  const conversation = order?.externalOrderId
+    ? (conversations[order.externalOrderId] ?? null)
+    : null;
 
   // Translate on open rather than on request. The operator reads
   // Chinese and the guests write English; making that a button meant
@@ -535,6 +553,56 @@ export function GuestMessagesView({
               <p className="px-3 pt-2 text-[11.5px] text-rose-600 sm:px-4">{draftError}</p>
             ) : null}
 
+            {conversation ? (
+              /* The real conversation, both directions. Only the
+                 browser agent can produce this: Turo sends no
+                 notification when the host replies, so the
+                 email-derived view below is permanently one-sided. */
+              <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 max-lg:max-h-[60dvh] sm:px-4">
+                {conversation.map((message) => {
+                  const outbound = message.direction === "outbound";
+                  return (
+                    <li
+                      key={message.id}
+                      className={`flex ${outbound ? "justify-end" : "items-start gap-2"}`}
+                    >
+                      {!outbound ? (
+                        <Avatar name={selected.guestName} src={selected.avatarUrl} size={28} />
+                      ) : null}
+                      <div className={outbound ? "max-w-[88%]" : "min-w-0 max-w-[88%]"}>
+                        <p
+                          className={`text-[10.5px] tabular-nums text-[var(--ink-soft)] ${outbound ? "text-right" : ""}`}
+                        >
+                          {formatWhen(message.sentAt, locale)}
+                        </p>
+                        <div
+                          className={`mt-1 rounded-lg px-3 py-2 ${
+                            outbound
+                              ? "rounded-br-sm bg-[var(--brand)] text-white"
+                              : "rounded-tl-sm bg-[var(--surface-muted)] text-[var(--ink)]"
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap text-[12.5px] leading-5">
+                            {message.body}
+                          </p>
+                          {message.bodyZh ? (
+                            <p
+                              className={`mt-1.5 border-t pt-1.5 text-[12.5px] leading-5 ${
+                                outbound
+                                  ? "border-white/25 text-white/85"
+                                  : "border-[var(--line)] text-[var(--ink-mid)]"
+                              }`}
+                            >
+                              {message.bodyZh}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
             <ul className="min-h-0 flex-1 divide-y divide-[var(--line)] overflow-y-auto max-lg:max-h-[60dvh]">
               {selected.messages.map((message) => {
                 const draft = drafts[message.id];
@@ -616,6 +684,7 @@ export function GuestMessagesView({
                 );
               })}
             </ul>
+            )}
           </section>
         </section>
       ) : (

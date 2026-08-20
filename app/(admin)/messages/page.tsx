@@ -58,6 +58,33 @@ export default async function GuestMessagesPage() {
     },
   });
 
+  // What we said. Turo sends no notification when the host replies, so
+  // these exist only where the browser agent has read the conversation
+  // back off the site. Keyed by reservation, which is how Turo threads
+  // a conversation and how the order already joins.
+  const reservationIds = [
+    ...new Set(
+      emails
+        .map((email) => {
+          if (!email.parsed) return null;
+          try {
+            return (JSON.parse(email.parsed) as { reservationId?: string }).reservationId ?? null;
+          } catch {
+            return null;
+          }
+        })
+        .filter((id): id is string => !!id),
+    ),
+  ];
+
+  const scraped = reservationIds.length
+    ? await prisma.turoConversationMessage.findMany({
+        where: { workspaceId: workspace.id, reservationId: { in: reservationIds } },
+        orderBy: { sentAt: "desc" },
+        take: 400,
+      })
+    : [];
+
   const threads = groupIntoThreads(
     emails.map((email) => {
       const extracted = (() => {
@@ -144,6 +171,26 @@ export default async function GuestMessagesPage() {
       <GuestMessagesView
         locale={locale}
         canDraft={isKimiConfigured()}
+        // Keyed by reservation, which is how Turo threads a
+        // conversation. A thread reaches it through its matched trip's
+        // externalOrderId; threads with no matched trip simply have no
+        // entry and keep showing the email-derived view.
+        conversations={Object.fromEntries(
+          reservationIds.map((reservationId) => [
+            reservationId,
+            scraped
+              .filter((message) => message.reservationId === reservationId)
+              .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
+              .map((message) => ({
+                id: message.id,
+                direction: message.direction,
+                authorName: message.authorName,
+                body: message.body,
+                bodyZh: message.bodyZh,
+                sentAt: message.sentAt.toISOString(),
+              })),
+          ]).filter(([, list]) => (list as unknown[]).length > 0),
+        )}
         threads={threads.map((thread) => ({
           ...thread,
           latestAt: thread.latestAt.toISOString(),

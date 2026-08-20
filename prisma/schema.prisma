@@ -168,6 +168,8 @@ model Workspace {
   turoSyncConfig                TuroSyncConfig?
   billing                       WorkspaceBilling?
   inboundEmails                 InboundEmail[]
+  agentTokens                   AgentToken[]
+  turoConversationMessages      TuroConversationMessage[]
   assistantThreads              AssistantThread[]
   assistantAlerts               AssistantAlert[]
 }
@@ -1011,4 +1013,79 @@ model AssistantAlert {
 
   @@unique([workspaceId, dedupeKey])
   @@index([workspaceId, resolvedAt, severity])
+}
+
+/// A credential for an automated client -- the browser agent that logs
+/// into Turo and pushes back what the mailbox cannot see.
+///
+/// Separate from the operator's session on purpose. An agent runs
+/// unattended on someone's laptop, so its credential has to be
+/// revocable on its own, without logging anyone out, and has to leave
+/// a trail of when it was last used. A shared secret in an env var --
+/// which is how the Gmail sync authenticates -- cannot do either.
+model AgentToken {
+  id          String    @id @default(cuid())
+  workspaceId String
+  /// Human label: which machine, which purpose.
+  name        String
+  /// SHA-256 of the token. The plaintext is shown once at creation and
+  /// never stored: a leaked database should not hand over working
+  /// credentials as well as data.
+  tokenHash   String    @unique
+  /// First 8 characters, so a token can be identified in a list
+  /// without being usable from it.
+  tokenPrefix String
+  /// What this token may do. Coarse on purpose -- an agent that can
+  /// write conversations has no business importing financials.
+  scopes      String
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  createdBy   String
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+enum TuroMessageDirection {
+  /// From the guest to us. Also arrives by email; the scraped copy is
+  /// the fuller one, since email carries only what Turo chose to quote.
+  inbound
+  /// From us to the guest. Exists nowhere else: Turo sends no
+  /// notification when the host replies, so without the browser agent
+  /// every conversation in this system is one-sided.
+  outbound
+}
+
+/// One message in a Turo conversation, as scraped from the site.
+///
+/// Keyed by reservation rather than by guest: Turo threads a
+/// conversation to a trip, and the same guest booking twice has two
+/// conversations. That also makes the join to `Order` exact.
+model TuroConversationMessage {
+  id            String               @id @default(cuid())
+  workspaceId   String
+  /// Turo's reservation id, as it appears in the URL.
+  reservationId String
+  /// Turo's own id for the message when the page exposes one. Null
+  /// falls back to a content hash, so a re-scrape updates rather than
+  /// duplicates.
+  externalId    String
+  direction     TuroMessageDirection
+  authorName    String?
+  body          String
+  sentAt        DateTime
+  /// Chinese, filled in by the same pass that translates inbound mail.
+  bodyZh        String?
+  /// Which agent run wrote this, for tracing a bad scrape back to its
+  /// source.
+  source        String?
+  createdAt     DateTime             @default(now())
+
+  workspace     Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, reservationId, externalId])
+  @@index([workspaceId, reservationId, sentAt])
+  @@index([workspaceId, sentAt])
 }

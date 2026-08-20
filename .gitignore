@@ -9,3 +9,6 @@ prisma/dev.db
 prisma/dev.db-journal
 tsconfig.tsbuildinfo
 .codegraph/
+
+# The browser agent's saved Turo session. A live login.
+agent/.state/

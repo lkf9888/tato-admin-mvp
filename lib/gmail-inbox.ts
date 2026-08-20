@@ -361,7 +361,21 @@ export async function runGmailSync(input: {
    *  the messages already stored -- a 365-day run scanned 100 and
    *  imported one. */
   maxMessages?: number;
+  /**
+   * What this run is for.
+   *
+   * Reading the mailbox takes about three seconds; summarising what
+   * arrived takes minutes. Bundled, the schedule has to be paced for
+   * the slow half, so a message can sit unseen for a quarter of an
+   * hour while a model finishes describing older mail.
+   *
+   * "ingest" reads and files, touching no model. "enrich" runs only
+   * the model passes. "full" is both and remains the default, so
+   * anything already calling this keeps its behaviour.
+   */
+  mode?: "ingest" | "enrich" | "full";
 }): Promise<GmailSyncResult> {
+  const mode = input.mode ?? "full";
   const config = getGmailConfig();
   if (!config.user || !config.password) {
     throw new GmailInboxError(
@@ -405,6 +419,37 @@ export async function runGmailSync(input: {
 
   result.reclassified = await reclassifyBySubject(input.workspaceId, fleet);
 
+  if (mode !== "enrich") {
+    await ingestMailbox({
+      workspaceId: input.workspaceId,
+      lookbackDays: input.lookbackDays,
+      maxMessages: input.maxMessages,
+      config,
+      fleet,
+      result,
+    });
+  }
+
+  if (mode !== "ingest") {
+    await enrichPendingEmails(
+      input.workspaceId,
+      result,
+      Date.now() + POST_INGEST_BUDGET_MS,
+    );
+  }
+
+  return result;
+}
+
+async function ingestMailbox(input: {
+  workspaceId: string;
+  lookbackDays?: number;
+  maxMessages?: number;
+  config: ReturnType<typeof getGmailConfig>;
+  fleet: VehicleForMatch[];
+  result: GmailSyncResult;
+}) {
+  const { config, fleet, result } = input;
   const client = new ImapFlow({
     host: config.host,
     port: config.port,
@@ -538,15 +583,6 @@ export async function runGmailSync(input: {
     await client.logout().catch(() => null);
   }
 
-  // Enrich after the mailbox is closed: these are slow model calls and
-  // there is no reason to hold an IMAP connection open through them.
-  await enrichPendingEmails(
-    input.workspaceId,
-    result,
-    Date.now() + POST_INGEST_BUDGET_MS,
-  );
-
-  return result;
 }
 
 /**

@@ -96,10 +96,18 @@ export async function POST(request: Request) {
         ? Math.min(requestedMax, 2000)
         : undefined;
 
+    // `?mode=ingest` reads the mailbox and stops; `?mode=enrich` runs
+    // only the model passes. Unrecognised or absent means both, so the
+    // scheduled job that has been calling this all along is unchanged.
+    const requestedMode = new URL(request.url).searchParams.get("mode");
+    const mode =
+      requestedMode === "ingest" || requestedMode === "enrich" ? requestedMode : undefined;
+
     const result = await runGmailSync({
       workspaceId: context.workspaceId,
       lookbackDays,
       maxMessages,
+      mode,
     });
 
     // Turn the mail into bookings. Runs on every sync, over the whole

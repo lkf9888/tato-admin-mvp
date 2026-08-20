@@ -5,6 +5,7 @@ import { MetricCard } from "@/components/metric-card";
 import {
   cn,
   formatCurrency,
+  formatCurrencyCompact,
   formatDateTime,
   formatTime,
   formatNumber,
@@ -411,6 +412,7 @@ export default async function DashboardPage() {
               <MetricCard
                 label={monthlyMessages.netLabel}
                 value={formatCurrency(currentMonthNet, locale)}
+                compactValue={formatCurrencyCompact(currentMonthNet, locale)}
                 hint={netHint}
               />
             </div>
@@ -436,6 +438,7 @@ export default async function DashboardPage() {
               <MetricCard
                 label={monthlyMessages.avgPerTripLabel}
                 value={avgPerTrip != null ? formatCurrency(avgPerTrip, locale) : "—"}
+                compactValue={avgPerTrip != null ? formatCurrencyCompact(avgPerTrip, locale) : "—"}
                 hint={monthlyMessages.avgPerTripHint}
               />
             </div>

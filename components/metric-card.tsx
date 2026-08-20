@@ -14,12 +14,40 @@
 export function MetricCard({
   label,
   value,
+  compactValue,
   hint,
 }: {
   label: string;
   value: string;
+  /**
+   * A shorter rendering of the same number, used below `sm`. Falls
+   * back to `value` when the two are the same thing.
+   */
+  compactValue?: string;
   hint: string;
 }) {
+  const phoneValue = compactValue ?? value;
+
+  // Four cards across a 375px screen leaves each number about 66px.
+  // A value with no space in it -- a currency amount, most of all --
+  // cannot wrap, so anything too wide is clipped mid-digit rather
+  // than pushed to a second line. Stepping the size down by length
+  // keeps the short values big and the long ones whole.
+  //
+  // The rungs are measured, not guessed: `CA$74,629.75` rendered 111px
+  // wide at 17px on the live dashboard, so a digit costs about 9.25px
+  // at that size, and each rung is the largest size whose worst-case
+  // string still lands under 66px. Seven-figure months hit the last
+  // rung and stay legible.
+  const phoneValueSize =
+    phoneValue.length >= 12
+      ? "text-[10px]"
+      : phoneValue.length >= 9
+        ? "text-[12px]"
+        : phoneValue.length >= 7
+          ? "text-[14px]"
+          : "text-[17px]";
+
   return (
     <div className="h-full rounded-lg border border-[var(--line)] bg-[var(--surface)] p-2 sm:p-4">
       {/* Four across on a phone, so the whole daily picture is one
@@ -30,8 +58,11 @@ export function MetricCard({
       <p className="text-[10px] leading-tight text-[var(--ink-soft)] sm:text-[11px] sm:uppercase sm:tracking-[0.26em]">
         {label}
       </p>
-      <p className="mt-0.5 text-[17px] font-black leading-none tracking-[-0.02em] text-[var(--ink)] sm:mt-1.5 sm:font-serif sm:text-[1.7rem] sm:tracking-normal">
-        {value}
+      <p
+        className={`mt-0.5 font-black leading-none tracking-[-0.02em] text-[var(--ink)] ${phoneValueSize} sm:mt-1.5 sm:font-serif sm:text-[1.7rem] sm:tracking-normal`}
+      >
+        <span className="sm:hidden">{phoneValue}</span>
+        <span className="hidden sm:inline">{value}</span>
       </p>
       {/* The explanation is the first thing to go when space is short:
           it explains a number that is already labelled. */}

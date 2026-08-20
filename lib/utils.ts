@@ -104,6 +104,27 @@ export function formatCurrency(value?: number | null, locale: Locale = "en") {
   }).format(value);
 }
 
+/**
+ * Same amount, no cents, correctly rounded.
+ *
+ * A dashboard tile four across on a 375px screen has about 66px for
+ * its number, and `CA$74,629.75` needs 111px at a legible weight --
+ * it clipped mid-digit, which is worse than any rounding. The cents
+ * are the part of that number nobody reads at a glance, so they are
+ * what goes; the desktop card keeps them. Rounded through Intl rather
+ * than by trimming the string, because chopping ".94" off CA$285.94
+ * silently understates it by most of a dollar.
+ */
+export function formatCurrencyCompact(value?: number | null, locale: Locale = "en") {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat(getLocaleTag(locale), {
+    style: "currency",
+    currency: "CAD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 export function roundCurrencyAmount(value?: number | null) {
   if (value == null || !Number.isFinite(value)) return null;
 

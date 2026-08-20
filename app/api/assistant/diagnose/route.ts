@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { getDiskBreakdown, getDiskUsage } from "@/lib/disk";
+import { gmailIdleStatus } from "@/lib/gmail-idle";
 import { prisma } from "@/lib/prisma";
 import { resolveTuroSyncWorkspace } from "@/lib/turo-sync";
 import { getGmailConfig, isGmailInboxConfigured } from "@/lib/gmail-inbox";
@@ -136,6 +137,7 @@ export async function GET() {
     version: APP_VERSION,
     disk,
     diskBreakdown,
+    mailWatcher: gmailIdleStatus(),
     workspaces,
     inbox,
     kimi: {

@@ -84,10 +84,29 @@ async function push(reservationId, messages) {
 /**
  * Read one conversation.
  *
- * Selectors are the fragile part. They are asserted rather than
- * defaulted: a thread that genuinely has no messages and a thread whose
- * markup moved look identical in the output, and returning an empty
- * list for the second would quietly delete nothing and report success.
+ * The selectors below were derived from the live page, not guessed.
+ * What the DOM actually looks like:
+ *
+ *   div[class*="conversationInnerContainerStyles"]   the thread
+ *     div[class*="messageOuterContainerStyles"]      one bubble
+ *       ...
+ *       p  "10:27 PM - Amarpreet (Guest)"            attribution
+ *
+ * Two things that shaped the approach:
+ *
+ * A message can be several bubbles with one attribution line at the
+ * end -- 41 bubbles carried 26 messages on the thread this was written
+ * against -- so bubbles are not messages. The attribution line is what
+ * terminates one, and the text since the previous attribution is its
+ * body. That is also how a person reads it.
+ *
+ * Direction comes from the role in that line, `(Guest)` against
+ * `(Co-host)`, not from which side the bubble sits on. Bubble position
+ * is a layout decision and layouts get rewritten; the role is content.
+ *
+ * Class names are emotion hashes, but each carries a readable suffix
+ * (`conversationInnerContainerStyles`). Matching the suffix survives a
+ * rebuild; matching the hash would not.
  */
 async function readConversation(page, reservationId) {
   await page.goto(`https://turo.com/us/en/reservation/${reservationId}/messages`, {
@@ -95,48 +114,122 @@ async function readConversation(page, reservationId) {
   });
   await sleep(PAUSE_MS);
 
-  const container = page.locator('[data-testid*="message"], [class*="message"]').first();
-  if ((await container.count()) === 0) {
-    throw new Error(
-      `No message container on reservation ${reservationId}. Turo's markup has probably moved -- ` +
-        `open the page with --headed and update the selectors in readConversation().`,
-    );
-  }
+  const result = await page.evaluate(() => {
+    const ATTRIBUTION =
+      /^(\d{1,2}:\d{2}\s*(?:AM|PM))\s*[-\u2013]\s*(.+?)\s*\((Guest|Co-host|Host|Owner)\)\s*$/i;
+    // Conversation separators carry the year. The trip header shows
+    // dates without one, and treating those as separators put every
+    // message on the wrong day.
+    const DAY = /^(Today|Yesterday|[A-Z][a-z]{2},\s+[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4})$/;
 
-  return page.evaluate(() => {
-    // Turo renders each message as a block carrying the text and a
-    // timestamp. Direction is read from which side the bubble sits on
-    // rather than from a class name, because the classes are hashed at
-    // build time and the layout is not.
-    const nodes = [...document.querySelectorAll('[class*="message"], [data-testid*="message"]')];
-    const out = [];
-    const seen = new Set();
+    const bubbles = [...document.querySelectorAll('div[class*="messageOuterContainerStyles"]')];
+    if (bubbles.length === 0) return { error: "no-bubbles" };
 
-    for (const node of nodes) {
-      const text = (node.innerText || "").trim();
-      if (!text || text.length < 2 || seen.has(text)) continue;
+    // Scope to the thread. Walking the document picked up the trip
+    // details panel and prefixed the first message with the mileage
+    // allowance.
+    let root =
+      document.querySelector('div[class*="conversationInnerContainerStyles"]') ?? bubbles[0];
+    while (root && !bubbles.every((bubble) => root.contains(bubble))) root = root.parentElement;
+    if (!root) return { error: "no-root" };
 
-      const time = node.querySelector("time");
-      const sentAt = time?.getAttribute("datetime") ?? null;
-      if (!sentAt) continue;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    const messages = [];
+    let day = null;
+    let buffer = [];
 
-      const rect = node.getBoundingClientRect();
-      const parentRect = node.parentElement?.getBoundingClientRect();
-      const outbound =
-        parentRect != null &&
-        rect.right >= parentRect.right - 4 &&
-        rect.left > parentRect.left + parentRect.width * 0.25;
+    while (walker.nextNode()) {
+      const el = walker.currentNode;
+      if (el.children.length !== 0) continue;
+      const text = (el.textContent || "").trim();
+      if (!text) continue;
 
-      seen.add(text);
-      out.push({
-        direction: outbound ? "outbound" : "inbound",
-        body: text.slice(0, 4000),
-        sentAt: new Date(sentAt).toISOString(),
-      });
+      if (DAY.test(text)) {
+        day = text;
+        buffer = [];
+        continue;
+      }
+
+      const attribution = text.match(ATTRIBUTION);
+      if (attribution) {
+        const body = buffer.join("\n").trim();
+        buffer = [];
+        if (body) {
+          messages.push({
+            day,
+            time: attribution[1],
+            author: attribution[2],
+            role: attribution[3],
+            body,
+          });
+        }
+        continue;
+      }
+
+      // Composer furniture, not conversation.
+      if (text.length > 1 && !/^(View message options|Insert a new line)/i.test(text)) {
+        buffer.push(text);
+      }
     }
 
-    return out;
+    return { messages };
   });
+
+  if (result.error === "no-bubbles") {
+    throw new Error(
+      `No message bubbles on ${reservationId}. Either the thread is genuinely empty or ` +
+        `Turo's markup moved -- rerun with --headed and check ` +
+        `div[class*="messageOuterContainerStyles"] still exists.`,
+    );
+  }
+  if (result.error) {
+    throw new Error(`Could not locate the conversation on ${reservationId} (${result.error}).`);
+  }
+
+  return result.messages
+    .map((message) => {
+      const sentAt = toIsoDate(message.day, message.time);
+      if (!sentAt) return null;
+      return {
+        direction: /guest/i.test(message.role) ? "inbound" : "outbound",
+        authorName: `${message.author} (${message.role})`.slice(0, 120),
+        body: message.body.slice(0, 4000),
+        sentAt,
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * "Wed, Aug 12, 2026" + "10:27 PM" -> ISO.
+ *
+ * Parsed in the machine's local timezone, which is the same one Turo
+ * renders in for a signed-in host. Run the agent somewhere else and
+ * the timestamps shift, which is worth knowing before wondering why a
+ * message looks eight hours early.
+ */
+function toIsoDate(day, time) {
+  if (!day || !time) return null;
+
+  let base;
+  if (/^Today$/i.test(day)) {
+    base = new Date();
+  } else if (/^Yesterday$/i.test(day)) {
+    base = new Date();
+    base.setDate(base.getDate() - 1);
+  } else {
+    base = new Date(day.replace(/^[A-Z][a-z]{2},\s*/, ""));
+  }
+  if (Number.isNaN(base.getTime())) return null;
+
+  const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+
+  let hours = Number(match[1]) % 12;
+  if (/pm/i.test(match[3])) hours += 12;
+
+  base.setHours(hours, Number(match[2]), 0, 0);
+  return base.toISOString();
 }
 
 async function run() {

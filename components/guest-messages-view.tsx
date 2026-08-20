@@ -346,20 +346,21 @@ export function GuestMessagesView({
                   </span>
 
                   {(() => {
-                    // A handover inside the next twelve hours is almost
-                    // certainly what the message is about, and it is the
-                    // thing that decides whether this thread can wait.
+                    // Where the trip is, not how soon it is. A finished
+                    // trip and one that has not started both used to
+                    // show nothing, so a thread gave no clue whether it
+                    // was still live -- which is the first thing that
+                    // decides whether a message can wait.
                     const trip = thread.orderId ? ordersById.get(thread.orderId) : null;
-                    const pickupIn = trip ? hoursUntil(trip.pickupDatetime) : null;
-                    const returnIn = trip ? hoursUntil(trip.returnDatetime) : null;
-                    const imminent =
-                      pickupIn !== null && pickupIn >= 0 && pickupIn <= IMMINENT_HOURS
-                        ? { label: t.pickupSoon, at: trip!.pickupDatetime }
-                        : returnIn !== null && returnIn >= 0 && returnIn <= IMMINENT_HOURS
-                          ? { label: t.returnSoon, at: trip!.returnDatetime }
-                          : null;
+                    const stage = !trip
+                      ? null
+                      : hoursUntil(trip.returnDatetime) < 0
+                        ? { label: t.tripEnded, at: null, done: true }
+                        : hoursUntil(trip.pickupDatetime) > 0
+                          ? { label: t.pickupSoon, at: trip.pickupDatetime, done: false }
+                          : { label: t.returnSoon, at: trip.returnDatetime, done: false };
 
-                    if (thread.openCount === 0 && !imminent) return null;
+                    if (thread.openCount === 0 && !stage) return null;
 
                     return (
                       <span className="mt-1 flex flex-wrap items-center gap-1">
@@ -368,9 +369,16 @@ export function GuestMessagesView({
                             {t.openBadge} {thread.openCount}
                           </span>
                         ) : null}
-                        {imminent ? (
-                          <span className="inline-flex rounded-[var(--radius-pill)] bg-[var(--brand-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--brand)]">
-                            {imminent.label} {formatWhen(imminent.at, locale)}
+                        {stage ? (
+                          <span
+                            className={`inline-flex rounded-[var(--radius-pill)] px-1.5 py-0.5 text-[10px] font-bold ${
+                              stage.done
+                                ? "bg-[var(--surface-muted)] text-[var(--ink-soft)]"
+                                : "bg-[var(--brand-soft)] text-[var(--brand)]"
+                            }`}
+                          >
+                            {stage.label}
+                            {stage.at ? ` ${formatWhen(stage.at, locale)}` : ""}
                           </span>
                         ) : null}
                       </span>
@@ -490,42 +498,60 @@ export function GuestMessagesView({
               {selected.messages.map((message) => {
                 const draft = drafts[message.id];
                 return (
-                  <li key={message.id} className="px-3 py-2.5 sm:px-4">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[10.5px] tabular-nums text-[var(--ink-soft)]">
-                        {formatWhen(message.receivedAt, locale)}
-                      </span>
-                      {!message.acknowledgedAt ? (
-                        <span className="shrink-0 rounded-[var(--radius-pill)] bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
-                          {t.openBadge}
-                        </span>
-                      ) : null}
+                  <li key={message.id} className="px-3 py-3 sm:px-4">
+                    {/* A chat bubble, because that is what this is: one
+                        side of a conversation. The guest's words sit
+                        left in a bubble; the draft the operator is
+                        about to send back sits right, in the colour
+                        outgoing messages have everywhere else. The
+                        flat rows this replaced read as a log, and a
+                        log is harder to follow than a conversation
+                        when the thing you are doing is conversing. */}
+                    <div className="flex items-start gap-2">
+                      <Avatar name={selected.guestName} src={selected.avatarUrl} size={28} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[10.5px] tabular-nums text-[var(--ink-soft)]">
+                            {formatWhen(message.receivedAt, locale)}
+                          </span>
+                          {!message.acknowledgedAt ? (
+                            <span className="rounded-[var(--radius-pill)] bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                              {t.openBadge}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-1 inline-block max-w-[88%] rounded-lg rounded-tl-sm bg-[var(--surface-muted)] px-3 py-2">
+                          <p className="whitespace-pre-wrap text-[12.5px] leading-5 text-[var(--ink)]">
+                            {message.guestText ?? message.summary ?? message.subject}
+                          </p>
+                          {chinese(message) ? (
+                            <p className="mt-1.5 border-t border-[var(--line)] pt-1.5 text-[12.5px] leading-5 text-[var(--ink-mid)]">
+                              {chinese(message)}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
 
-                    {/* The guest's own words, then the Chinese under
-                        them. This showed a model's summary for a
-                        while, with the summary's translation beneath
-                        it -- two paraphrases and no sign of what the
-                        person actually said. A summary of one sentence
-                        is not a shorter version of that sentence.
-                        The summary survives only as a fallback, for
-                        notifications that carry no message at all. */}
-                    <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] leading-5 text-[var(--ink)]">
-                      {message.guestText ?? message.summary ?? message.subject}
-                    </p>
-                    {chinese(message) ? (
-                      <p className="mt-1 border-l-2 border-[var(--brand-soft)] pl-2 text-[12.5px] leading-5 text-[var(--ink-mid)]">
-                        {chinese(message)}
-                      </p>
+                    {draft ? (
+                      <div className="mt-2 flex justify-end">
+                        <div className="max-w-[88%] rounded-lg rounded-br-sm bg-[var(--brand)] px-3 py-2">
+                          <textarea
+                            value={draft}
+                            onChange={(event) =>
+                              setDrafts((current) => ({
+                                ...current,
+                                [message.id]: event.target.value,
+                              }))
+                            }
+                            rows={3}
+                            className="w-full resize-y bg-transparent text-[12.5px] leading-5 text-white outline-none placeholder:text-white/60"
+                          />
+                        </div>
+                      </div>
                     ) : null}
 
-                    {/* Drafting sits on the message it answers rather
-                        than at the bottom of the page: the operator
-                        reads one message and replies to it, and a box
-                        two screens away is a box they scroll back to
-                        lose their place in. */}
-                    {/* Bottom-right: the reply is what you do after
-                        reading, so it sits where reading ends. */}
                     <div className="tap-row mt-1.5 flex items-center justify-end gap-2">
                       {draft ? (
                         <button
@@ -545,17 +571,6 @@ export function GuestMessagesView({
                         {draftingId === message.id ? t.draftingOne : t.draftOne}
                       </button>
                     </div>
-
-                    {draft ? (
-                      <textarea
-                        value={draft}
-                        onChange={(event) =>
-                          setDrafts((current) => ({ ...current, [message.id]: event.target.value }))
-                        }
-                        rows={3}
-                        className="mt-1.5 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-1.5 text-[12.5px] leading-5 text-[var(--ink)] outline-none focus:border-[var(--brand)]"
-                      />
-                    ) : null}
                   </li>
                 );
               })}

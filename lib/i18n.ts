@@ -18,6 +18,7 @@ import { accountSettingsMessages } from "@/lib/i18n/messages/account-settings";
 import { assistantMessages } from "@/lib/i18n/messages/assistant";
 import { guestMessagesMessages } from "@/lib/i18n/messages/guest-messages";
 import { orderDetailMessages } from "@/lib/i18n/messages/order-detail";
+import { turoUpdatesMessages } from "@/lib/i18n/messages/turo-updates";
 import { authMessages } from "@/lib/i18n/messages/auth";
 import { billingMessages } from "@/lib/i18n/messages/billing";
 import { calendarMessages } from "@/lib/i18n/messages/calendar";
@@ -303,6 +304,7 @@ const messages = {
     ...assistantMessages.en,
     ...guestMessagesMessages.en,
     ...orderDetailMessages.en,
+    ...turoUpdatesMessages.en,
     ...authMessages.en,
     ...dashboardMessages.en,
     ...fleetMessages.en,
@@ -320,6 +322,7 @@ const messages = {
     ...assistantMessages.zh,
     ...guestMessagesMessages.zh,
     ...orderDetailMessages.zh,
+    ...turoUpdatesMessages.zh,
     ...authMessages.zh,
     ...dashboardMessages.zh,
     ...fleetMessages.zh,

@@ -53,6 +53,7 @@ export function AppShell({
         { href: "/dashboard", label: messages.shell.nav.dashboard, icon: "dashboard" },
         { href: "/assistant", label: messages.shell.nav.assistant, icon: "assistant" },
         { href: "/messages", label: messages.shell.nav.guestMessages, icon: "messages" },
+        { href: "/updates", label: messages.shell.nav.turoUpdates, icon: "turoUpdates" },
         { href: "/calendar", label: messages.shell.nav.calendar, icon: "calendar" },
         { href: "/orders", label: messages.shell.nav.orders, icon: "orders" },
         { href: "/imports", label: messages.shell.nav.imports, icon: "imports" },

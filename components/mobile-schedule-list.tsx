@@ -69,6 +69,17 @@ function bucketOrders(orders: ScheduleOrder[], labels: ScheduleListLabels): Buck
       continue;
     }
 
+    // Finished trips leave the list. Every bucket below asks only
+    // "is the pickup before X", with no lower bound, so without this
+    // a trip that was picked up and returned last week satisfies
+    // "before the day after tomorrow" and files itself under Tomorrow
+    // -- which is how an 8/18-8/19 booking came to be listed as
+    // tomorrow's work on the 20th. The buckets are all forward-
+    // looking; something already over belongs in none of them.
+    if (order.returnDatetime < startOfToday) {
+      continue;
+    }
+
     if (order.pickupDatetime < startOfDayAfterTomorrow) {
       tomorrow.push(order);
       continue;

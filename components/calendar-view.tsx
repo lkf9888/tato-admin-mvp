@@ -92,8 +92,14 @@ const DEFAULT_VEHICLE_COLUMN_WIDTH = 188;
 // day columns visible -- the timeline is technically present and
 // useless. Narrow it when the viewport is narrow; the row still shows
 // the nickname, just with less room around it.
-const COMPACT_VEHICLE_COLUMN_WIDTH = 104;
+const COMPACT_VEHICLE_COLUMN_WIDTH = 88;
 const COMPACT_VIEWPORT_WIDTH = 640;
+// What a phone should be able to see at once without scrolling: this
+// week and the few days after it. Everything else about the compact
+// timeline -- the column width, the row height, the type -- falls out
+// of making seven columns fit.
+const COMPACT_VISIBLE_DAYS = 7;
+const COMPACT_MIN_DAY_COLUMN_WIDTH = 30;
 const DAY_COLUMN_WIDTHS = {
   week: 92,
   month: 52,
@@ -110,6 +116,13 @@ const MAX_CUSTOM_DAY_WIDTH = 104;
 const DEFAULT_CUSTOM_DAY_WIDTH = 52;
 const LANE_HEIGHT = 32;
 const BAR_HEIGHT = 28;
+// The same rows about a third shorter. Desktop heights on a phone made
+// four vehicles a full screen; at these, it is closer to nine, which
+// is the point of a timeline.
+const COMPACT_LANE_HEIGHT = 22;
+const COMPACT_BAR_HEIGHT = 20;
+const COMPACT_MIN_ROW_HEIGHT = 31;
+const MIN_ROW_HEIGHT = 44;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const SCRUBBER_DAY_RANGE = 365;
 
@@ -165,9 +178,22 @@ function orderIntersectsRange(order: CalendarOrder, rangeStart: Date, rangeEndEx
   );
 }
 
-function getTimelineBarClasses(order: CalendarOrder, clippedStart: boolean, clippedEnd: boolean) {
+function getTimelineBarClasses(
+  order: CalendarOrder,
+  clippedStart: boolean,
+  clippedEnd: boolean,
+  compact = false,
+) {
   return cn(
-    "absolute flex items-center overflow-hidden border-[1.5px] px-3.5 text-left text-[13px] font-semibold leading-tight text-white shadow-[0_18px_36px_-18px_rgba(17,19,24,0.7)] transition hover:-translate-y-0.5 hover:brightness-110 cursor-pointer",
+    "absolute flex items-center overflow-hidden border-[1.5px] text-left font-semibold leading-tight text-white shadow-[0_18px_36px_-18px_rgba(17,19,24,0.7)] transition hover:-translate-y-0.5 hover:brightness-110 cursor-pointer",
+    // 14px of padding either side is most of a 34px column, so a
+    // single-day booking would be all padding and no name.
+    //
+    // `tap-compact` opts out of the 44px touch floor. A bar is a grid
+    // cell that happens to be clickable; at the floor's height four
+    // vehicles fill a phone screen, which defeats the view. It stays a
+    // comfortable target because it is wide.
+    compact ? "tap-compact px-1.5 text-[10px]" : "px-3.5 text-[13px]",
     order.hasConflict
       ? "border-[#c61e22] bg-[#e5484d]"
       : order.status === "cancelled"
@@ -720,19 +746,54 @@ export function CalendarView({
     orderIntersectsRange(order, rangeStart, rangeEndExclusive),
   );
 
-  const vehicleColumnWidth =
-    timelineViewportWidth !== null && timelineViewportWidth < COMPACT_VIEWPORT_WIDTH
-      ? COMPACT_VEHICLE_COLUMN_WIDTH
-      : DEFAULT_VEHICLE_COLUMN_WIDTH;
+  const compact =
+    timelineViewportWidth !== null && timelineViewportWidth < COMPACT_VIEWPORT_WIDTH;
+  const vehicleColumnWidth = compact
+    ? COMPACT_VEHICLE_COLUMN_WIDTH
+    : DEFAULT_VEHICLE_COLUMN_WIDTH;
+  const laneHeight = compact ? COMPACT_LANE_HEIGHT : LANE_HEIGHT;
+  const barHeight = compact ? COMPACT_BAR_HEIGHT : BAR_HEIGHT;
+  const barTopOffset = compact ? 4 : 6;
+  const minRowHeight = compact ? COMPACT_MIN_ROW_HEIGHT : MIN_ROW_HEIGHT;
   const fittedTimelineWidth = Math.max((timelineViewportWidth ?? 0) - vehicleColumnWidth, 0);
-  const dayColumnWidth = Math.max(
-    MIN_DAY_COLUMN_WIDTHS[rangeMode],
-    rangeMode === "week" && fittedTimelineWidth > 0
-      ? Math.max(Math.floor(fittedTimelineWidth / days.length), customDayWidth)
-      : customDayWidth || DAY_COLUMN_WIDTHS[rangeMode],
-  );
+  // A phone divides the width it has by seven and takes that, rather
+  // than reading the day-width slider. The slider is a desktop control
+  // -- it lives inside the collapsed filter panel here -- and a value
+  // set on a 1400px screen means nothing on a 375px one.
+  const dayColumnWidth =
+    compact && fittedTimelineWidth > 0
+      ? Math.max(
+          COMPACT_MIN_DAY_COLUMN_WIDTH,
+          Math.floor(fittedTimelineWidth / COMPACT_VISIBLE_DAYS),
+        )
+      : Math.max(
+          MIN_DAY_COLUMN_WIDTHS[rangeMode],
+          rangeMode === "week" && fittedTimelineWidth > 0
+            ? Math.max(Math.floor(fittedTimelineWidth / days.length), customDayWidth)
+            : customDayWidth || DAY_COLUMN_WIDTHS[rangeMode],
+        );
   const timelineWidth = days.length * dayColumnWidth;
   const tableWidth = Math.max(vehicleColumnWidth + timelineWidth, timelineViewportWidth ?? 0);
+
+  // Seven columns fit, so which seven matters. A six-week range starts
+  // on the Monday of the focused week, which on a Friday leaves four of
+  // the seven already spent -- so the viewport is scrolled to put the
+  // focused day at the left edge and the week ahead beside it.
+  //
+  // Keyed on the focused day rather than on mount, so prev / next /
+  // today land where the operator asked to be. Their own sideways
+  // scrolling changes none of these, so this never fights it.
+  useEffect(() => {
+    const node = timelineViewportRef.current;
+    if (!node || !compact) return;
+
+    const offsetDays = Math.round(
+      (normalizedFocusDate.getTime() - rangeStart.getTime()) / DAY_IN_MS,
+    );
+    if (offsetDays < 0) return;
+
+    node.scrollTo({ left: offsetDays * dayColumnWidth, behavior: "auto" });
+  }, [compact, normalizedFocusDate, rangeStart, dayColumnWidth]);
   // v0.19.3 visual refresh: dropped the heavy dark glass-pill container
   // language entirely. The previous styles relied on placing
   // `bg-rgba(255,255,255,0.76)` buttons on top of an
@@ -1119,7 +1180,7 @@ export function CalendarView({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+      <section className="calendar-dense overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
         {filteredVehicles.length === 0 ? (
           <div className="rounded-lg bg-[rgba(255,255,255,0.72)] px-4 py-10 text-sm text-[color:var(--ink-soft)]">
             {calendarMessages.noVehicles}
@@ -1136,7 +1197,7 @@ export function CalendarView({
                   gridTemplateColumns: `${vehicleColumnWidth}px repeat(${days.length}, ${dayColumnWidth}px)`,
                 }}
               >
-                <div className="sticky left-0 z-50 border-r border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] px-3 py-3">
+                <div className="sticky left-0 z-50 border-r border-[color:var(--line)] bg-[linear-gradient(180deg,#ffffff,#f7f7f7)] px-3 py-3 max-lg:px-2 max-lg:py-2">
                   <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
                     {messages.shell.nav.vehicles}
                   </p>
@@ -1161,10 +1222,10 @@ export function CalendarView({
                         todayColumn ? "bg-[rgba(89,60,251,0.14)]" : "",
                       )}
                     >
-                      <p className="truncate text-[9px] font-semibold uppercase tracking-[0.04em] text-[color:var(--ink-soft)]">
+                      <p className="truncate text-[9px] font-semibold uppercase tracking-[0.04em] text-[color:var(--ink-soft)] max-lg:text-[8px]">
                         {formatWeekday(date, locale)}
                       </p>
-                      <p className="mt-0.5 whitespace-nowrap text-[12px] font-semibold leading-tight text-[color:var(--ink)] tabular-nums">
+                      <p className="mt-0.5 whitespace-nowrap text-[12px] font-semibold leading-tight text-[color:var(--ink)] tabular-nums max-lg:text-[10px]">
                         {formatTimelineDateLabel(date)}
                       </p>
                     </div>
@@ -1180,7 +1241,7 @@ export function CalendarView({
                   rangeEndExclusive,
                   dayColumnWidth,
                 );
-                const rowHeight = Math.max(44, laneCount * LANE_HEIGHT + 8);
+                const rowHeight = Math.max(minRowHeight, laneCount * laneHeight + 8);
                 const alternateRow = index % 2 === 1;
 
                 return (
@@ -1193,8 +1254,12 @@ export function CalendarView({
                   >
                     <div
                       className={cn(
-                        "sticky left-0 z-20 flex flex-col justify-center overflow-hidden border-r border-[color:var(--line)] px-3 py-1.5 backdrop-blur",
-                        alternateRow ? "bg-[#faf4eb]/95" : "bg-[rgba(255,255,255,0.95)]",
+                        "sticky left-0 z-20 flex flex-col justify-center overflow-hidden border-r border-[color:var(--line)] px-3 py-1.5 backdrop-blur max-lg:px-2 max-lg:py-1",
+                        // Opaque, not 95%. The column stands still
+                        // while a month of days slides underneath it,
+                        // and five percent of that was enough to read
+                        // as ghost text through the plate numbers.
+                        alternateRow ? "bg-[#faf4eb]" : "bg-white",
                       )}
                       style={{ height: rowHeight }}
                     >
@@ -1208,14 +1273,20 @@ export function CalendarView({
                               {highlightText(vehicle.plateNumber || vehicle.label, vehicleFilterQuery)}
                             </span>
                           }
-                          triggerClassName="inline-flex max-w-full items-center rounded px-0 text-left text-[12px] font-semibold leading-tight text-[color:var(--ink)] underline-offset-2 transition hover:text-[var(--accent)] hover:underline"
+                          triggerClassName="tap-compact inline-flex max-w-full items-center rounded px-0 text-left text-[12px] font-semibold leading-tight text-[color:var(--ink)] underline-offset-2 transition hover:text-[var(--accent)] hover:underline max-lg:text-[11px]"
                         />
                       ) : (
-                        <p className="truncate text-[12px] font-semibold leading-tight text-[color:var(--ink)]">
+                        <p className="truncate text-[12px] font-semibold leading-tight text-[color:var(--ink)] max-lg:text-[11px]">
                           {highlightText(vehicle.plateNumber || vehicle.label, vehicleFilterQuery)}
                         </p>
                       )}
-                      <p className="mt-0.5 truncate text-[10.5px] leading-tight text-[color:var(--ink-soft)]">
+                      {/* Model and owner are a second line, and a
+                          31px row has height for one. Clipped through
+                          the middle of the glyphs it read as damage,
+                          not as detail; the plate is the identifier
+                          that matters here and the row opens a dialog
+                          with the rest. */}
+                      <p className="mt-0.5 hidden truncate text-[10.5px] leading-tight text-[color:var(--ink-soft)] lg:block">
                         {highlightText(vehicle.secondaryLabel || vehicle.label, vehicleFilterQuery)}
                         {" · "}
                         {highlightText(vehicle.ownerName || calendarMessages.unassignedOwner, ownerFilterQuery)}
@@ -1277,12 +1348,13 @@ export function CalendarView({
                               bar.order,
                               bar.clippedStart,
                               bar.clippedEnd,
+                              compact,
                             )}
                             style={{
                               left: bar.left,
-                              top: 6 + bar.lane * LANE_HEIGHT,
+                              top: barTopOffset + bar.lane * laneHeight,
                               width: bar.width,
-                              height: BAR_HEIGHT,
+                              height: barHeight,
                             }}
                           >
                             <span className="truncate">{highlightText(shortLabel || fullLabel, calendarSearchQuery)}</span>

@@ -576,3 +576,33 @@ a[class*="rounded-2xl"],
     font-size: 11px;
   }
 }
+
+/* ---------------------------------------------------------------
+   The one place the floors above are wrong.
+
+   Both floors -- 11px type and 44px touch targets -- exist because a
+   phone is held at arm's length and operated with a thumb, and both
+   are right for the pages that are read. The calendar timeline is not
+   read, it is scanned: it is a data grid whose whole value is seeing
+   many vehicles and many days at once, and the floors turn seven
+   bookings into four screens of them. An order bar is a grid cell that
+   happens to be clickable, closer to a spreadsheet row than to a
+   button, and its target is wide even when it is short.
+
+   Scoped to this one container so the exception cannot spread, and
+   written as class-plus-class so it outranks the floor by specificity
+   rather than by order.
+   --------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .calendar-dense .text-\[9px\] {
+    font-size: 9px;
+  }
+
+  .calendar-dense .text-\[10px\] {
+    font-size: 10px;
+  }
+
+  .calendar-dense .text-\[11px\] {
+    font-size: 11px;
+  }
+}

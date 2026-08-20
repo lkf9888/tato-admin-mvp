@@ -545,21 +545,31 @@ export async function runGmailSync(input: {
   // Cheap pass first. It clears the rows that only lack a translation,
   // so the expensive extraction below spends its budget on emails that
   // have never been read at all.
-  await translatePendingSummaries(input.workspaceId, result);
-  await enrichPendingEmails(input.workspaceId, result);
+  const deadline = Date.now() + POST_INGEST_BUDGET_MS;
+  await translatePendingSummaries(input.workspaceId, result, deadline);
+  await enrichPendingEmails(input.workspaceId, result, deadline);
 
   return result;
 }
 
-/** Summaries translated in one call. Translation is the cheapest thing
- *  the model does here -- no extraction, no judgement, one line in and
- *  one line out -- so the batch can be large where a full extraction
- *  has to be one email at a time. */
-const TRANSLATE_BATCH = 20;
+/** Lines translated in one call.
+ *
+ *  Twenty was tried and failed: reasoning scales with the input, so a
+ *  batch of twenty burned a 4000-token budget before writing a line
+ *  and returned empty. Twelve at 6000 leaves 500 a line, which is the
+ *  ratio the messages page has been translating at successfully. */
+const TRANSLATE_BATCH = 12;
 
-/** Batches per run, bounding the pass the same way enrichment is
- *  bounded: this shares the 300s request with everything else. */
-const TRANSLATE_BATCHES = 3;
+/**
+ * Everything after the mailbox closes shares one deadline.
+ *
+ * Translation and enrichment each used to carry their own budget, and
+ * the sum could exceed Railway's 300s gateway -- at which point the
+ * request is killed and the whole sync is lost, new mail included.
+ * A single deadline means adding a pass cannot silently make the
+ * endpoint fail.
+ */
+const POST_INGEST_BUDGET_MS = 210_000;
 
 const BULK_TRANSLATE_PROMPT = [
   "你是翻译。把每一行翻译成简体中文。",
@@ -584,8 +594,16 @@ const BULK_TRANSLATE_PROMPT = [
  *
  * Newest first, because the operator is looking at the top of the feed.
  */
-async function translatePendingSummaries(workspaceId: string, result: GmailSyncResult) {
-  for (let batch = 0; batch < TRANSLATE_BATCHES; batch += 1) {
+async function translatePendingSummaries(
+  workspaceId: string,
+  result: GmailSyncResult,
+  deadline: number,
+) {
+  // Half the shared window at most, so a long backlog cannot starve
+  // the extraction pass that gives never-read mail its first summary.
+  const ownDeadline = Math.min(deadline, Date.now() + (deadline - Date.now()) / 2);
+
+  while (Date.now() < ownDeadline) {
     const rows = await prisma.inboundEmail.findMany({
       where: {
         workspaceId,
@@ -634,7 +652,7 @@ async function translatePendingSummaries(workspaceId: string, result: GmailSyncR
         { role: "system", content: BULK_TRANSLATE_PROMPT },
         { role: "user", content: jobs.map((job, i) => `${i + 1}. ${job.text}`).join("\n") },
       ],
-      maxTokens: 4000,
+      maxTokens: 6000,
       timeoutMs: 90_000,
     });
 
@@ -711,7 +729,11 @@ const ENRICH_TIME_BUDGET_MS = 150_000;
  * Newest first: a summary matters most for a message someone may still
  * need to answer.
  */
-async function enrichPendingEmails(workspaceId: string, result: GmailSyncResult) {
+async function enrichPendingEmails(
+  workspaceId: string,
+  result: GmailSyncResult,
+  deadline: number,
+) {
   const pending = await prisma.inboundEmail.findMany({
     where: {
       workspaceId,
@@ -733,7 +755,7 @@ async function enrichPendingEmails(workspaceId: string, result: GmailSyncResult)
   // chunks, so one slow chunk can overrun by at most its own duration
   // -- bounded by the per-call timeout, which is why both limits exist.
   for (let index = 0; index < pending.length; index += ENRICH_CONCURRENCY) {
-    if (Date.now() - startedAt > ENRICH_TIME_BUDGET_MS) break;
+    if (Date.now() - startedAt > ENRICH_TIME_BUDGET_MS || Date.now() > deadline) break;
 
     const chunk = pending.slice(index, index + ENRICH_CONCURRENCY);
 

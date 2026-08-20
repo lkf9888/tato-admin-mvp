@@ -14,6 +14,7 @@ type ThreadMessage = {
   acknowledgedAt: string | null;
   summary: string | null;
   summaryZh: string | null;
+  summaryZhBrief: string | null;
   needsAction: boolean;
   turoLink: string | null;
 };
@@ -153,6 +154,20 @@ export function GuestMessagesView({
   // a translation that is already on screen.
   const [translatedKeys, setTranslatedKeys] = useState<Set<string>>(new Set());
 
+  // Word-for-word or the gist. Kept in localStorage because it is a
+  // preference about how someone reads, not about this thread -- and
+  // re-picking it on every visit is the kind of small tax that makes a
+  // setting feel like it is not remembered.
+  const [zhMode, setZhMode] = useState<"literal" | "brief">("literal");
+  useEffect(() => {
+    const saved = window.localStorage.getItem("tato.zhMode");
+    if (saved === "literal" || saved === "brief") setZhMode(saved);
+  }, []);
+  function pickZhMode(mode: "literal" | "brief") {
+    setZhMode(mode);
+    window.localStorage.setItem("tato.zhMode", mode);
+  }
+
   const ordersById = useMemo(() => new Map(orders.map((o) => [o.id, o])), [orders]);
 
   const selected = threads.find((thread) => thread.key === selectedKey) ?? null;
@@ -186,6 +201,11 @@ export function GuestMessagesView({
 
   /** The Chinese reading of a message, from this session or the cache. */
   function chinese(message: ThreadMessage) {
+    // In brief mode the summary is the answer, and there is no falling
+    // back to the literal: they are different lengths and different
+    // voices, and silently swapping one for the other would make the
+    // toggle look broken rather than empty.
+    if (zhMode === "brief") return message.summaryZhBrief;
     return zh[message.id] ?? message.summaryZh ?? null;
   }
 
@@ -482,9 +502,30 @@ export function GuestMessagesView({
               <span className="t-eyebrow text-[var(--ink-soft)]">
                 {t.messageCount(selected.messages.length)}
               </span>
-              {translating ? (
-                <span className="text-[11px] text-[var(--ink-soft)]">{t.autoTranslating}</span>
-              ) : null}
+              <span className="flex items-center gap-2">
+                {translating ? (
+                  <span className="text-[11px] text-[var(--ink-soft)]">{t.autoTranslating}</span>
+                ) : null}
+                <span
+                  className="tap-row inline-flex rounded-md border border-[var(--line)] p-0.5"
+                  title={t.zhModeHint}
+                >
+                  {(["literal", "brief"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => pickZhMode(mode)}
+                      className={`tap-press rounded-[5px] px-2 py-1 text-[11px] font-bold transition ${
+                        zhMode === mode
+                          ? "bg-[var(--ink)] text-white"
+                          : "text-[var(--ink-mid)] hover:bg-[var(--surface-muted)]"
+                      }`}
+                    >
+                      {mode === "literal" ? t.zhModeLiteral : t.zhModeSummary}
+                    </button>
+                  ))}
+                </span>
+              </span>
             </header>
 
             {translateError ? (

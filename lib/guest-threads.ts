@@ -31,8 +31,10 @@ export type ThreadEmail = {
   guestText: string | null;
   /** The model's one-line reading of the message, when it has run. */
   summary: string | null;
-  /** That reading in Chinese, cached after the first translation. */
+  /** The guest's words in Chinese, word for word. */
   summaryZh: string | null;
+  /** One sentence in Chinese saying what the message is about. */
+  summaryZhBrief: string | null;
   needsAction: boolean;
 };
 

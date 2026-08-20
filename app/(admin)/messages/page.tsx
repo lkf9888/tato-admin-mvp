@@ -63,7 +63,7 @@ export default async function GuestMessagesPage() {
       const extracted = (() => {
         if (!email.parsed) return null;
         try {
-          return JSON.parse(email.parsed) as { summary?: string; needsAction?: boolean };
+          return JSON.parse(email.parsed) as { summary?: string; summaryZh?: string; needsAction?: boolean };
         } catch {
           return null;
         }
@@ -89,14 +89,16 @@ export default async function GuestMessagesPage() {
         orderId: email.orderId,
         guestText: email.guestText,
         summary: extracted?.summary ?? null,
-        // The Chinese has to have been made from the text shown above
-        // it. Falling back to the summary's translation whenever the
-        // guest's was missing defeated the split it was meant to fix:
-        // the stale line kept rendering, the client saw "already
-        // translated", and nothing ever retranslated. So the summary's
-        // Chinese is only used where there is no guest text to have
-        // translated instead.
+        // Both readings travel to the client, which picks one. A
+        // literal translation is what you need to answer someone; a
+        // summary is what you need to decide whether to. Neither is
+        // the right default for both jobs, so the operator chooses.
+        //
+        // The literal falls back to nothing rather than to the
+        // summary: a summary shown where a translation was asked for
+        // is a paraphrase wearing the wrong label.
         summaryZh: email.guestText ? email.guestTextZh : email.summaryZh,
+        summaryZhBrief: email.summaryZh ?? extracted?.summaryZh ?? null,
         needsAction: extracted?.needsAction === true,
       };
     }),

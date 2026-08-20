@@ -4,7 +4,9 @@ import { InboundEmailKind } from "@prisma/client";
 import { ImapFlow } from "imapflow";
 import { simpleParser, type ParsedMail } from "mailparser";
 
-import { kimiExtractJson, isKimiConfigured } from "@/lib/kimi";
+import { kimiExtractJson, isKimiConfigured,
+  kimiChat,
+} from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
 import {
   classifyTuroSubject,
@@ -264,6 +266,8 @@ export type GmailSyncResult = {
   /** Distinct reasons extraction failed this run, verbatim from the
    *  model client. Empty is the healthy state. */
   enrichErrors: string[];
+  /** Chinese lines filled in by the bulk pass this run. */
+  translated: number;
 };
 
 /**
@@ -378,6 +382,7 @@ export async function runGmailSync(input: {
     reclassified: 0,
     enrichRemaining: 0,
     enrichErrors: [],
+    translated: 0,
   };
 
   // Heal history before fetching anything new. Rows imported while the
@@ -537,9 +542,131 @@ export async function runGmailSync(input: {
 
   // Enrich after the mailbox is closed: these are slow model calls and
   // there is no reason to hold an IMAP connection open through them.
+  // Cheap pass first. It clears the rows that only lack a translation,
+  // so the expensive extraction below spends its budget on emails that
+  // have never been read at all.
+  await translatePendingSummaries(input.workspaceId, result);
   await enrichPendingEmails(input.workspaceId, result);
 
   return result;
+}
+
+/** Summaries translated in one call. Translation is the cheapest thing
+ *  the model does here -- no extraction, no judgement, one line in and
+ *  one line out -- so the batch can be large where a full extraction
+ *  has to be one email at a time. */
+const TRANSLATE_BATCH = 20;
+
+/** Batches per run, bounding the pass the same way enrichment is
+ *  bounded: this shares the 300s request with everything else. */
+const TRANSLATE_BATCHES = 3;
+
+const BULK_TRANSLATE_PROMPT = [
+  "你是翻译。把每一行翻译成简体中文。",
+  "只输出译文，不要解释、不要引号。",
+  "保留 emoji、数字、日期、金额、车牌和人名。语气贴近原文，不要润色成客服腔。",
+  "输入是带编号的多行，每行形如 `3. <原文>`。输出必须是同样数量、同样编号的行，每条只占一行。",
+].join("\n");
+
+/**
+ * Fill in the Chinese, in bulk, for rows that already have English.
+ *
+ * The enrichment pass below re-extracts a whole email to obtain one
+ * missing sentence: forty-five seconds, three at a time. For a row
+ * that already carries the guest's words or an English summary, none
+ * of that work is needed -- the only thing missing is a translation,
+ * and twenty of those fit in a single call.
+ *
+ * Measured before this existed: 388 rows extracted, 7 with a Chinese
+ * summary, and a queue of 1091 draining at roughly forty-eight an
+ * hour. Nearly a day for a line the model could produce twenty at a
+ * time.
+ *
+ * Newest first, because the operator is looking at the top of the feed.
+ */
+async function translatePendingSummaries(workspaceId: string, result: GmailSyncResult) {
+  for (let batch = 0; batch < TRANSLATE_BATCHES; batch += 1) {
+    const rows = await prisma.inboundEmail.findMany({
+      where: {
+        workspaceId,
+        OR: [
+          { guestText: { not: null }, guestTextZh: null },
+          { parsed: { not: null }, summaryZh: null },
+        ],
+      },
+      orderBy: { receivedAt: "desc" },
+      take: TRANSLATE_BATCH,
+      select: { id: true, guestText: true, guestTextZh: true, parsed: true, summaryZh: true },
+    });
+
+    if (rows.length === 0) return;
+
+    // One row can need both fields; each is its own numbered line so a
+    // dropped line cannot shift the other onto the wrong record.
+    type Job = { id: string; field: "guestTextZh" | "summaryZh"; text: string };
+    const jobs: Job[] = [];
+
+    for (const row of rows) {
+      if (row.guestText && !row.guestTextZh) {
+        jobs.push({
+          id: row.id,
+          field: "guestTextZh",
+          text: row.guestText.replace(/\s*\n+\s*/g, " ").slice(0, 600),
+        });
+      }
+      if (!row.summaryZh && row.parsed) {
+        try {
+          const summary = (JSON.parse(row.parsed) as { summary?: string }).summary;
+          if (summary?.trim()) {
+            jobs.push({ id: row.id, field: "summaryZh", text: summary.trim().slice(0, 400) });
+          }
+        } catch {
+          // Unparseable blob: nothing to translate, and the extraction
+          // pass will rewrite it.
+        }
+      }
+    }
+
+    if (jobs.length === 0) return;
+
+    const response = await kimiChat({
+      messages: [
+        { role: "system", content: BULK_TRANSLATE_PROMPT },
+        { role: "user", content: jobs.map((job, i) => `${i + 1}. ${job.text}`).join("\n") },
+      ],
+      maxTokens: 4000,
+      timeoutMs: 90_000,
+    });
+
+    if (!response.ok) {
+      if (!result.enrichErrors.includes(response.reason) && result.enrichErrors.length < 5) {
+        result.enrichErrors.push(response.reason);
+      }
+      return;
+    }
+
+    const byIndex = new Map<number, string>();
+    for (const line of response.content.split(/\r?\n/)) {
+      const match = line.match(/^\s*(\d+)[.、)]\s*(.+)$/);
+      if (match) byIndex.set(Number(match[1]), match[2].trim());
+    }
+
+    let wrote = 0;
+    for (const [index, job] of jobs.entries()) {
+      const text = byIndex.get(index + 1);
+      if (!text) continue;
+      await prisma.inboundEmail.update({
+        where: { id: job.id },
+        data: { [job.field]: text.slice(0, 1200) },
+      });
+      wrote += 1;
+    }
+
+    result.translated += wrote;
+    // A batch that returned nothing usable will return nothing usable
+    // again; stop rather than spend the run on it.
+    if (wrote === 0) return;
+  }
 }
 
 /** Model calls per sync run. */
@@ -779,6 +906,7 @@ export function summarizeGmailSyncResult(result: GmailSyncResult) {
     `parsed=${result.parsed}`,
     `parseFailed=${result.parseFailed}`,
     `reclassified=${result.reclassified}`,
+    `translated=${result.translated}`,
     `enrichRemaining=${result.enrichRemaining}`,
     result.enrichErrors.length > 0 ? `enrichErrors=${result.enrichErrors.join("|")}` : "",
   ]

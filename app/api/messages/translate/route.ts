@@ -30,7 +30,11 @@ const BATCH = 12;
  * resolve, however it arrived.
  */
 const translateSchema = z.object({
-  emailIds: z.array(z.string().trim().min(1)).min(1).max(60),
+  emailIds: z.array(z.string().trim().min(1)).max(60).optional(),
+  /** Messages read off Turo by the browser reader. These carry both
+   *  directions, so this is also how our own replies get Chinese --
+   *  the mailbox has never contained them. */
+  conversationIds: z.array(z.string().trim().min(1)).max(60).optional(),
 });
 
 const SYSTEM_PROMPT = [
@@ -81,19 +85,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 
-  const pending = await prisma.inboundEmail.findMany({
+  const emailIds = parsed.data.emailIds ?? [];
+  const conversationIds = parsed.data.conversationIds ?? [];
+  if (emailIds.length === 0 && conversationIds.length === 0) {
+    return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
+  }
+
+  const conversationRows = conversationIds.length
+    ? await prisma.turoConversationMessage.findMany({
+        where: {
+          workspaceId: context.workspace.id,
+          id: { in: conversationIds },
+          bodyZh: null,
+        },
+        orderBy: { sentAt: "desc" },
+        take: BATCH,
+        select: { id: true, body: true },
+      })
+    : [];
+
+  const pending = emailIds.length
+    ? await prisma.inboundEmail.findMany({
     where: {
       workspaceId: context.workspace.id,
-      id: { in: parsed.data.emailIds },
+      id: { in: emailIds },
       OR: [
         { guestText: { not: null }, guestTextZh: null },
         { guestText: null, summaryZh: null },
       ],
     },
-    orderBy: { receivedAt: "desc" },
-    take: BATCH,
-    select: { id: true, guestText: true, guestTextZh: true, parsed: true },
-  });
+        orderBy: { receivedAt: "desc" },
+        take: BATCH,
+        select: { id: true, guestText: true, guestTextZh: true, parsed: true },
+      })
+    : [];
 
   // The guest's own words when we have them. The summary is the
   // fallback for notifications that carry no message -- a cancellation,
@@ -123,9 +148,24 @@ export async function POST(request: Request) {
         return null;
       }
     })
-    .filter((item): item is { id: string; fromGuest: boolean; text: string } => item !== null);
+    .filter(
+      (item): item is { id: string; fromGuest: boolean; text: string } => item !== null,
+    );
 
-  if (items.length === 0) {
+  // Conversation messages carry no summary and need no fallback: the
+  // body is what the person wrote, whichever direction it went.
+  const conversationItems = conversationRows.map((row) => ({
+    id: row.id,
+    kind: "conversation" as const,
+    text: row.body.replace(/\s*\n+\s*/g, " ").slice(0, 1200),
+  }));
+
+  const allItems = [
+    ...items.map((item) => ({ ...item, kind: "email" as const })),
+    ...conversationItems,
+  ];
+
+  if (allItems.length === 0) {
     return NextResponse.json({ translated: 0, translations: {} });
   }
 
@@ -134,7 +174,7 @@ export async function POST(request: Request) {
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
-        content: items.map((item, index) => `${index + 1}. ${item.text}`).join("\n"),
+        content: allItems.map((item, index) => `${index + 1}. ${item.text}`).join("\n"),
       },
     ],
     maxTokens: 3000,
@@ -155,10 +195,19 @@ export async function POST(request: Request) {
   }
 
   const translations: Record<string, string> = {};
-  for (const [index, item] of items.entries()) {
+  for (const [index, item] of allItems.entries()) {
     const text = byIndex.get(index + 1);
     if (!text) continue;
     translations[item.id] = text;
+
+    if (item.kind === "conversation") {
+      await prisma.turoConversationMessage.update({
+        where: { id: item.id },
+        data: { bodyZh: text.slice(0, 1200) },
+      });
+      continue;
+    }
+
     await prisma.inboundEmail.update({
       where: { id: item.id },
       // Stored beside the source it came from, so a later change to
@@ -172,7 +221,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     translated: Object.keys(translations).length,
-    requested: items.length,
+    requested: allItems.length,
     translations,
   });
 }

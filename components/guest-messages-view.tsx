@@ -187,6 +187,11 @@ export function GuestMessagesView({
 
   const selected = threads.find((thread) => thread.key === selectedKey) ?? null;
   const order = selected?.orderId ? (ordersById.get(selected.orderId) ?? null) : null;
+  function conversationFor(thread: Thread) {
+    const trip = thread.orderId ? ordersById.get(thread.orderId) : null;
+    return trip?.externalOrderId ? (conversations[trip.externalOrderId] ?? []) : [];
+  }
+
   const conversation = order?.externalOrderId
     ? (conversations[order.externalOrderId] ?? null)
     : null;
@@ -199,9 +204,10 @@ export function GuestMessagesView({
   useEffect(() => {
     if (!selected || !canDraft) return;
     if (translatedKeys.has(selected.key)) return;
-    const missing = selected.messages.some(
-      (message) => !zh[message.id] && !message.summaryZh && message.summary,
-    );
+    const missing =
+      selected.messages.some(
+        (message) => !zh[message.id] && !message.summaryZh && message.summary,
+      ) || conversationFor(selected).some((message) => !message.bodyZh && !zh[message.id]);
     if (!missing) return;
     void translateThread(selected);
     // translateThread is stable enough for this: it only reads state
@@ -235,7 +241,15 @@ export function GuestMessagesView({
       const response = await fetch("/api/messages/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailIds: thread.messages.map((m) => m.id) }),
+        body: JSON.stringify({
+          emailIds: thread.messages.map((m) => m.id),
+          // The scraped conversation as well, which is the only place
+          // our own replies exist -- and therefore the only way they
+          // get Chinese.
+          conversationIds: conversationFor(thread)
+            .filter((message) => !message.bodyZh && !zh[message.id])
+            .map((message) => message.id),
+        }),
       });
       const data = (await response.json().catch(() => ({}))) as {
         translations?: Record<string, string>;
@@ -585,7 +599,7 @@ export function GuestMessagesView({
                           <p className="whitespace-pre-wrap text-[12.5px] leading-5">
                             {message.body}
                           </p>
-                          {message.bodyZh ? (
+                          {message.bodyZh ?? zh[message.id] ? (
                             <p
                               className={`mt-1.5 border-t pt-1.5 text-[12.5px] leading-5 ${
                                 outbound
@@ -593,7 +607,7 @@ export function GuestMessagesView({
                                   : "border-[var(--line)] text-[var(--ink-mid)]"
                               }`}
                             >
-                              {message.bodyZh}
+                              {message.bodyZh ?? zh[message.id]}
                             </p>
                           ) : null}
                         </div>

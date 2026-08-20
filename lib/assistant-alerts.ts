@@ -214,9 +214,40 @@ async function detectUnansweredGuestMessages(workspaceId: string): Promise<Alert
     take: GUEST_MESSAGE_SCAN_CAP,
   });
 
+  // What we said, and when. Turo sends no notification when the host
+  // replies, so before the browser reader existed this could only ever
+  // ask "has anyone marked it handled in TATO" -- and a message
+  // answered on Turo an hour ago stayed on the list until somebody
+  // came back here and ticked it. Where a conversation has been read
+  // back, the honest test is whether our last word came after theirs.
+  const replies = await prisma.turoConversationMessage.groupBy({
+    by: ["reservationId"],
+    where: { workspaceId, direction: "outbound" },
+    _max: { sentAt: true },
+  });
+  const lastReplyAt = new Map(
+    replies.map((row) => [row.reservationId, row._max.sentAt ?? new Date(0)]),
+  );
+
   // Only the ones the extractor judged as needing a reply. A guest
   // saying "thanks, all good" is a guest message but not a task.
   const needsReply = pending.filter((email) => {
+    // Answered since. Only decides anything for reservations the
+    // reader has actually reached; everywhere else `lastReplyAt` has
+    // no entry and the acknowledgement rules below still apply.
+    const reservationId = (() => {
+      if (!email.parsed) return null;
+      try {
+        return (JSON.parse(email.parsed) as { reservationId?: string }).reservationId ?? null;
+      } catch {
+        return null;
+      }
+    })();
+    if (reservationId) {
+      const repliedAt = lastReplyAt.get(reservationId);
+      if (repliedAt && repliedAt > email.receivedAt) return false;
+    }
+
     if (!email.parsed) return true; // Unparsed: surface rather than swallow.
     try {
       return (JSON.parse(email.parsed) as { needsAction?: boolean }).needsAction === true;

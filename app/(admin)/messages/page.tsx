@@ -85,6 +85,19 @@ export default async function GuestMessagesPage() {
       })
     : [];
 
+  // When our last word came after theirs, the thread is answered --
+  // whatever anyone did or did not tick in TATO. Only meaningful for
+  // reservations the reader has reached; the rest keep the
+  // acknowledgement rule, which is all the mailbox alone can support.
+  const lastReplyAt = new Map<string, Date>();
+  for (const message of scraped) {
+    if (message.direction !== "outbound") continue;
+    const current = lastReplyAt.get(message.reservationId);
+    if (!current || message.sentAt > current) lastReplyAt.set(message.reservationId, message.sentAt);
+  }
+
+  const reservationByOrderId = new Map<string, string>();
+
   const threads = groupIntoThreads(
     emails.map((email) => {
       const extracted = (() => {
@@ -154,6 +167,27 @@ export default async function GuestMessagesPage() {
       })
     : [];
 
+  for (const order of orders) {
+    if (order.externalOrderId) reservationByOrderId.set(order.id, order.externalOrderId);
+  }
+
+  // Threads whose last inbound message predates our last reply are
+  // answered. Recomputed here rather than inside `groupIntoThreads`,
+  // which is pure and has no business knowing about scraped data.
+  const answeredThreads = new Set(
+    threads
+      .filter((thread) => {
+        const reservationId = thread.orderId
+          ? reservationByOrderId.get(thread.orderId)
+          : undefined;
+        if (!reservationId) return false;
+        const repliedAt = lastReplyAt.get(reservationId);
+        if (!repliedAt) return false;
+        return thread.messages.every((message) => message.receivedAt < repliedAt);
+      })
+      .map((thread) => thread.key),
+  );
+
   const t = messages.guestMessagesPage;
 
   return (
@@ -193,6 +227,7 @@ export default async function GuestMessagesPage() {
         )}
         threads={threads.map((thread) => ({
           ...thread,
+          openCount: answeredThreads.has(thread.key) ? 0 : thread.openCount,
           latestAt: thread.latestAt.toISOString(),
           messages: thread.messages.map((message) => ({
             ...message,

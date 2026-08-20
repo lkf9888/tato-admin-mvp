@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { SearchableSelect } from "@/components/searchable-select";
+import { cn } from "@/lib/utils";
 import { getMessages, type Locale } from "@/lib/i18n";
 
 type VehicleExportOption = {
@@ -18,6 +19,8 @@ type VehicleOrdersExportButtonProps = {
   preferredVehicleId?: string;
   rangeStart: string;
   rangeEnd: string;
+  /** Extra classes for the trigger, e.g. hiding it on a phone. */
+  className?: string;
 };
 
 function padNumber(value: number) {
@@ -47,6 +50,7 @@ export function VehicleOrdersExportButton({
   preferredVehicleId,
   rangeStart,
   rangeEnd,
+  className,
 }: VehicleOrdersExportButtonProps) {
   const calendarMessages = getMessages(locale).calendar;
   const [isOpen, setIsOpen] = useState(false);
@@ -136,7 +140,7 @@ export function VehicleOrdersExportButton({
         type="button"
         onClick={openDialog}
         disabled={vehicleOptions.length === 0}
-        className={triggerClass}
+        className={cn(triggerClass, className)}
       >
         {calendarMessages.downloadOrders}
       </button>

@@ -348,37 +348,37 @@ export default async function DashboardPage() {
        * stronger), and the desktop grid gap tightened from gap-4 to
        * gap-3 to match the rest of the page's density.
        */}
-      <section className="-mx-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex snap-x snap-mandatory gap-3 sm:grid sm:grid-cols-2 sm:gap-3 xl:grid-cols-5">
-          <div className="w-[52%] shrink-0 sm:w-auto">
+      <section>
+        <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-5">
+          <div>
             <MetricCard
               label={dashboardMessages.metrics.inUseLabel}
               value={String(todaysRentals)}
               hint={dashboardMessages.metrics.inUseHint}
             />
           </div>
-          <div className="w-[52%] shrink-0 sm:w-auto">
+          <div>
             <MetricCard
               label={dashboardMessages.metrics.pickupsLabel}
               value={String(todaysPickups)}
               hint={dashboardMessages.metrics.pickupsHint}
             />
           </div>
-          <div className="w-[52%] shrink-0 sm:w-auto">
+          <div>
             <MetricCard
               label={dashboardMessages.metrics.returnsLabel}
               value={String(todaysReturns)}
               hint={dashboardMessages.metrics.returnsHint}
             />
           </div>
-          <div className="w-[52%] shrink-0 sm:w-auto">
+          <div>
             <MetricCard
               label={dashboardMessages.metrics.conflictsLabel}
               value={String(conflictOrders.length)}
               hint={dashboardMessages.metrics.conflictsHint}
             />
           </div>
-          <div className="w-[52%] shrink-0 sm:w-auto">
+          <div>
             <MetricCard
               label={dashboardMessages.metrics.lastSyncLabel}
               value={
@@ -405,16 +405,16 @@ export default async function DashboardPage() {
           </p>
           <p className="text-[10px] text-[color:var(--ink-soft)] sm:text-[11px]">{monthlyMessages.title(monthLabel)}</p>
         </div>
-        <div className="-mx-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex snap-x snap-mandatory gap-3 sm:grid sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
-            <div className="w-[52%] shrink-0 sm:w-auto">
+        <div>
+          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
+            <div>
               <MetricCard
                 label={monthlyMessages.netLabel}
                 value={formatCurrency(currentMonthNet, locale)}
                 hint={netHint}
               />
             </div>
-            <div className="w-[52%] shrink-0 sm:w-auto">
+            <div>
               <MetricCard
                 label={monthlyMessages.tripsLabel}
                 value={formatNumber(currentMonthTripCount, locale, 0)}
@@ -425,14 +425,14 @@ export default async function DashboardPage() {
                 }
               />
             </div>
-            <div className="w-[52%] shrink-0 sm:w-auto">
+            <div>
               <MetricCard
                 label={monthlyMessages.activeVehiclesLabel}
                 value={formatNumber(activeVehicleCount, locale, 0)}
                 hint={monthlyMessages.activeVehiclesHint}
               />
             </div>
-            <div className="w-[52%] shrink-0 sm:w-auto">
+            <div>
               <MetricCard
                 label={monthlyMessages.avgPerTripLabel}
                 value={avgPerTrip != null ? formatCurrency(avgPerTrip, locale) : "—"}

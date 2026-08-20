@@ -88,6 +88,12 @@ type SearchableFilterDropdownProps = {
 };
 
 const DEFAULT_VEHICLE_COLUMN_WIDTH = 188;
+// A 188px sticky column eats half of a 375px phone, leaving barely two
+// day columns visible -- the timeline is technically present and
+// useless. Narrow it when the viewport is narrow; the row still shows
+// the nickname, just with less room around it.
+const COMPACT_VEHICLE_COLUMN_WIDTH = 104;
+const COMPACT_VIEWPORT_WIDTH = 640;
 const DAY_COLUMN_WIDTHS = {
   week: 92,
   month: 52,
@@ -493,6 +499,13 @@ export function CalendarView({
   );
   const [orderFormError, setOrderFormError] = useState<string | null>(null);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+  // Every control the timeline has, stacked on a 375px screen, comes
+  // to well over a screen's worth of chrome before the first bar --
+  // the timeline was reachable only by scrolling past all of it. Below
+  // `lg` the search, the filters, the secondary actions and the two
+  // scrubbers fold away behind one button, leaving prev / next /
+  // today, which is what moving around a calendar actually needs.
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const timelineViewportRef = useRef<HTMLDivElement | null>(null);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState<number | null>(null);
   const [orderPopover, setOrderPopover] = useState<OrderPopoverState | null>(null);
@@ -707,7 +720,10 @@ export function CalendarView({
     orderIntersectsRange(order, rangeStart, rangeEndExclusive),
   );
 
-  const vehicleColumnWidth = DEFAULT_VEHICLE_COLUMN_WIDTH;
+  const vehicleColumnWidth =
+    timelineViewportWidth !== null && timelineViewportWidth < COMPACT_VIEWPORT_WIDTH
+      ? COMPACT_VEHICLE_COLUMN_WIDTH
+      : DEFAULT_VEHICLE_COLUMN_WIDTH;
   const fittedTimelineWidth = Math.max((timelineViewportWidth ?? 0) - vehicleColumnWidth, 0);
   const dayColumnWidth = Math.max(
     MIN_DAY_COLUMN_WIDTHS[rangeMode],
@@ -904,12 +920,20 @@ export function CalendarView({
             <button type="button" onClick={() => setFocusDate(new Date())} className={secondaryActionClass}>
               {calendarMessages.today}
             </button>
+            <button
+              type="button"
+              onClick={() => setMobileControlsOpen((open) => !open)}
+              className={cn(secondaryActionClass, "lg:hidden")}
+              aria-expanded={mobileControlsOpen}
+            >
+              {mobileControlsOpen ? calendarMessages.hideControls : calendarMessages.showControls}
+            </button>
             {!readOnly ? (
               <button
                 type="button"
                 onClick={handleTuroSync}
                 disabled={isTuroSyncing}
-                className={secondaryActionClass}
+                className={cn(secondaryActionClass, mobileControlsOpen ? "" : "max-lg:hidden")}
               >
                 {isTuroSyncing ? calendarMessages.turoSyncingAction : calendarMessages.turoSyncAction}
               </button>
@@ -919,13 +943,14 @@ export function CalendarView({
                 type="button"
                 onClick={openCreateOrderDialog}
                 disabled={vehicleOptions.length === 0}
-                className={primaryActionClass}
+                className={cn(primaryActionClass, mobileControlsOpen ? "" : "max-lg:hidden")}
               >
                 {calendarMessages.manualCreate}
               </button>
             ) : null}
             {!readOnly ? (
               <VehicleOrdersExportButton
+                className={mobileControlsOpen ? undefined : "max-lg:hidden"}
                 locale={locale}
                 vehicleOptions={vehicleOptions}
                 preferredVehicleId={selectedVehicleId !== "all" ? selectedVehicleId : filteredVehicles[0]?.id}
@@ -935,7 +960,12 @@ export function CalendarView({
             ) : null}
           </div>
 
-          <div className="grid min-w-0 gap-1.5 sm:grid-cols-2 xl:grid-cols-[minmax(17rem,1.45fr)_minmax(9.5rem,1fr)_minmax(9.5rem,1fr)_minmax(9.5rem,1fr)]">
+          <div
+            className={cn(
+              "grid min-w-0 gap-1.5 sm:grid-cols-2 xl:grid-cols-[minmax(17rem,1.45fr)_minmax(9.5rem,1fr)_minmax(9.5rem,1fr)_minmax(9.5rem,1fr)]",
+              mobileControlsOpen ? "" : "max-lg:hidden",
+            )}
+          >
             <label className="relative min-w-0">
               <span className="sr-only">{calendarMessages.timelineSearch}</span>
               <input
@@ -1008,7 +1038,12 @@ export function CalendarView({
         {/* Scrubber + range title combined into one compact row. The
          * full date title was redundant when the scrubber thumb +
          * range buttons already convey the same info. */}
-        <div className="mt-2 rounded-lg border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.78)] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+        <div
+          className={cn(
+            "mt-2 rounded-lg border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.78)] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]",
+            mobileControlsOpen ? "" : "max-lg:hidden",
+          )}
+        >
           <div className="grid gap-x-3 gap-y-1.5 xl:grid-cols-[minmax(18rem,auto)_minmax(24rem,1fr)_minmax(14rem,auto)] xl:items-center">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
               <h3 className="font-serif text-[1.05rem] font-semibold leading-none text-[color:var(--ink)] md:text-[1.2rem]">
@@ -1064,13 +1099,21 @@ export function CalendarView({
               ) : null}
             </div>
           </div>
+          {/* Five dates on one 375px line overlap into an unreadable
+              smear. The quarter marks are the two that carry least --
+              the ends bound the scrubber and TODAY marks the middle --
+              so they are the ones that go. */}
           <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
             <span>{formatDate(addDays(today, -SCRUBBER_DAY_RANGE), locale)}</span>
-            <span>{formatDate(addDays(today, -Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}</span>
+            <span className="hidden sm:inline">
+              {formatDate(addDays(today, -Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}
+            </span>
             <span className="rounded-full bg-[rgba(89,60,251,0.12)] px-2 py-0.5 text-[color:var(--ink)]">
               {calendarMessages.today}
             </span>
-            <span>{formatDate(addDays(today, Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}</span>
+            <span className="hidden sm:inline">
+              {formatDate(addDays(today, Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}
+            </span>
             <span>{formatDate(addDays(today, SCRUBBER_DAY_RANGE), locale)}</span>
           </div>
         </div>
@@ -1097,7 +1140,11 @@ export function CalendarView({
                   <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
                     {messages.shell.nav.vehicles}
                   </p>
-                  <p className="mt-1.5 text-[12px] font-semibold text-[color:var(--ink)]">
+                  {/* The count wraps to three lines in a 104px column
+                      and pushes every bar down by roughly a row for
+                      information the page states again below. Desktop
+                      keeps it; the phone gets the bars sooner. */}
+                  <p className="mt-1.5 hidden text-[12px] font-semibold text-[color:var(--ink)] lg:block">
                     {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
                   </p>
                 </div>

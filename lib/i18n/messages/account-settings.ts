@@ -68,6 +68,10 @@ export const accountSettingsMessages = {
         "Public booking rates, deposits, insurance, tax labels, and booking availability from Online Booking.",
         "Turo CSV sync source settings from CSV Imports.",
       ],
+      turoReaderTitle: "Turo reader",
+      turoReaderCopy:
+        "Turo sends no notification when you reply, so guest conversations arriving by email are one-sided. The reader is a browser bookmark you click while signed in to Turo; it writes both halves of every conversation back to TATO. Set it up once.",
+      turoReaderLink: "Set up the reader",
       ledgerTitle: "Owner revenue split",
       ledgerCopy:
         "Turo's payout bundles rental revenue together with reimbursements, service fees, and penalties. Choose who keeps each part when settling with a vehicle owner. Amounts you keep appear as an explicit deduction line on the owner's statement, and commission is charged only on what actually reaches them.",
@@ -154,6 +158,10 @@ export const accountSettingsMessages = {
         "在线预定页面里的车辆日租金、押金、保险费、税种和可预订开关。",
         "CSV 导入页面里的 Turo 同步来源设置。",
       ],
+      turoReaderTitle: "Turo 读取器",
+      turoReaderCopy:
+        "你回复客人的时候 Turo 不会发任何邮件通知，所以靠邮件同步过来的客人消息只有客人那一半。读取器是一个浏览器书签，在已经登录 Turo 的情况下点一下，就会把整段对话的双方消息都写回 TATO。设置一次即可。",
+      turoReaderLink: "去设置读取器",
       ledgerTitle: "车主分账规则",
       ledgerCopy:
         "Turo 的打款把租金收入、代垫费用报销、增值服务收入和罚金混在一起。你可以分别决定每一类在和车主结算时归谁。归你的部分会作为一条明确的扣款行出现在车主对账单上，佣金只按真正到车主手里的金额收取。",

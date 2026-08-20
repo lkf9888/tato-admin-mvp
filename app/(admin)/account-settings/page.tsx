@@ -273,6 +273,25 @@ export default async function AccountSettingsPage({
         </ul>
       </section>
 
+      {/* The reader used to be its own nav entry, which put a
+          set-it-once task permanently in the same list as the pages
+          used every day -- and on a phone, where the nav is a fixed
+          bottom bar with room for a handful of destinations, that is
+          an expensive slot. It lives here now, next to the other
+          things configured once and then forgotten. The route is
+          unchanged, so an existing bookmark of /agent still works. */}
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+          {t.turoReaderTitle}
+        </p>
+        <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
+          {t.turoReaderCopy}
+        </p>
+        <Link href="/agent" className="btn-secondary mt-3 inline-flex">
+          {t.turoReaderLink}
+        </Link>
+      </section>
+
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
           {t.ledgerTitle}

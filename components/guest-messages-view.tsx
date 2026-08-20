@@ -356,15 +356,23 @@ export function GuestMessagesView({
     : [];
 
   return (
-    // The lists fill whatever height the browser gives them instead of
-    // a fixed vh guess, so a tall screen shows more conversation and a
-    // short one still scrolls inside its own pane rather than pushing
-    // the page. 13rem is the shell chrome above this grid.
+    // Two different layouts, deliberately.
+    //
+    // On a desktop the two panes are side by side and each scrolls
+    // inside itself, so the page never moves and both lists stay in
+    // view -- 13rem is the shell chrome above this grid.
+    //
+    // On a phone there is only ever one pane on screen, and capping it
+    // at 60dvh was the wrong instinct carried over from the desktop
+    // layout: it left the list occupying a little over half the screen
+    // with dead space beneath, and put a second scroll area inside a
+    // page that already scrolls. Below `lg` the lists simply flow and
+    // the page scrolls, so a conversation uses the whole screen.
     <div className="grid gap-3 lg:h-[calc(100dvh-13rem)] lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
       <section
         className={`flex min-h-0 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)] ${selected ? "hidden lg:flex" : ""}`}
       >
-        <ul className="min-h-0 flex-1 divide-y divide-[var(--line)] overflow-y-auto max-lg:max-h-[60dvh]">
+        <ul className="min-h-0 flex-1 divide-y divide-[var(--line)] lg:overflow-y-auto">
           {threads.map((thread) => (
             <li key={thread.key}>
               <button
@@ -572,7 +580,7 @@ export function GuestMessagesView({
                  browser agent can produce this: Turo sends no
                  notification when the host replies, so the
                  email-derived view below is permanently one-sided. */
-              <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 max-lg:max-h-[60dvh] sm:px-4">
+              <ul className="min-h-0 flex-1 space-y-3 px-3 py-3 sm:px-4 lg:overflow-y-auto">
                 {conversation.map((message) => {
                   const outbound = message.direction === "outbound";
                   return (
@@ -617,7 +625,7 @@ export function GuestMessagesView({
                 })}
               </ul>
             ) : (
-            <ul className="min-h-0 flex-1 divide-y divide-[var(--line)] overflow-y-auto max-lg:max-h-[60dvh]">
+            <ul className="min-h-0 flex-1 divide-y divide-[var(--line)] lg:overflow-y-auto">
               {selected.messages.map((message) => {
                 const draft = drafts[message.id];
                 return (

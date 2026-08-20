@@ -7,6 +7,8 @@ export const calendarMessages = {
   en: {
     calendar: {
       mobile: {
+        viewList: "List",
+        viewTimeline: "Timeline",
         title: "What's on your plate",
         subtitle: "Schedule",
         emptyAll: "No upcoming bookings. New trips will show up here.",
@@ -27,6 +29,8 @@ export const calendarMessages = {
       searchSourcesPlaceholder: "Search source...",
       manualCreate: "Create manual order",
       turoSyncAction: "Sync Turo",
+      showControls: "Filters",
+      hideControls: "Hide filters",
       turoSyncingAction: "Syncing...",
       turoSyncSuccess: (successRows: number, createdVehicles: number, updatedVehicles: number) =>
         `Turo sync complete: ${successRows} row(s), ${createdVehicles} new vehicle(s), ${updatedVehicles} refreshed vehicle(s).`,
@@ -101,6 +105,8 @@ export const calendarMessages = {
   zh: {
     calendar: {
       mobile: {
+        viewList: "列表",
+        viewTimeline: "日历条",
         title: "需要你关注的行程",
         subtitle: "日程",
         emptyAll: "暂时没有即将开始的订单，新订单会显示在这里。",
@@ -121,6 +127,8 @@ export const calendarMessages = {
       searchSourcesPlaceholder: "搜索订单来源...",
       manualCreate: "手动创建订单",
       turoSyncAction: "同步 Turo",
+      showControls: "筛选",
+      hideControls: "收起筛选",
       turoSyncingAction: "同步中...",
       turoSyncSuccess: (successRows: number, createdVehicles: number, updatedVehicles: number) =>
         `Turo 同步完成：${successRows} 行，新增 ${createdVehicles} 台车，更新 ${updatedVehicles} 台车。`,

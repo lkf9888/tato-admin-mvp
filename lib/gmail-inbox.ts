@@ -267,8 +267,6 @@ export type GmailSyncResult = {
   /** Distinct reasons extraction failed this run, verbatim from the
    *  model client. Empty is the healthy state. */
   enrichErrors: string[];
-  /** Chinese lines filled in by the bulk pass this run. */
-  translated: number;
 };
 
 /**
@@ -383,7 +381,6 @@ export async function runGmailSync(input: {
     reclassified: 0,
     enrichRemaining: 0,
     enrichErrors: [],
-    translated: 0,
   };
 
   // Heal history before fetching anything new. Rows imported while the
@@ -543,40 +540,14 @@ export async function runGmailSync(input: {
 
   // Enrich after the mailbox is closed: these are slow model calls and
   // there is no reason to hold an IMAP connection open through them.
-  // Cheap pass first. It clears the rows that only lack a translation,
-  // so the expensive extraction below spends its budget on emails that
-  // have never been read at all.
-  const deadline = Date.now() + POST_INGEST_BUDGET_MS;
-  await translatePendingSummaries(input.workspaceId, result, deadline);
-  await enrichPendingEmails(input.workspaceId, result, deadline);
+  await enrichPendingEmails(
+    input.workspaceId,
+    result,
+    Date.now() + POST_INGEST_BUDGET_MS,
+  );
 
   return result;
 }
-
-/**
- * How much text goes into one translation call.
- *
- * Counted in characters, not lines. Twenty lines failed on budget and
- * twelve failed on the clock, and the reason both times was the same:
- * with a reasoning model the cost is the thinking, and the thinking
- * scales with content. A batch of twelve one-line summaries and a
- * batch of twelve three-paragraph messages are not the same request,
- * so counting lines was measuring the wrong thing.
- *
- * There is no per-call overhead to amortise here, so batching buys
- * only fewer round trips. Keeping each call small is what keeps it
- * inside its timeout.
- */
-const TRANSLATE_CHARS = 1200;
-const TRANSLATE_MAX_LINES = 10;
-
-/** Only the recent end of the archive.
- *
- *  1,091 rows lack a Chinese line and the feed shows 300. Translating
- *  the rest would spend hours of model time on mail nobody will scroll
- *  to -- and the queue never emptying is itself a problem, because a
- *  backlog that never drains hides a backlog that is growing. */
-const TRANSLATE_SCOPE = 400;
 
 /**
  * Everything after the mailbox closes shares one deadline.
@@ -584,140 +555,18 @@ const TRANSLATE_SCOPE = 400;
  * Translation and enrichment each used to carry their own budget, and
  * the sum could exceed Railway's 300s gateway -- at which point the
  * request is killed and the whole sync is lost, new mail included.
- * A single deadline means adding a pass cannot silently make the
- * endpoint fail.
  */
 const POST_INGEST_BUDGET_MS = 210_000;
 
-const BULK_TRANSLATE_PROMPT = [
-  "你是翻译。把每一行翻译成简体中文。",
-  "只输出译文，不要解释、不要引号。",
-  "保留 emoji、数字、日期、金额、车牌和人名。语气贴近原文，不要润色成客服腔。",
-  "输入是带编号的多行，每行形如 `3. <原文>`。输出必须是同样数量、同样编号的行，每条只占一行。",
-].join("\n");
-
 /**
- * Fill in the Chinese, in bulk, for rows that already have English.
+ * Only the recent end of the archive gets a summary.
  *
- * The enrichment pass below re-extracts a whole email to obtain one
- * missing sentence: forty-five seconds, three at a time. For a row
- * that already carries the guest's words or an English summary, none
- * of that work is needed -- the only thing missing is a translation,
- * and twenty of those fit in a single call.
- *
- * Measured before this existed: 388 rows extracted, 7 with a Chinese
- * summary, and a queue of 1091 draining at roughly forty-eight an
- * hour. Nearly a day for a line the model could produce twenty at a
- * time.
- *
- * Newest first, because the operator is looking at the top of the feed.
+ * 1,091 rows lack one and the feed shows 300. Chasing the rest spends
+ * hours of model time on mail nobody will scroll to, and a queue that
+ * never empties hides a queue that is growing -- the number stops
+ * meaning anything.
  */
-async function translatePendingSummaries(
-  workspaceId: string,
-  result: GmailSyncResult,
-  deadline: number,
-) {
-  // Half the shared window at most, so a long backlog cannot starve
-  // the extraction pass that gives never-read mail its first summary.
-  const ownDeadline = Math.min(deadline, Date.now() + (deadline - Date.now()) / 2);
-
-  while (Date.now() < ownDeadline) {
-    const rows = await prisma.inboundEmail.findMany({
-      where: {
-        workspaceId,
-        OR: [
-          { guestText: { not: null }, guestTextZh: null },
-          { parsed: { not: null }, summaryZh: null },
-        ],
-      },
-      orderBy: { receivedAt: "desc" },
-      take: TRANSLATE_MAX_LINES,
-      select: { id: true, guestText: true, guestTextZh: true, parsed: true, summaryZh: true },
-    });
-
-    if (rows.length === 0) return;
-
-    // One row can need both fields; each is its own numbered line so a
-    // dropped line cannot shift the other onto the wrong record.
-    type Job = { id: string; field: "guestTextZh" | "summaryZh"; text: string };
-    const jobs: Job[] = [];
-
-    for (const row of rows) {
-      if (row.guestText && !row.guestTextZh) {
-        jobs.push({
-          id: row.id,
-          field: "guestTextZh",
-          text: row.guestText.replace(/\s*\n+\s*/g, " ").slice(0, 600),
-        });
-      }
-      if (!row.summaryZh && row.parsed) {
-        try {
-          const summary = (JSON.parse(row.parsed) as { summary?: string }).summary;
-          if (summary?.trim()) {
-            jobs.push({ id: row.id, field: "summaryZh", text: summary.trim().slice(0, 400) });
-          }
-        } catch {
-          // Unparseable blob: nothing to translate, and the extraction
-          // pass will rewrite it.
-        }
-      }
-    }
-
-    if (jobs.length === 0) return;
-
-    // Trim the batch to a character budget. One long message can be
-    // worth more thinking than eight short ones.
-    const batched: Job[] = [];
-    let chars = 0;
-    for (const job of jobs) {
-      if (batched.length > 0 && chars + job.text.length > TRANSLATE_CHARS) break;
-      batched.push(job);
-      chars += job.text.length;
-    }
-
-    const response = await kimiChat({
-      messages: [
-        { role: "system", content: BULK_TRANSLATE_PROMPT },
-        { role: "user", content: batched.map((job, i) => `${i + 1}. ${job.text}`).join("\n") },
-      ],
-      // The cheaper tier. Translation needs no judgement, and the
-      // conversational model was being paid to deliberate over
-      // sentences it only had to restate in another language.
-      model: getExtractionModel(),
-      maxTokens: 4000,
-      timeoutMs: 120_000,
-    });
-
-    if (!response.ok) {
-      if (!result.enrichErrors.includes(response.reason) && result.enrichErrors.length < 5) {
-        result.enrichErrors.push(response.reason);
-      }
-      return;
-    }
-
-    const byIndex = new Map<number, string>();
-    for (const line of response.content.split(/\r?\n/)) {
-      const match = line.match(/^\s*(\d+)[.、)]\s*(.+)$/);
-      if (match) byIndex.set(Number(match[1]), match[2].trim());
-    }
-
-    let wrote = 0;
-    for (const [index, job] of batched.entries()) {
-      const text = byIndex.get(index + 1);
-      if (!text) continue;
-      await prisma.inboundEmail.update({
-        where: { id: job.id },
-        data: { [job.field]: text.slice(0, 1200) },
-      });
-      wrote += 1;
-    }
-
-    result.translated += wrote;
-    // A batch that returned nothing usable will return nothing usable
-    // again; stop rather than spend the run on it.
-    if (wrote === 0) return;
-  }
-}
+const ENRICH_SCOPE = 400;
 
 /** Model calls per sync run. */
 const ENRICH_MAX_MESSAGES = 12;
@@ -766,6 +615,18 @@ async function enrichPendingEmails(
   result: GmailSyncResult,
   deadline: number,
 ) {
+  // The cutoff behind which mail is left in English: old enough that
+  // nobody is scrolling to it, and counting it would make the backlog
+  // number permanently alarming.
+  const scoped = await prisma.inboundEmail.findMany({
+    where: { workspaceId },
+    orderBy: { receivedAt: "desc" },
+    skip: ENRICH_SCOPE - 1,
+    take: 1,
+    select: { receivedAt: true },
+  });
+  const scopeFrom = scoped[0]?.receivedAt ?? new Date(0);
+
   const pending = await prisma.inboundEmail.findMany({
     where: {
       workspaceId,
@@ -773,6 +634,8 @@ async function enrichPendingEmails(
       // summary existed. Newest first, so the feed the operator is
       // actually looking at fills in before the archive does.
       OR: [{ parsedAt: null }, { summaryZh: null }],
+      // Bounded to the recent end. See ENRICH_SCOPE.
+      receivedAt: { gte: scopeFrom },
     },
     orderBy: { receivedAt: "desc" },
     select: { id: true, subject: true, fromName: true, bodyText: true, kind: true },
@@ -844,7 +707,11 @@ async function enrichPendingEmails(
   }
 
   result.enrichRemaining = await prisma.inboundEmail.count({
-    where: { workspaceId, OR: [{ parsedAt: null }, { summaryZh: null }] },
+    where: {
+      workspaceId,
+      OR: [{ parsedAt: null }, { summaryZh: null }],
+      receivedAt: { gte: scopeFrom },
+    },
   });
 
   if (result.enrichRemaining > 0) {
@@ -960,7 +827,6 @@ export function summarizeGmailSyncResult(result: GmailSyncResult) {
     `parsed=${result.parsed}`,
     `parseFailed=${result.parseFailed}`,
     `reclassified=${result.reclassified}`,
-    `translated=${result.translated}`,
     `enrichRemaining=${result.enrichRemaining}`,
     result.enrichErrors.length > 0 ? `enrichErrors=${result.enrichErrors.join("|")}` : "",
   ]

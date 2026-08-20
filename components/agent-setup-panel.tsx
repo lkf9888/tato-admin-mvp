@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Token = {
   id: string;
@@ -24,6 +24,28 @@ export function AgentSetupPanel({
 }) {
   const [minted, setMinted] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  /**
+   * The href is set through the DOM, not through JSX.
+   *
+   * React refuses to render a `javascript:` URL and substitutes one
+   * that throws: the bookmark this page handed out contained React's
+   * error rather than the reader, which is why clicking it did
+   * nothing at all. Setting the attribute afterwards is the same
+   * anchor, past the sanitiser -- and the sanitiser is protecting
+   * against untrusted URLs reaching an href, which is not what this
+   * is: the source is built on the server, in this repository.
+   */
+  const linkRef = useRef<HTMLAnchorElement | null>(null);
+  useEffect(() => {
+    linkRef.current?.setAttribute("href", bookmarklet);
+  }, [bookmarklet]);
+
+  async function copyBookmarklet() {
+    await navigator.clipboard.writeText(bookmarklet).catch(() => null);
+    setCopied(true);
+  }
 
   async function mint() {
     if (busy) return;
@@ -121,14 +143,26 @@ export function AgentSetupPanel({
           把下面这个链接<strong>拖到浏览器书签栏</strong>。然后在任意 Turo 页面点它一下——
           它会依次读取最近 25 个会话并推送回来。第一次会问你要令牌，只问一次。
         </p>
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-        <a
-          href={bookmarklet}
-          onClick={(event) => event.preventDefault()}
-          className="mt-2 inline-flex cursor-grab items-center rounded-md bg-[var(--brand)] px-4 py-2.5 text-[13px] font-bold text-white"
-        >
-          ↕ 读取 Turo 会话
-        </a>
+        <div className="tap-row mt-2 flex flex-wrap items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a
+            ref={linkRef}
+            onClick={(event) => event.preventDefault()}
+            className="inline-flex cursor-grab items-center rounded-md bg-[var(--brand)] px-4 py-2.5 text-[13px] font-bold text-white"
+          >
+            ↕ 读取 Turo 会话
+          </a>
+          <button
+            type="button"
+            onClick={copyBookmarklet}
+            className="tap-press rounded-md border border-[var(--line-strong)] bg-white px-3 py-2.5 text-[12.5px] font-bold text-[var(--ink-mid)]"
+          >
+            {copied ? "已复制" : "复制代码"}
+          </button>
+        </div>
+        <p className="mt-1.5 text-[11px] leading-4 text-[var(--ink-soft)]">
+          拖不动的话用「复制代码」：书签栏右键 → 添加网页，名称随便填，网址栏粘贴。
+        </p>
         <p className="mt-2 text-[11px] leading-4 text-[var(--ink-soft)]">
           为什么是书签而不是后台任务：Turo 由 Cloudflare 防护，自动化浏览器全部被拦——
           自带的 Chromium 和你机器上真正的 Chrome 都试过，有头无头都一样，它认的是自动化连接本身。

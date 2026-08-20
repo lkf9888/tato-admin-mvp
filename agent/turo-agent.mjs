@@ -36,18 +36,49 @@ function fail(message) {
 
 async function stateExists() {
   try {
-    await access(STATE_FILE);
+    await access(PROFILE_DIR);
     return true;
   } catch {
     return false;
   }
 }
 
+/**
+ * A real Chrome, with a profile that persists.
+ *
+ * Turo sits behind Cloudflare, which blocked Playwright's bundled
+ * Chromium outright -- "Sorry, you've been blocked" before the login
+ * form. Headed or not made no difference: what it recognises is the
+ * automation framework, not the absence of a window.
+ *
+ * `channel: "chrome"` runs the Chrome already installed on this
+ * machine instead, and a persistent profile means the session, cookies
+ * and device history accumulate the way a person's would rather than
+ * arriving fresh on every run.
+ *
+ * That is the whole of the effort here. There are libraries that patch
+ * out the remaining automation signals, and this deliberately does not
+ * use them: defeating bot detection is a different activity from
+ * reading your own account, it is an arms race that breaks on their
+ * schedule rather than yours, and it is not what should be running
+ * against an account you depend on. If Chrome is refused too, the
+ * answer is the in-browser route in README.md, not a better disguise.
+ */
+const PROFILE_DIR = path.join(STATE_DIR, "chrome-profile");
+
+async function openBrowser({ headless }) {
+  await mkdir(PROFILE_DIR, { recursive: true });
+  return chromium.launchPersistentContext(PROFILE_DIR, {
+    channel: "chrome",
+    headless,
+    viewport: { width: 1280, height: 900 },
+  });
+}
+
 async function login() {
   await mkdir(STATE_DIR, { recursive: true });
-  const browser = await chromium.launch({ headless: false });
-  const context = await browser.newContext();
-  const page = await context.newPage();
+  const context = await openBrowser({ headless: false });
+  const page = context.pages()[0] ?? (await context.newPage());
   await page.goto("https://turo.com/us/en/login");
 
   console.log("\nLog into Turo in the window that opened, including any 2FA.");
@@ -62,9 +93,9 @@ async function login() {
   });
 
   await context.storageState({ path: STATE_FILE });
-  await browser.close();
-  console.log(`\n✔ Session saved to ${STATE_FILE}`);
-  console.log("  This file is a live login. It is gitignored. Treat it like a password.\n");
+  await context.close();
+  console.log(`\n✔ Session saved to ${PROFILE_DIR}`);
+  console.log("  That profile is a live login. It is gitignored. Treat it like a password.\n");
 }
 
 async function push(reservationId, messages) {
@@ -236,9 +267,8 @@ async function run() {
   if (!TOKEN) fail("Set TATO_AGENT_TOKEN. Mint one in TATO under agent tokens.");
   if (!(await stateExists())) fail("No saved session. Run with --login first.");
 
-  const browser = await chromium.launch({ headless: !args.has("--headed") });
-  const context = await browser.newContext({ storageState: STATE_FILE });
-  const page = await context.newPage();
+  const context = await openBrowser({ headless: !args.has("--headed") });
+  const page = context.pages()[0] ?? (await context.newPage());
 
   // Reservations to read, newest first, straight from TATO -- it
   // already knows every reservation the mailbox has seen, so the agent
@@ -275,7 +305,7 @@ async function run() {
     await sleep(PAUSE_MS);
   }
 
-  await browser.close();
+  await context.close();
 
   console.log(`\n✔ ${created} new, ${updated} updated`);
   if (failures.length > 0) {

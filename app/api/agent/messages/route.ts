@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { corsPreflight, withCors } from "@/lib/agent-cors";
 import { z } from "zod";
 
 import { authenticateAgent, messageFingerprint } from "@/lib/agent-auth";
@@ -40,12 +40,12 @@ const payloadSchema = z.object({
 export async function POST(request: Request) {
   const agent = await authenticateAgent(request, "messages:write");
   if (!agent) {
-    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    return withCors({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
   const parsed = payloadSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json(
+    return withCors(
       { error: "VALIDATION_ERROR", detail: parsed.error.issues.slice(0, 3) },
       { status: 400 },
     );
@@ -110,5 +110,9 @@ export async function POST(request: Request) {
     `[agent] ${agent.name} :: reservation=${reservationId} created=${written} updated=${updated}`,
   );
 
-  return NextResponse.json({ ok: true, reservationId, created: written, updated });
+  return withCors({ ok: true, reservationId, created: written, updated });
+}
+
+export function OPTIONS() {
+  return corsPreflight();
 }

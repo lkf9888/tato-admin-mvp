@@ -57,6 +57,7 @@ export function AppShell({
         { href: "/calendar", label: messages.shell.nav.calendar, icon: "calendar" },
         { href: "/orders", label: messages.shell.nav.orders, icon: "orders" },
         { href: "/imports", label: messages.shell.nav.imports, icon: "imports" },
+        { href: "/agent", label: messages.shell.nav.agent, icon: "agent" },
       ],
     },
     {

@@ -1,5 +1,6 @@
 import {
   Banknote,
+  Bot,
   Car,
   CalendarDays,
   CreditCard,
@@ -40,6 +41,7 @@ export const NAV_ICONS = {
   assistant: Sparkles,
   messages: MessageCircle,
   turoUpdates: Radio,
+  agent: Bot,
   calendar: CalendarDays,
   orders: Route,
   imports: Upload,

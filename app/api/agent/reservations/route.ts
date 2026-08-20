@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { corsPreflight, withCors } from "@/lib/agent-cors";
+
 import { authenticateAgent } from "@/lib/agent-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -20,7 +22,7 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const agent = await authenticateAgent(request, "messages:write");
   if (!agent) {
-    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    return withCors({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
   const url = new URL(request.url);
@@ -43,9 +45,13 @@ export async function GET(request: Request) {
     select: { externalOrderId: true },
   });
 
-  return NextResponse.json({
+  return withCors({
     reservationIds: orders
       .map((order) => order.externalOrderId)
       .filter((id): id is string => !!id),
   });
+}
+
+export function OPTIONS() {
+  return corsPreflight();
 }

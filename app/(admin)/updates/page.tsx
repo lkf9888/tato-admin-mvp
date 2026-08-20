@@ -91,7 +91,12 @@ export default async function TuroUpdatesPage() {
             // where they wrote any, the model's reading of the
             // notification where they did not.
             headline: email.guestText ?? extracted?.summary ?? email.subject,
-            headlineZh: email.guestText ? email.guestTextZh : email.summaryZh,
+            // The Chinese summary first: this page is skimmed, and
+            // "what is this about" is better served by a sentence
+            // saying what happened than by a faithful rendering of
+            // three paragraphs. The guest's translated words are the
+            // fallback, for rows extracted before the summary existed.
+            headlineZh: email.summaryZh ?? email.guestTextZh,
             needsAction: extracted?.needsAction === true && email.acknowledgedAt == null,
             turoLink: email.turoLink,
             orderId: email.orderId,

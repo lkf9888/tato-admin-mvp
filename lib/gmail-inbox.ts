@@ -150,6 +150,13 @@ export type ParsedTuroEmail = {
   amount?: number | null;
   /** One-sentence plain-language summary for the alert feed. */
   summary: string;
+  /** The same sentence in Chinese. Produced by the extraction call
+   *  rather than a separate translation pass: the model is already
+   *  reading this email and writing that sentence, so the Chinese
+   *  costs nothing beyond a few output tokens. A second call per
+   *  email, for one line, would have doubled the sync's model
+   *  budget for no additional understanding. */
+  summaryZh?: string | null;
   /** Whether this needs the operator to do something. */
   needsAction: boolean;
 };
@@ -166,6 +173,7 @@ Return ONLY a JSON object with these keys:
   "tripEnd": ISO 8601 string or null,
   "amount": number or null,
   "summary": one short sentence describing what happened,
+  "summaryZh": the same sentence in Simplified Chinese,
   "needsAction": true if the host must reply or act, false otherwise
 }
 
@@ -174,7 +182,11 @@ Rules:
 - "needsAction" is true for guest messages awaiting a reply, and for
   anything asking the host to confirm, approve, or provide something.
   It is false for pure notifications like payout confirmations.
-- Write "summary" in the same language as the email.`;
+- Write "summary" in the same language as the email.
+- "summaryZh" is always Simplified Chinese, whatever the email is in.
+  It is read at a glance in a feed, so say what happened and to which
+  car or guest, not that a notification arrived: "Andrew 把 Dodge Grand
+  Caravan 的取车改到 8/20 23:30", not "收到一封行程变更通知".`;
 
 /**
  * How much of the body the model actually sees.
@@ -230,6 +242,7 @@ async function extractTuroEmail(input: {
       ...parsed,
       kind,
       summary: typeof parsed.summary === "string" ? parsed.summary.slice(0, 400) : "",
+      summaryZh: typeof parsed.summaryZh === "string" ? parsed.summaryZh.slice(0, 400) : null,
       needsAction: parsed.needsAction === true,
     },
   };
@@ -573,7 +586,13 @@ const ENRICH_TIME_BUDGET_MS = 150_000;
  */
 async function enrichPendingEmails(workspaceId: string, result: GmailSyncResult) {
   const pending = await prisma.inboundEmail.findMany({
-    where: { workspaceId, parsedAt: null },
+    where: {
+      workspaceId,
+      // Rows never extracted, and rows extracted before the Chinese
+      // summary existed. Newest first, so the feed the operator is
+      // actually looking at fills in before the archive does.
+      OR: [{ parsedAt: null }, { summaryZh: null }],
+    },
     orderBy: { receivedAt: "desc" },
     select: { id: true, subject: true, fromName: true, bodyText: true, kind: true },
     take: ENRICH_MAX_MESSAGES,
@@ -644,7 +663,7 @@ async function enrichPendingEmails(workspaceId: string, result: GmailSyncResult)
   }
 
   result.enrichRemaining = await prisma.inboundEmail.count({
-    where: { workspaceId, parsedAt: null },
+    where: { workspaceId, OR: [{ parsedAt: null }, { summaryZh: null }] },
   });
 
   if (result.enrichRemaining > 0) {

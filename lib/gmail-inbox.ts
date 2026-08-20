@@ -6,6 +6,7 @@ import { simpleParser, type ParsedMail } from "mailparser";
 
 import { kimiExtractJson, isKimiConfigured,
   kimiChat,
+  getExtractionModel,
 } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
 import {
@@ -552,13 +553,30 @@ export async function runGmailSync(input: {
   return result;
 }
 
-/** Lines translated in one call.
+/**
+ * How much text goes into one translation call.
  *
- *  Twenty was tried and failed: reasoning scales with the input, so a
- *  batch of twenty burned a 4000-token budget before writing a line
- *  and returned empty. Twelve at 6000 leaves 500 a line, which is the
- *  ratio the messages page has been translating at successfully. */
-const TRANSLATE_BATCH = 12;
+ * Counted in characters, not lines. Twenty lines failed on budget and
+ * twelve failed on the clock, and the reason both times was the same:
+ * with a reasoning model the cost is the thinking, and the thinking
+ * scales with content. A batch of twelve one-line summaries and a
+ * batch of twelve three-paragraph messages are not the same request,
+ * so counting lines was measuring the wrong thing.
+ *
+ * There is no per-call overhead to amortise here, so batching buys
+ * only fewer round trips. Keeping each call small is what keeps it
+ * inside its timeout.
+ */
+const TRANSLATE_CHARS = 1200;
+const TRANSLATE_MAX_LINES = 10;
+
+/** Only the recent end of the archive.
+ *
+ *  1,091 rows lack a Chinese line and the feed shows 300. Translating
+ *  the rest would spend hours of model time on mail nobody will scroll
+ *  to -- and the queue never emptying is itself a problem, because a
+ *  backlog that never drains hides a backlog that is growing. */
+const TRANSLATE_SCOPE = 400;
 
 /**
  * Everything after the mailbox closes shares one deadline.
@@ -613,7 +631,7 @@ async function translatePendingSummaries(
         ],
       },
       orderBy: { receivedAt: "desc" },
-      take: TRANSLATE_BATCH,
+      take: TRANSLATE_MAX_LINES,
       select: { id: true, guestText: true, guestTextZh: true, parsed: true, summaryZh: true },
     });
 
@@ -647,13 +665,27 @@ async function translatePendingSummaries(
 
     if (jobs.length === 0) return;
 
+    // Trim the batch to a character budget. One long message can be
+    // worth more thinking than eight short ones.
+    const batched: Job[] = [];
+    let chars = 0;
+    for (const job of jobs) {
+      if (batched.length > 0 && chars + job.text.length > TRANSLATE_CHARS) break;
+      batched.push(job);
+      chars += job.text.length;
+    }
+
     const response = await kimiChat({
       messages: [
         { role: "system", content: BULK_TRANSLATE_PROMPT },
-        { role: "user", content: jobs.map((job, i) => `${i + 1}. ${job.text}`).join("\n") },
+        { role: "user", content: batched.map((job, i) => `${i + 1}. ${job.text}`).join("\n") },
       ],
-      maxTokens: 6000,
-      timeoutMs: 90_000,
+      // The cheaper tier. Translation needs no judgement, and the
+      // conversational model was being paid to deliberate over
+      // sentences it only had to restate in another language.
+      model: getExtractionModel(),
+      maxTokens: 4000,
+      timeoutMs: 120_000,
     });
 
     if (!response.ok) {
@@ -670,7 +702,7 @@ async function translatePendingSummaries(
     }
 
     let wrote = 0;
-    for (const [index, job] of jobs.entries()) {
+    for (const [index, job] of batched.entries()) {
       const text = byIndex.get(index + 1);
       if (!text) continue;
       await prisma.inboundEmail.update({

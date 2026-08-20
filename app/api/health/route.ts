@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { startGmailIdle } from "@/lib/gmail-idle";
 import { prisma } from "@/lib/prisma";
 import { APP_VERSION } from "@/lib/version";
 
@@ -20,7 +21,23 @@ export const dynamic = "force-dynamic";
  * guessing. A Railway deploy that silently didn't pick up a push is
  * otherwise invisible until someone notices the fix isn't working.
  */
+/**
+ * The mail watcher starts here.
+ *
+ * It belongs in `instrumentation.ts`, and that is where it was, but
+ * Next compiles that file for the edge runtime as well -- where there
+ * are no sockets and no filesystem -- and traces the imports whatever
+ * runtime guard sits in front of them. The build failed on
+ * `Can't resolve 'net'`.
+ *
+ * This route is Node-only and is the first thing Railway calls after a
+ * deploy, so it is the earliest reliable moment in the process's life.
+ * `startGmailIdle` is idempotent, so every later health check is a
+ * no-op.
+ */
 export async function GET() {
+  startGmailIdle();
+
   const checks: Record<string, "ok" | "fail"> = {};
   let healthy = true;
 

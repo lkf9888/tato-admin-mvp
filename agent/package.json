@@ -1,0 +1,11 @@
+{
+  "name": "tato-turo-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reads Turo conversations off the site and pushes them to TATO. Runs on a laptop, not on the server -- see README.md.",
+  "//": "Its own package.json on purpose. Playwright is ~50MB and the web app never needs it; putting it in the root manifest would download it on every Railway build to run code that only ever executes here.",
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

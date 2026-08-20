@@ -31,7 +31,14 @@ research script in HostHub uses, for the same reason.
 
 ## What it needs
 
-- Node 20+ and `npx playwright install chromium`
+Node 20+, and its own dependencies. The agent keeps a separate
+`package.json` on purpose: Playwright is about 50MB and the web app
+never touches it, so putting it in the root manifest would download it
+on every Railway build to run code that only ever executes here.
+
+```bash
+cd agent && npm install && npx playwright install chromium
+```
 - A TATO agent token (Account settings → agent tokens, or
   `POST /api/agent/tokens`). Shown once; it is stored hashed.
 

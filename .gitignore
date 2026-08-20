@@ -12,3 +12,4 @@ tsconfig.tsbuildinfo
 
 # The browser agent's saved Turo session. A live login.
 agent/.state/
+agent/node_modules/

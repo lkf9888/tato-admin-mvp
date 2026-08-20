@@ -61,16 +61,38 @@ export async function GET() {
           workspaceId,
           kind: { in: [InboundEmailKind.GUEST_MESSAGE, InboundEmailKind.SUPPORT] },
         };
-        const [total, guestMessages, withGuestName, withVehicle, withOrder, withTuroLink] =
-          await Promise.all([
+        const [
+          total,
+          guestMessages,
+          withGuestName,
+          withVehicle,
+          withOrder,
+          withTuroLink,
+          withSummaryZh,
+          extracted,
+        ] = await Promise.all([
             prisma.inboundEmail.count({ where: { workspaceId } }),
             prisma.inboundEmail.count({ where: guestWhere }),
             prisma.inboundEmail.count({ where: { ...guestWhere, guestName: { not: null } } }),
             prisma.inboundEmail.count({ where: { ...guestWhere, vehicleId: { not: null } } }),
             prisma.inboundEmail.count({ where: { ...guestWhere, orderId: { not: null } } }),
             prisma.inboundEmail.count({ where: { ...guestWhere, turoLink: { not: null } } }),
+            // Across every kind, not just guest messages: the activity
+            // feed shows all of them and a Chinese line is what makes
+            // it skimmable.
+            prisma.inboundEmail.count({ where: { workspaceId, summaryZh: { not: null } } }),
+            prisma.inboundEmail.count({ where: { workspaceId, parsedAt: { not: null } } }),
           ]);
-        return { total, guestMessages, withGuestName, withVehicle, withOrder, withTuroLink };
+        return {
+          total,
+          extracted,
+          withSummaryZh,
+          guestMessages,
+          withGuestName,
+          withVehicle,
+          withOrder,
+          withTuroLink,
+        };
       })()
     : null;
 

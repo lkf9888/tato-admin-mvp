@@ -69,7 +69,11 @@ export default async function TuroUpdatesPage() {
           const extracted = (() => {
             if (!email.parsed) return null;
             try {
-              return JSON.parse(email.parsed) as { summary?: string; needsAction?: boolean };
+              return JSON.parse(email.parsed) as {
+                summary?: string;
+                summaryZh?: string;
+                needsAction?: boolean;
+              };
             } catch {
               return null;
             }
@@ -96,7 +100,11 @@ export default async function TuroUpdatesPage() {
             // saying what happened than by a faithful rendering of
             // three paragraphs. The guest's translated words are the
             // fallback, for rows extracted before the summary existed.
-            headlineZh: email.summaryZh ?? email.guestTextZh,
+            // Column first, then the same field inside `parsed`. The
+            // extraction writes both, and reading the blob as a
+            // fallback means a row whose column write was missed still
+            // renders a Chinese line instead of looking untranslated.
+            headlineZh: email.summaryZh ?? extracted?.summaryZh ?? email.guestTextZh,
             needsAction: extracted?.needsAction === true && email.acknowledgedAt == null,
             turoLink: email.turoLink,
             orderId: email.orderId,

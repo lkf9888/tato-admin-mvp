@@ -4,6 +4,7 @@ import { parse } from "date-fns";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { prisma } from "@/lib/prisma";
 import {
+  foldLatinLookalikes,
   getNetEarningFromFinancials,
   normalizeText,
   parseNumberValue,
@@ -437,12 +438,22 @@ function buildSourceMetadata(row: CsvImportRow) {
 }
 
 function extractPlateNumber(vehicleLabel?: string, externalVehicleId?: string, vin?: string) {
+  // Fold look-alike letters to Latin before anything reads this
+  // string. Every rule below is written in `[A-Za-z0-9]`, and rule 3
+  // strips whatever is not, so a Cyrillic A -- which Turo's export
+  // really does use on at least one plate -- was not preserved and
+  // not converted: it was deleted, and A661GL was recorded as 661GL.
+  // A plate that no longer contains its own first letter cannot be
+  // found by typing it, which is how a car ends up invisible in a
+  // fleet it was correctly imported into.
+  const label = foldLatinLookalikes(vehicleLabel ?? "");
+
   // 1. Explicit BC-style plate marker, e.g. "Tesla Model Y #A603JM".
-  const bcPlateMatch = (vehicleLabel ?? "").match(/#([A-Za-z0-9]+)/);
+  const bcPlateMatch = label.match(/#([A-Za-z0-9]+)/);
   if (bcPlateMatch?.[1]) return bcPlateMatch[1].toUpperCase();
 
   // 2. Parenthesised plate, e.g. "2022 Tesla Model Y (A603JM)".
-  const parenPlateMatch = (vehicleLabel ?? "").match(/\(([A-Za-z0-9]{5,10})\)/);
+  const parenPlateMatch = label.match(/\(([A-Za-z0-9]{5,10})\)/);
   if (parenPlateMatch?.[1] && !/^\d+$/.test(parenPlateMatch[1])) {
     return parenPlateMatch[1].toUpperCase();
   }
@@ -450,7 +461,7 @@ function extractPlateNumber(vehicleLabel?: string, externalVehicleId?: string, v
   // 3. A plate-shaped token (letters+digits) inside the label. Skip pure-digit
   // tokens because a leading year (e.g. "2022 Tesla Model Y") must NOT be
   // treated as the plate — that collapses every 2022-year car into one row.
-  const plateLikeToken = (vehicleLabel ?? "")
+  const plateLikeToken = label
     .split(/[\s,()\[\]]+/)
     .map((token) => token.replace(/[^A-Za-z0-9]/g, "").trim())
     .find(
@@ -478,11 +489,39 @@ function buildPlateNumberCandidates(
     new Set(
       [
         extractPlateNumber(vehicleLabel, externalVehicleId, vin),
+        // What this label used to produce, before look-alike letters
+        // were folded instead of dropped. Kept as a lookup candidate
+        // so a car already imported under the mangled plate is FOUND
+        // and repaired rather than duplicated -- a second copy would
+        // be worse than the original bug, because two cars of one
+        // model make every booking email for it ambiguous, and
+        // ambiguous mail files nothing at all.
+        legacyStrippedPlate(vehicleLabel),
         externalVehicleId ? `TURO-${externalVehicleId}` : null,
         vin ? `VIN-${vin.slice(-8).toUpperCase()}` : null,
       ].filter(Boolean) as string[],
     ),
   );
+}
+
+/** The plate this label produced when non-ASCII letters were deleted. */
+function legacyStrippedPlate(vehicleLabel?: string): string | null {
+  if (!vehicleLabel) return null;
+  const folded = foldLatinLookalikes(vehicleLabel);
+  if (folded === vehicleLabel) return null;
+  return extractPlateNumberFrom(vehicleLabel);
+}
+
+/** `extractPlateNumber`'s rule 3, applied to a label as-is. */
+function extractPlateNumberFrom(vehicleLabel: string): string | null {
+  const token = vehicleLabel
+    .split(/[\s,()\[\]]+/)
+    .map((part) => part.replace(/[^A-Za-z0-9]/g, "").trim())
+    .find(
+      (part) =>
+        part.length >= 5 && part.length <= 10 && /[A-Za-z]/.test(part) && /[0-9]/.test(part),
+    );
+  return token ? token.toUpperCase() : null;
 }
 
 async function findAvailablePlateNumber(candidates: string[], workspaceId: string) {
@@ -697,12 +736,31 @@ async function syncVehicleFromCsvRow(input: {
   const vin = safeString(input.row[input.mapping.vin ?? ""]);
   const basics = parseVehicleBasics(vehicleName || vehicleLabel);
 
-  // Intentionally do NOT touch `plateNumber` here. Plates are stable
-  // identifiers, re-writing them during per-row CSV sync can collide with the
-  // global unique constraint (two rows parse the same plate, a cross-workspace
-  // vehicle already owns it, etc.) and takes down the whole batch. Users can
-  // edit the plate directly from the vehicle management UI when they truly
-  // need to change it.
+  // Plates are otherwise left alone here, and for good reason: they are
+  // stable identifiers, rewriting them per-row can collide with the
+  // global unique constraint, and a collision takes down the whole
+  // batch. The one exception is a plate this importer itself mangled.
+  //
+  // A label carrying a look-alike letter used to lose it entirely, so
+  // A661GL was stored as 661GL -- a plate that cannot be found by
+  // typing the real one. Now that the letter survives, the same row
+  // resolves to the same car through the legacy candidate, and this
+  // repairs the stored value in passing. Guarded three ways: it only
+  // fires when the label actually contained a look-alike, only when
+  // the stored plate is exactly the mangled form, and only if no other
+  // vehicle already holds the corrected plate.
+  const canonicalPlate = extractPlateNumber(vehicleLabel, externalVehicleId, vin);
+  const mangledPlate = legacyStrippedPlate(vehicleLabel);
+  const shouldRepairPlate =
+    Boolean(canonicalPlate) &&
+    Boolean(mangledPlate) &&
+    canonicalPlate !== mangledPlate &&
+    input.vehicle.plateNumber === mangledPlate &&
+    !(await prisma.vehicle.findFirst({
+      where: { plateNumber: canonicalPlate as string },
+      select: { id: true },
+    }));
+
   const nextData = {
     nickname: vehicleName || vehicleLabel || input.vehicle.nickname,
     brand: basics.brand,
@@ -711,9 +769,11 @@ async function syncVehicleFromCsvRow(input: {
     vin: vin || input.vehicle.vin || null,
     turoListingName: vehicleName || vehicleLabel || input.vehicle.turoListingName || null,
     turoVehicleCode: externalVehicleId || input.vehicle.turoVehicleCode || null,
+    ...(shouldRepairPlate ? { plateNumber: canonicalPlate as string } : {}),
   };
 
   const hasChanges =
+    shouldRepairPlate ||
     input.vehicle.nickname !== nextData.nickname ||
     input.vehicle.brand !== nextData.brand ||
     input.vehicle.model !== nextData.model ||

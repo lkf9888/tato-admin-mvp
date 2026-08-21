@@ -164,6 +164,46 @@ export function maskPhone(value?: string | null) {
   return `***-***-${digits.slice(-4)}`;
 }
 
+/**
+ * Cyrillic and Greek letters that are drawn the same as Latin ones.
+ *
+ * Turo's own export writes A661GL with a CYRILLIC CAPITAL LETTER A
+ * (U+0410) in front. On screen it is indistinguishable from the Latin
+ * A, and it is one plate out of 79 in the same file, so there is
+ * nothing to notice: it renders correctly, it copies correctly, and it
+ * compares equal to nothing.
+ *
+ * These are the confusables that actually turn up in vehicle
+ * identifiers -- the upper-case letters both alphabets draw alike.
+ * Mapping them to Latin is safe here because a licence plate is a
+ * Latin-alphanumeric identifier by definition; a Cyrillic letter in
+ * one is always an artefact of whoever typed it.
+ */
+const LATIN_LOOKALIKES: Record<string, string> = {
+  // Cyrillic
+  "\u0410": "A", "\u0412": "B", "\u0415": "E", "\u041A": "K", "\u041C": "M",
+  "\u041D": "H", "\u041E": "O", "\u0420": "P", "\u0421": "C", "\u0422": "T",
+  "\u0423": "Y", "\u0425": "X", "\u0406": "I", "\u0408": "J", "\u04C0": "I",
+  // Greek
+  "\u0391": "A", "\u0392": "B", "\u0395": "E", "\u0396": "Z", "\u0397": "H",
+  "\u0399": "I", "\u039A": "K", "\u039C": "M", "\u039D": "N", "\u039F": "O",
+  "\u03A1": "P", "\u03A4": "T", "\u03A5": "Y", "\u03A7": "X",
+};
+
+/**
+ * The same string with look-alike letters folded to Latin.
+ *
+ * Call this BEFORE stripping a string to `[A-Za-z0-9]`. That strip
+ * deletes anything non-ASCII, so without this step the Cyrillic A in
+ * A661GL does not survive as an A -- it vanishes, and the plate is
+ * silently recorded as 661GL.
+ */
+export function foldLatinLookalikes(value: string): string {
+  let out = "";
+  for (const ch of value) out += LATIN_LOOKALIKES[ch] ?? ch;
+  return out;
+}
+
 export function normalizeText(value?: string | null) {
   return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }

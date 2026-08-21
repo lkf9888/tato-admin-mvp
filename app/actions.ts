@@ -960,6 +960,113 @@ export async function deleteOwnerCommissionAction(formData: FormData) {
   revalidateAdminPages();
 }
 
+/**
+ * Move a parked booking onto a car.
+ *
+ * The trip is real and already described -- guest, dates, location all
+ * came from Turo's own mail. The only thing missing was which car, and
+ * this supplies it. So it becomes an ordinary order rather than
+ * anything special: same shape the email applier would have created if
+ * the model had resolved to one vehicle.
+ *
+ * Deliberately no price. Booking mail quotes an estimate before tolls,
+ * cleaning and fees move it, and the owner ledger settles on the CSV's
+ * figure -- writing the quote here would put an estimate where the
+ * accounts expect a settlement. The next import fills it in.
+ */
+export async function assignPendingOrderAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  const pendingId = formData.get("pendingId")?.toString() ?? "";
+  const vehicleId = formData.get("vehicleId")?.toString() ?? "";
+  if (!pendingId || !vehicleId) return;
+
+  const [pending, vehicle] = await Promise.all([
+    prisma.pendingOrder.findFirst({
+      where: { id: pendingId, workspaceId: workspace.id },
+    }),
+    prisma.vehicle.findFirst({
+      where: { id: vehicleId, workspaceId: workspace.id },
+      select: { id: true, plateNumber: true },
+    }),
+  ]);
+  if (!pending || !vehicle) return;
+
+  // The reservation may have been imported by CSV between the page
+  // rendering and this submit. If so the CSV's version wins and this
+  // is just a stale basket row to clear.
+  const existing = await prisma.order.findFirst({
+    where: {
+      workspaceId: workspace.id,
+      source: OrderSource.turo,
+      externalOrderId: pending.externalOrderId,
+    },
+    select: { id: true },
+  });
+
+  const order =
+    existing ??
+    (await prisma.order.create({
+      data: {
+        workspaceId: workspace.id,
+        vehicleId: vehicle.id,
+        source: OrderSource.turo,
+        externalOrderId: pending.externalOrderId,
+        renterName: pending.renterName,
+        renterPhone: pending.renterPhone,
+        pickupDatetime: pending.pickupDatetime,
+        returnDatetime: pending.returnDatetime,
+        pickupLocation: pending.pickupLocation,
+        status: pending.status,
+        createdBy: user.name,
+      },
+    }));
+
+  await prisma.pendingOrder.delete({ where: { id: pending.id } });
+  await reconcileVehicleConflicts(vehicle.id);
+  await syncOrderOwnerLedger(order.id);
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: existing ? "pending_order_already_imported" : "pending_order_assigned",
+    entityType: "Order",
+    entityId: order.id,
+    metadata: {
+      externalOrderId: pending.externalOrderId,
+      vehicleText: pending.vehicleText,
+      plateNumber: vehicle.plateNumber,
+    },
+  });
+
+  revalidateAdminPages();
+}
+
+/** Drop a parked booking without filing it. */
+export async function dismissPendingOrderAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+  const pendingId = formData.get("pendingId")?.toString() ?? "";
+
+  const pending = await prisma.pendingOrder.findFirst({
+    where: { id: pendingId, workspaceId: workspace.id },
+    select: { id: true, externalOrderId: true },
+  });
+  if (!pending) return;
+
+  await prisma.pendingOrder.delete({ where: { id: pending.id } });
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "pending_order_dismissed",
+    entityType: "Workspace",
+    entityId: workspace.id,
+    metadata: { externalOrderId: pending.externalOrderId },
+  });
+
+  revalidateAdminPages();
+}
+
 export async function assignOwnerVehiclesAction(formData: FormData) {
   const { workspace, user } = await requireCurrentAdminContext();
   const ownerId = formData.get("ownerId")?.toString();

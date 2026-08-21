@@ -1091,6 +1091,14 @@ export async function importTuroOrders(input: {
         : await prisma.order.create({
             data: payload,
           });
+
+      // This reservation now has a real car, named by its plate, so it
+      // leaves the unassigned basket. The CSV is the authority the
+      // basket was waiting for.
+      await prisma.pendingOrder.deleteMany({
+        where: { workspaceId: input.workspaceId, externalOrderId },
+      });
+
       await syncOrderOwnerLedger(savedOrder.id);
 
       touchedVehicleIds.add(vehicle.id);

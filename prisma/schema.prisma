@@ -173,6 +173,7 @@ model Workspace {
   activityLogs                  ActivityLog[]
   ownerLedgerItems              OwnerLedgerItem[]
   ownerCommissionRules          OwnerCommissionRule[]
+  pendingOrders                 PendingOrder[]
   vehicleCleaningFeeRules       VehicleCleaningFeeRule[]
   ownerLedgerReceipts           OwnerLedgerReceipt[]
   orderAttachments              OrderAttachment[]
@@ -416,6 +417,53 @@ model VehicleCleaningFeeRule {
   @@unique([vehicleId, effectiveFrom])
   @@index([workspaceId])
   @@index([vehicleId, effectiveFrom])
+}
+
+/// A real booking whose car we could not identify.
+///
+/// Booking mail names a model and never a plate, so a fleet running
+/// four Dodge Journey 2014s gives the matcher nothing to choose
+/// between. Guessing files a real trip against the wrong car -- wrong
+/// plate to the guest, a phantom conflict on the calendar, the wrong
+/// owner credited -- so it refuses.
+///
+/// Refusing used to mean the booking vanished: it was counted in the
+/// run's outcome and dropped. The trip is real either way, and a
+/// calendar missing a booking that exists is its own kind of wrong.
+/// So it lands here instead, visible and assignable, until one of
+/// three things resolves it:
+///
+///   - someone picks the car by hand,
+///   - a CSV import arrives with the plate,
+///   - or the fleet changes and the model resolves to one car.
+///
+/// Keyed by reservation, so re-reading the same mail updates this row
+/// rather than stacking duplicates -- the order applier re-derives the
+/// whole picture on every run.
+model PendingOrder {
+  id              String      @id @default(cuid())
+  workspaceId     String
+  externalOrderId String
+  renterName      String
+  renterPhone     String?
+  pickupDatetime  DateTime
+  returnDatetime  DateTime
+  pickupLocation  String?
+  status          OrderStatus @default(booked)
+  /// The vehicle as the email wrote it, e.g. "Dodge Journey 2014".
+  vehicleText     String
+  /// Which Turo account the mail came from; null is the main one.
+  turoAccount     String?
+  /// How many cars answered to `vehicleText`. Zero means the fleet is
+  /// missing the car; more than one means it cannot be told apart.
+  matchCount      Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  workspace       Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, externalOrderId])
+  @@index([workspaceId, pickupDatetime])
 }
 
 model OwnerLedgerItem {

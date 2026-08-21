@@ -49,6 +49,8 @@ export type ApplyOutcome = {
   updated: number;
   /** Completed trips whose mail disagreed and was deliberately ignored. */
   skippedCompleted: number;
+  /** Bookings parked in the unassigned basket this run. */
+  pending: number;
   /** Overrides that named a plate no vehicle in this workspace has.
    *  Reported rather than ignored: a typo here files nothing, and
    *  silence would look identical to the trip not existing. */
@@ -144,6 +146,7 @@ export async function applyTuroEmailsToOrders(input: {
     created: 0,
     updated: 0,
     skippedCompleted: 0,
+    pending: 0,
     ambiguousVehicle: [],
     unknownPlates: [],
     byAccount: {},
@@ -241,12 +244,47 @@ export async function applyTuroEmailsToOrders(input: {
         // no plate. Guessing would file a real booking against the
         // wrong vehicle, which shows up as a phantom conflict on the
         // calendar.
+        //
+        // But the trip is real whether or not we can place it, and a
+        // calendar missing a booking that exists is its own kind of
+        // wrong. So it is parked rather than dropped: visible,
+        // assignable by hand, and picked up automatically the moment a
+        // CSV names the plate or the fleet resolves the model.
         outcome.ambiguousVehicle.push({
           reservationId,
           vehicleText: facts.vehicleText,
           matches: matches.length,
           turoAccount: facts.coHostAccount,
         });
+
+        if (input.apply) {
+          const pending = {
+            renterName: facts.guestName ?? "Turo guest",
+            renterPhone: facts.guestPhone ?? null,
+            pickupDatetime: facts.tripStart,
+            returnDatetime: facts.tripEnd,
+            pickupLocation: facts.location ?? null,
+            status: statusFor(facts),
+            vehicleText: facts.vehicleText,
+            turoAccount: facts.coHostAccount ?? null,
+            matchCount: matches.length,
+          };
+          await prisma.pendingOrder.upsert({
+            where: {
+              workspaceId_externalOrderId: {
+                workspaceId: input.workspaceId,
+                externalOrderId: reservationId,
+              },
+            },
+            update: pending,
+            create: {
+              workspaceId: input.workspaceId,
+              externalOrderId: reservationId,
+              ...pending,
+            },
+          });
+          outcome.pending += 1;
+        }
         continue;
       }
 
@@ -271,8 +309,23 @@ export async function applyTuroEmailsToOrders(input: {
           },
         });
       }
+      // It exists now, so it does not belong in the basket. Covers the
+      // fleet-changed route; the CSV route clears its own on import.
+      if (input.apply) {
+        await prisma.pendingOrder.deleteMany({
+          where: { workspaceId: input.workspaceId, externalOrderId: reservationId },
+        });
+      }
+
       outcome.created += 1;
       continue;
+    }
+
+    // The order exists, so nothing about this reservation is pending.
+    if (input.apply) {
+      await prisma.pendingOrder.deleteMany({
+        where: { workspaceId: input.workspaceId, externalOrderId: reservationId },
+      });
     }
 
     const finished =

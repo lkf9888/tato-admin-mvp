@@ -11,6 +11,8 @@ import { StatusBadge } from "@/components/status-badge";
 import { getOrderStatusOptions, getStatusLabel, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import { PendingOrdersPanel } from "@/components/pending-orders-panel";
+import { matchVehiclesForEmail } from "@/lib/turo-message-match";
 import {
   cn,
   formatCurrency,
@@ -212,6 +214,16 @@ export default async function OrdersPage({
     }),
   ]);
 
+  // Bookings Turo told us about that could not be placed on a car.
+  // They live here, at the top of the orders page, because that is
+  // where someone goes to ask "what have we got" -- and the honest
+  // answer includes the ones we could not file.
+  const pendingOrders = await prisma.pendingOrder.findMany({
+    where: { workspaceId: workspace.id },
+    orderBy: { pickupDatetime: "asc" },
+    take: 50,
+  });
+
   const orderMessages = messages.orders;
   const orderStatusOptions = getOrderStatusOptions(locale);
   const statusSelectOptions = orderStatusOptions.map((option) => ({
@@ -321,6 +333,44 @@ export default async function OrdersPage({
 
   return (
     <div className="space-y-2.5">
+      <PendingOrdersPanel
+        locale={locale}
+        rows={pendingOrders.map((row) => ({
+          id: row.id,
+          externalOrderId: row.externalOrderId,
+          renterName: row.renterName,
+          renterPhone: row.renterPhone,
+          pickupDatetime: row.pickupDatetime.toISOString(),
+          returnDatetime: row.returnDatetime.toISOString(),
+          pickupLocation: row.pickupLocation,
+          vehicleText: row.vehicleText,
+          turoAccount: row.turoAccount,
+          matchCount: row.matchCount,
+          // Recomputed rather than stored: a car added to the fleet
+          // today should be offered against a booking parked
+          // yesterday, without waiting for a sync to rewrite the row.
+          candidateVehicleIds: matchVehiclesForEmail(
+            row.vehicleText,
+            vehicles,
+            row.turoAccount,
+          ).matches.map((vehicle) => vehicle.id),
+        }))}
+        vehicles={vehicles.map((vehicle) => ({
+          id: vehicle.id,
+          label: vehicle.plateNumber
+            ? `${vehicle.plateNumber} · ${vehicle.nickname}`
+            : vehicle.nickname,
+          searchText: [
+            vehicle.plateNumber,
+            vehicle.nickname,
+            `${vehicle.brand} ${vehicle.model} ${vehicle.year}`,
+            vehicle.owner?.name,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        }))}
+      />
+
       {params.error ? (
         <div className="rounded-lg border border-amber-200/70 bg-[rgba(247,247,247,0.92)] px-4 py-3 text-[12px] text-amber-700 shadow-[0_16px_40px_-36px_rgba(17,19,24,0.45)]">
           {orderMessages.importedReadOnly}

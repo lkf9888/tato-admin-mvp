@@ -1,12 +1,26 @@
 name: Gmail sync
 
-# Turo has no webhooks, so we poll the mailbox. Every 15 minutes is a
-# reasonable trade between freshness and Kimi extraction cost — each run
-# only pays for genuinely new mail, since the sync dedupes on Message-ID.
+# 读邮箱约 3 秒,跑模型写摘要要几分钟。捆在一起,整个计划任务
+# 就得迁就慢的那一半 —— 一条客人消息可能要等一刻钟才被看到,
+# 而那一刻钟里模型正在给更早的邮件写摘要。
+#
+# 所以这个任务用 ?mode=ingest:只读取、归档、把预订邮件变成订单、
+# 补齐还没匹配上的归因,完全不碰模型。这么轻,五分钟一次没问题。
+# 慢的那一半交给 gmail-enrich.yml。
+#
+# GitHub 的 cron 是尽力而为、负载高时会漂 —— 名义上的 */5 实测
+# 可能相隔 10–20 分钟。真正的低延迟靠 app 里的 IMAP IDLE;
+# 这个是那条连接断掉、还没重连上时的兜底。
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
+
+# 重叠的运行做不了有用的事:同步内部按 Message-ID 去重并且单飞,
+# 第二个只会重读第一个正在处理的东西。
+concurrency:
+  group: gmail-sync
+  cancel-in-progress: false
 
 jobs:
   sync:
@@ -15,7 +29,7 @@ jobs:
       - name: Trigger Turo inbox sync
         run: |
           code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
-            -X POST https://tatocar.co/api/gmail-sync \
+            -X POST "https://tatocar.co/api/gmail-sync?mode=ingest" \
             -H "x-tato-sync-secret: ${{ secrets.GMAIL_SYNC_SECRET }}")
           cat /tmp/out.json
           echo ""

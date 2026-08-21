@@ -23,7 +23,7 @@ import { getDisplayOrderNote, getOrderNetEarning } from "@/lib/utils";
  * search and filters.
  */
 const CALENDAR_PAST_MONTHS = 3;
-const CALENDAR_FUTURE_MONTHS = 6;
+const CALENDAR_FUTURE_MONTHS = 3;
 
 function calendarWindow() {
   const from = new Date();

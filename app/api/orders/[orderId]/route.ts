@@ -106,7 +106,22 @@ function buildResponseOrder(order: OrderForResponse) {
     createdBy: order.createdBy,
     externalOrderId: order.externalOrderId,
     ownerLedgerSyncedAt: order.ownerLedgerSyncedAt?.toISOString() ?? null,
+    // Two different numbers, and conflating them was a bug.
+    //
+    // `cleaningFee` is the car's fee as it stands today -- the value
+    // the panel edits. `cleaningFeeOnTrip` is what THIS trip is
+    // charged, which is the fee that was in force on the day it
+    // started and is a different number whenever the price has changed
+    // since. Returning the second one in the field that writes the
+    // first made a fee typed against an old trip appear to vanish on
+    // save: the rule was written from today, the trip resolved to the
+    // older price, and the box came back showing that instead.
     cleaningFee: resolveCleaningFee(
+      order.vehicle.cleaningFeeRules,
+      new Date(),
+      order.vehicle.cleaningFee,
+    ).amount,
+    cleaningFeeOnTrip: resolveCleaningFee(
       order.vehicle.cleaningFeeRules,
       order.pickupDatetime,
       order.vehicle.cleaningFee,

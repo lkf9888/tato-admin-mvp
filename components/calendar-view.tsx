@@ -526,6 +526,19 @@ export function CalendarView({
   // today, which is what moving around a calendar actually needs.
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const timelineViewportRef = useRef<HTMLDivElement | null>(null);
+  // Drag-to-pan state. Refs rather than state on purpose: this runs on
+  // every pointer move, and re-rendering a grid of several hundred bars
+  // at pointer rate is how a smooth drag becomes a stuttering one.
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startScrollLeft: number;
+    lastX: number;
+    lastT: number;
+    velocity: number;
+    moved: boolean;
+  } | null>(null);
+  const momentumRef = useRef<number | null>(null);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState<number | null>(null);
   const [orderPopover, setOrderPopover] = useState<OrderPopoverState | null>(null);
   const [isTuroSyncing, setIsTuroSyncing] = useState(false);
@@ -560,6 +573,129 @@ export function CalendarView({
   const rangeEndExclusive = addDays(rangeStart, visibleDayCount);
   const rangeEndInclusive = addDays(rangeEndExclusive, -1);
   const today = startOfDay(new Date());
+
+  // Grab the timeline and throw it.
+  //
+  // The wheel scrolls vertically and the horizontal scrollbar is a
+  // 4px target at the bottom of a tall pane, so moving through weeks
+  // meant either shift-scrolling or hunting for the bar. Dragging the
+  // surface is what the gesture wants to be.
+  //
+  // Three details make it feel right rather than technically working:
+  // a small threshold before the drag starts, so a click on a bar is
+  // still a click; pointer capture, so leaving the element mid-drag
+  // does not strand it; and momentum on release, because a timeline
+  // that stops dead the instant you let go feels stuck to the finger.
+  useEffect(() => {
+    const node = timelineViewportRef.current;
+    if (!node) return;
+
+    const stopMomentum = () => {
+      if (momentumRef.current !== null) {
+        cancelAnimationFrame(momentumRef.current);
+        momentumRef.current = null;
+      }
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      // Touch already pans natively and does it better; hijacking it
+      // would fight the browser's own scrolling. Middle and right
+      // buttons belong to the OS.
+      if (event.pointerType === "touch" || event.button !== 0) return;
+      // Anything interactive keeps its own click.
+      if ((event.target as HTMLElement).closest("button, a, input, select, textarea, [role='button']")) {
+        return;
+      }
+      stopMomentum();
+      dragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startScrollLeft: node.scrollLeft,
+        lastX: event.clientX,
+        lastT: event.timeStamp,
+        velocity: 0,
+        moved: false,
+      };
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+
+      const dx = event.clientX - drag.startX;
+      // Below the threshold this is still a click, not a drag.
+      if (!drag.moved) {
+        if (Math.abs(dx) < 4) return;
+        drag.moved = true;
+        node.setPointerCapture(event.pointerId);
+        node.style.cursor = "grabbing";
+        node.style.userSelect = "none";
+      }
+
+      node.scrollLeft = drag.startScrollLeft - dx;
+
+      const dt = event.timeStamp - drag.lastT;
+      if (dt > 0) {
+        // Smoothed, so one jittery sample near release does not fling
+        // the view across a month.
+        const instant = (event.clientX - drag.lastX) / dt;
+        drag.velocity = drag.velocity * 0.7 + instant * 0.3;
+        drag.lastX = event.clientX;
+        drag.lastT = event.timeStamp;
+      }
+    };
+
+    const endDrag = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      dragRef.current = null;
+      node.style.cursor = "";
+      node.style.userSelect = "";
+      if (node.hasPointerCapture(event.pointerId)) node.releasePointerCapture(event.pointerId);
+      if (!drag.moved) return;
+
+      // A drag that ends in a click would open whatever bar is under
+      // the cursor. Swallow exactly one click, in the capture phase so
+      // it never reaches the bar's own handler.
+      const swallow = (click: MouseEvent) => {
+        click.stopPropagation();
+        click.preventDefault();
+      };
+      node.addEventListener("click", swallow, { capture: true, once: true });
+      window.setTimeout(() => node.removeEventListener("click", swallow, { capture: true }), 0);
+
+      let velocity = drag.velocity;
+      if (Math.abs(velocity) < 0.05) return;
+
+      const step = () => {
+        velocity *= 0.94;
+        node.scrollLeft -= velocity * 16;
+        if (Math.abs(velocity) < 0.02) {
+          momentumRef.current = null;
+          return;
+        }
+        momentumRef.current = requestAnimationFrame(step);
+      };
+      momentumRef.current = requestAnimationFrame(step);
+    };
+
+    node.addEventListener("pointerdown", onPointerDown);
+    node.addEventListener("pointermove", onPointerMove);
+    node.addEventListener("pointerup", endDrag);
+    node.addEventListener("pointercancel", endDrag);
+    // A fresh drag or a wheel should cut momentum short rather than
+    // compete with it.
+    node.addEventListener("wheel", stopMomentum, { passive: true });
+
+    return () => {
+      stopMomentum();
+      node.removeEventListener("pointerdown", onPointerDown);
+      node.removeEventListener("pointermove", onPointerMove);
+      node.removeEventListener("pointerup", endDrag);
+      node.removeEventListener("pointercancel", endDrag);
+      node.removeEventListener("wheel", stopMomentum);
+    };
+  }, []);
 
   useEffect(() => {
     const node = timelineViewportRef.current;
@@ -1181,7 +1317,7 @@ export function CalendarView({
         ) : (
           <div
             ref={timelineViewportRef}
-            className="max-h-[76vh] overflow-auto rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+            className="max-h-[76vh] cursor-grab overflow-auto rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
           >
             <div style={{ width: tableWidth, minWidth: vehicleColumnWidth + timelineWidth }}>
               <div

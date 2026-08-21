@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Share2, Trash2, X } from "lucide-react";
+import { Lock, Pencil, Save, Share2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { OrderAttachments } from "@/components/order-attachments";
@@ -44,9 +44,13 @@ export type EditableOrder = {
   createdBy?: string | null;
   externalOrderId?: string | null;
   ownerLedgerSyncedAt?: string | null;
-  /** The fee this trip is priced at, which is not necessarily the
-   *  vehicle's current one if it changed after the trip started. */
+  /** The car's cleaning fee as it stands today. This is the value the
+   *  panel edits. */
   cleaningFee?: number | null;
+  /** What THIS trip is charged, which is the fee that was in force on
+   *  the day it started -- a different number whenever the price has
+   *  changed since. Read-only. */
+  cleaningFeeOnTrip?: number | null;
 };
 
 export type OrderEditorVehicleOption = {
@@ -135,6 +139,10 @@ function labels(locale: Locale) {
         externalOrderId: "外部订单号",
         attachments: "照片 / 视频 / 合约文件",
         readOnly: "共享视图只读",
+        lockFields: "结束编辑",
+        unlockFields: "编辑",
+        lockedHint: "字段已锁定,点右上角「编辑」才能修改",
+        editingHint: "编辑中 —— 改完记得保存",
         ownerShare: "车主共享",
         ownerShareHelp: "同步后，这条订单会出现在车主共享日历和车主分成流水账中。",
         ownerShareNotAssigned: "车辆还没有绑定车主，暂时无法同步。",
@@ -152,6 +160,8 @@ function labels(locale: Locale) {
         cleaningFeeFrom: "生效日",
         cleaningFeeHint:
           "洗车费是车辆的价格,不是这一单的属性。保存后,这台车在生效日当天及以后开始的所有订单都按这个金额计费,之前的订单不受影响。",
+        cleaningFeeOnTrip: (amount: string) =>
+          `这一单按 ${amount} 计费 —— 它开始于生效日之前,所以用的是当时的价格。上面的金额是这台车现在的洗车费。`,
       }
     : {
         title: "Order details and edits",
@@ -184,6 +194,10 @@ function labels(locale: Locale) {
         externalOrderId: "External order ID",
         attachments: "Photos / videos / contract files",
         readOnly: "Shared view is read-only",
+        lockFields: "Done editing",
+        unlockFields: "Edit",
+        lockedHint: "Fields are locked — press Edit to change them",
+        editingHint: "Editing — remember to save",
         ownerShare: "Owner share",
         ownerShareHelp: "After sync, this order appears in the owner share calendar and owner ledger.",
         ownerShareNotAssigned: "Assign this vehicle to an owner before syncing.",
@@ -201,6 +215,8 @@ function labels(locale: Locale) {
         cleaningFeeFrom: "From",
         cleaningFeeHint:
           "The cleaning fee is a price on the car, not a property of this order. Saving it charges this amount on every trip that car starts on or after the chosen date. Earlier trips are untouched.",
+        cleaningFeeOnTrip: (amount: string) =>
+          `This trip is charged ${amount} — it started before the date above, so it keeps the price from then. The figure above is the car's fee today.`,
       };
 }
 
@@ -249,6 +265,20 @@ export function OrderDetailModal({
     "grid min-w-0 gap-0.5 rounded-md border border-[rgba(17,19,24,0.1)] bg-white/84 px-3 py-1.5 transition focus-within:border-[rgba(17,19,24,0.28)]";
   const fieldLabelClass =
     "text-[10px] font-medium uppercase tracking-[0.13em] text-[color:var(--ink-soft)]";
+  // Fields are locked until someone asks to edit them.
+  //
+  // This panel opens from a calendar bar and from the orders list, and
+  // the reason to open it is nearly always to read it -- who has the
+  // car, when it comes back, what it earned. Every one of those live
+  // in a text box, so reading meant hovering a cursor over editable
+  // fields on a record that feeds the owner's statement. One stray
+  // keystroke in the price and the ledger follows it.
+  //
+  // `readOnly` stays what it always was: a shared view that can never
+  // edit. `locked` is the everyday state that a button lifts.
+  const [isEditing, setIsEditing] = useState(false);
+  const locked = readOnly || !isEditing;
+
   const inputClass =
     "h-6 w-full min-w-0 max-w-full truncate border-0 bg-transparent p-0 text-[13px] text-[color:var(--ink)] outline-none placeholder:text-[color:var(--ink-soft)]/70";
   // Kept for the SearchableSelect, which draws its own trigger.
@@ -270,7 +300,7 @@ export function OrderDetailModal({
   };
 
   const persistOrder = async () => {
-    if (readOnly || isSaving) return;
+    if (locked || isSaving) return;
 
     const pickupDatetime = parseDateTimeInputParts(draft.pickupDate, draft.pickupTime);
     const returnDatetime = parseDateTimeInputParts(draft.returnDate, draft.returnTime);
@@ -393,7 +423,7 @@ export function OrderDetailModal({
   };
 
   const deleteOrder = async () => {
-    if (readOnly || isDeleting) return;
+    if (locked || isDeleting) return;
     if (!window.confirm(t.deleteConfirm)) return;
 
     setIsDeleting(true);
@@ -444,7 +474,7 @@ export function OrderDetailModal({
                   : currentOrder.vehicleName}
               </h3>
               <p className="mt-1 text-[12px] text-[color:var(--ink-soft)]">
-                {readOnly ? t.readOnly : t.subtitle}
+                {readOnly ? t.readOnly : locked ? t.lockedHint : t.editingHint}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -452,6 +482,36 @@ export function OrderDetailModal({
                   It used to sit inside a status panel below the summary
                   tiles -- the one action on this panel that reaches
                   outside the order, three scrolls from its own heading. */}
+              {!readOnly ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Leaving edit mode throws away anything typed and
+                    // not saved. Reverting to the stored order is the
+                    // honest reading of "stop editing", and it keeps
+                    // the lock from preserving a half-made change that
+                    // the next person would not know was there.
+                    if (isEditing) setDraft(buildDraft(currentOrder));
+                    setIsEditing((value) => !value);
+                    setError(null);
+                  }}
+                  disabled={isSaving || isDeleting}
+                  className={
+                    isEditing
+                      ? "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[var(--ink)] bg-white px-3 text-[12px] font-semibold text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                      : "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-3 text-[12px] font-semibold text-[color:var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.22)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                  }
+                >
+                  {isEditing ? (
+                    <Lock className="h-3.5 w-3.5" aria-hidden />
+                  ) : (
+                    <Pencil className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                  <span className="hidden sm:inline">
+                    {isEditing ? t.lockFields : t.unlockFields}
+                  </span>
+                </button>
+              ) : null}
               {!readOnly ? (
                 <button
                   type="button"
@@ -539,7 +599,7 @@ export function OrderDetailModal({
           <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className={labelClass}>
               <span className={fieldLabelClass}>{t.vehicle}</span>
-              {readOnly ? (
+              {locked ? (
                 <span className={cn(inputClass, "flex items-center")}>
                   {currentOrder.vehiclePlateNumber
                     ? `${currentOrder.vehiclePlateNumber} · ${currentOrder.vehicleName}`
@@ -565,7 +625,7 @@ export function OrderDetailModal({
 
             <label className={labelClass}>
               <span className={fieldLabelClass}>{t.status}</span>
-              {readOnly ? (
+              {locked ? (
                 <span className={cn(inputClass, "flex items-center")}>{getStatusLabel(currentOrder.status, locale)}</span>
               ) : (
                 <SearchableSelect
@@ -585,9 +645,9 @@ export function OrderDetailModal({
             <label className={labelClass}>
               <span className={fieldLabelClass}>{t.renter}</span>
               <input
-                value={readOnly ? currentOrder.renterName : draft.renterName}
+                value={locked ? currentOrder.renterName : draft.renterName}
                 onChange={(event) => updateDraft({ renterName: event.target.value })}
-                readOnly={readOnly}
+                readOnly={locked}
                 className={inputClass}
               />
             </label>
@@ -596,16 +656,16 @@ export function OrderDetailModal({
               <span className={fieldLabelClass}>{t.phone}</span>
               <input
                 type="tel"
-                value={readOnly ? displayPhone : draft.renterPhone}
+                value={locked ? displayPhone : draft.renterPhone}
                 onChange={(event) => updateDraft({ renterPhone: event.target.value })}
-                readOnly={readOnly}
+                readOnly={locked}
                 className={inputClass}
               />
             </label>
 
             <label className={cn(labelClass, "lg:col-span-2")}>
               <span className={fieldLabelClass}>{t.pickupTime}</span>
-              {readOnly ? (
+              {locked ? (
                 <span className={cn(inputClass, "flex items-center")}>
                   {formatDateTime(currentOrder.pickupDatetime, locale)}
                 </span>
@@ -636,7 +696,7 @@ export function OrderDetailModal({
 
             <label className={cn(labelClass, "lg:col-span-2")}>
               <span className={fieldLabelClass}>{t.returnTime}</span>
-              {readOnly ? (
+              {locked ? (
                 <span className={cn(inputClass, "flex items-center")}>
                   {formatDateTime(currentOrder.returnDatetime, locale)}
                 </span>
@@ -670,9 +730,9 @@ export function OrderDetailModal({
             <label className={labelClass}>
               <span className={fieldLabelClass}>{t.pickupLocation}</span>
               <input
-                value={readOnly ? currentOrder.pickupLocation ?? "" : draft.pickupLocation}
+                value={locked ? currentOrder.pickupLocation ?? "" : draft.pickupLocation}
                 onChange={(event) => updateDraft({ pickupLocation: event.target.value })}
-                readOnly={readOnly}
+                readOnly={locked}
                 className={inputClass}
               />
             </label>
@@ -680,9 +740,9 @@ export function OrderDetailModal({
             <label className={labelClass}>
               <span className={fieldLabelClass}>{t.returnLocation}</span>
               <input
-                value={readOnly ? currentOrder.returnLocation ?? "" : draft.returnLocation}
+                value={locked ? currentOrder.returnLocation ?? "" : draft.returnLocation}
                 onChange={(event) => updateDraft({ returnLocation: event.target.value })}
-                readOnly={readOnly}
+                readOnly={locked}
                 className={inputClass}
               />
             </label>
@@ -708,10 +768,10 @@ export function OrderDetailModal({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={readOnly ? formatCurrencyInputValue(currentOrder.totalPrice) : draft.totalPrice}
+                  value={locked ? formatCurrencyInputValue(currentOrder.totalPrice) : draft.totalPrice}
                   onChange={(event) => updateDraft({ totalPrice: event.target.value })}
                   onBlur={(event) => updateDraft({ totalPrice: formatCurrencyInputText(event.target.value) })}
-                  readOnly={readOnly}
+                  readOnly={locked}
                   className={inputClass}
                 />
               </label>
@@ -722,10 +782,10 @@ export function OrderDetailModal({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={readOnly ? formatCurrencyInputValue(currentOrder.depositAmount) : draft.depositAmount}
+                  value={locked ? formatCurrencyInputValue(currentOrder.depositAmount) : draft.depositAmount}
                   onChange={(event) => updateDraft({ depositAmount: event.target.value })}
                   onBlur={(event) => updateDraft({ depositAmount: formatCurrencyInputText(event.target.value) })}
-                  readOnly={readOnly}
+                  readOnly={locked}
                   className={inputClass}
                 />
               </label>
@@ -733,9 +793,9 @@ export function OrderDetailModal({
               <label className={labelClass}>
                 <span className={fieldLabelClass}>{t.paymentMethod}</span>
                 <input
-                  value={readOnly ? currentOrder.paymentMethod ?? "" : draft.paymentMethod}
+                  value={locked ? currentOrder.paymentMethod ?? "" : draft.paymentMethod}
                   onChange={(event) => updateDraft({ paymentMethod: event.target.value })}
-                  readOnly={readOnly}
+                  readOnly={locked}
                   className={inputClass}
                 />
               </label>
@@ -743,9 +803,9 @@ export function OrderDetailModal({
               <label className={labelClass}>
                 <span className={fieldLabelClass}>{t.contractNumber}</span>
                 <input
-                  value={readOnly ? currentOrder.contractNumber ?? "" : draft.contractNumber}
+                  value={locked ? currentOrder.contractNumber ?? "" : draft.contractNumber}
                   onChange={(event) => updateDraft({ contractNumber: event.target.value })}
-                  readOnly={readOnly}
+                  readOnly={locked}
                   className={inputClass}
                 />
               </label>
@@ -754,9 +814,9 @@ export function OrderDetailModal({
                 <span className={fieldLabelClass}>{t.cleaningFee}</span>
                 <div className="grid min-w-0 grid-cols-[minmax(0,7rem)_auto_minmax(0,1fr)] items-center gap-2">
                   <input
-                    value={readOnly ? formatCurrencyInputValue(currentOrder.cleaningFee) : draft.cleaningFee}
+                    value={locked ? formatCurrencyInputValue(currentOrder.cleaningFee) : draft.cleaningFee}
                     onChange={(event) => updateDraft({ cleaningFee: event.target.value })}
-                    readOnly={readOnly}
+                    readOnly={locked}
                     type="number"
                     step="0.01"
                     min="0"
@@ -767,12 +827,16 @@ export function OrderDetailModal({
                     <span className="shrink-0 text-[10px] uppercase tracking-[0.13em] text-[color:var(--ink-soft)]">
                       {t.cleaningFeeFrom}
                     </span>
+                    {/* `readOnly` is not honoured on a date input --
+                        the calendar picker still writes to it -- so the
+                        lock has to be `disabled` here to mean anything. */}
                     <input
                       value={draft.cleaningFeeFrom}
                       onChange={(event) => updateDraft({ cleaningFeeFrom: event.target.value })}
-                      readOnly={readOnly}
+                      readOnly={locked}
+                      disabled={locked}
                       type="date"
-                      className={inputClass}
+                      className={cn(inputClass, "disabled:opacity-60")}
                     />
                   </span>
                 </div>
@@ -781,15 +845,26 @@ export function OrderDetailModal({
             <p className="mt-2 text-[11px] leading-4 text-[color:var(--ink-soft)]">
               {t.cleaningFeeHint}
             </p>
+            {/* What this particular trip is charged, when that is not
+                the car's current fee. Without it, editing an old trip
+                looks like the fee failed to save -- the box holds the
+                car's price and the statement holds the trip's. */}
+            {currentOrder.cleaningFeeOnTrip != null &&
+            Math.abs((currentOrder.cleaningFeeOnTrip ?? 0) - (currentOrder.cleaningFee ?? 0)) >=
+              0.005 ? (
+              <p className="mt-1 text-[11px] leading-4 text-amber-700">
+                {t.cleaningFeeOnTrip(formatCurrency(currentOrder.cleaningFeeOnTrip, locale))}
+              </p>
+            ) : null}
           </div>
 
           <div className="mt-4 grid min-w-0 gap-2">
             <label className={cn(labelClass)}>
               <span className={fieldLabelClass}>{t.notes}</span>
               <textarea
-                value={readOnly ? currentOrder.notes ?? "" : draft.notes}
+                value={locked ? currentOrder.notes ?? "" : draft.notes}
                 onChange={(event) => updateDraft({ notes: event.target.value })}
-                readOnly={readOnly}
+                readOnly={locked}
                 rows={4}
                 className="w-full min-w-0 max-w-full rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 py-2.5 text-[13px] text-[color:var(--ink)] outline-none focus:border-[rgba(17,19,24,0.22)]"
               />
@@ -825,7 +900,10 @@ export function OrderDetailModal({
             </p>
           ) : null}
 
-          {!readOnly ? (
+          {/* Delete and Save appear only once the panel is unlocked.
+              A destructive button sitting under a record you opened to
+              read is an invitation to a mistake. */}
+          {!readOnly && !locked ? (
             <div className="mt-4 flex flex-col gap-2 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"

@@ -14,6 +14,15 @@ export const guestMessagesMessages = {
       tripNone: "No trip matched",
       tripNoneCopy:
         "Turo does not put a reservation number in message notifications, so this is matched on guest name, car and date. An ambiguous match is left unmatched on purpose — the wrong trip is worse than none.",
+      // Why, specifically. Each of these wants a different action, so
+      // they are worth telling apart.
+      tripWhyNoVehicleText: "The subject named no car, so there was nothing to match a trip on.",
+      tripWhyNoSuchVehicle: (vehicle: string) =>
+        `The email is about a ${vehicle}, and no car in your fleet answers to that. Add the vehicle and this thread files itself on the next sync.`,
+      tripWhySeveralVehicles: (vehicle: string, count: number) =>
+        `${count} cars in your fleet are a ${vehicle}, and the email names no plate. Set a plate override for the reservation to pin it.`,
+      tripWhyNoTripInWindow: (vehicle: string) =>
+        `The ${vehicle} is in your fleet, but no booking for this guest on that car falls near these messages.`,
       tripDates: "Dates",
       tripVehicle: "Vehicle",
       tripStatus: "Status",
@@ -71,6 +80,13 @@ export const guestMessagesMessages = {
       tripNone: "未匹配到订单",
       tripNoneCopy:
         "Turo 的消息通知里不带预订号,所以这里靠客人名、车辆和时间匹配。匹配不唯一时会**故意**留空——挂错订单比不挂更糟。",
+      tripWhyNoVehicleText: "邮件标题里没有车辆信息,所以没有可以用来匹配订单的线索。",
+      tripWhyNoSuchVehicle: (vehicle: string) =>
+        `这封邮件说的车是 ${vehicle},但车队里没有这台车。把车辆加进来,下次同步时这个会话就会自动挂上订单。`,
+      tripWhySeveralVehicles: (vehicle: string, count: number) =>
+        `车队里有 ${count} 台 ${vehicle},而邮件里没有车牌号。给这个订单设置车牌覆盖就能指定到具体哪一台。`,
+      tripWhyNoTripInWindow: (vehicle: string) =>
+        `${vehicle} 在车队里,但这段时间附近没有这位客人在这台车上的订单。`,
       tripDates: "时间",
       tripVehicle: "车辆",
       tripStatus: "状态",

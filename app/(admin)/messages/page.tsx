@@ -4,7 +4,28 @@ import { groupIntoThreads } from "@/lib/guest-threads";
 import { getI18n } from "@/lib/i18n-server";
 import { isKimiConfigured } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
+import { classifyTuroSubject } from "@/lib/turo-subjects";
+import { matchVehicles } from "@/lib/turo-message-match";
 import { getNetEarningFromFinancials } from "@/lib/utils";
+
+/**
+ * Why a message could not be filed against a trip.
+ *
+ * A guest notification carries no reservation id, so the trip is found
+ * by name plus the car named in the subject. When that fails the page
+ * used to say only "no trip matched", which is true and useless: the
+ * operator cannot tell a car missing from the fleet from two cars of
+ * the same model, and those want opposite actions -- add the vehicle,
+ * or set a plate override.
+ *
+ * `noVehicleText` is the third case and a different problem again: the
+ * subject named no car at all, so there was nothing to match on.
+ */
+type UnmatchedReason =
+  | { kind: "noVehicleText" }
+  | { kind: "noSuchVehicle"; vehicleText: string }
+  | { kind: "severalVehicles"; vehicleText: string; count: number }
+  | { kind: "noTripInWindow"; vehicleText: string };
 
 /**
  * Guest messages.
@@ -20,6 +41,39 @@ export default async function GuestMessagesPage() {
     getI18n(),
     requireCurrentAdminContext(),
   ]);
+
+  // Needed to explain a thread with no trip. The system already knows
+  // why it could not file one -- the subject named a car, and either
+  // no vehicle in the fleet answers to it or several do -- and until
+  // now that reason was computed during sync and thrown away into a
+  // log line, leaving the page saying only "no trip matched".
+  const fleet = await prisma.vehicle.findMany({
+    where: { workspaceId: workspace.id },
+    select: {
+      id: true,
+      brand: true,
+      model: true,
+      year: true,
+      nickname: true,
+      turoListingName: true,
+      turoAccount: true,
+    },
+  });
+
+  function explainUnmatched(subject: string): UnmatchedReason | null {
+    const parsed = classifyTuroSubject(subject);
+    const vehicleText = parsed?.vehicleText?.trim();
+    if (!vehicleText) return { kind: "noVehicleText" };
+
+    const matches = matchVehicles(vehicleText, fleet, parsed?.coHostAccount ?? null);
+    if (matches.length === 0) return { kind: "noSuchVehicle", vehicleText };
+    if (matches.length > 1) {
+      return { kind: "severalVehicles", vehicleText, count: matches.length };
+    }
+    // The car is known and unique, so the miss is on the trip side --
+    // no booking for this guest on this car within the window.
+    return { kind: "noTripInWindow", vehicleText };
+  }
 
   const emails = await prisma.inboundEmail.findMany({
     where: {
@@ -227,6 +281,11 @@ export default async function GuestMessagesPage() {
         )}
         threads={threads.map((thread) => ({
           ...thread,
+          // Why there is no trip, when there is no trip. Recomputed
+          // rather than stored: it is pure string work over the
+          // subject we already have, and a vehicle added to the fleet
+          // tomorrow should change the answer without a migration.
+          unmatchedReason: thread.orderId ? null : explainUnmatched(thread.messages[0]?.subject ?? ""),
           openCount: answeredThreads.has(thread.key) ? 0 : thread.openCount,
           latestAt: thread.latestAt.toISOString(),
           messages: thread.messages.map((message) => ({

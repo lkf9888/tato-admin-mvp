@@ -32,6 +32,14 @@ type Thread = {
   latestAt: string;
   openCount: number;
   orderId: string | null;
+  /** Present only when there is no trip: what specifically stopped the
+   *  match, so the operator knows which fix applies. */
+  unmatchedReason?:
+    | { kind: "noVehicleText" }
+    | { kind: "noSuchVehicle"; vehicleText: string }
+    | { kind: "severalVehicles"; vehicleText: string; count: number }
+    | { kind: "noTripInWindow"; vehicleText: string }
+    | null;
   turoLink: string | null;
 };
 
@@ -532,7 +540,29 @@ export function GuestMessagesView({
                 </Link>
               </>
             ) : (
-              <p className="mt-1 text-[11.5px] leading-5 text-[var(--ink-soft)]">{t.tripNoneCopy}</p>
+              <>
+                <p className="mt-1 text-[11.5px] leading-5 text-[var(--ink-soft)]">
+                  {t.tripNoneCopy}
+                </p>
+                {/* The general rule above, then what happened here.
+                    Without the second line the operator cannot tell a
+                    car missing from the fleet from two cars of the same
+                    model, and those want opposite fixes. */}
+                {selected.unmatchedReason ? (
+                  <p className="mt-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[11.5px] leading-5 text-[var(--ink)]">
+                    {selected.unmatchedReason.kind === "noVehicleText"
+                      ? t.tripWhyNoVehicleText
+                      : selected.unmatchedReason.kind === "noSuchVehicle"
+                        ? t.tripWhyNoSuchVehicle(selected.unmatchedReason.vehicleText)
+                        : selected.unmatchedReason.kind === "severalVehicles"
+                          ? t.tripWhySeveralVehicles(
+                              selected.unmatchedReason.vehicleText,
+                              selected.unmatchedReason.count,
+                            )
+                          : t.tripWhyNoTripInWindow(selected.unmatchedReason.vehicleText)}
+                  </p>
+                ) : null}
+              </>
             )}
           </div>
           </div>

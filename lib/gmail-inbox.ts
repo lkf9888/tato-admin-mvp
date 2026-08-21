@@ -9,6 +9,7 @@ import { kimiExtractJson, isKimiConfigured,
   getExtractionModel,
 } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
+import { applyTuroEmailsToOrders, type ApplyOutcome } from "@/lib/turo-email-apply";
 import {
   classifyTuroSubject,
   extractGuestAvatar,
@@ -260,6 +261,8 @@ export type GmailSyncResult = {
   parseFailed: number;
   /** Historical rows healed by the subject classifier this run. */
   reclassified: number;
+  /** What the booking mail did to orders on this run. */
+  orders?: ApplyOutcome;
   /** Messages still waiting for a summary after this run's budget ran
    *  out. Drains over subsequent runs; non-zero is normal after a
    *  burst, persistently large means the schedule is too slow. */
@@ -397,11 +400,6 @@ export async function runGmailSync(input: {
     enrichErrors: [],
   };
 
-  // Heal history before fetching anything new. Rows imported while the
-  // model was failing all landed as OTHER, which made the guest-message
-  // alert detector -- it selects on kind -- report an empty fleet while
-  // guests were waiting. The classifier needs no network and no model,
-  // so this is a cheap pass that runs even when there is no new mail.
   // Loaded once and reused for every message: the fleet is ~100 rows
   // and does not change during a sync.
   const fleet = await prisma.vehicle.findMany({
@@ -417,8 +415,6 @@ export async function runGmailSync(input: {
     },
   });
 
-  result.reclassified = await reclassifyBySubject(input.workspaceId, fleet);
-
   if (mode !== "enrich") {
     await ingestMailbox({
       workspaceId: input.workspaceId,
@@ -429,6 +425,35 @@ export async function runGmailSync(input: {
       result,
     });
   }
+
+  // Order of these three is the whole point, and it used to be wrong.
+  //
+  // A guest message is attributed to a trip at the moment it is
+  // ingested, by looking for an order whose renter and dates fit. So
+  // the order has to exist by then. Booking mail creates orders --
+  // but that step ran in the API route, after this function had
+  // already returned, while re-attribution ran *before* ingestion.
+  //
+  // For mail that arrives together, which is exactly what happens
+  // when someone books and then immediately writes to ask about
+  // pickup, that sequence never resolved: the booking became an order
+  // only after the message had already been filed as "no trip", and
+  // the message was not looked at again until the next run.
+  //
+  // Now it reads: file the new mail, turn booking mail into orders,
+  // then heal anything still unattributed. A booking and a message in
+  // the same batch resolve in the same run.
+  result.orders = await applyTuroEmailsToOrders({
+    workspaceId: input.workspaceId,
+    apply: true,
+    actor: "turo-email-sync",
+  });
+
+  // Rows imported while the model was failing all landed as OTHER,
+  // which made the guest-message alert detector -- it selects on kind
+  // -- report an empty fleet while guests were waiting. Needs no
+  // network and no model, so it runs even when no new mail arrived.
+  result.reclassified = await reclassifyBySubject(input.workspaceId, fleet);
 
   if (mode !== "ingest") {
     await enrichPendingEmails(

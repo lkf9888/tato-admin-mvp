@@ -9,7 +9,6 @@ import {
   summarizeGmailSyncResult,
 } from "@/lib/gmail-inbox";
 import { logActivity } from "@/lib/orders";
-import { applyTuroEmailsToOrders } from "@/lib/turo-email-apply";
 import { resolveTuroSyncWorkspace } from "@/lib/turo-sync";
 
 export const runtime = "nodejs";
@@ -110,24 +109,14 @@ export async function POST(request: Request) {
       mode,
     });
 
-    // Turn the mail into bookings. Runs on every sync, over the whole
-    // archive rather than just what arrived: the fold is pure string
-    // work over rows we already have, and re-deriving the full picture
-    // each time is what makes it self-healing. A run that changes
-    // nothing is the normal outcome -- verified idempotent against
-    // production, where the second pass reported 0 created, 0 updated,
-    // 140 unchanged.
-    //
-    // Ordering matters. This has to follow ingestion, so mail that
-    // arrived in this same run is included, and it deliberately does
-    // not wait on the model: attribution and order-writing are regex
-    // over labelled fields, and neither should be held up by a
-    // summary that is only there to be read by a person.
-    const orders = await applyTuroEmailsToOrders({
-      workspaceId: context.workspaceId,
-      apply: true,
-      actor: "turo-email-sync",
-    });
+    // Turning mail into bookings now happens inside `runGmailSync`,
+    // between ingestion and re-attribution, because a guest message is
+    // matched to its trip at ingest and therefore needs the order to
+    // already exist. Doing it out here meant a booking and a message
+    // arriving together could not resolve in the same run -- and the
+    // IMAP push path, which never called this route at all, created no
+    // orders whatsoever.
+    const orders = result.orders;
 
     // Only log when something actually happened. A poll that finds
     // nothing new is the common case and would otherwise bury the
@@ -145,7 +134,7 @@ export async function POST(request: Request) {
 
     // eslint-disable-next-line no-console
     console.log(
-      `[gmail-sync] ${summarizeGmailSyncResult(result)} ordersCreated=${orders.created} ordersUpdated=${orders.updated} skippedCompleted=${orders.skippedCompleted} ambiguousVehicle=${orders.ambiguousVehicle.length}`,
+      `[gmail-sync] ${summarizeGmailSyncResult(result)} ordersCreated=${orders?.created ?? 0} ordersUpdated=${orders?.updated ?? 0} skippedCompleted=${orders?.skippedCompleted ?? 0} ambiguousVehicle=${orders?.ambiguousVehicle.length ?? 0}`,
     );
     return NextResponse.json({ ...result, orders });
   } catch (error) {

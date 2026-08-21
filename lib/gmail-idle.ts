@@ -78,11 +78,23 @@ async function ingestNow(reason: string) {
   syncing = true;
   try {
     const workspace = await resolveTuroSyncWorkspace();
+    // `ingest` skips only the model passes -- reading the mailbox,
+    // writing orders from booking mail and re-attributing messages all
+    // run here. That matters: this is the path that fires seconds
+    // after mail arrives, and for a while it was the only path most
+    // mail took, while order-writing lived in the API route that the
+    // cron calls. Booking mail delivered by push became an email and
+    // never an order, so a guest writing right after booking had their
+    // message filed against a trip that did not exist yet.
     const result = await runGmailSync({ workspaceId: workspace.id, mode: "ingest" });
     if (result.imported > 0) {
       status.lastImportAt = new Date().toISOString();
       // eslint-disable-next-line no-console
-      console.log(`[gmail-idle] ${reason} :: imported=${result.imported}`);
+      console.log(
+        `[gmail-idle] ${reason} :: imported=${result.imported}` +
+          ` ordersCreated=${result.orders?.created ?? 0}` +
+          ` reattributed=${result.reclassified}`,
+      );
     }
   } catch (error) {
     // eslint-disable-next-line no-console

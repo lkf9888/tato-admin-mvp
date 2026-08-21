@@ -78,6 +78,16 @@ const ownerSchema = z.object({
   notes: z.string().optional(),
 });
 
+/** Prisma's "that plate is already on file", without importing its
+ *  error classes into every caller. */
+function isUniquePlateError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; meta?: { target?: unknown } };
+  if (candidate.code !== "P2002") return false;
+  const target = candidate.meta?.target;
+  return Array.isArray(target) ? target.includes("plateNumber") : target === "plateNumber";
+}
+
 const ownerCommissionSchema = z.object({
   // Typed as a percentage because that is how the agreement is written.
   // Stored as a fraction, converted once at the boundary.
@@ -1235,17 +1245,55 @@ export async function saveVehicleAction(formData: FormData) {
       })
     : null;
 
-  const vehicle = existingVehicle
-    ? await prisma.vehicle.update({
-        where: { id: existingVehicle.id },
-        data: normalizedVehicleData,
-      })
-    : await prisma.vehicle.create({
-        data: {
-          ...normalizedVehicleData,
-          workspaceId: workspace.id,
-        },
-      });
+  // A plate is globally unique, across every workspace, and this path
+  // did not handle the collision at all -- Prisma threw P2002, the
+  // server action 500'd, and the operator got an error page with a
+  // digest and no idea that the cause was a plate already on file.
+  //
+  // It is easy to hit without realising: the plate is folded to Latin
+  // now, so pasting A661GL with Turo's Cyrillic A lands on exactly the
+  // string an earlier import already created. Which is correct -- it
+  // IS the same car -- but "you already have this car" is a sentence,
+  // not a crash.
+  let vehicle: Awaited<ReturnType<typeof prisma.vehicle.create>> | null = null;
+  let conflictPlate: string | null = null;
+  let conflictIsElsewhere = false;
+
+  try {
+    vehicle = existingVehicle
+      ? await prisma.vehicle.update({
+          where: { id: existingVehicle.id },
+          data: normalizedVehicleData,
+        })
+      : await prisma.vehicle.create({
+          data: {
+            ...normalizedVehicleData,
+            workspaceId: workspace.id,
+          },
+        });
+  } catch (error) {
+    if (!isUniquePlateError(error)) throw error;
+
+    // Look it up globally on purpose. A plate held by another
+    // workspace is invisible in this fleet list, which is the case
+    // that looks most like a bug from the inside -- the car is not
+    // there and cannot be added.
+    const holder = await prisma.vehicle.findUnique({
+      where: { plateNumber: normalizedVehicleData.plateNumber },
+      select: { workspaceId: true, plateNumber: true, nickname: true },
+    });
+    conflictPlate = holder?.plateNumber ?? normalizedVehicleData.plateNumber;
+    conflictIsElsewhere = Boolean(holder && holder.workspaceId !== workspace.id);
+  }
+
+  // Redirects throw, so this sits outside the catch above rather than
+  // being swallowed by it.
+  if (!vehicle) {
+    redirect(
+      `/vehicles?error=${conflictIsElsewhere ? "plate_taken_elsewhere" : "plate_taken"}` +
+        `&plate=${encodeURIComponent(conflictPlate ?? "")}`,
+    );
+  }
 
   await syncVehicleOwnerLedger(vehicle.id);
 

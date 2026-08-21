@@ -12,7 +12,7 @@ import { foldLatinLookalikes } from "@/lib/utils";
 export default async function VehiclesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; q?: string }>;
+  searchParams: Promise<{ error?: string; q?: string; plate?: string }>;
 }) {
   const workspace = await requireCurrentWorkspace();
   const [{ locale, messages }, vehicles, owners, params] = await Promise.all([
@@ -95,9 +95,18 @@ export default async function VehiclesPage({
 
   return (
     <div className="space-y-2.5">
+      {/* One banner, three reasons. A duplicate plate used to crash the
+          request outright, so the operator saw an error digest and no
+          hint that the cause was a car already on file -- and when the
+          holder is another workspace, the car is invisible here, which
+          looks exactly like the plate being free. */}
       {params.error ? (
-        <div className="rounded-lg bg-amber-50 px-4 py-3 text-[12px] text-amber-700">
-          {vehicleMessages.deleteError}
+        <div className="rounded-lg bg-amber-50 px-4 py-3 text-[12px] leading-5 text-amber-700">
+          {params.error === "plate_taken"
+            ? vehicleMessages.plateTaken(params.plate ?? "")
+            : params.error === "plate_taken_elsewhere"
+              ? vehicleMessages.plateTakenElsewhere(params.plate ?? "")
+              : vehicleMessages.deleteError}
         </div>
       ) : null}
 

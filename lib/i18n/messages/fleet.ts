@@ -7,6 +7,10 @@ export const fleetMessages = {
   en: {
     vehicles: {
       deleteError: "Vehicle records are preserved for data safety. Use inactive status to remove a vehicle from active operations.",
+      plateTaken: (plate: string) =>
+        `${plate} is already in your fleet — search for it above rather than adding it again. If you cannot see it, the plate may be stored under a slightly different spelling; the search folds look-alike letters, so try the plate exactly as Turo writes it.`,
+      plateTakenElsewhere: (plate: string) =>
+        `${plate} is registered to another workspace. Plate numbers are unique across all of TATO, so this one cannot be added here until it is released there.`,
       createKicker: "Create vehicle",
       placeholders: {
         plateNumber: "Plate number",
@@ -107,6 +111,10 @@ export const fleetMessages = {
   zh: {
     vehicles: {
       deleteError: "为保护车辆数据，系统会保留车辆记录。需要退出运营时请停用车辆。",
+      plateTaken: (plate: string) =>
+        `${plate} 已经在你的车队里了 —— 用上面的搜索找它,不用重复添加。如果搜不到,可能是存的写法略有不同;搜索会自动折叠同形字母,试试按 Turo 上的原样输入车牌。`,
+      plateTakenElsewhere: (plate: string) =>
+        `${plate} 已被另一个工作区占用。车牌号在整个 TATO 里是唯一的,那边释放之前这里无法添加。`,
       createKicker: "新增车辆",
       placeholders: {
         plateNumber: "车牌号",

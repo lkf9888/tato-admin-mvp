@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  OwnerCommissionPanel,
+  type CommissionRuleRow,
+} from "@/components/owner-commission-panel";
 import type { Locale } from "@/lib/i18n";
 
 type Owner = {
@@ -120,11 +124,13 @@ export function OwnerEditor({
   owner,
   assignedVehicleIds,
   allVehicles,
+  commissionRules,
   locale,
 }: {
   owner: Owner;
   assignedVehicleIds: string[];
   allVehicles: VehicleRow[];
+  commissionRules: CommissionRuleRow[];
   locale: Locale;
 }) {
   const labels = copy(locale);
@@ -288,6 +294,11 @@ export function OwnerEditor({
           </button>
         </div>
       </section>
+
+      {/* Directly after the profile, and before the share link: the
+          terms are the thing an owner and the operator argue about,
+          and the share link publishes a statement computed from them. */}
+      <OwnerCommissionPanel locale={locale} ownerId={owner.id} rules={commissionRules} />
 
       <section className="card space-y-3 p-6">
         <h2 className="text-lg font-semibold">{labels.sections.share}</h2>

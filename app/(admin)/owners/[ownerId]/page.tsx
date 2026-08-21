@@ -4,6 +4,7 @@ import { OwnerEditor } from "@/app/(admin)/owners/[ownerId]/owner-editor";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import { getOwnerCommissionRules, pickCommissionRule } from "@/lib/owner-commission";
 
 type Params = Promise<{ ownerId: string }>;
 
@@ -38,6 +39,11 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
   });
   if (!owner) notFound();
 
+  // Newest start date first, which is also the order the panel shows
+  // them in -- most recent terms at the top, history beneath.
+  const commissionRules = await getOwnerCommissionRules(owner.id);
+  const currentRule = pickCommissionRule(commissionRules, new Date());
+
   const allVehicles = await prisma.vehicle.findMany({
     where: { workspaceId: workspace.id },
     orderBy: [{ plateNumber: "asc" }, { nickname: "asc" }],
@@ -68,6 +74,16 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
         notes: owner.notes,
         shareToken: owner.shareLinks[0]?.token ?? null,
       }}
+      commissionRules={commissionRules.map((rule) => ({
+        id: rule.id,
+        // Stored as a fraction, read as a percentage. Rounded to one
+        // decimal so 0.175 does not surface as 17.499999999999998.
+        ratePercent: Math.round(rule.rate * 1000) / 10,
+        settlement: rule.settlement,
+        effectiveFrom: rule.effectiveFrom.toISOString(),
+        note: rule.note,
+        isCurrent: rule.id === currentRule?.id,
+      }))}
       assignedVehicleIds={owner.vehicles.map((vehicle) => vehicle.id)}
       allVehicles={allVehicles.map((vehicle) => ({
         id: vehicle.id,

@@ -1,4 +1,9 @@
-import { OwnerLedgerKind, OrderStatus, type Prisma } from "@prisma/client";
+import {
+  OwnerLedgerKind,
+  OwnerSettlementDirection,
+  OrderStatus,
+  type Prisma,
+} from "@prisma/client";
 
 import {
   getManagerRetention,
@@ -7,6 +12,7 @@ import {
   type LedgerShareCategory,
 } from "@/lib/ledger-policy";
 import { prisma } from "@/lib/prisma";
+import { resolveCommission } from "@/lib/owner-commission";
 import { getOrderNetEarning } from "@/lib/utils";
 
 type Tx = typeof prisma | Prisma.TransactionClient;
@@ -16,6 +22,10 @@ const AUTO_KINDS = [
   OwnerLedgerKind.MANAGER_COMMISSION,
   OwnerLedgerKind.CLEANING_FEE,
   OwnerLedgerKind.EXPENSE_REIMBURSEMENT,
+  // Derived from the order like the rest, so it must be replaceable by
+  // a resync. Left out, switching an owner back to company-collects
+  // would leave the offsetting line behind and halve their statement.
+  OwnerLedgerKind.DIRECT_TO_OWNER,
 ] as const;
 
 const RETENTION_CATEGORY_LABELS: Record<LedgerShareCategory, string> = {
@@ -88,7 +98,20 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
   );
   const retainedAmount = roundLedgerAmount(Math.min(retention.total, Math.max(0, netEarning ?? 0)));
 
-  const commissionRate = order.vehicle.ownerCommissionRate ?? 0;
+  // Terms as of the day the trip started, not as of today. A rate
+  // renegotiated in March must not reprice a trip that ran in January
+  // and was already settled at the old one.
+  const commissionRules = await db.ownerCommissionRule.findMany({
+    where: { ownerId: order.vehicle.ownerId },
+    orderBy: { effectiveFrom: "desc" },
+    select: { id: true, rate: true, settlement: true, effectiveFrom: true },
+  });
+  const terms = resolveCommission(
+    commissionRules,
+    order.pickupDatetime,
+    order.vehicle.ownerCommissionRate,
+  );
+  const commissionRate = terms.rate;
   // Commission is charged on what actually reaches the owner. Charging
   // it on the full `Total earnings` while also retaining part of that
   // total would take the same money twice.
@@ -127,6 +150,24 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
       amount: -retainedAmount,
       occurredAt: order.pickupDatetime,
       note: `Retained by TATO · ${detail} · ${order.renterName} · ${vehicleLabel}`,
+    });
+  }
+
+  // When the guest paid the owner directly, we never held this money,
+  // so crediting it and stopping there would say we owe it. The
+  // revenue line stays -- the commission is a percentage of it and the
+  // owner has to be able to check the arithmetic -- and this cancels
+  // it, leaving the commission as the only real balance.
+  if (
+    terms.settlement === OwnerSettlementDirection.OWNER_COLLECTS &&
+    netEarning != null &&
+    Math.abs(netEarning) >= 0.005
+  ) {
+    desired.push({
+      kind: OwnerLedgerKind.DIRECT_TO_OWNER,
+      amount: -+netEarning.toFixed(2),
+      occurredAt: order.pickupDatetime,
+      note: `Collected directly by owner · ${order.renterName} · ${vehicleLabel}`,
     });
   }
 
@@ -234,6 +275,7 @@ export function ownerLedgerKindLabel(kind: OwnerLedgerKind, locale: "en" | "zh")
       EXPENSE_REIMBURSEMENT: "Expense reimbursement",
       MANUAL_ADJUSTMENT: "Manual adjustment",
       SETTLEMENT_PAYMENT: "Settlement payment",
+      DIRECT_TO_OWNER: "Collected directly by owner",
     },
     zh: {
       OWNER_NET_EARNING: "车主净收益",
@@ -242,6 +284,7 @@ export function ownerLedgerKindLabel(kind: OwnerLedgerKind, locale: "en" | "zh")
       EXPENSE_REIMBURSEMENT: "费用报销",
       MANUAL_ADJUSTMENT: "手动调整",
       SETTLEMENT_PAYMENT: "结算付款",
+      DIRECT_TO_OWNER: "租金已由车主直接收取",
     },
   } as const;
 

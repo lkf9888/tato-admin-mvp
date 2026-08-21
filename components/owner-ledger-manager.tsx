@@ -15,6 +15,7 @@ const OwnerLedgerKind = {
   EXPENSE_REIMBURSEMENT: "EXPENSE_REIMBURSEMENT",
   MANUAL_ADJUSTMENT: "MANUAL_ADJUSTMENT",
   SETTLEMENT_PAYMENT: "SETTLEMENT_PAYMENT",
+  DIRECT_TO_OWNER: "DIRECT_TO_OWNER",
 } as const;
 
 type OwnerLedgerKind = (typeof OwnerLedgerKind)[keyof typeof OwnerLedgerKind];
@@ -124,6 +125,7 @@ function copy(locale: Locale) {
         kindLabels: {
           OWNER_NET_EARNING: "车主净收益",
           MANAGER_COMMISSION: "TATO 佣金",
+          DIRECT_TO_OWNER: "租金已由车主直接收取",
           CLEANING_FEE: "洗车费",
           EXPENSE_REIMBURSEMENT: "报销",
           MANUAL_ADJUSTMENT: "手动调整",
@@ -181,6 +183,7 @@ function copy(locale: Locale) {
         kindLabels: {
           OWNER_NET_EARNING: "Owner net earning",
           MANAGER_COMMISSION: "TATO commission",
+          DIRECT_TO_OWNER: "Collected directly by owner",
           CLEANING_FEE: "Cleaning fee",
           EXPENSE_REIMBURSEMENT: "Reimbursement",
           MANUAL_ADJUSTMENT: "Adjustment",

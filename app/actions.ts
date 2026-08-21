@@ -2,7 +2,13 @@
 
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
-import { OrderStatus, OrderSource, ShareVisibility, VehicleStatus } from "@prisma/client";
+import {
+  OrderStatus,
+  OrderSource,
+  OwnerSettlementDirection,
+  ShareVisibility,
+  VehicleStatus,
+} from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -24,6 +30,7 @@ import {
 import { getLocale } from "@/lib/i18n-server";
 import {
   syncOrderOwnerLedger,
+  syncOwnerLedger,
   syncVehicleOwnerLedger,
 } from "@/lib/owner-ledger";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
@@ -69,6 +76,15 @@ const ownerSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   companyName: z.string().optional(),
   notes: z.string().optional(),
+});
+
+const ownerCommissionSchema = z.object({
+  // Typed as a percentage because that is how the agreement is written.
+  // Stored as a fraction, converted once at the boundary.
+  ratePercent: z.coerce.number().min(0).max(100),
+  settlement: z.nativeEnum(OwnerSettlementDirection),
+  effectiveFrom: z.string().min(8),
+  note: z.string().optional(),
 });
 
 const vehicleSchema = z.object({
@@ -835,6 +851,110 @@ export async function saveOwnerAction(formData: FormData) {
     entityType: "Owner",
     entityId: owner.id,
     metadata: { name: owner.name },
+  });
+
+  revalidateAdminPages();
+}
+
+/**
+ * Save or replace one owner's commission terms from a given date.
+ *
+ * Terms are a history, not a field: the rule that applies to a trip is
+ * the one in force on the day the trip started, so raising a rate in
+ * March leaves January's settled statements exactly as they were. That
+ * is the whole reason `effectiveFrom` exists and why this upserts on
+ * (owner, date) rather than editing a single row.
+ *
+ * Every affected order is re-synced afterwards. Ledger lines for a trip
+ * are derived, so recomputing them is how a rate change reaches the
+ * statements -- and trips before the new start date resolve to the
+ * older rule and come out unchanged, which is the point.
+ */
+export async function saveOwnerCommissionAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  const ownerId = formData.get("ownerId")?.toString() ?? "";
+  const owner = await prisma.owner.findFirst({
+    where: { id: ownerId, workspaceId: workspace.id },
+    select: { id: true, name: true },
+  });
+  if (!owner) return;
+
+  const parsed = ownerCommissionSchema.safeParse({
+    ratePercent: formData.get("ratePercent"),
+    settlement: formData.get("settlement"),
+    effectiveFrom: formData.get("effectiveFrom"),
+    note: cleanOptional(formData.get("note")),
+  });
+  if (!parsed.success) return;
+
+  // Dates arrive as a plain calendar day from a date input. Anchored to
+  // midday UTC so the day it lands on cannot shift under a timezone --
+  // an off-by-one here silently reprices a day's worth of trips.
+  const effectiveFrom = new Date(`${parsed.data.effectiveFrom}T12:00:00.000Z`);
+  if (Number.isNaN(effectiveFrom.getTime())) return;
+
+  const rate = parsed.data.ratePercent / 100;
+
+  await prisma.ownerCommissionRule.upsert({
+    where: { ownerId_effectiveFrom: { ownerId: owner.id, effectiveFrom } },
+    update: {
+      rate,
+      settlement: parsed.data.settlement,
+      note: parsed.data.note ?? null,
+    },
+    create: {
+      workspaceId: workspace.id,
+      ownerId: owner.id,
+      rate,
+      settlement: parsed.data.settlement,
+      effectiveFrom,
+      note: parsed.data.note ?? null,
+      createdBy: user.name,
+    },
+  });
+
+  const resynced = await syncOwnerLedger(owner.id, workspace.id);
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "owner_commission_saved",
+    entityType: "Owner",
+    entityId: owner.id,
+    metadata: {
+      name: owner.name,
+      ratePercent: parsed.data.ratePercent,
+      settlement: parsed.data.settlement,
+      effectiveFrom: parsed.data.effectiveFrom,
+      resyncedOrders: resynced.orderCount,
+    },
+  });
+
+  revalidateAdminPages();
+}
+
+/** Remove one set of terms; earlier terms take over from that date. */
+export async function deleteOwnerCommissionAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  const ruleId = formData.get("ruleId")?.toString() ?? "";
+  const rule = await prisma.ownerCommissionRule.findFirst({
+    where: { id: ruleId, owner: { workspaceId: workspace.id } },
+    select: { id: true, ownerId: true, owner: { select: { name: true } } },
+  });
+  if (!rule) return;
+
+  await prisma.ownerCommissionRule.delete({ where: { id: rule.id } });
+  const resynced = await syncOwnerLedger(rule.ownerId, workspace.id);
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "owner_commission_deleted",
+    entityType: "Owner",
+    entityId: rule.ownerId,
+    metadata: { name: rule.owner.name, resyncedOrders: resynced.orderCount },
   });
 
   revalidateAdminPages();

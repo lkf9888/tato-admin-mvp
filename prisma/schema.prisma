@@ -54,6 +54,24 @@ enum OwnerLedgerKind {
   EXPENSE_REIMBURSEMENT
   MANUAL_ADJUSTMENT
   SETTLEMENT_PAYMENT
+  // Rent the guest paid straight to the owner, so we never held it.
+  // Recorded as an offsetting line rather than by omitting the revenue
+  // line, because the owner still needs to see what the trip earned --
+  // the commission is a percentage of it, and a bill you cannot check
+  // the arithmetic on is a bill you argue about.
+  DIRECT_TO_OWNER
+}
+
+/// Who receives the rent before anyone settles up.
+///
+/// Not a detail of presentation -- it decides which direction money
+/// moves at the end of the month. When it lands with the company we owe
+/// the owner their share, so the statement is a payout. When it lands
+/// with the owner they hold money that is partly ours, so the statement
+/// is an invoice for the commission. Same percentage, opposite sign.
+enum OwnerSettlementDirection {
+  COMPANY_COLLECTS
+  OWNER_COLLECTS
 }
 
 enum OrderAttachmentKind {
@@ -154,6 +172,7 @@ model Workspace {
   shareLinks                    ShareLink[]
   activityLogs                  ActivityLog[]
   ownerLedgerItems              OwnerLedgerItem[]
+  ownerCommissionRules          OwnerCommissionRule[]
   ownerLedgerReceipts           OwnerLedgerReceipt[]
   orderAttachments              OrderAttachment[]
   staffMembers                  StaffMember[]
@@ -203,6 +222,7 @@ model Owner {
   vehicles    Vehicle[]
   shareLinks  ShareLink[]
   ledgerItems OwnerLedgerItem[]
+  commissionRules OwnerCommissionRule[]
 
   @@index([workspaceId])
 }
@@ -337,6 +357,37 @@ model TuroSyncConfig {
   workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
+}
+
+/// A management commission agreement, as of a date.
+///
+/// Rates get renegotiated, and a new rate must not silently rewrite
+/// what was already settled. So this is a history rather than a field:
+/// each row says "from this date, these terms", and an order is priced
+/// by whichever row was in force on the day the trip started. Change
+/// the rate and last quarter's statements still reconcile.
+model OwnerCommissionRule {
+  id            String                   @id @default(cuid())
+  workspaceId   String?
+  ownerId       String
+  /// Stored as a fraction (0.2 = 20%), matching Vehicle.ownerCommissionRate.
+  rate          Float
+  settlement    OwnerSettlementDirection @default(COMPANY_COLLECTS)
+  /// Inclusive. A trip starting on this date uses this rule.
+  effectiveFrom DateTime
+  note          String?
+  createdBy     String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  workspace     Workspace?               @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  owner         Owner                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  /// One set of terms per owner per start date; re-saving the same date
+  /// edits that rule instead of stacking a second one behind it.
+  @@unique([ownerId, effectiveFrom])
+  @@index([workspaceId])
+  @@index([ownerId, effectiveFrom])
 }
 
 model OwnerLedgerItem {

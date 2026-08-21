@@ -6,6 +6,7 @@ import { isKimiConfigured } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
 import { classifyTuroSubject } from "@/lib/turo-subjects";
 import { matchVehiclesForEmail } from "@/lib/turo-message-match";
+import { isPlateUnconfirmed } from "@/lib/vehicle-assignment";
 import { getNetEarningFromFinancials } from "@/lib/utils";
 
 /**
@@ -243,6 +244,8 @@ export default async function GuestMessagesPage() {
           status: true,
           totalPrice: true,
           sourceMetadata: true,
+          source: true,
+          importBatchId: true,
           vehicle: { select: { brand: true, model: true, year: true, plateNumber: true } },
         },
       })
@@ -341,6 +344,10 @@ export default async function GuestMessagesPage() {
             renterPhone: order.renterPhone,
             externalOrderId: order.externalOrderId,
             plateNumber: order.vehicle?.plateNumber ?? null,
+            // The plate is what an operator reads before handing over a
+            // car, so it is the plate that has to say when it was
+            // inferred from a model name rather than stated by Turo.
+            plateUnconfirmed: isPlateUnconfirmed(order),
             status: order.status,
             netEarning: getNetEarningFromFinancials(financials, order.totalPrice),
             vehicleLabel: order.vehicle

@@ -25,6 +25,7 @@ export const guestMessagesMessages = {
         `${count} cars in your fleet are a ${vehicle}, and the email names no plate. Set a plate override for the reservation to pin it.`,
       tripWhyNoTripInWindow: (vehicle: string) =>
         `The ${vehicle} is in your fleet, but no booking for this guest on that car falls near these messages.`,
+      tripPlateUnconfirmed: "not confirmed by a plate",
       tripDates: "Dates",
       tripVehicle: "Vehicle",
       tripStatus: "Status",
@@ -91,6 +92,7 @@ export const guestMessagesMessages = {
         `车队里有 ${count} 台 ${vehicle},而邮件里没有车牌号。给这个订单设置车牌覆盖就能指定到具体哪一台。`,
       tripWhyNoTripInWindow: (vehicle: string) =>
         `${vehicle} 在车队里,但这段时间附近没有这位客人在这台车上的订单。`,
+      tripPlateUnconfirmed: "车牌未确认",
       tripDates: "时间",
       tripVehicle: "车辆",
       tripStatus: "状态",

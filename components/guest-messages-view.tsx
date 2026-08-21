@@ -58,6 +58,7 @@ type Order = {
   renterPhone: string | null;
   externalOrderId: string | null;
   plateNumber: string | null;
+  plateUnconfirmed?: boolean;
   pickupDatetime: string;
   returnDatetime: string;
   pickupLocation: string | null;
@@ -350,7 +351,12 @@ export function GuestMessagesView({
           value: `${formatWhen(order.pickupDatetime, locale)} → ${formatWhen(order.returnDatetime, locale)}`,
         },
         { label: t.tripVehicle, value: order.vehicleLabel },
-        { label: t.tripPlate, value: order.plateNumber },
+        {
+          label: t.tripPlate,
+          value: order.plateUnconfirmed
+            ? `${order.plateNumber ?? "—"} · ${t.tripPlateUnconfirmed}`
+            : order.plateNumber,
+        },
         { label: t.tripStatus, value: order.status },
         {
           label: t.tripTotal,

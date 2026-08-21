@@ -29,6 +29,17 @@ export const importsMessages = {
           body: "Click Run import. New vehicles will be auto-created (unless you opt out) and offline conflicts will be flagged for you to review.",
         },
       ],
+      unconfirmedKicker: "Check these",
+      unconfirmedTitle: (count: number) =>
+        count === 1
+          ? "1 upcoming trip has no plate-confirmed car"
+          : `${count} upcoming trips have no plate-confirmed car`,
+      unconfirmedCopy:
+        "Booking email names a model, never a plate, so the car on these trips was worked out by matching that model against your fleet. That only holds while the fleet is complete: if the real car is missing, the model can still match exactly one car — the wrong one — and nothing about the result looks uncertain. Import the CSV covering these dates and the plates settle it.",
+      unconfirmedSiblings: (count: number) =>
+        `${count} cars in the fleet share this model and year`,
+      unconfirmedUnknownVehicles: (list: string) =>
+        `Past imports named cars your fleet does not have: ${list}. Until they exist here, booking email for their model matches one car fewer than really exists — and can land on the wrong one. Re-import with "Auto-create missing vehicles" on, or add them by hand.`,
       logKicker: "Import log",
       logTitle: "Recent CSV batches",
       sampleFile: "Sample file lives in `/sample-data/turo-sample.csv`",
@@ -150,6 +161,13 @@ export const importsMessages = {
           body: "点击「执行导入」。新车辆会自动建档（除非关闭该选项），与线下订单冲突的记录会被标记等你处理。",
         },
       ],
+      unconfirmedKicker: "需要核对",
+      unconfirmedTitle: (count: number) => `${count} 个即将开始的订单,车辆未经车牌确认`,
+      unconfirmedCopy:
+        "预订邮件里只有车型,从来没有车牌,所以这些订单的车辆是拿车型去车队里匹配出来的。只有在车队完整时这才成立:如果真正那台车不在车队里,车型仍然可能唯一匹配到另一台车——错的那台——而结果看上去和正确答案没有任何区别。导入覆盖这些日期的 CSV,车牌就能定案。",
+      unconfirmedSiblings: (count: number) => `车队里有 ${count} 台同款同年份`,
+      unconfirmedUnknownVehicles: (list: string) =>
+        `以前的导入里出现过车队中没有的车:${list}。只要它们不在车队里,这些车型的预订邮件能匹配到的车就比实际少一台,就可能落到错误的车上。重新导入时勾选「自动创建缺失车辆」,或者手动把它们加进来。`,
       logKicker: "导入日志",
       logTitle: "最近 CSV 批次",
       sampleFile: "示例文件位于 `/sample-data/turo-sample.csv`",

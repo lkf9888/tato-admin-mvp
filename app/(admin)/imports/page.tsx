@@ -5,8 +5,12 @@ import { requireCurrentWorkspace } from "@/lib/auth";
 import { getWorkspaceBillingSnapshot } from "@/lib/billing";
 import type { Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
-import { formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
+import {
+  findUnconfirmedAssignments,
+  findUnknownVehiclesFromImports,
+} from "@/lib/vehicle-assignment";
 
 export default async function ImportsPage({
   searchParams,
@@ -25,6 +29,13 @@ export default async function ImportsPage({
       where: { workspaceId: workspace.id },
     }),
     searchParams,
+  ]);
+
+  // Trips still to come whose car no plate has confirmed. This lives
+  // on the imports page because importing the CSV is the fix.
+  const [unconfirmed, unknownVehicles] = await Promise.all([
+    findUnconfirmedAssignments(workspace.id, { limit: 25 }),
+    findUnknownVehiclesFromImports(workspace.id),
   ]);
   const importMessages = messages.imports;
   const turoSyncMessages = getTuroSyncSettingsCopy(locale);
@@ -172,6 +183,61 @@ export default async function ImportsPage({
           </div>
         </form>
       </section>
+
+      {unconfirmed.length > 0 ? (
+        <section className="rounded-lg border border-amber-300 bg-amber-50 p-3 sm:p-4">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-amber-800">
+            {importMessages.unconfirmedKicker}
+          </p>
+          <h3 className="mt-1 font-serif text-[1.05rem] text-[var(--ink)] sm:text-[1.25rem]">
+            {importMessages.unconfirmedTitle(unconfirmed.length)}
+          </h3>
+          <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-amber-900">
+            {importMessages.unconfirmedCopy}
+          </p>
+
+          <ul className="mt-3 space-y-1.5">
+            {unconfirmed.map((row) => (
+              <li
+                key={row.orderId}
+                className="rounded-md border border-amber-200 bg-white/70 px-3 py-2 text-[12px] leading-5"
+              >
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="font-semibold text-[var(--ink)]">{row.renterName}</span>
+                  <span className="text-[var(--ink-soft)]">
+                    {formatDate(row.pickupDatetime, locale)} → {formatDate(row.returnDatetime, locale)}
+                  </span>
+                  {row.externalOrderId ? (
+                    <span className="text-[var(--ink-soft)] tabular-nums">
+                      #{row.externalOrderId}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-0.5 text-[var(--ink-soft)]">
+                  {row.plateNumber ? `${row.plateNumber} · ` : ""}
+                  {row.vehicleLabel}
+                  {/* The dangerous case is not "several cars matched"
+                      -- that one refuses and files nothing. It is a
+                      lone match in a fleet that may be missing the
+                      real car, which looks certain and is not. */}
+                  {row.sameModelYearCount > 1
+                    ? ` — ${importMessages.unconfirmedSiblings(row.sameModelYearCount)}`
+                    : ""}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {/* Why the fleet was incomplete in the first place. A plate
+              the CSV named and the fleet does not have is exactly what
+              turns a model match into a confident wrong answer. */}
+          {unknownVehicles.length > 0 ? (
+            <p className="mt-3 rounded-md border border-amber-200 bg-white/70 px-3 py-2 text-[12px] leading-5 text-amber-900">
+              {importMessages.unconfirmedUnknownVehicles(unknownVehicles.join("、"))}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <CsvImportPanel
         locale={locale}

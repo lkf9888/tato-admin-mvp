@@ -5,7 +5,7 @@ import { OrderStatus } from "@prisma/client";
 import { reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { parseTuroOrderEmail, type TuroOrderFacts } from "@/lib/turo-email-order";
-import { matchVehicles } from "@/lib/turo-message-match";
+import { matchVehiclesForEmail } from "@/lib/turo-message-match";
 
 /**
  * Writing Turo's mail into orders.
@@ -225,7 +225,7 @@ export async function applyTuroEmailsToOrders(input: {
       // that turns an ambiguous model into one car.
       const matches = overrideVehicle
         ? [overrideVehicle]
-        : matchVehicles(facts.vehicleText, fleet, facts.coHostAccount);
+        : matchVehiclesForEmail(facts.vehicleText, fleet, facts.coHostAccount).matches;
       if (matches.length !== 1) {
         // Several cars of one model is normal here, and the mail names
         // no plate. Guessing would file a real booking against the

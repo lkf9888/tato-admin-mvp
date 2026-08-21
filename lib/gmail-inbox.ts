@@ -17,7 +17,7 @@ import {
   extractTuroLink,
 } from "@/lib/turo-subjects";
 import {
-  matchVehicles,
+  matchVehiclesForEmail,
   pickOrderForMessage,
   type VehicleForMatch,
 } from "@/lib/turo-message-match";
@@ -292,7 +292,8 @@ async function attributeEmail(input: {
   const guestText = extractGuestMessageText(input.bodyText, input.subject);
 
   const matchedVehicles = bySubject?.vehicleText
-    ? matchVehicles(bySubject.vehicleText, input.fleet, bySubject.coHostAccount ?? null)
+    ? matchVehiclesForEmail(bySubject.vehicleText, input.fleet, bySubject.coHostAccount ?? null)
+        .matches
     : [];
 
   // One vehicle is an identification; several is only a narrowing, and

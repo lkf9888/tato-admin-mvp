@@ -37,6 +37,14 @@ function normalizeVehicle(text: string): string {
     .replace(/[^a-z0-9]+/g, "");
 }
 
+/** The same text as a set of words, for the trim-word rule below. */
+function vehicleTokens(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
 export type VehicleForMatch = {
   id: string;
   brand: string;
@@ -77,23 +85,41 @@ export function matchVehicles(
       : vehicles.filter((vehicle) => (vehicle.turoAccount ?? null) === coHostAccount);
 
   return scoped.filter((vehicle) => {
-    const candidates = [
+    const candidateTexts = [
       `${vehicle.brand} ${vehicle.model}`,
       `${vehicle.brand} ${vehicle.model} ${vehicle.year}`,
       vehicle.turoListingName ?? "",
       vehicle.nickname,
-    ]
-      .filter(Boolean)
-      .map(normalizeVehicle);
+    ].filter(Boolean);
+    const candidates = candidateTexts.map(normalizeVehicle);
 
     // Turo sometimes appends the year and sometimes does not, so accept
     // either direction of containment rather than equality alone.
-    return candidates.some(
+    const prefixMatch = candidates.some(
       (candidate) =>
         candidate === wanted ||
         (candidate.length >= 6 && wanted.startsWith(candidate)) ||
         (wanted.length >= 6 && candidate.startsWith(wanted)),
     );
+    if (prefixMatch) return true;
+
+    // Trim words break the prefix rule in both directions. A fleet row
+    // reading "Volvo XC40 Recharge 2021" against mail that says "Volvo
+    // XC40 2021" is neither a prefix of the other, so a car sitting in
+    // the fleet under its full trim name matched nothing its own Turo
+    // mail said about it.
+    //
+    // So: also match when every word the email used appears in the
+    // fleet's own name for the car. That is a narrowing, never an
+    // identification -- two Explorers both containing "ford explorer"
+    // still return two, and the caller still refuses to choose.
+    const wantedTokens = vehicleTokens(vehicleText);
+    if (wantedTokens.length === 0) return false;
+
+    return candidateTexts.some((candidate) => {
+      const tokens = new Set(vehicleTokens(candidate));
+      return wantedTokens.every((token) => tokens.has(token));
+    });
   });
 }
 
@@ -164,4 +190,32 @@ export function pickOrderForMessage(input: {
 
   // Still more than one, so there is no answer that is safe to show.
   return null;
+}
+
+/**
+ * The same match, with the account as a tie-breaker rather than a gate.
+ *
+ * Scoping to the account the mail came from is what turns "Tesla Model
+ * Y 2020" into one car when four of them are listed across two
+ * accounts. But it was applied as a filter first and always, which
+ * means a car whose `turoAccount` does not agree with the mail --
+ * because the mail carried no co-host prefix and the car was imported
+ * under an account name, or the other way round -- matched nothing at
+ * all, even when it was the only car in the fleet of that model.
+ *
+ * Zero matches is never a safer answer than one. So: scope first, and
+ * if that finds nothing, ask again without the scope. The refusal that
+ * matters is still intact -- if the unscoped question returns several,
+ * the caller gets several and declines to choose.
+ */
+export function matchVehiclesForEmail(
+  vehicleText: string,
+  vehicles: VehicleForMatch[],
+  coHostAccount: string | null,
+): { matches: VehicleForMatch[]; usedAccountFallback: boolean } {
+  const scoped = matchVehicles(vehicleText, vehicles, coHostAccount);
+  if (scoped.length > 0) return { matches: scoped, usedAccountFallback: false };
+
+  const unscoped = matchVehicles(vehicleText, vehicles);
+  return { matches: unscoped, usedAccountFallback: unscoped.length > 0 };
 }

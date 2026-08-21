@@ -18,7 +18,9 @@ export const guestMessagesMessages = {
       // they are worth telling apart.
       tripWhyNoVehicleText: "The subject named no car, so there was nothing to match a trip on.",
       tripWhyNoSuchVehicle: (vehicle: string) =>
-        `The email is about a ${vehicle}, and no car in your fleet answers to that. Add the vehicle and this thread files itself on the next sync.`,
+        `The email is about a ${vehicle}, and no car in your fleet answers to that name. Add the vehicle and this thread files itself on the next sync.`,
+      tripWhyNearest: (rows: string) =>
+        `Closest cars in your fleet: ${rows}. If one of these is the car, make its brand and model read the way Turo writes them — or put Turo's own listing name on it — and the match works from then on.`,
       tripWhySeveralVehicles: (vehicle: string, count: number) =>
         `${count} cars in your fleet are a ${vehicle}, and the email names no plate. Set a plate override for the reservation to pin it.`,
       tripWhyNoTripInWindow: (vehicle: string) =>
@@ -82,7 +84,9 @@ export const guestMessagesMessages = {
         "Turo 的消息通知里不带预订号,所以这里靠客人名、车辆和时间匹配。匹配不唯一时会**故意**留空——挂错订单比不挂更糟。",
       tripWhyNoVehicleText: "邮件标题里没有车辆信息,所以没有可以用来匹配订单的线索。",
       tripWhyNoSuchVehicle: (vehicle: string) =>
-        `这封邮件说的车是 ${vehicle},但车队里没有这台车。把车辆加进来,下次同步时这个会话就会自动挂上订单。`,
+        `这封邮件说的车是 ${vehicle},但车队里没有叫这个名字的车。把车辆加进来,下次同步时这个会话就会自动挂上订单。`,
+      tripWhyNearest: (rows: string) =>
+        `车队里最接近的是:${rows}。如果就是其中一台,把它的品牌和型号改成 Turo 的写法,或者填上 Turo 的 listing 名称,以后就能自动匹配了。`,
       tripWhySeveralVehicles: (vehicle: string, count: number) =>
         `车队里有 ${count} 台 ${vehicle},而邮件里没有车牌号。给这个订单设置车牌覆盖就能指定到具体哪一台。`,
       tripWhyNoTripInWindow: (vehicle: string) =>

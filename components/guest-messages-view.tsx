@@ -36,7 +36,7 @@ type Thread = {
    *  match, so the operator knows which fix applies. */
   unmatchedReason?:
     | { kind: "noVehicleText" }
-    | { kind: "noSuchVehicle"; vehicleText: string }
+    | { kind: "noSuchVehicle"; vehicleText: string; nearest: string[] }
     | { kind: "severalVehicles"; vehicleText: string; count: number }
     | { kind: "noTripInWindow"; vehicleText: string }
     | null;
@@ -553,7 +553,11 @@ export function GuestMessagesView({
                     {selected.unmatchedReason.kind === "noVehicleText"
                       ? t.tripWhyNoVehicleText
                       : selected.unmatchedReason.kind === "noSuchVehicle"
-                        ? t.tripWhyNoSuchVehicle(selected.unmatchedReason.vehicleText)
+                        ? `${t.tripWhyNoSuchVehicle(selected.unmatchedReason.vehicleText)}${
+                            selected.unmatchedReason.nearest.length > 0
+                              ? ` ${t.tripWhyNearest(selected.unmatchedReason.nearest.join("、"))}`
+                              : ""
+                          }`
                         : selected.unmatchedReason.kind === "severalVehicles"
                           ? t.tripWhySeveralVehicles(
                               selected.unmatchedReason.vehicleText,

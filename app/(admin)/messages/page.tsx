@@ -5,7 +5,7 @@ import { getI18n } from "@/lib/i18n-server";
 import { isKimiConfigured } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
 import { classifyTuroSubject } from "@/lib/turo-subjects";
-import { matchVehicles } from "@/lib/turo-message-match";
+import { matchVehiclesForEmail } from "@/lib/turo-message-match";
 import { getNetEarningFromFinancials } from "@/lib/utils";
 
 /**
@@ -23,7 +23,7 @@ import { getNetEarningFromFinancials } from "@/lib/utils";
  */
 type UnmatchedReason =
   | { kind: "noVehicleText" }
-  | { kind: "noSuchVehicle"; vehicleText: string }
+  | { kind: "noSuchVehicle"; vehicleText: string; nearest: string[] }
   | { kind: "severalVehicles"; vehicleText: string; count: number }
   | { kind: "noTripInWindow"; vehicleText: string };
 
@@ -57,6 +57,7 @@ export default async function GuestMessagesPage() {
       nickname: true,
       turoListingName: true,
       turoAccount: true,
+      plateNumber: true,
     },
   });
 
@@ -65,8 +66,34 @@ export default async function GuestMessagesPage() {
     const vehicleText = parsed?.vehicleText?.trim();
     if (!vehicleText) return { kind: "noVehicleText" };
 
-    const matches = matchVehicles(vehicleText, fleet, parsed?.coHostAccount ?? null);
-    if (matches.length === 0) return { kind: "noSuchVehicle", vehicleText };
+    const { matches } = matchVehiclesForEmail(vehicleText, fleet, parsed?.coHostAccount ?? null);
+    if (matches.length === 0) {
+      // "No car answers to that" is true and still leaves the operator
+      // guessing, because the usual cause is a car that IS in the
+      // fleet under a name that does not line up -- a trim word, a
+      // different model spelling. Naming the closest rows turns it
+      // into a thing they can look at and fix.
+      const wanted = vehicleText.toLowerCase().split(/[^a-z0-9]+/i).filter(Boolean);
+      const nearest = fleet
+        .map((vehicle) => {
+          const label = `${vehicle.year} ${vehicle.brand} ${vehicle.model}`;
+          const tokens = new Set(
+            `${vehicle.brand} ${vehicle.model} ${vehicle.nickname} ${vehicle.turoListingName ?? ""}`
+              .toLowerCase()
+              .split(/[^a-z0-9]+/)
+              .filter(Boolean),
+          );
+          const shared = wanted.filter((token) => tokens.has(token)).length;
+          return { label, plate: vehicle.plateNumber, shared };
+        })
+        // One shared word is a coincidence -- every Ford shares "ford".
+        .filter((row) => row.shared >= 2)
+        .sort((a, b) => b.shared - a.shared)
+        .slice(0, 3)
+        .map((row) => (row.plate ? `${row.plate} · ${row.label}` : row.label));
+
+      return { kind: "noSuchVehicle", vehicleText, nearest };
+    }
     if (matches.length > 1) {
       return { kind: "severalVehicles", vehicleText, count: matches.length };
     }

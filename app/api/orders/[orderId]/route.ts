@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
+import { resolveCleaningFee } from "@/lib/owner-commission";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { roundCurrencyAmount } from "@/lib/utils";
@@ -38,6 +39,12 @@ const orderUpdateSchema = z.object({
   paymentMethod: nullableString,
   contractNumber: nullableString,
   notes: nullableString,
+  // Not a property of this order. Saving it writes a dated rule on the
+  // vehicle that prices every trip of that car starting on or after
+  // the given day -- including this one, which is why it is edited
+  // from here rather than buried in the vehicle form.
+  cleaningFee: nullableNumber.optional(),
+  cleaningFeeFrom: z.string().optional(),
 });
 
 function revalidateOrderSurfaces() {
@@ -58,7 +65,17 @@ function revalidateOrderSurfaces() {
 async function fetchOrderForResponse(id: string, workspaceId: string) {
   return prisma.order.findFirstOrThrow({
     where: { id, workspaceId, isArchived: false },
-    include: { vehicle: { include: { owner: true } } },
+    include: {
+      vehicle: {
+        include: {
+          owner: true,
+          // Needed to show the fee this trip is actually priced at,
+          // which is not the vehicle's current fee if the rate changed
+          // after the trip started.
+          cleaningFeeRules: { orderBy: { effectiveFrom: "desc" } },
+        },
+      },
+    },
   });
 }
 
@@ -89,6 +106,11 @@ function buildResponseOrder(order: OrderForResponse) {
     createdBy: order.createdBy,
     externalOrderId: order.externalOrderId,
     ownerLedgerSyncedAt: order.ownerLedgerSyncedAt?.toISOString() ?? null,
+    cleaningFee: resolveCleaningFee(
+      order.vehicle.cleaningFeeRules,
+      order.pickupDatetime,
+      order.vehicle.cleaningFee,
+    ).amount,
   };
 }
 
@@ -144,6 +166,44 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
         notes: parsed.notes ?? null,
       },
     });
+
+    // A cleaning fee is a price on the car, not a line on this order,
+    // so saving one writes a dated rule and then resyncs every trip it
+    // now covers. Anchored on the trip's start date, so a trip already
+    // under way keeps the fee it was booked under.
+    if (parsed.cleaningFee != null && parsed.cleaningFeeFrom) {
+      const effectiveFrom = new Date(`${parsed.cleaningFeeFrom}T12:00:00.000Z`);
+      if (!Number.isNaN(effectiveFrom.getTime())) {
+        const amount = roundCurrencyAmount(parsed.cleaningFee) ?? 0;
+        await prisma.vehicleCleaningFeeRule.upsert({
+          where: {
+            vehicleId_effectiveFrom: { vehicleId: order.vehicleId, effectiveFrom },
+          },
+          update: { amount },
+          create: {
+            workspaceId: workspace.id,
+            vehicleId: order.vehicleId,
+            amount,
+            effectiveFrom,
+            createdBy: user.name,
+          },
+        });
+
+        // Every trip on this car from that day on is repriced. Bounded
+        // to that car and that date rather than resyncing the fleet.
+        const affected = await prisma.order.findMany({
+          where: {
+            vehicleId: order.vehicleId,
+            workspaceId: workspace.id,
+            pickupDatetime: { gte: effectiveFrom },
+          },
+          select: { id: true },
+        });
+        for (const row of affected) {
+          await syncOrderOwnerLedger(row.id);
+        }
+      }
+    }
 
     await syncOrderOwnerLedger(order.id);
     await reconcileVehicleConflicts(order.vehicleId);

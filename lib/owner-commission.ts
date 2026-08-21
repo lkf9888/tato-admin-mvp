@@ -101,3 +101,29 @@ export async function getOwnerCommissionRules(ownerId: string) {
     orderBy: { effectiveFrom: "desc" },
   });
 }
+
+/**
+ * The cleaning fee to charge for one trip.
+ *
+ * Same shape as the commission above, and for the same reason: the fee
+ * is a price that gets revised, and a plain field on the vehicle would
+ * reprice every trip that car ever ran the moment it changed.
+ *
+ * Anchored on the trip's start date rather than its return, so a trip
+ * already under way keeps the fee it was booked under. "From this date
+ * onward" reads as being about the trips that begin after it.
+ */
+export function resolveCleaningFee(
+  rules: Array<{ id: string; amount: number; effectiveFrom: Date }>,
+  on: Date,
+  fallbackAmount: number | null | undefined,
+): { amount: number; ruleId: string | null } {
+  let best: { id: string; amount: number; effectiveFrom: Date } | null = null;
+  const at = on.getTime();
+  for (const rule of rules) {
+    if (rule.effectiveFrom.getTime() > at) continue;
+    if (!best || rule.effectiveFrom.getTime() > best.effectiveFrom.getTime()) best = rule;
+  }
+  if (best) return { amount: best.amount, ruleId: best.id };
+  return { amount: fallbackAmount ?? 0, ruleId: null };
+}

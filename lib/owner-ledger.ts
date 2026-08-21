@@ -12,7 +12,7 @@ import {
   type LedgerShareCategory,
 } from "@/lib/ledger-policy";
 import { prisma } from "@/lib/prisma";
-import { resolveCommission } from "@/lib/owner-commission";
+import { resolveCleaningFee, resolveCommission } from "@/lib/owner-commission";
 import { getOrderNetEarning } from "@/lib/utils";
 
 type Tx = typeof prisma | Prisma.TransactionClient;
@@ -71,7 +71,16 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
   }
 
   const netEarning = getOrderNetEarning(order.sourceMetadata, order.totalPrice);
-  const cleaningFee = roundLedgerAmount(order.vehicle.cleaningFee ?? 0);
+  // Priced as of the day the trip started, so revising the fee today
+  // does not rewrite what last month's trips were charged.
+  const cleaningFeeRules = await db.vehicleCleaningFeeRule.findMany({
+    where: { vehicleId: order.vehicleId },
+    orderBy: { effectiveFrom: "desc" },
+    select: { id: true, amount: true, effectiveFrom: true },
+  });
+  const cleaningFee = roundLedgerAmount(
+    resolveCleaningFee(cleaningFeeRules, order.pickupDatetime, order.vehicle.cleaningFee).amount,
+  );
   const shouldChargeCleaningFee =
     cleaningFee > 0 &&
     (order.status === OrderStatus.completed || order.returnDatetime.getTime() <= Date.now());

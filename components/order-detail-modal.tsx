@@ -44,6 +44,9 @@ export type EditableOrder = {
   createdBy?: string | null;
   externalOrderId?: string | null;
   ownerLedgerSyncedAt?: string | null;
+  /** The fee this trip is priced at, which is not necessarily the
+   *  vehicle's current one if it changed after the trip started. */
+  cleaningFee?: number | null;
 };
 
 export type OrderEditorVehicleOption = {
@@ -71,6 +74,8 @@ type OrderDraft = {
   paymentMethod: string;
   contractNumber: string;
   notes: string;
+  cleaningFee: string;
+  cleaningFeeFrom: string;
 };
 
 function buildDraft(order: EditableOrder): OrderDraft {
@@ -90,6 +95,10 @@ function buildDraft(order: EditableOrder): OrderDraft {
     paymentMethod: order.paymentMethod ?? "",
     contractNumber: order.contractNumber ?? "",
     notes: order.notes ?? "",
+    cleaningFee: formatCurrencyInputValue(order.cleaningFee),
+    // Defaults to today: the common edit is "from now on it costs
+    // this", and back-dating is the deliberate act.
+    cleaningFeeFrom: new Date().toISOString().slice(0, 10),
   };
 }
 
@@ -138,6 +147,11 @@ function labels(locale: Locale) {
         ownerShareSyncError: "同步失败，请稍后再试。",
         ownerShareSyncOwnerRequired: "请先给车辆绑定车主。",
         ownerShareLastSynced: "最后同步",
+        accounting: "会计信息",
+        cleaningFee: "洗车费",
+        cleaningFeeFrom: "生效日",
+        cleaningFeeHint:
+          "洗车费是车辆的价格,不是这一单的属性。保存后,这台车在生效日当天及以后开始的所有订单都按这个金额计费,之前的订单不受影响。",
       }
     : {
         title: "Order details and edits",
@@ -182,6 +196,11 @@ function labels(locale: Locale) {
         ownerShareSyncError: "Sync failed. Please try again.",
         ownerShareSyncOwnerRequired: "Assign this vehicle to an owner first.",
         ownerShareLastSynced: "Last synced",
+        accounting: "Accounting",
+        cleaningFee: "Cleaning fee",
+        cleaningFeeFrom: "From",
+        cleaningFeeHint:
+          "The cleaning fee is a price on the car, not a property of this order. Saving it charges this amount on every trip that car starts on or after the chosen date. Earlier trips are untouched.",
       };
 }
 
@@ -222,9 +241,20 @@ export function OrderDetailModal({
     setOwnerSyncMessage(null);
   }, [order]);
 
+  // The label sits inside the field rather than above it. A caption and
+  // its box read as one control that way, and it buys back a line of
+  // height per field -- on a phone that is the difference between the
+  // form being scrollable and being a scroll.
+  const fieldClass =
+    "grid min-w-0 gap-0.5 rounded-md border border-[rgba(17,19,24,0.1)] bg-white/84 px-3 py-1.5 transition focus-within:border-[rgba(17,19,24,0.28)]";
+  const fieldLabelClass =
+    "text-[10px] font-medium uppercase tracking-[0.13em] text-[color:var(--ink-soft)]";
   const inputClass =
-    "h-10 w-full min-w-0 max-w-full truncate rounded-md border border-[rgba(17,19,24,0.08)] bg-white/84 px-3 text-[13px] text-[color:var(--ink)] outline-none focus:border-[rgba(17,19,24,0.22)]";
-  const labelClass = "grid min-w-0 gap-1.5 text-[11px] font-medium uppercase tracking-[0.13em] text-[color:var(--ink-soft)]";
+    "h-6 w-full min-w-0 max-w-full truncate border-0 bg-transparent p-0 text-[13px] text-[color:var(--ink)] outline-none placeholder:text-[color:var(--ink-soft)]/70";
+  // Kept for the SearchableSelect, which draws its own trigger.
+  const selectInputClass =
+    "h-7 w-full min-w-0 max-w-full truncate border-0 bg-transparent px-0 text-[13px] text-[color:var(--ink)] outline-none";
+  const labelClass = fieldClass;
   const primaryButtonClass =
     "inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3.5 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] disabled:cursor-not-allowed disabled:opacity-50";
   const secondaryButtonClass =
@@ -277,6 +307,14 @@ export function OrderDetailModal({
           paymentMethod: draft.paymentMethod,
           contractNumber: draft.contractNumber,
           notes: draft.notes,
+          // Only sent when it was actually touched, so opening and
+          // saving an order does not stamp a redundant rule on the car.
+          ...(draft.cleaningFee !== formatCurrencyInputValue(currentOrder.cleaningFee)
+            ? {
+                cleaningFee: draft.cleaningFee === "" ? 0 : Number(draft.cleaningFee),
+                cleaningFeeFrom: draft.cleaningFeeFrom,
+              }
+            : {}),
         }),
       });
       const payload = (await response.json().catch(() => null)) as
@@ -409,14 +447,38 @@ export function OrderDetailModal({
                 {readOnly ? t.readOnly : t.subtitle}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--ink)] transition hover:bg-[var(--surface-muted)]"
-              aria-label={t.close}
-            >
-              <X className="h-4 w-4" aria-hidden />
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {/* Beside the title, where the thing it acts on is named.
+                  It used to sit inside a status panel below the summary
+                  tiles -- the one action on this panel that reaches
+                  outside the order, three scrolls from its own heading. */}
+              {!readOnly ? (
+                <button
+                  type="button"
+                  onClick={syncOwnerShare}
+                  disabled={!selectedOwnerId || isSaving || isSyncingOwner || isDeleting}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[var(--ink)] bg-[var(--ink)] px-3 text-[12px] font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[var(--surface-muted)] disabled:text-[color:var(--ink-soft)]"
+                  title={selectedOwnerId ? t.ownerShareHelp : t.ownerShareNotAssigned}
+                >
+                  <Share2 className="h-3.5 w-3.5" aria-hidden />
+                  <span className="hidden sm:inline">
+                    {isSyncingOwner
+                      ? t.ownerShareSyncing
+                      : ownerShareSyncedAt
+                        ? t.ownerShareResync
+                        : t.ownerShareSync}
+                  </span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--ink)] transition hover:bg-[var(--surface-muted)]"
+                aria-label={t.close}
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <StatusBadge value={currentOrder.source} locale={locale} />
@@ -453,45 +515,30 @@ export function OrderDetailModal({
             </div>
           </div>
 
+          {/* One line now, not a panel. The button moved to the header,
+              and what is left is a status plus the timestamp -- which is
+              a caption, not a section. */}
           {!readOnly ? (
-            <div className="mt-3 rounded-md border border-[rgba(17,19,24,0.08)] bg-white/72 px-3 py-3 text-[12px] text-[color:var(--ink)]">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                    {t.ownerShare}
-                  </p>
-                  <p className="mt-1 font-semibold">
-                    {ownerShareSyncedAt ? t.ownerShareSynced : selectedOwnerId ? t.ownerShareUnsynced : t.ownerShareNotAssigned}
-                  </p>
-                  <p className="mt-1 text-[11px] leading-4 text-[color:var(--ink-soft)]">
-                    {ownerShareSyncedAt
-                      ? `${t.ownerShareLastSynced}: ${formatDateTime(ownerShareSyncedAt, locale)}`
-                      : t.ownerShareHelp}
-                  </p>
-                  {ownerSyncMessage ? (
-                    <p className="mt-1 text-[11px] font-semibold text-emerald-700">{ownerSyncMessage}</p>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={syncOwnerShare}
-                  disabled={!selectedOwnerId || isSaving || isSyncingOwner || isDeleting}
-                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-[var(--ink)] bg-[var(--ink)] px-3.5 text-[12px] font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[var(--surface-muted)] disabled:text-[color:var(--ink-soft)]"
-                >
-                  <Share2 className="h-3.5 w-3.5" aria-hidden />
-                  {isSyncingOwner
-                    ? t.ownerShareSyncing
-                    : ownerShareSyncedAt
-                      ? t.ownerShareResync
-                      : t.ownerShareSync}
-                </button>
-              </div>
-            </div>
+            <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] leading-4 text-[color:var(--ink-soft)]">
+              <span className="font-semibold text-[color:var(--ink)]">
+                {ownerShareSyncedAt
+                  ? t.ownerShareSynced
+                  : selectedOwnerId
+                    ? t.ownerShareUnsynced
+                    : t.ownerShareNotAssigned}
+              </span>
+              {ownerShareSyncedAt ? (
+                <span>{`${t.ownerShareLastSynced}: ${formatDateTime(ownerShareSyncedAt, locale)}`}</span>
+              ) : null}
+              {ownerSyncMessage ? (
+                <span className="font-semibold text-emerald-700">{ownerSyncMessage}</span>
+              ) : null}
+            </p>
           ) : null}
 
           <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className={labelClass}>
-              <span>{t.vehicle}</span>
+              <span className={fieldLabelClass}>{t.vehicle}</span>
               {readOnly ? (
                 <span className={cn(inputClass, "flex items-center")}>
                   {currentOrder.vehiclePlateNumber
@@ -511,13 +558,13 @@ export function OrderDetailModal({
                   }))}
                   placeholder={t.vehicle}
                   searchPlaceholder={t.vehicle}
-                  className={inputClass}
+                  className={selectInputClass}
                 />
               )}
             </label>
 
             <label className={labelClass}>
-              <span>{t.status}</span>
+              <span className={fieldLabelClass}>{t.status}</span>
               {readOnly ? (
                 <span className={cn(inputClass, "flex items-center")}>{getStatusLabel(currentOrder.status, locale)}</span>
               ) : (
@@ -530,13 +577,13 @@ export function OrderDetailModal({
                   }))}
                   placeholder={t.status}
                   searchPlaceholder={t.status}
-                  className={inputClass}
+                  className={selectInputClass}
                 />
               )}
             </label>
 
             <label className={labelClass}>
-              <span>{t.renter}</span>
+              <span className={fieldLabelClass}>{t.renter}</span>
               <input
                 value={readOnly ? currentOrder.renterName : draft.renterName}
                 onChange={(event) => updateDraft({ renterName: event.target.value })}
@@ -546,7 +593,7 @@ export function OrderDetailModal({
             </label>
 
             <label className={labelClass}>
-              <span>{t.phone}</span>
+              <span className={fieldLabelClass}>{t.phone}</span>
               <input
                 type="tel"
                 value={readOnly ? displayPhone : draft.renterPhone}
@@ -557,13 +604,17 @@ export function OrderDetailModal({
             </label>
 
             <label className={cn(labelClass, "lg:col-span-2")}>
-              <span>{t.pickupTime}</span>
+              <span className={fieldLabelClass}>{t.pickupTime}</span>
               {readOnly ? (
                 <span className={cn(inputClass, "flex items-center")}>
                   {formatDateTime(currentOrder.pickupDatetime, locale)}
                 </span>
               ) : (
-                <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_6rem]">
+                /* One field, two parts. The date and the clock time are
+                   a single fact -- when the car changes hands -- and two
+                   separate boxes made it read as two. Divided by a rule
+                   rather than a border so it stays one control. */
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_4.5rem] items-center gap-2">
                   <input
                     value={draft.pickupDate}
                     onChange={(event) => updateDraft({ pickupDate: event.target.value })}
@@ -571,6 +622,7 @@ export function OrderDetailModal({
                     placeholder="yyyy/mm/dd"
                     className={inputClass}
                   />
+                  <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
                   <input
                     value={draft.pickupTime}
                     onChange={(event) => updateDraft({ pickupTime: event.target.value })}
@@ -583,13 +635,17 @@ export function OrderDetailModal({
             </label>
 
             <label className={cn(labelClass, "lg:col-span-2")}>
-              <span>{t.returnTime}</span>
+              <span className={fieldLabelClass}>{t.returnTime}</span>
               {readOnly ? (
                 <span className={cn(inputClass, "flex items-center")}>
                   {formatDateTime(currentOrder.returnDatetime, locale)}
                 </span>
               ) : (
-                <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_6rem]">
+                /* One field, two parts. The date and the clock time are
+                   a single fact -- when the car changes hands -- and two
+                   separate boxes made it read as two. Divided by a rule
+                   rather than a border so it stays one control. */
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_4.5rem] items-center gap-2">
                   <input
                     value={draft.returnDate}
                     onChange={(event) => updateDraft({ returnDate: event.target.value })}
@@ -597,6 +653,7 @@ export function OrderDetailModal({
                     placeholder="yyyy/mm/dd"
                     className={inputClass}
                   />
+                  <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
                   <input
                     value={draft.returnTime}
                     onChange={(event) => updateDraft({ returnTime: event.target.value })}
@@ -608,36 +665,10 @@ export function OrderDetailModal({
               )}
             </label>
 
-            <label className={labelClass}>
-              <span>{t.totalPrice}</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={readOnly ? formatCurrencyInputValue(currentOrder.totalPrice) : draft.totalPrice}
-                onChange={(event) => updateDraft({ totalPrice: event.target.value })}
-                onBlur={(event) => updateDraft({ totalPrice: formatCurrencyInputText(event.target.value) })}
-                readOnly={readOnly}
-                className={inputClass}
-              />
-            </label>
+
 
             <label className={labelClass}>
-              <span>{t.deposit}</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={readOnly ? formatCurrencyInputValue(currentOrder.depositAmount) : draft.depositAmount}
-                onChange={(event) => updateDraft({ depositAmount: event.target.value })}
-                onBlur={(event) => updateDraft({ depositAmount: formatCurrencyInputText(event.target.value) })}
-                readOnly={readOnly}
-                className={inputClass}
-              />
-            </label>
-
-            <label className={labelClass}>
-              <span>{t.pickupLocation}</span>
+              <span className={fieldLabelClass}>{t.pickupLocation}</span>
               <input
                 value={readOnly ? currentOrder.pickupLocation ?? "" : draft.pickupLocation}
                 onChange={(event) => updateDraft({ pickupLocation: event.target.value })}
@@ -647,7 +678,7 @@ export function OrderDetailModal({
             </label>
 
             <label className={labelClass}>
-              <span>{t.returnLocation}</span>
+              <span className={fieldLabelClass}>{t.returnLocation}</span>
               <input
                 value={readOnly ? currentOrder.returnLocation ?? "" : draft.returnLocation}
                 onChange={(event) => updateDraft({ returnLocation: event.target.value })}
@@ -656,28 +687,105 @@ export function OrderDetailModal({
               />
             </label>
 
-            <label className={labelClass}>
-              <span>{t.paymentMethod}</span>
-              <input
-                value={readOnly ? currentOrder.paymentMethod ?? "" : draft.paymentMethod}
-                onChange={(event) => updateDraft({ paymentMethod: event.target.value })}
-                readOnly={readOnly}
-                className={inputClass}
-              />
-            </label>
+          </div>
 
-            <label className={labelClass}>
-              <span>{t.contractNumber}</span>
-              <input
-                value={readOnly ? currentOrder.contractNumber ?? "" : draft.contractNumber}
-                onChange={(event) => updateDraft({ contractNumber: event.target.value })}
-                readOnly={readOnly}
-                className={inputClass}
-              />
-            </label>
+          {/* Accounting on its own. These four are what a bookkeeper
+              reconciles against a bank statement, and they were mixed in
+              among renter name and pickup address, which are operations.
+              The cleaning fee sits here because it is the one number on
+              this panel that is not a property of the order at all --
+              it is a price on the car, and saving it prices every trip
+              that car runs from the chosen date onward. */}
+          <div className="mt-4 rounded-lg border border-[rgba(17,19,24,0.1)] bg-[var(--surface-muted)]/50 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
+              {t.accounting}
+            </p>
+            <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
 
-            <label className={cn(labelClass, "sm:col-span-2 lg:col-span-4")}>
-              <span>{t.notes}</span>
+              <label className={labelClass}>
+                <span className={fieldLabelClass}>{t.totalPrice}</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={readOnly ? formatCurrencyInputValue(currentOrder.totalPrice) : draft.totalPrice}
+                  onChange={(event) => updateDraft({ totalPrice: event.target.value })}
+                  onBlur={(event) => updateDraft({ totalPrice: formatCurrencyInputText(event.target.value) })}
+                  readOnly={readOnly}
+                  className={inputClass}
+                />
+              </label>
+
+              <label className={labelClass}>
+                <span className={fieldLabelClass}>{t.deposit}</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={readOnly ? formatCurrencyInputValue(currentOrder.depositAmount) : draft.depositAmount}
+                  onChange={(event) => updateDraft({ depositAmount: event.target.value })}
+                  onBlur={(event) => updateDraft({ depositAmount: formatCurrencyInputText(event.target.value) })}
+                  readOnly={readOnly}
+                  className={inputClass}
+                />
+              </label>
+
+              <label className={labelClass}>
+                <span className={fieldLabelClass}>{t.paymentMethod}</span>
+                <input
+                  value={readOnly ? currentOrder.paymentMethod ?? "" : draft.paymentMethod}
+                  onChange={(event) => updateDraft({ paymentMethod: event.target.value })}
+                  readOnly={readOnly}
+                  className={inputClass}
+                />
+              </label>
+
+              <label className={labelClass}>
+                <span className={fieldLabelClass}>{t.contractNumber}</span>
+                <input
+                  value={readOnly ? currentOrder.contractNumber ?? "" : draft.contractNumber}
+                  onChange={(event) => updateDraft({ contractNumber: event.target.value })}
+                  readOnly={readOnly}
+                  className={inputClass}
+                />
+              </label>
+
+              <label className={cn(fieldClass, "sm:col-span-2")}>
+                <span className={fieldLabelClass}>{t.cleaningFee}</span>
+                <div className="grid min-w-0 grid-cols-[minmax(0,7rem)_auto_minmax(0,1fr)] items-center gap-2">
+                  <input
+                    value={readOnly ? formatCurrencyInputValue(currentOrder.cleaningFee) : draft.cleaningFee}
+                    onChange={(event) => updateDraft({ cleaningFee: event.target.value })}
+                    readOnly={readOnly}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className={inputClass}
+                  />
+                  <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="shrink-0 text-[10px] uppercase tracking-[0.13em] text-[color:var(--ink-soft)]">
+                      {t.cleaningFeeFrom}
+                    </span>
+                    <input
+                      value={draft.cleaningFeeFrom}
+                      onChange={(event) => updateDraft({ cleaningFeeFrom: event.target.value })}
+                      readOnly={readOnly}
+                      type="date"
+                      className={inputClass}
+                    />
+                  </span>
+                </div>
+              </label>
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-[color:var(--ink-soft)]">
+              {t.cleaningFeeHint}
+            </p>
+          </div>
+
+          <div className="mt-4 grid min-w-0 gap-2">
+            <label className={cn(labelClass)}>
+              <span className={fieldLabelClass}>{t.notes}</span>
               <textarea
                 value={readOnly ? currentOrder.notes ?? "" : draft.notes}
                 onChange={(event) => updateDraft({ notes: event.target.value })}

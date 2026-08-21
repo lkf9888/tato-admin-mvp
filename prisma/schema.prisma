@@ -173,6 +173,7 @@ model Workspace {
   activityLogs                  ActivityLog[]
   ownerLedgerItems              OwnerLedgerItem[]
   ownerCommissionRules          OwnerCommissionRule[]
+  vehicleCleaningFeeRules       VehicleCleaningFeeRule[]
   ownerLedgerReceipts           OwnerLedgerReceipt[]
   orderAttachments              OrderAttachment[]
   staffMembers                  StaffMember[]
@@ -266,6 +267,7 @@ model Vehicle {
   attachments            OrderAttachment[]
   staffTasks             StaffTask[]
   directBookingDocuments DirectBookingDocument[]
+  cleaningFeeRules       VehicleCleaningFeeRule[]
 
   @@index([workspaceId])
   inboundEmails          InboundEmail[]
@@ -388,6 +390,32 @@ model OwnerCommissionRule {
   @@unique([ownerId, effectiveFrom])
   @@index([workspaceId])
   @@index([ownerId, effectiveFrom])
+}
+
+/// A cleaning fee, as of a date.
+///
+/// Same reasoning as OwnerCommissionRule and the same hazard: the fee
+/// is a price that changes, and a plain field on the vehicle would
+/// silently reprice every trip that car has ever run the moment it is
+/// edited. Trips are keyed by the day they started, so raising the fee
+/// today leaves last month's statements alone.
+model VehicleCleaningFeeRule {
+  id            String   @id @default(cuid())
+  workspaceId   String?
+  vehicleId     String
+  amount        Float
+  /// Inclusive. A trip starting on this date is charged this fee.
+  effectiveFrom DateTime
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace     Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  vehicle       Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleId, effectiveFrom])
+  @@index([workspaceId])
+  @@index([vehicleId, effectiveFrom])
 }
 
 model OwnerLedgerItem {

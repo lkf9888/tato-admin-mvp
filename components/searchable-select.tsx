@@ -3,7 +3,7 @@
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn, foldLatinLookalikes } from "@/lib/utils";
 
 export type SearchableSelectOption = {
   value: string;
@@ -28,7 +28,8 @@ type SearchableSelectProps = {
 };
 
 function normalizeSearch(value: string) {
-  return value.trim().toLowerCase();
+  // Look-alike letters folded so a pasted plate matches a typed one.
+  return foldLatinLookalikes(value.trim()).toLowerCase();
 }
 
 export function SearchableSelect({

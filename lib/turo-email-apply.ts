@@ -6,6 +6,7 @@ import { reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { parseTuroOrderEmail, type TuroOrderFacts } from "@/lib/turo-email-order";
 import { matchVehiclesForEmail } from "@/lib/turo-message-match";
+import { foldLatinLookalikes } from "@/lib/utils";
 
 /**
  * Writing Turo's mail into orders.
@@ -209,9 +210,18 @@ export async function applyTuroEmailsToOrders(input: {
       // A plate the operator supplied wins outright: they can see what
       // the email cannot, and there is nothing here to second-guess
       // them with.
-      const overridePlate = input.plateOverrides?.[reservationId]?.trim().toUpperCase();
+      // Typed by a person, matched against a stored plate that may
+      // have come from Turo -- so both sides are folded, or an
+      // override typed with an ordinary A silently finds nothing.
+      const overridePlate = input.plateOverrides?.[reservationId]
+        ? foldLatinLookalikes(input.plateOverrides[reservationId].trim()).toUpperCase()
+        : undefined;
       const overrideVehicle = overridePlate
-        ? fleet.find((vehicle) => vehicle.plateNumber?.toUpperCase() === overridePlate)
+        ? fleet.find(
+            (vehicle) =>
+              vehicle.plateNumber &&
+              foldLatinLookalikes(vehicle.plateNumber).toUpperCase() === overridePlate,
+          )
         : undefined;
 
       if (overridePlate && !overrideVehicle) {

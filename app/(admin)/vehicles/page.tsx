@@ -7,6 +7,7 @@ import { getVehicleStatusOptions } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import type { ReactNode } from "react";
+import { foldLatinLookalikes } from "@/lib/utils";
 
 export default async function VehiclesPage({
   searchParams,
@@ -61,7 +62,10 @@ export default async function VehiclesPage({
     label: option.label,
   }));
   const vehicleQuery = (params.q ?? "").trim();
-  const normalizedVehicleQuery = vehicleQuery.toLowerCase();
+  // Folded on both sides, so a plate pasted from Turo finds the same
+  // car as one typed by hand. The two spellings are drawn identically
+  // and nothing on screen can tell them apart.
+  const normalizedVehicleQuery = foldLatinLookalikes(vehicleQuery).toLowerCase();
   const filteredVehicles = normalizedVehicleQuery
     ? vehicles.filter((vehicle) =>
         [
@@ -79,6 +83,11 @@ export default async function VehiclesPage({
         ]
           .filter(Boolean)
           .join(" ")
+          .toLowerCase()
+          .includes(normalizedVehicleQuery) ||
+        foldLatinLookalikes(
+          [vehicle.plateNumber, vehicle.vin, vehicle.turoVehicleCode].filter(Boolean).join(" "),
+        )
           .toLowerCase()
           .includes(normalizedVehicleQuery),
       )

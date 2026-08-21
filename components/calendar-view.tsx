@@ -9,16 +9,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { VehicleEditDialog, type VehicleEditDialogVehicle } from "@/components/vehicle-edit-dialog";
 import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-button";
 import { getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
-import {
-  cn,
-  formatCurrencyInputText,
-  formatCurrencyInputValue,
-  formatDate,
-  formatDateInputDisplay,
-  formatTime as formatTime24,
-  formatTimeInputDisplay,
-  parseDateTimeInputParts,
-} from "@/lib/utils";
+import { cn, foldLatinLookalikes, formatCurrencyInputText, formatCurrencyInputValue, formatDate, formatDateInputDisplay, formatTime as formatTime24, formatTimeInputDisplay, parseDateTimeInputParts } from "@/lib/utils";
 
 type CalendarOrder = EditableOrder;
 
@@ -295,12 +286,14 @@ function buildCreateDraft(baseDate: Date, vehicleId?: string) {
 }
 
 function normalizeFilterText(value: string) {
-  return value.trim().toLowerCase();
+  // Both sides go through the same fold, so a plate pasted from Turo
+  // and one typed by hand are the same search.
+  return foldLatinLookalikes(value.trim()).toLowerCase();
 }
 
 function includesFilterText(searchText: string, query: string) {
   const normalizedQuery = normalizeFilterText(query);
-  return !normalizedQuery || searchText.toLowerCase().includes(normalizedQuery);
+  return !normalizedQuery || normalizeFilterText(searchText).includes(normalizedQuery);
 }
 
 function highlightText(value: string, query: string) {

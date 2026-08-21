@@ -28,6 +28,7 @@ import {
 } from "@/lib/owner-ledger";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { foldLatinLookalikes } from "@/lib/utils";
 import {
   checkRateLimit,
   formatRetryAfterSeconds,
@@ -962,7 +963,11 @@ export async function saveVehicleAction(formData: FormData) {
   const parsed = vehicleSchema.parse({
     id: cleanOptional(formData.get("id")),
     ownerId: cleanOptional(formData.get("ownerId")),
-    plateNumber: formData.get("plateNumber"),
+    // Folded at the boundary. A plate is nearly always pasted from
+    // Turo, and Turo has at least one that carries a Cyrillic A --
+    // drawn exactly like the Latin one, so a hand-added car and an
+    // imported car can look identical and never match each other.
+    plateNumber: foldLatinLookalikes(String(formData.get("plateNumber") ?? "").trim()),
     nickname: formData.get("nickname"),
     brand: formData.get("brand"),
     model: formData.get("model"),

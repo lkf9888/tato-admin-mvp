@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { assignOwnerVehiclesAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
+import { foldLatinLookalikes } from "@/lib/utils";
 
 type VehicleOption = {
   id: string;
@@ -32,6 +33,7 @@ type OwnerVehicleAssignmentFormProps = {
 };
 
 function normalizeSearch(value: string) {
+  value = foldLatinLookalikes(value);
   return value.trim().toLowerCase();
 }
 

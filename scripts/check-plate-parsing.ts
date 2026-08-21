@@ -49,6 +49,23 @@ for (const c of CASES) {
   console.log(`${ok ? "PASS" : "FAIL"}  ${String(got).padEnd(8)} (want ${c.expect})  ${c.why}`);
 }
 
+// Searching works whichever way the plate is spelled. This is the half
+// the first fix missed: storage was corrected to Latin, so a plate
+// pasted from Turo -- Cyrillic -- then matched nothing at all.
+const stored = "A661GL"; // as stored, Latin A
+const pastedFromTuro = "\u0410661GL"; // as the operator pastes it
+const typedByHand = "a661gl";
+const norm = (v: string) => foldLatinLookalikes(v.trim()).toLowerCase();
+for (const [q, why] of [
+  [pastedFromTuro, "pasted from Turo (Cyrillic A)"],
+  [typedByHand, "typed by hand, lower case"],
+  ["A661GL", "typed by hand, upper case"],
+] as [string, string][]) {
+  const hit = norm(stored).includes(norm(q));
+  if (!hit) failed++;
+  console.log(`${hit ? "PASS" : "FAIL"}   search finds it — ${why}`);
+}
+
 // A folded plate must be pure ASCII, or the strip downstream eats it again.
 const folded = foldLatinLookalikes("\u0410661GL");
 const ascii = [...folded].every((ch) => ch.codePointAt(0)! < 128);

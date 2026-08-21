@@ -1,0 +1,35 @@
+name: Gmail enrich
+
+# 同步里慢的那一半:跑模型写摘要和中文翻译。这些是给人闲下来读的,
+# 不需要分钟级新鲜度,而且实打实花钱花时间 —— 正是把它和读取
+# 拆开的理由。
+#
+# 十五分钟一次,接口自己会限量:每次取固定数量的待处理行,时间
+# 预算用完就停,所以积压是分几次跑完,而不是一次跑到 300 秒网关超时。
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# 重叠的 enrich 会把同一批待处理行同时交给两个模型,一个答案付两次钱。
+concurrency:
+  group: gmail-enrich
+  cancel-in-progress: false
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    # 接口可能跑满自己的预算才返回,卡住的请求不该占着 runner 六小时。
+    timeout-minutes: 10
+    steps:
+      - name: Run Turo inbox enrichment
+        run: |
+          code=$(curl -sS --max-time 330 -o /tmp/out.json -w "%{http_code}" \
+            -X POST "https://tatocar.co/api/gmail-sync?mode=enrich" \
+            -H "x-tato-sync-secret: ${{ secrets.GMAIL_SYNC_SECRET }}")
+          cat /tmp/out.json
+          echo ""
+          if [ "$code" != "200" ]; then
+            echo "::error::Gmail enrich returned HTTP $code"
+            exit 1
+          fi

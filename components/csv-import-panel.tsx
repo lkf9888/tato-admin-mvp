@@ -276,6 +276,7 @@ export function CsvImportPanel({
           failedRows?: number;
           createdVehicles?: number;
           skippedRows?: number;
+          reclaimedIdentifiers?: Array<{ plateNumber: string; takenFrom: string }>;
           error?: string;
           details?: BillingProjection;
           failures?: Array<{ rowNumber: number; reason: string }>;
@@ -302,12 +303,21 @@ export function CsvImportPanel({
           return;
         }
 
-        const message = panelMessages.importResult(
-          payload.successRows ?? 0,
-          payload.createdVehicles ?? 0,
-          payload.failedRows ?? 0,
-          payload.skippedRows ?? 0,
-        );
+        // Reclaiming a VIN edits a vehicle nobody asked about, so it
+        // is said out loud rather than left to the activity log.
+        const reclaimed = payload.reclaimedIdentifiers ?? [];
+        const message =
+          panelMessages.importResult(
+            payload.successRows ?? 0,
+            payload.createdVehicles ?? 0,
+            payload.failedRows ?? 0,
+            payload.skippedRows ?? 0,
+          ) +
+          (reclaimed.length > 0
+            ? ` ${panelMessages.reclaimedIdentifiers(
+                reclaimed.map((row) => `${row.plateNumber} ← ${row.takenFrom}`).join("、"),
+              )}`
+            : "");
 
         setShowBillingModal(false);
         setResult(message);

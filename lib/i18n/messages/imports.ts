@@ -122,6 +122,8 @@ export const importsMessages = {
           skippedRows = 0,
         ) =>
           `Imported ${successRows} row(s), auto-created ${createdVehicles} vehicle(s), skipped ${skippedRows} row(s), ${failedRows} row(s) need review. Refresh logs below to inspect the new batch.`,
+        reclaimedIdentifiers: (pairs: string) =>
+          `Took back VIN / Turo vehicle id held by the wrong car: ${pairs}. Those identifiers outrank the plate on every import, so the trips were filing against the wrong vehicle until now.`,
         selectedVehiclesSummary: (selected: number, max: number) =>
           `Selected ${selected} / ${max} new vehicle(s) to fit within the current quota.`,
         selectedVehiclesHint:
@@ -249,6 +251,8 @@ export const importsMessages = {
           skippedRows = 0,
         ) =>
           `已导入 ${successRows} 行，自动创建 ${createdVehicles} 台车辆，跳过 ${skippedRows} 行，另有 ${failedRows} 行待人工检查。可刷新下方日志查看新批次。`,
+        reclaimedIdentifiers: (pairs: string) =>
+          `已从错误的车辆上收回 VIN / Turo 车辆 ID:${pairs}。这两个标识在导入时优先级高于车牌,在收回之前行程一直被归到错误的车上。`,
         selectedVehiclesSummary: (selected: number, max: number) =>
           `已选择 ${selected} / ${max} 台新车辆，符合当前额度上限。`,
         selectedVehiclesHint:

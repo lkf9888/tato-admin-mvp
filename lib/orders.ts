@@ -184,6 +184,36 @@ function resolveVehicleFromCsv(
   vin?: string;
 },
 ) {
+  // The plate goes first, and the order matters more than it looks.
+  //
+  // VIN and Turo's vehicle id used to win, on the reasoning that they
+  // are stronger identifiers than a string parsed out of a label. They
+  // are — but not the copies we hold, because `syncVehicleFromCsvRow`
+  // writes a row's VIN and vehicle id onto whichever vehicle the row
+  // matched. So one wrong match is permanent and self-reinforcing: the
+  // mis-matched car now carries the other car's identifiers, they
+  // outrank the plate on every later import, and the plate never gets
+  // to correct anything.
+  //
+  // That is not hypothetical. A603JM ended up holding A661GL's VIN and
+  // vehicle id, so all 25 of A661GL's trips filed onto A603JM, and
+  // re-importing only re-confirmed it.
+  //
+  // The plate is stated per row by Turo and is the identifier the
+  // operator can actually check. VIN and vehicle id stay as fallbacks
+  // for rows whose label carries no readable plate.
+  const extractedPlate = extractPlateNumber(
+    refs.vehicleLabel,
+    refs.externalVehicleId,
+    refs.vin,
+  );
+  if (extractedPlate) {
+    const byPlate = vehicles.find(
+      (vehicle) => normalizeText(vehicle.plateNumber) === normalizeText(extractedPlate),
+    );
+    if (byPlate) return byPlate;
+  }
+
   const normalizedVin = normalizeText(refs.vin);
   if (normalizedVin) {
     const byVin = vehicles.find((vehicle) => normalizeText(vehicle.vin) === normalizedVin);
@@ -196,18 +226,6 @@ function resolveVehicleFromCsv(
       (vehicle) => normalizeText(vehicle.turoVehicleCode) === normalizedExternalVehicleId,
     );
     if (byTuroVehicleCode) return byTuroVehicleCode;
-  }
-
-  const extractedPlate = extractPlateNumber(
-    refs.vehicleLabel,
-    refs.externalVehicleId,
-    refs.vin,
-  );
-  if (extractedPlate) {
-    const byPlate = vehicles.find(
-      (vehicle) => normalizeText(vehicle.plateNumber) === normalizeText(extractedPlate),
-    );
-    if (byPlate) return byPlate;
   }
 
   if (normalizedVin || normalizedExternalVehicleId || extractedPlate) {
@@ -920,6 +938,8 @@ export async function importTuroOrders(input: {
   const syncedVehicleIds = new Set<string>();
   let createdVehicles = 0;
   let updatedVehicles = 0;
+  /** VIN / vehicle-id pairs taken back from a car that was not theirs. */
+  const reclaimedIdentifiers: Array<{ plateNumber: string; takenFrom: string }> = [];
   let deletedCancelledRows = 0;
   const deletedStaleOrders = 0;
   let skippedRows = 0;
@@ -991,6 +1011,53 @@ export async function importTuroOrders(input: {
       }
 
       if (!syncedVehicleIds.has(vehicle.id)) {
+        // Take back identifiers another car is holding.
+        //
+        // The row named this plate, and Turo states one VIN and one
+        // vehicle id per car -- so if a different vehicle in this
+        // fleet carries them, that is a leftover from a match that was
+        // wrong, and it will keep being wrong until it is cleared.
+        // Reordering the lookup above stops the damage; this undoes it.
+        //
+        // Scoped to the identifiers actually present on this row, and
+        // only ever clears them on OTHER vehicles -- never on the one
+        // the row belongs to.
+        const rowVin = safeString(row[mapping.vin ?? ""]);
+        const rowVehicleCode = safeString(row[mapping.externalVehicleId ?? ""]);
+        if (rowVin || rowVehicleCode) {
+          // Captured, because the narrowing on `vehicle` does not
+          // survive into the callback below.
+          const owner = vehicle;
+          const impostors = vehicles.filter(
+            (other) =>
+              other.id !== owner.id &&
+              ((rowVin && normalizeText(other.vin) === normalizeText(rowVin)) ||
+                (rowVehicleCode &&
+                  normalizeText(other.turoVehicleCode) === normalizeText(rowVehicleCode))),
+          );
+
+          for (const impostor of impostors) {
+            await prisma.vehicle.update({
+              where: { id: impostor.id },
+              data: {
+                vin:
+                  rowVin && normalizeText(impostor.vin) === normalizeText(rowVin)
+                    ? null
+                    : impostor.vin,
+                turoVehicleCode:
+                  rowVehicleCode &&
+                  normalizeText(impostor.turoVehicleCode) === normalizeText(rowVehicleCode)
+                    ? null
+                    : impostor.turoVehicleCode,
+              },
+            });
+            reclaimedIdentifiers.push({
+              plateNumber: owner.plateNumber,
+              takenFrom: impostor.plateNumber,
+            });
+          }
+        }
+
         const syncedVehicle = await syncVehicleFromCsvRow({
           vehicle,
           vehicles,
@@ -1147,6 +1214,9 @@ export async function importTuroOrders(input: {
       skippedRows,
       deletedCancelledRows,
       deletedStaleOrders,
+      // A silent write to a vehicle other than the one being imported,
+      // so it belongs in the log even though nobody asked for it.
+      reclaimedIdentifiers,
     },
   });
 
@@ -1159,6 +1229,7 @@ export async function importTuroOrders(input: {
     skippedRows,
     deletedCancelledRows,
     deletedStaleOrders,
+    reclaimedIdentifiers,
     failures,
   };
 }

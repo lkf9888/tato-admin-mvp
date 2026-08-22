@@ -8,6 +8,10 @@ import {
   OwnerCommissionPanel,
   type CommissionRuleRow,
 } from "@/components/owner-commission-panel";
+import {
+  OwnerFeeSharingPanel,
+  type FeeShareRow,
+} from "@/components/owner-fee-sharing-panel";
 import type { Locale } from "@/lib/i18n";
 
 type Owner = {
@@ -125,12 +129,14 @@ export function OwnerEditor({
   assignedVehicleIds,
   allVehicles,
   commissionRules,
+  feeRows,
   locale,
 }: {
   owner: Owner;
   assignedVehicleIds: string[];
   allVehicles: VehicleRow[];
   commissionRules: CommissionRuleRow[];
+  feeRows: FeeShareRow[];
   locale: Locale;
 }) {
   const labels = copy(locale);
@@ -299,6 +305,10 @@ export function OwnerEditor({
           terms are the thing an owner and the operator argue about,
           and the share link publishes a statement computed from them. */}
       <OwnerCommissionPanel locale={locale} ownerId={owner.id} rules={commissionRules} />
+
+      {/* Straight after the commission, because the two together are
+          the whole agreement: what percentage, and of what. */}
+      <OwnerFeeSharingPanel locale={locale} ownerId={owner.id} rows={feeRows} />
 
       <section className="card space-y-3 p-6">
         <h2 className="text-lg font-semibold">{labels.sections.share}</h2>

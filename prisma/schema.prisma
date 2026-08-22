@@ -217,6 +217,15 @@ model Owner {
   email       String?
   companyName String?
   accessType  OwnerAccessType   @default(share_link)
+  /// Per-fee exceptions to the workspace share policy, as JSON:
+  /// `{"Late fee":"MANAGER","Cleaning":"OWNER"}`.
+  ///
+  /// Stored as exceptions rather than a full map on purpose. An owner
+  /// with no entry behaves exactly as they did before this existed, so
+  /// adding the feature changes nobody's statement until it is used --
+  /// and a fee added to the catalogue later inherits the workspace
+  /// default instead of silently defaulting to withheld.
+  feeShareOverrides String?
   notes       String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt

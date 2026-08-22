@@ -6,8 +6,8 @@ import {
 } from "@prisma/client";
 
 import {
-  getManagerRetention,
-  getOrderCategoryBreakdown,
+  getManagerRetentionByFee,
+  parseFeeShareOverrides,
   resolveWorkspaceLedgerPolicy,
   type LedgerShareCategory,
 } from "@/lib/ledger-policy";
@@ -101,9 +101,17 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
   // statement rather than being netted out of the revenue figure, so
   // the owner can see exactly what was withheld and why.
   const policy = resolveWorkspaceLedgerPolicy(order.workspace);
-  const retention = getManagerRetention(
-    getOrderCategoryBreakdown(order.sourceMetadata),
+  // Per fee now, not per category. An owner with no exceptions
+  // resolves every fee through the same category policy as before, so
+  // their totals are unchanged; an owner with exceptions gets them.
+  const owner = await db.owner.findUnique({
+    where: { id: order.vehicle.ownerId },
+    select: { feeShareOverrides: true },
+  });
+  const retention = getManagerRetentionByFee(
+    order.sourceMetadata,
     policy,
+    parseFeeShareOverrides(owner?.feeShareOverrides),
   );
   const retainedAmount = roundLedgerAmount(Math.min(retention.total, Math.max(0, netEarning ?? 0)));
 
@@ -148,11 +156,10 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
   }
 
   if (retainedAmount > 0.005) {
-    const detail = retention.categories
-      .map(
-        (entry) =>
-          `${RETENTION_CATEGORY_LABELS[entry.category]} ${roundLedgerAmount(entry.amount).toFixed(2)}`,
-      )
+    // Named fee by fee. "reimbursements 41.20" told the owner a
+    // category was withheld; the fee names tell them which charge.
+    const detail = retention.lines
+      .map((entry) => `${entry.column} ${roundLedgerAmount(entry.amount).toFixed(2)}`)
       .join(" + ");
     desired.push({
       kind: OwnerLedgerKind.EXPENSE_REIMBURSEMENT,

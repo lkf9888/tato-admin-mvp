@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { resolveCleaningFee } from "@/lib/owner-commission";
+import { getOrderFeeLines } from "@/lib/ledger-policy";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { roundCurrencyAmount } from "@/lib/utils";
@@ -121,6 +122,9 @@ function buildResponseOrder(order: OrderForResponse) {
       new Date(),
       order.vehicle.cleaningFee,
     ).amount,
+    // Every charge this trip carried beyond the rent. The importer has
+    // always captured these; nothing ever showed them.
+    feeLines: getOrderFeeLines(order.sourceMetadata),
     cleaningFeeOnTrip: resolveCleaningFee(
       order.vehicle.cleaningFeeRules,
       order.pickupDatetime,

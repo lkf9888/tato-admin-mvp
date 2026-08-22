@@ -5,6 +5,12 @@ import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getOwnerCommissionRules, pickCommissionRule } from "@/lib/owner-commission";
+import {
+  FEE_CATALOGUE,
+  parseFeeShareOverrides,
+  resolveFeeTarget,
+  resolveWorkspaceLedgerPolicy,
+} from "@/lib/ledger-policy";
 
 type Params = Promise<{ ownerId: string }>;
 
@@ -43,6 +49,20 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
   // them in -- most recent terms at the top, history beneath.
   const commissionRules = await getOwnerCommissionRules(owner.id);
   const currentRule = pickCommissionRule(commissionRules, new Date());
+
+  // Resolved here rather than in the panel, so the page shows what
+  // actually applies -- the owner's exception where there is one, the
+  // workspace policy where there is not.
+  const policy = resolveWorkspaceLedgerPolicy(workspace);
+  const overrides = parseFeeShareOverrides(owner.feeShareOverrides);
+  const feeRows = FEE_CATALOGUE.filter(
+    (fee) => fee.group !== "rent" && fee.group !== "discount",
+  ).map((fee) => ({
+    column: fee.column,
+    group: fee.group,
+    target: resolveFeeTarget(fee.column, policy, overrides),
+    isOverride: Boolean(overrides?.[fee.column]),
+  }));
 
   const allVehicles = await prisma.vehicle.findMany({
     where: { workspaceId: workspace.id },
@@ -84,6 +104,7 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
         note: rule.note,
         isCurrent: rule.id === currentRule?.id,
       }))}
+      feeRows={feeRows}
       assignedVehicleIds={owner.vehicles.map((vehicle) => vehicle.id)}
       allVehicles={allVehicles.map((vehicle) => ({
         id: vehicle.id,

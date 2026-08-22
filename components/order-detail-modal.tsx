@@ -51,6 +51,8 @@ export type EditableOrder = {
    *  the day it started -- a different number whenever the price has
    *  changed since. Read-only. */
   cleaningFeeOnTrip?: number | null;
+  /** Every charge beyond the rent, straight from the CSV row. */
+  feeLines?: Array<{ column: string; group: string; amount: number; sign: string }>;
 };
 
 export type OrderEditorVehicleOption = {
@@ -156,6 +158,7 @@ function labels(locale: Locale) {
         ownerShareSyncOwnerRequired: "请先给车辆绑定车主。",
         ownerShareLastSynced: "最后同步",
         accounting: "会计信息",
+        feeBreakdown: "费用明细(来自 Turo CSV)",
         cleaningFee: "洗车费",
         cleaningFeeFrom: "生效日",
         cleaningFeeHint:
@@ -211,6 +214,7 @@ function labels(locale: Locale) {
         ownerShareSyncOwnerRequired: "Assign this vehicle to an owner first.",
         ownerShareLastSynced: "Last synced",
         accounting: "Accounting",
+        feeBreakdown: "Charges on this trip (from the Turo CSV)",
         cleaningFee: "Cleaning fee",
         cleaningFeeFrom: "From",
         cleaningFeeHint:
@@ -842,6 +846,40 @@ export function OrderDetailModal({
                 </div>
               </label>
             </div>
+            {/* What the trip was actually made of. Turo bundles a
+                dozen possible charges into one earnings figure, and
+                until now the panel showed the figure and none of the
+                charges -- so "why is this trip $377" had no answer
+                anywhere in the product. */}
+            {currentOrder.feeLines && currentOrder.feeLines.length > 0 ? (
+              <div className="mt-3 rounded-md border border-[rgba(17,19,24,0.1)] bg-white/70 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
+                  {t.feeBreakdown}
+                </p>
+                <ul className="mt-1.5 space-y-0.5">
+                  {currentOrder.feeLines.map((line) => (
+                    <li
+                      key={line.column}
+                      className="flex items-baseline justify-between gap-3 text-[12px] leading-5"
+                    >
+                      <span className="min-w-0 truncate text-[color:var(--ink-soft)]">
+                        {line.column}
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 tabular-nums",
+                          line.sign === "debit" ? "text-rose-600" : "text-[color:var(--ink)]",
+                        )}
+                      >
+                        {line.sign === "debit" ? "−" : ""}
+                        {formatCurrency(Math.abs(line.amount), locale)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             <p className="mt-2 text-[11px] leading-4 text-[color:var(--ink-soft)]">
               {t.cleaningFeeHint}
             </p>

@@ -3,6 +3,7 @@
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import {
+  LedgerShareTarget,
   OrderStatus,
   OrderSource,
   OwnerSettlementDirection,
@@ -34,6 +35,11 @@ import {
   syncVehicleOwnerLedger,
 } from "@/lib/owner-ledger";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
+import {
+  resolveFeeTarget,
+  resolveWorkspaceLedgerPolicy,
+  SHAREABLE_FEE_COLUMNS,
+} from "@/lib/ledger-policy";
 import { prisma } from "@/lib/prisma";
 import { foldLatinLookalikes } from "@/lib/utils";
 import {
@@ -1082,6 +1088,61 @@ export async function dismissPendingOrderAction(formData: FormData) {
     entityType: "Workspace",
     entityId: workspace.id,
     metadata: { externalOrderId: pending.externalOrderId },
+  });
+
+  revalidateAdminPages();
+}
+
+/**
+ * Which charges this owner participates in.
+ *
+ * Saved as exceptions to the workspace policy, not as a full map: an
+ * owner with no entries keeps behaving exactly as they did, and a fee
+ * added to the catalogue later inherits the workspace default rather
+ * than silently becoming withheld.
+ *
+ * The form posts one value per fee, so anything matching the policy is
+ * dropped before storing -- otherwise changing a workspace-level
+ * setting would stop reaching every owner who had ever opened this
+ * page.
+ */
+export async function saveOwnerFeeSharingAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  const ownerId = formData.get("ownerId")?.toString() ?? "";
+  const owner = await prisma.owner.findFirst({
+    where: { id: ownerId, workspaceId: workspace.id },
+    select: { id: true, name: true },
+  });
+  if (!owner) return;
+
+  const policy = resolveWorkspaceLedgerPolicy(workspace);
+  const overrides: Record<string, string> = {};
+
+  for (const column of SHAREABLE_FEE_COLUMNS) {
+    const raw = formData.get(`fee:${column}`)?.toString();
+    if (raw !== LedgerShareTarget.MANAGER && raw !== LedgerShareTarget.OWNER) continue;
+    // Only a genuine departure from the policy is stored.
+    if (raw === resolveFeeTarget(column, policy, null)) continue;
+    overrides[column] = raw;
+  }
+
+  await prisma.owner.update({
+    where: { id: owner.id },
+    data: {
+      feeShareOverrides: Object.keys(overrides).length > 0 ? JSON.stringify(overrides) : null,
+    },
+  });
+
+  const resynced = await syncOwnerLedger(owner.id, workspace.id);
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "owner_fee_sharing_saved",
+    entityType: "Owner",
+    entityId: owner.id,
+    metadata: { name: owner.name, overrides, resyncedOrders: resynced.orderCount },
   });
 
   revalidateAdminPages();

@@ -240,6 +240,15 @@ model Vehicle {
   year                   Int
   vin                    String?
   status                 VehicleStatus           @default(available)
+  /// Retired from sync, not merely out of service.
+  ///
+  /// `status: inactive` means a car is off the road for a while, and
+  /// its trips are still real -- the CSV should keep correcting them.
+  /// Archiving means the opposite: stop writing to this car at all. An
+  /// import skips its rows and booking mail will not file new trips
+  /// against it, so a car sold or handed back stops absorbing updates
+  /// without its history being deleted.
+  isArchived             Boolean                 @default(false)
   turoListingName        String?
   // Which Turo account this car is listed on. Null is the main
   // account. A co-hosted listing lives on someone else's account, so

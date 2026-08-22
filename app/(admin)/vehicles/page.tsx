@@ -398,6 +398,7 @@ export default async function VehiclesPage({
                   year: vehicle.year,
                   vin: vehicle.vin,
                   status: vehicle.status,
+                  isArchived: vehicle.isArchived,
                   turoListingName: vehicle.turoListingName,
                   turoAccount: vehicle.turoAccount,
                   turoVehicleCode: vehicle.turoVehicleCode,

@@ -277,6 +277,7 @@ export function CsvImportPanel({
           createdVehicles?: number;
           skippedRows?: number;
           reclaimedIdentifiers?: Array<{ plateNumber: string; takenFrom: string }>;
+          archivedRows?: number;
           error?: string;
           details?: BillingProjection;
           failures?: Array<{ rowNumber: number; reason: string }>;
@@ -317,6 +318,11 @@ export function CsvImportPanel({
             ? ` ${panelMessages.reclaimedIdentifiers(
                 reclaimed.map((row) => `${row.plateNumber} ← ${row.takenFrom}`).join("、"),
               )}`
+            : "") +
+          // Declined rows are not failures, but silence would read as
+          // data loss on a file the operator watched go in.
+          ((payload.archivedRows ?? 0) > 0
+            ? ` ${panelMessages.archivedRows(payload.archivedRows ?? 0)}`
             : "");
 
         setShowBillingModal(false);

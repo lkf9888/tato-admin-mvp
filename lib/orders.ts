@@ -938,6 +938,8 @@ export async function importTuroOrders(input: {
   const syncedVehicleIds = new Set<string>();
   let createdVehicles = 0;
   let updatedVehicles = 0;
+  /** Rows declined because their car is archived. */
+  let archivedRows = 0;
   /** VIN / vehicle-id pairs taken back from a car that was not theirs. */
   const reclaimedIdentifiers: Array<{ plateNumber: string; takenFrom: string }> = [];
   let deletedCancelledRows = 0;
@@ -1007,6 +1009,17 @@ export async function importTuroOrders(input: {
           reason: `Vehicle not found for "${vehicleLabel || vehicleName || externalVehicleId || vin}"`,
           row,
         });
+        continue;
+      }
+
+      // Archived means "stop writing to this car". Skipped before any
+      // of the writes below -- the order upsert, the vehicle field
+      // sync, the identifier reclaim -- so an archived car absorbs
+      // nothing from an import, which is the whole point of archiving
+      // one. Counted rather than failed: there is nothing wrong with
+      // the row, we are declining it.
+      if (vehicle.isArchived) {
+        archivedRows += 1;
         continue;
       }
 
@@ -1230,6 +1243,7 @@ export async function importTuroOrders(input: {
     deletedCancelledRows,
     deletedStaleOrders,
     reclaimedIdentifiers,
+    archivedRows,
     failures,
   };
 }

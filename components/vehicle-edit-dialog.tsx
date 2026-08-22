@@ -19,6 +19,7 @@ export type VehicleEditDialogVehicle = {
   year: number;
   vin?: string | null;
   status: string;
+  isArchived?: boolean;
   turoListingName?: string | null;
   turoAccount?: string | null;
   turoVehicleCode?: string | null;
@@ -145,6 +146,35 @@ export function VehicleEditDialog({
                 className={fieldClass}
               />
             </DialogField>
+
+            {/* Distinct from `inactive`, and the label says how. A car
+                out of service still has real trips that the CSV should
+                keep correcting; an archived one should stop receiving
+                anything at all. */}
+            <label className="flex items-start gap-2 sm:col-span-2">
+              <input
+                type="checkbox"
+                name="isArchived"
+                defaultChecked={vehicle.isArchived ?? false}
+                className="mt-0.5 h-4 w-4"
+              />
+              <span className="min-w-0">
+                <span className="block text-[12px] font-semibold text-[var(--ink)]">
+                  {locale === "en"
+                    ? "Archive this vehicle"
+                    : locale === "zh-Hant"
+                      ? "封存這台車"
+                      : "归档这台车"}
+                </span>
+                <span className="block text-[11px] leading-4 text-[var(--ink-soft)]">
+                  {locale === "en"
+                    ? "CSV imports skip its rows and booking email stops filing new trips against it. Existing orders and history are kept."
+                    : locale === "zh-Hant"
+                      ? "CSV 匯入會略過它的資料列，預訂郵件也不再把新行程掛到它身上。既有訂單與歷史都會保留。"
+                      : "CSV 导入会跳过它的数据行,预订邮件也不再把新行程挂到它身上。已有订单和历史都保留。"}
+                </span>
+              </span>
+            </label>
           </DialogSection>
 
           <DialogSection title={locale === "en" ? "Owner and costs" : locale === "zh-Hant" ? "車主與費用" : "车主与费用"}>

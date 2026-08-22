@@ -602,8 +602,22 @@ export function CalendarView({
       // would fight the browser's own scrolling. Middle and right
       // buttons belong to the OS.
       if (event.pointerType === "touch" || event.button !== 0) return;
-      // Anything interactive keeps its own click.
-      if ((event.target as HTMLElement).closest("button, a, input, select, textarea, [role='button']")) {
+
+      // Only text controls are excluded, and that is the fix.
+      //
+      // This used to bail on `button, a, [role=button]` too, on the
+      // reasoning that anything clickable should keep its click. The
+      // timeline is almost entirely buttons -- every booking bar is
+      // one, and so is every plate in the sticky column -- so the
+      // places a person naturally grabs were exactly the places where
+      // dragging did nothing. Which is what "dragging does not work"
+      // looks like from the outside.
+      //
+      // Nothing is lost by allowing it: the 4px threshold below still
+      // treats a press-and-release as a click, and a real drag
+      // swallows the click that follows it. A bar can be both a thing
+      // you press and a thing you drag from.
+      if ((event.target as HTMLElement).closest("input, select, textarea, [contenteditable]")) {
         return;
       }
       stopMomentum();
@@ -627,7 +641,19 @@ export function CalendarView({
       if (!drag.moved) {
         if (Math.abs(dx) < 4) return;
         drag.moved = true;
-        node.setPointerCapture(event.pointerId);
+        // Capture is an optimisation -- it keeps the drag alive when
+        // the cursor leaves the element -- and it was written as a
+        // precondition. `setPointerCapture` throws whenever the
+        // browser does not consider that pointer capturable, and the
+        // throw aborted the handler before the line below, so the
+        // whole drag silently did nothing. Scrolling must not depend
+        // on it succeeding.
+        try {
+          node.setPointerCapture(event.pointerId);
+        } catch {
+          // Without capture the drag still works; it just ends early
+          // if the cursor leaves the timeline.
+        }
         node.style.cursor = "grabbing";
         node.style.userSelect = "none";
       }
@@ -651,7 +677,11 @@ export function CalendarView({
       dragRef.current = null;
       node.style.cursor = "";
       node.style.userSelect = "";
-      if (node.hasPointerCapture(event.pointerId)) node.releasePointerCapture(event.pointerId);
+      try {
+        if (node.hasPointerCapture(event.pointerId)) node.releasePointerCapture(event.pointerId);
+      } catch {
+        // Same reasoning as the capture above.
+      }
       if (!drag.moved) return;
 
       // A drag that ends in a click would open whatever bar is under
@@ -664,11 +694,19 @@ export function CalendarView({
       node.addEventListener("click", swallow, { capture: true, once: true });
       window.setTimeout(() => node.removeEventListener("click", swallow, { capture: true }), 0);
 
-      let velocity = drag.velocity;
+      // Clamped, then decayed harder than before.
+      //
+      // Total glide is roughly velocity * 16 / (1 - decay), so at 0.94
+      // every 1px/ms of release speed bought 267px of travel -- a
+      // 300px drag measured 1,212px of scroll, four weeks past where
+      // it was let go. At 0.88 that is 133px, and the clamp stops a
+      // fast flick from launching regardless.
+      const MAX_VELOCITY = 1.6; // px per ms
+      let velocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, drag.velocity));
       if (Math.abs(velocity) < 0.05) return;
 
       const step = () => {
-        velocity *= 0.94;
+        velocity *= 0.88;
         node.scrollLeft -= velocity * 16;
         if (Math.abs(velocity) < 0.02) {
           momentumRef.current = null;
@@ -1384,6 +1422,8 @@ export function CalendarView({
                     <div
                       className={cn(
                         "sticky left-0 z-20 flex flex-col justify-center overflow-hidden border-r border-[color:var(--line)] px-3 py-1.5 backdrop-blur max-lg:px-2 max-lg:py-1",
+                        // The detail the second line used to carry.
+                        "cursor-default",
                         // Opaque, not 95%. The column stands still
                         // while a month of days slides underneath it,
                         // and five percent of that was enough to read
@@ -1391,6 +1431,9 @@ export function CalendarView({
                         alternateRow ? "bg-[#faf4eb]" : "bg-white",
                       )}
                       style={{ height: rowHeight }}
+                      title={[vehicle.plateNumber, vehicle.secondaryLabel, vehicle.ownerName]
+                        .filter(Boolean)
+                        .join(" · ")}
                     >
                       {!readOnly && vehicle.editVehicle ? (
                         <VehicleEditDialog
@@ -1409,13 +1452,15 @@ export function CalendarView({
                           {highlightText(vehicle.plateNumber || vehicle.label, vehicleFilterQuery)}
                         </p>
                       )}
-                      {/* Model and owner are a second line, and a
-                          31px row has height for one. Clipped through
-                          the middle of the glyphs it read as damage,
-                          not as detail; the plate is the identifier
-                          that matters here and the row opens a dialog
-                          with the rest. */}
-                      <p className="mt-0.5 hidden truncate text-[10.5px] leading-tight text-[color:var(--ink-soft)] lg:block">
+                      {/* The plate is the column, on every size now.
+                          Model and owner were a second line under it,
+                          and in a grid whose job is "which car is free
+                          when" they are the part nobody reads -- the
+                          plate identifies the car and the row already
+                          opens a dialog with everything else. Kept in
+                          the tooltip so the detail is a hover away
+                          rather than gone. */}
+                      <p className="mt-0.5 hidden truncate text-[10.5px] leading-tight text-[color:var(--ink-soft)]">
                         {highlightText(vehicle.secondaryLabel || vehicle.label, vehicleFilterQuery)}
                         {" · "}
                         {highlightText(vehicle.ownerName || calendarMessages.unassignedOwner, ownerFilterQuery)}

@@ -125,6 +125,7 @@ export default async function CalendarPage() {
           year: vehicle.year,
           vin: vehicle.vin,
           status: vehicle.status,
+          isArchived: vehicle.isArchived,
           turoListingName: vehicle.turoListingName,
           turoVehicleCode: vehicle.turoVehicleCode,
           purchasePrice: vehicle.purchasePrice,

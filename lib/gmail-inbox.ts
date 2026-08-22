@@ -404,7 +404,9 @@ export async function runGmailSync(input: {
   // Loaded once and reused for every message: the fleet is ~100 rows
   // and does not change during a sync.
   const fleet = await prisma.vehicle.findMany({
-    where: { workspaceId: input.workspaceId },
+    // Archived cars are excluded, or booking mail would keep filing
+    // new trips against a car retired precisely to stop receiving them.
+    where: { workspaceId: input.workspaceId, isArchived: false },
     select: {
       id: true,
       brand: true,

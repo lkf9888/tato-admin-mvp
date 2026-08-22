@@ -1,5 +1,6 @@
 "use client";
 
+import { ActionSubmitButton } from "@/components/action-submit-button";
 import { deleteOwnerCommissionAction, saveOwnerCommissionAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
@@ -35,6 +36,8 @@ function copy(locale: Locale) {
         fromHint: "这一天(含)之后开始的行程按这套条款计算,之前的行程不受影响。",
         noteLabel: "备注(可选)",
         save: "保存这套条款",
+        saving: "保存中…",
+        saved: "已保存,并已重算这位车主的订单",
         historyTitle: "条款历史",
         historyEmpty: "还没有任何条款记录。",
         currentTag: "生效中",
@@ -64,6 +67,8 @@ function copy(locale: Locale) {
           "Trips starting on or after this date use these terms. Earlier trips are untouched.",
         noteLabel: "Note (optional)",
         save: "Save these terms",
+        saving: "Saving…",
+        saved: "Saved — this owner’s orders were resynced",
         historyTitle: "Terms history",
         historyEmpty: "No terms recorded yet.",
         currentTag: "In force",
@@ -179,9 +184,7 @@ export function OwnerCommissionPanel({
         </label>
 
         <div className="sm:col-span-2">
-          <button type="submit" className="btn-primary">
-            {t.save}
-          </button>
+          <ActionSubmitButton label={t.save} pendingLabel={t.saving} savedLabel={t.saved} />
         </div>
       </form>
 

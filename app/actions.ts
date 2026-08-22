@@ -192,6 +192,11 @@ function revalidateAdminPages() {
     "/billing",
     "/share-links",
   ].forEach((path) => revalidatePath(path));
+  // Dynamic routes are not covered by their parent path: revalidating
+  // "/owners" leaves "/owners/<id>" -- the page these settings are
+  // edited on -- serving whatever it last rendered.
+  revalidatePath("/owners/[ownerId]", "page");
+  revalidatePath("/owners/[ownerId]/ledger", "page");
 }
 
 function cleanText(value: string | undefined) {

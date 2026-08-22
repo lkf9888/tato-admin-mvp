@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ActionSubmitButton } from "@/components/action-submit-button";
 import { saveOwnerFeeSharingAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
 
@@ -26,6 +27,8 @@ function copy(locale: Locale) {
         withheld: "公司留下",
         overrideTag: "例外",
         save: "保存费用共享设置",
+        saving: "保存中…",
+        saved: "已保存,并已重算这位车主的订单",
         groups: {
           usage: "超时超里程",
           service: "服务性收入",
@@ -44,6 +47,8 @@ function copy(locale: Locale) {
         withheld: "Company keeps",
         overrideTag: "exception",
         save: "Save fee sharing",
+        saving: "Saving…",
+        saved: "Saved — this owner’s orders were resynced",
         groups: {
           usage: "Extra usage",
           service: "Service income",
@@ -154,9 +159,7 @@ export function OwnerFeeSharingPanel({
           </div>
         ))}
 
-        <button type="submit" className="btn-primary">
-          {t.save}
-        </button>
+        <ActionSubmitButton label={t.save} pendingLabel={t.saving} savedLabel={t.saved} />
       </form>
     </section>
   );

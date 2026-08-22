@@ -108,7 +108,16 @@ const vehicleSchema = z.object({
   vin: z.string().optional(),
   status: z.nativeEnum(VehicleStatus),
   turoListingName: z.string().optional(),
-  turoAccount: z.string().optional(),
+  // `nullish`, not `optional`. Blank means "the main account", and the
+  // action writes that as an explicit null -- which `.optional()`
+  // rejects, because it admits `undefined` and nothing else. So every
+  // hand-added vehicle without a co-host account failed validation and
+  // took the whole request down with it.
+  //
+  // Same shape as the assistant's threadId bug: a nullable column, a
+  // caller that sends null, and a schema that only allows undefined.
+  // Worth checking for wherever a parse input ends in `|| null`.
+  turoAccount: z.string().nullish(),
   turoVehicleCode: z.string().optional(),
   purchasePrice: z.coerce.number().nonnegative().optional(),
   ownerCommissionRate: z.coerce.number().min(0).max(100).optional(),

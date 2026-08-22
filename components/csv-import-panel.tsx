@@ -390,10 +390,13 @@ export function CsvImportPanel({
           <p className="text-[12px] text-[color:var(--ink-soft)]">{importMessages.pageSubtitle}</p>
         </div>
 
-        <div className="mt-3 border-t border-[color:var(--line)] pt-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
+        {/* The four steps are read once and then known. Folded away
+            rather than deleted, because the first import is the one
+            that needs them. */}
+        <details className="mt-3 border-t border-[color:var(--line)] pt-3">
+          <summary className="tap-press cursor-pointer list-none text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)] underline underline-offset-2">
             {importMessages.guideTitle}
-          </p>
+          </summary>
           <ol className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             {importMessages.guideSteps.map((step, index) => (
               <li
@@ -410,7 +413,7 @@ export function CsvImportPanel({
               </li>
             ))}
           </ol>
-        </div>
+        </details>
       </section>
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -519,11 +522,14 @@ export function CsvImportPanel({
                   {panelMessages.mappingKicker}
                 </h3>
                 <p className="text-[12px] text-[color:var(--ink-soft)]">
+                  {/* Not `emptyState` -- step 1 already says that,
+                      verbatim, eight lines up. Two cards repeating one
+                      sentence reads as a rendering fault. */}
                   {hasFile
                     ? missingRequired.length > 0
                       ? `${panelMessages.requiredMappingLeft}: ${missingRequired.join(", ")}`
                       : `${panelMessages.requiredMappingLeft}: ${panelMessages.none}`
-                    : panelMessages.emptyState}
+                    : panelMessages.mappingWaiting}
                 </p>
               </div>
             </div>

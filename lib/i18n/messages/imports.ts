@@ -40,6 +40,8 @@ export const importsMessages = {
         `${count} cars in the fleet share this model and year`,
       unconfirmedUnknownVehicles: (list: string) =>
         `Past imports named cars your fleet does not have: ${list}. Until they exist here, booking email for their model matches one car fewer than really exists — and can land on the wrong one. Re-import with "Auto-create missing vehicles" on, or add them by hand.`,
+      unconfirmedShowList: (count: number) => `Show the ${count}`,
+      logShowAll: (count: number) => `Show ${count} older import(s)`,
       logKicker: "Import log",
       logTitle: "Recent CSV batches",
       sampleFile: "Sample file lives in `/sample-data/turo-sample.csv`",
@@ -60,6 +62,7 @@ export const importsMessages = {
         emptyState:
           "Upload the sample CSV in `/sample-data/turo-sample.csv` or a real Turo export to see mapped rows here.",
         mappingKicker: "2. Field mapping",
+        mappingWaiting: "Waiting for a file.",
         importKicker: "3. Import",
         ignoreColumn: "Ignore column",
         rowsDetected: "Rows detected",
@@ -170,6 +173,8 @@ export const importsMessages = {
       unconfirmedSiblings: (count: number) => `车队里有 ${count} 台同款同年份`,
       unconfirmedUnknownVehicles: (list: string) =>
         `以前的导入里出现过车队中没有的车:${list}。只要它们不在车队里,这些车型的预订邮件能匹配到的车就比实际少一台,就可能落到错误的车上。重新导入时勾选「自动创建缺失车辆」,或者手动把它们加进来。`,
+      unconfirmedShowList: (count: number) => `查看这 ${count} 笔`,
+      logShowAll: (count: number) => `显示更早的 ${count} 次导入`,
       logKicker: "导入日志",
       logTitle: "最近 CSV 批次",
       sampleFile: "示例文件位于 `/sample-data/turo-sample.csv`",
@@ -189,6 +194,7 @@ export const importsMessages = {
         chooseFile: "选择文件",
         emptyState: "上传 `/sample-data/turo-sample.csv` 示例文件，或真实的 Turo 导出文件后，这里会显示映射预览。",
         mappingKicker: "2. 字段映射",
+        mappingWaiting: "等待上传文件。",
         importKicker: "3. 开始导入",
         ignoreColumn: "忽略该列",
         rowsDetected: "识别到行数",

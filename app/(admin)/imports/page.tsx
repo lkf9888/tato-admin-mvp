@@ -48,18 +48,30 @@ export default async function ImportsPage({
 
   return (
     <div className="space-y-3">
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
-        <div className="flex flex-col gap-1">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
-            {turoSyncMessages.kicker}
-          </p>
-          <h3 className="font-serif text-[1.05rem] text-[var(--ink)] sm:text-[1.25rem]">
-            {turoSyncMessages.title}
-          </h3>
-          <p className="max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
-            {turoSyncMessages.copy}
-          </p>
-        </div>
+      {/* Closed by default. Seven inputs, a cURL paste and two secret
+          headers -- configured once and then never again, yet it was
+          the first 879px of a page whose job is "upload this file". */}
+      <details className="group overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+        <summary className="tap-press flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 sm:px-4">
+          <span className="min-w-0">
+            <span className="block text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
+              {turoSyncMessages.kicker}
+            </span>
+            <span className="mt-0.5 block truncate font-serif text-[1.05rem] text-[var(--ink)]">
+              {turoSyncMessages.title}
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-soft)]">
+            {turoSyncConfig?.csvUrl || hasSavedRequestHeaders
+              ? turoSyncMessages.configured
+              : turoSyncMessages.notConfigured}
+          </span>
+        </summary>
+
+        <div className="border-t border-[var(--line)] px-3 pb-3 pt-3 sm:px-4">
+        <p className="max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
+          {turoSyncMessages.copy}
+        </p>
 
         {turoSyncNotice ? (
           <div className={turoSyncNotice.className}>
@@ -91,14 +103,6 @@ export default async function ImportsPage({
                 className="min-h-9 border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
               />
             </label>
-          </div>
-
-          <div className="border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[11px] leading-4 text-[var(--ink-soft)]">
-            <span className="font-medium text-[var(--ink-mid)]">{turoSyncMessages.discoveredEndpointLabel}</span>{" "}
-            <code className="break-all text-[var(--ink-mid)]">
-              https://turo.com/api/earnings/download?year={"{year}"}
-            </code>
-            <span className="block pt-1">{turoSyncMessages.discoveredEndpointHint}</span>
           </div>
 
           <label className="grid gap-1">
@@ -149,16 +153,12 @@ export default async function ImportsPage({
             </label>
           ) : null}
 
-          <label className="grid gap-1">
-            <span className="font-medium text-[var(--ink-mid)]">{turoSyncMessages.mapping}</span>
-            <textarea
-              name="csvMapping"
-              defaultValue={turoSyncConfig?.csvMapping ?? ""}
-              placeholder='{"Reservation ID":"externalOrderId"}'
-              rows={3}
-              className="border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
-            />
-          </label>
+          {/* The column-mapping JSON box is gone. Hand-writing a field
+              map is a developer's escape hatch, and auto-detection has
+              handled every real export -- 2,221 rows on the last one.
+              Carried as a hidden input so removing the control does not
+              erase a mapping somebody already saved. */}
+          <input type="hidden" name="csvMapping" defaultValue={turoSyncConfig?.csvMapping ?? ""} />
 
           <div className="grid gap-2">
             <label className="flex items-start gap-2 border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2">
@@ -182,7 +182,8 @@ export default async function ImportsPage({
             </button>
           </div>
         </form>
-      </section>
+        </div>
+      </details>
 
       {unconfirmed.length > 0 ? (
         <section className="rounded-lg border border-amber-300 bg-amber-50 p-3 sm:p-4">
@@ -196,7 +197,14 @@ export default async function ImportsPage({
             {importMessages.unconfirmedCopy}
           </p>
 
-          <ul className="mt-3 space-y-1.5">
+          {/* The count and the reason stay visible -- that is the
+              warning. The rows behind it are for when someone acts on
+              it, and five of them was most of this section's height. */}
+          <details className="mt-3">
+            <summary className="tap-press cursor-pointer list-none text-[12px] font-semibold text-amber-900 underline underline-offset-2">
+              {importMessages.unconfirmedShowList(unconfirmed.length)}
+            </summary>
+          <ul className="mt-2 space-y-1.5">
             {unconfirmed.map((row) => (
               <li
                 key={row.orderId}
@@ -227,6 +235,7 @@ export default async function ImportsPage({
               </li>
             ))}
           </ul>
+          </details>
 
           {/* Why the fleet was incomplete in the first place. A plate
               the CSV named and the fleet does not have is exactly what
@@ -286,7 +295,7 @@ export default async function ImportsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--line)] bg-white">
-              {batches.map((batch) => (
+              {batches.slice(0, 3).map((batch) => (
                 <tr key={batch.id}>
                   <td className="px-3 py-2 text-[var(--ink-mid)]">{batch.fileName}</td>
                   <td className="px-3 py-2 text-[var(--ink-mid)]">{batch.importedBy}</td>
@@ -302,6 +311,29 @@ export default async function ImportsPage({
             </tbody>
           </table>
         </div>
+
+        {/* The log only answers "did the last import work". Every batch
+            ever was 1,436px of table for a question about the top row. */}
+        {batches.length > 3 ? (
+          <details className="mt-2">
+            <summary className="tap-press cursor-pointer list-none text-[12px] font-semibold text-[var(--ink-soft)] underline underline-offset-2">
+              {importMessages.logShowAll(batches.length - 3)}
+            </summary>
+            <ul className="mt-2 divide-y divide-[var(--line)] rounded-lg border border-[var(--line)] text-[12px]">
+              {batches.slice(3).map((batch) => (
+                <li key={batch.id} className="flex flex-wrap items-baseline gap-x-2 px-3 py-1.5">
+                  <span className="text-[var(--ink-mid)]">{batch.fileName}</span>
+                  <span className="text-[var(--ink-soft)]">
+                    {formatDateTime(batch.importedAt, locale)}
+                  </span>
+                  <span className="text-[var(--ink-soft)]">
+                    {importMessages.table.batchResult(batch.successRows, batch.failedRows)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </section>
     </div>
   );
@@ -312,6 +344,8 @@ function getTuroSyncSettingsCopy(locale: Locale) {
     ? {
         kicker: "Turo 自动同步",
         title: "同步来源设置",
+        configured: "已配置",
+        notConfigured: "未配置",
         copy:
           "把可直接下载 CSV 的链接粘贴到这里保存。日历里的「同步 Turo」按钮会优先使用这里的设置，不需要再去 Railway Variables 改 URL。",
         csvUrl: "CSV 直接下载 URL",
@@ -335,6 +369,8 @@ function getTuroSyncSettingsCopy(locale: Locale) {
       }
     : {
         kicker: "Turo auto sync",
+        configured: "Configured",
+        notConfigured: "Not set up",
         title: "Sync source settings",
         copy:
           "Paste a direct-download CSV URL here. The calendar Sync Turo button will use this workspace setting before falling back to Railway variables.",

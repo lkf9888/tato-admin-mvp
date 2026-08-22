@@ -1197,7 +1197,13 @@ export async function deleteOwnerAction(formData: FormData) {
 
 export async function saveVehicleAction(formData: FormData) {
   const { workspace, user } = await requireCurrentAdminContext();
-  const parsed = vehicleSchema.parse({
+
+  // Parsed inside a guard, not thrown from. A ZodError here produced
+  // the same anonymous error page as a database failure, so "the year
+  // is blank" and "that plate is taken" were indistinguishable from
+  // the outside -- both arrived as a digest and a shrug. Naming the
+  // field is the whole difference between a bug report and a fix.
+  const result = vehicleSchema.safeParse({
     id: cleanOptional(formData.get("id")),
     ownerId: cleanOptional(formData.get("ownerId")),
     // Folded at the boundary. A plate is nearly always pasted from
@@ -1230,6 +1236,16 @@ export async function saveVehicleAction(formData: FormData) {
     notes: cleanOptional(formData.get("notes")),
   });
 
+  if (!result.success) {
+    const firstIssue = result.error.issues[0];
+    const field = firstIssue?.path?.join(".") || "form";
+    redirect(
+      `/vehicles?error=invalid_field&field=${encodeURIComponent(field)}` +
+        `&reason=${encodeURIComponent(firstIssue?.message ?? "")}`,
+    );
+  }
+
+  const parsed = result.data;
   const { id, ownerCommissionRate, cleaningFee, bookingTaxRate, ...vehicleData } = parsed;
   const normalizedVehicleData = {
     ...vehicleData,

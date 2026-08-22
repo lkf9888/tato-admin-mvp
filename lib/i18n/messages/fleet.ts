@@ -11,6 +11,8 @@ export const fleetMessages = {
         `${plate} is already in your fleet — search for it above rather than adding it again. If you cannot see it, the plate may be stored under a slightly different spelling; the search folds look-alike letters, so try the plate exactly as Turo writes it.`,
       plateTakenElsewhere: (plate: string) =>
         `${plate} is registered to another workspace. Plate numbers are unique across all of TATO, so this one cannot be added here until it is released there.`,
+      invalidField: (field: string, reason: string) =>
+        `The vehicle was not saved — “${field}” did not pass validation${reason ? `: ${reason}` : ""}. Nothing was changed.`,
       createKicker: "Create vehicle",
       placeholders: {
         plateNumber: "Plate number",
@@ -115,6 +117,8 @@ export const fleetMessages = {
         `${plate} 已经在你的车队里了 —— 用上面的搜索找它,不用重复添加。如果搜不到,可能是存的写法略有不同;搜索会自动折叠同形字母,试试按 Turo 上的原样输入车牌。`,
       plateTakenElsewhere: (plate: string) =>
         `${plate} 已被另一个工作区占用。车牌号在整个 TATO 里是唯一的,那边释放之前这里无法添加。`,
+      invalidField: (field: string, reason: string) =>
+        `车辆没有保存 —— 字段「${field}」没通过校验${reason ? `:${reason}` : ""}。数据没有任何改动。`,
       createKicker: "新增车辆",
       placeholders: {
         plateNumber: "车牌号",

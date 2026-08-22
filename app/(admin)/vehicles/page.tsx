@@ -9,10 +9,38 @@ import { prisma } from "@/lib/prisma";
 import type { ReactNode } from "react";
 import { foldLatinLookalikes } from "@/lib/utils";
 
+/**
+ * Does this plate answer to what was typed, allowing for a character
+ * that is present on one side and not the other?
+ *
+ * Ordinary containment only looks one way: type A661GL and a plate
+ * stored as 661GL never matches, because the query is longer than the
+ * thing it is searching. That is exactly the failure worth surviving
+ * here -- an importer that dropped a leading letter, or an operator
+ * typing one the record does not have -- and it is invisible, because
+ * the two strings look almost identical.
+ *
+ * So containment is tested in both directions. Bounded to four
+ * characters, since below that a stored plate would match half the
+ * fleet, and only ever against the plate itself: reverse containment
+ * over free text like notes would match everything.
+ */
+function plateMatchesLoosely(plateNumber: string | null, query: string): boolean {
+  if (!plateNumber || query.length < 4) return false;
+  const plate = foldLatinLookalikes(plateNumber).toLowerCase();
+  return plate.length >= 4 && query.includes(plate);
+}
+
 export default async function VehiclesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; q?: string; plate?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    q?: string;
+    plate?: string;
+    field?: string;
+    reason?: string;
+  }>;
 }) {
   const workspace = await requireCurrentWorkspace();
   const [{ locale, messages }, vehicles, owners, params] = await Promise.all([
@@ -89,7 +117,8 @@ export default async function VehiclesPage({
           [vehicle.plateNumber, vehicle.vin, vehicle.turoVehicleCode].filter(Boolean).join(" "),
         )
           .toLowerCase()
-          .includes(normalizedVehicleQuery),
+          .includes(normalizedVehicleQuery) ||
+        plateMatchesLoosely(vehicle.plateNumber, normalizedVehicleQuery),
       )
     : vehicles;
 
@@ -106,7 +135,9 @@ export default async function VehiclesPage({
             ? vehicleMessages.plateTaken(params.plate ?? "")
             : params.error === "plate_taken_elsewhere"
               ? vehicleMessages.plateTakenElsewhere(params.plate ?? "")
-              : vehicleMessages.deleteError}
+              : params.error === "invalid_field"
+                ? vehicleMessages.invalidField(params.field ?? "", params.reason ?? "")
+                : vehicleMessages.deleteError}
         </div>
       ) : null}
 

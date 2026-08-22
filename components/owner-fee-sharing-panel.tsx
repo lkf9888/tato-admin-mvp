@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { saveOwnerFeeSharingAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
 
@@ -73,6 +75,18 @@ export function OwnerFeeSharingPanel({
 }) {
   const t = copy(locale);
 
+  // Held in state, and it has to be.
+  //
+  // The first version styled the selected side from the `rows` prop,
+  // which is computed on the server and does not change when a radio
+  // is clicked. The click worked -- the input's checked state really
+  // did move -- and absolutely nothing on screen did, so the control
+  // read as dead. A toggle that does not move when pressed is broken
+  // whatever the form later submits.
+  const [choices, setChoices] = useState<Record<string, "OWNER" | "MANAGER">>(() =>
+    Object.fromEntries(rows.map((row) => [row.column, row.target])),
+  );
+
   // Grouped for reading. A flat list of 20 charges is a wall.
   const groups = rows.reduce<Record<string, FeeShareRow[]>>((acc, row) => {
     (acc[row.group] ??= []).push(row);
@@ -103,7 +117,7 @@ export function OwnerFeeSharingPanel({
                 >
                   <span className="min-w-0 text-[12px] text-[var(--ink)]">
                     {row.column}
-                    {row.isOverride ? (
+                    {choices[row.column] !== row.target || row.isOverride ? (
                       <span className="ml-2 rounded-full border border-[var(--line)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-soft)]">
                         {t.overrideTag}
                       </span>
@@ -114,8 +128,8 @@ export function OwnerFeeSharingPanel({
                     {(["OWNER", "MANAGER"] as const).map((value) => (
                       <label
                         key={value}
-                        className={`cursor-pointer rounded-[5px] px-2.5 py-1 text-[11px] font-semibold transition ${
-                          row.target === value
+                        className={`tap-press cursor-pointer rounded-[5px] px-2.5 py-1 text-[11px] font-semibold transition ${
+                          choices[row.column] === value
                             ? "bg-[var(--ink)] text-white"
                             : "text-[var(--ink-soft)] hover:bg-[var(--surface-muted)]"
                         }`}
@@ -124,7 +138,10 @@ export function OwnerFeeSharingPanel({
                           type="radio"
                           name={`fee:${row.column}`}
                           value={value}
-                          defaultChecked={row.target === value}
+                          checked={choices[row.column] === value}
+                          onChange={() =>
+                            setChoices((current) => ({ ...current, [row.column]: value }))
+                          }
                           className="sr-only"
                         />
                         {value === "OWNER" ? t.shared : t.withheld}

@@ -109,6 +109,7 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
   return (
     <OwnerLedgerManager
       netEarningBreakdown={breakdownByItemId}
+      operatorName={workspace.name?.trim() || "TATO"}
       locale={locale}
       owners={owners}
       selectedOwner={{ id: owner.id, name: owner.name }}

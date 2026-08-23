@@ -24,6 +24,8 @@ export const accountSettingsMessages = {
       profileTitle: "Company profile",
       profileCopy: "This controls the company/workspace name and the name shown for your admin login.",
       companyNameLabel: "Company name",
+      companyNameHint:
+        "This is the name owners see on their statements — the commission line reads “<name> commission”, and the balance reads “<name> owes you”. Their agreement is with you, not with the software, so a third party's name here is a line item they will ask about.",
       displayNameLabel: "Login display name",
       saveProfile: "Save profile",
       loginTitle: "Login email",
@@ -116,6 +118,8 @@ export const accountSettingsMessages = {
       profileTitle: "公司资料",
       profileCopy: "这里控制公司/工作台名称，以及后台登录用户显示名称。",
       companyNameLabel: "公司名称",
+      companyNameHint:
+        "这个名字会出现在车主的对账单上 —— 佣金行显示为「<名称> 佣金」,余额显示为「<名称> 应付给您」。车主的合同是和你签的,不是和这套软件签的,所以这里写别人的名字会引起他们追问。",
       displayNameLabel: "登录显示名称",
       saveProfile: "保存资料",
       loginTitle: "登录邮箱",

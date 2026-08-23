@@ -61,13 +61,13 @@ export type PublicLedgerItem = {
   } | null;
 };
 
-function copy(locale: Locale) {
+function copy(locale: Locale, operatorName: string) {
   return locale === "en"
     ? {
         tabs: { ledger: "Ledger", statements: "Monthly statement", calendar: "Calendar" },
         language: "Language",
         currentBalance: "Current balance",
-        tatoOwesOwner: "TATO owes you",
+        tatoOwesOwner: `${operatorName} owes you`,
         ownerOwesTato: "You owe TATO",
         settled: "Settled",
         dateFrom: "From",
@@ -89,7 +89,7 @@ function copy(locale: Locale) {
         ownerVehicleCount: (count: number) => `${count} vehicle${count === 1 ? "" : "s"}`,
         kindLabels: {
           OWNER_NET_EARNING: "Owner net earning",
-          MANAGER_COMMISSION: "TATO commission",
+          MANAGER_COMMISSION: `${operatorName} commission`,
           DIRECT_TO_OWNER: "Collected directly by owner",
           CLEANING_FEE: "Cleaning fee",
           EXPENSE_REIMBURSEMENT: "Reimbursement",
@@ -101,7 +101,7 @@ function copy(locale: Locale) {
         tabs: { ledger: "流水账", statements: "月度对账单", calendar: "日历" },
         language: "语言",
         currentBalance: "当前余额",
-        tatoOwesOwner: "TATO 应付给您",
+        tatoOwesOwner: `${operatorName} 应付给您`,
         ownerOwesTato: "您应付给 TATO",
         settled: "账目已结清",
         dateFrom: "起始",
@@ -123,7 +123,7 @@ function copy(locale: Locale) {
         ownerVehicleCount: (count: number) => `${count} 台车`,
         kindLabels: {
           OWNER_NET_EARNING: "车主净收益",
-          MANAGER_COMMISSION: "TATO 佣金",
+          MANAGER_COMMISSION: `${operatorName} 佣金`,
           DIRECT_TO_OWNER: "租金已由车主直接收取",
           CLEANING_FEE: "洗车费",
           EXPENSE_REIMBURSEMENT: "报销",
@@ -205,16 +205,20 @@ export function OwnerPublicShareView({
   calendarOrders,
   activeTab,
   maskSensitive,
+  operatorName,
 }: {
   locale: Locale;
   owner: { id: string; name: string };
+  /** Whose statement this is, from the owner's side. Their agreement
+   *  is with this company, not with the software. */
+  operatorName: string;
   vehicles: PublicOwnerVehicle[];
   ledgerItems: PublicLedgerItem[];
   calendarOrders: EditableOrder[];
   activeTab: ShareTab;
   maskSensitive: boolean;
 }) {
-  const labels = copy(locale);
+  const labels = copy(locale, operatorName);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

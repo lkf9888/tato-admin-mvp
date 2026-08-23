@@ -91,6 +91,12 @@ export default async function AccountSettingsPage({
                 maxLength={120}
                 className="input"
               />
+              {/* Said out loud, because this field reaches further
+                  than its label suggests -- it is the name printed on
+                  every owner statement. */}
+              <span className="mt-1 block text-[11px] leading-4 text-[var(--ink-soft)]">
+                {t.companyNameHint}
+              </span>
             </label>
             <label className="block min-w-0">
               <span className="mb-1 block text-[11px] font-semibold text-[var(--ink-soft)]">

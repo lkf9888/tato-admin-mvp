@@ -135,6 +135,7 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
   const commissionBase = Math.max(0, (netEarning ?? 0) - retainedAmount);
   const commission = +(commissionBase * commissionRate).toFixed(2);
   const sourceLabel = order.source === "turo" ? "Turo" : "Offline";
+  const operatorName = order.workspace?.name?.trim() || "TATO";
   const vehicleLabel = order.vehicle.plateNumber
     ? `${order.vehicle.plateNumber} · ${order.vehicle.nickname}`
     : order.vehicle.nickname;
@@ -198,7 +199,11 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
       kind: OwnerLedgerKind.MANAGER_COMMISSION,
       amount: -commission,
       occurredAt: order.pickupDatetime,
-      note: `TATO commission ${(commissionRate * 100).toFixed(
+      // The operator's own name, not the product's. An owner reading
+      // "TATO commission" on their statement has no idea who TATO is
+      // -- their agreement is with SpeedX, and a line item naming a
+      // third party is a line item they will ask about.
+      note: `${operatorName} commission ${(commissionRate * 100).toFixed(
         Number.isInteger(commissionRate * 100) ? 0 : 1,
       )}% · ${order.renterName}`,
     });
@@ -288,11 +293,15 @@ export async function syncOwnerLedger(ownerId: string, workspaceId: string, tx?:
   return { vehicleCount: vehicles.length, orderCount };
 }
 
-export function ownerLedgerKindLabel(kind: OwnerLedgerKind, locale: "en" | "zh") {
+export function ownerLedgerKindLabel(
+  kind: OwnerLedgerKind,
+  locale: "en" | "zh",
+  operatorName = "TATO",
+) {
   const labels = {
     en: {
       OWNER_NET_EARNING: "Owner net earning",
-      MANAGER_COMMISSION: "TATO commission",
+      MANAGER_COMMISSION: `${operatorName} commission`,
       CLEANING_FEE: "Cleaning fee",
       EXPENSE_REIMBURSEMENT: "Expense reimbursement",
       MANUAL_ADJUSTMENT: "Manual adjustment",
@@ -301,7 +310,7 @@ export function ownerLedgerKindLabel(kind: OwnerLedgerKind, locale: "en" | "zh")
     },
     zh: {
       OWNER_NET_EARNING: "车主净收益",
-      MANAGER_COMMISSION: "TATO 管理佣金",
+      MANAGER_COMMISSION: `${operatorName} 管理佣金`,
       CLEANING_FEE: "洗车费",
       EXPENSE_REIMBURSEMENT: "费用报销",
       MANUAL_ADJUSTMENT: "手动调整",

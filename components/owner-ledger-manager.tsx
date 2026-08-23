@@ -72,14 +72,14 @@ type ModalState =
   | { mode: "create"; kind: OwnerLedgerKind }
   | { mode: "edit"; item: LedgerItem };
 
-function copy(locale: Locale) {
+function copy(locale: Locale, operatorName: string) {
   return locale !== "en"
     ? {
         title: "流水账",
         backPrefix: "返回",
         viewAsOwner: "以车主视角查看",
         currentBalance: "当前余额",
-        tatoOwesOwner: "TATO 应付给车主",
+        tatoOwesOwner: `${operatorName} 应付给车主`,
         ownerOwesTato: "车主应付给 TATO",
         zeroBalance: "账目已结清",
         periodSubtotal: "筛选区间小计",
@@ -115,7 +115,7 @@ function copy(locale: Locale) {
         noVehicle: "不指定车辆",
         note: "备注",
         direction: "付款方向",
-        managerToOwner: "TATO → 车主",
+        managerToOwner: `${operatorName} → 车主`,
         ownerToManager: "车主 → TATO",
         createTitle: "新增账目",
         editTitle: "修改账目",
@@ -128,7 +128,7 @@ function copy(locale: Locale) {
         remove: "移除",
         kindLabels: {
           OWNER_NET_EARNING: "车主净收益",
-          MANAGER_COMMISSION: "TATO 佣金",
+          MANAGER_COMMISSION: `${operatorName} 佣金`,
           DIRECT_TO_OWNER: "租金已由车主直接收取",
           CLEANING_FEE: "洗车费",
           EXPENSE_REIMBURSEMENT: "报销",
@@ -141,7 +141,7 @@ function copy(locale: Locale) {
         backPrefix: "Back",
         viewAsOwner: "View as owner",
         currentBalance: "Current balance",
-        tatoOwesOwner: "TATO owes owner",
+        tatoOwesOwner: `${operatorName} owes owner`,
         ownerOwesTato: "Owner owes TATO",
         zeroBalance: "Settled",
         periodSubtotal: "Period subtotal",
@@ -177,7 +177,7 @@ function copy(locale: Locale) {
         noVehicle: "No vehicle",
         note: "Note",
         direction: "Payment direction",
-        managerToOwner: "TATO → owner",
+        managerToOwner: `${operatorName} → owner`,
         ownerToManager: "Owner → TATO",
         createTitle: "Add ledger item",
         editTitle: "Edit ledger item",
@@ -190,7 +190,7 @@ function copy(locale: Locale) {
         remove: "Remove",
         kindLabels: {
           OWNER_NET_EARNING: "Owner net earning",
-          MANAGER_COMMISSION: "TATO commission",
+          MANAGER_COMMISSION: `${operatorName} commission`,
           DIRECT_TO_OWNER: "Collected directly by owner",
           CLEANING_FEE: "Cleaning fee",
           EXPENSE_REIMBURSEMENT: "Reimbursement",
@@ -230,6 +230,7 @@ export function OwnerLedgerManager({
   vehicles,
   items,
   netEarningBreakdown = {},
+  operatorName,
   shareToken,
   ownerSelectRoute = "query",
 }: {
@@ -240,10 +241,12 @@ export function OwnerLedgerManager({
   items: LedgerItem[];
   /** How each net-earning line was arrived at. Admin view only. */
   netEarningBreakdown?: NetEarningBreakdown;
+  /** The operator's own trading name, for the commission line. */
+  operatorName: string;
   shareToken?: string | null;
   ownerSelectRoute?: "query" | "ledger";
 }) {
-  const labels = copy(locale);
+  const labels = copy(locale, operatorName);
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
   const [dateFrom, setDateFrom] = useState("");

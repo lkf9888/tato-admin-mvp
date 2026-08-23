@@ -32,6 +32,9 @@ export default async function SharePage({
   const shareLink = await prisma.shareLink.findUnique({
     where: { token },
     include: {
+      // The owner's agreement is with this company, so its name is what
+      // belongs on their statement -- not the software's.
+      workspace: { select: { name: true } },
       owner: {
         include: {
           vehicles: {
@@ -215,6 +218,7 @@ export default async function SharePage({
       }))}
       calendarOrders={orders}
       activeTab={resolveShareTab(query.tab)}
+      operatorName={shareLink.workspace?.name?.trim() || "TATO"}
       maskSensitive={shareLink.visibility === "privacy"}
     />
   );

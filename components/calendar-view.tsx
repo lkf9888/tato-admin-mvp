@@ -524,6 +524,7 @@ export function CalendarView({
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
+    startY: number;
     startScrollLeft: number;
     lastX: number;
     lastT: number;
@@ -590,10 +591,22 @@ export function CalendarView({
     };
 
     const onPointerDown = (event: PointerEvent) => {
-      // Touch already pans natively and does it better; hijacking it
-      // would fight the browser's own scrolling. Middle and right
-      // buttons belong to the OS.
-      if (event.pointerType === "touch" || event.button !== 0) return;
+      // Touch drags the timeline too, and `touch-action: pan-y` on the
+      // viewport is what makes that safe: the browser keeps vertical
+      // panning for itself and hands us the horizontal component as
+      // ordinary pointer events. Nothing moves twice and nothing has
+      // to preventDefault its way past native scrolling.
+      //
+      // Leaving both axes to the browser was the earlier call, on the
+      // reasoning that native panning does it better. It does -- when
+      // it runs. This pane is a 5,000px vertical scroller with 123
+      // cars in it, so the platform's axis lock reads almost every
+      // swipe as vertical and drops the sideways component. The
+      // timeline stays put, which is exactly what "dragging sideways
+      // does nothing" looks like from the outside.
+      //
+      // Middle and right buttons still belong to the OS.
+      if (event.button !== 0) return;
 
       // Only text controls are excluded, and that is the fix.
       //
@@ -616,6 +629,7 @@ export function CalendarView({
       dragRef.current = {
         pointerId: event.pointerId,
         startX: event.clientX,
+        startY: event.clientY,
         startScrollLeft: node.scrollLeft,
         lastX: event.clientX,
         lastT: event.timeStamp,
@@ -632,6 +646,17 @@ export function CalendarView({
       // Below the threshold this is still a click, not a drag.
       if (!drag.moved) {
         if (Math.abs(dx) < 4) return;
+        // A finger scrolling down the vehicle list wanders sideways by
+        // a few pixels on the way, and taking the gesture on that would
+        // drag the dates along under the thumb. The browser settles the
+        // same question for its own panning by whichever axis leads, so
+        // this waits for the same answer before claiming the gesture.
+        if (
+          event.pointerType === "touch" &&
+          Math.abs(dx) <= Math.abs(event.clientY - drag.startY)
+        ) {
+          return;
+        }
         drag.moved = true;
         // Capture is an optimisation -- it keeps the drag alive when
         // the cursor leaves the element -- and it was written as a
@@ -1336,7 +1361,16 @@ export function CalendarView({
         ) : (
           <div
             ref={timelineViewportRef}
-            className="max-h-[76vh] cursor-grab overflow-auto rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+            /* Two of these classes are the sideways gesture working at
+               all. `touch-pan-y` reserves the vertical axis for the
+               browser and leaves the horizontal one to the drag
+               handler above. `overscroll-x-contain` keeps the gesture
+               inside the timeline: left at `auto`, reaching either end
+               passes it up to the browser, and on macOS and iOS that
+               is the back/forward swipe -- so a hard scroll towards
+               next month stops the calendar and navigates the app
+               away instead. */
+            className="max-h-[76vh] cursor-grab touch-pan-y overflow-auto overscroll-x-contain rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
           >
             <div style={{ width: tableWidth, minWidth: vehicleColumnWidth + timelineWidth }}>
               <div

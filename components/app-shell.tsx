@@ -1,7 +1,6 @@
 import { logoutAction } from "@/app/actions";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { ContactButton } from "@/components/contact-button";
-import { LanguageSwitcher } from "@/components/language-switcher";
 import { MobileNav } from "@/components/mobile-nav";
 import { NavigationOptimizer } from "@/components/navigation-optimizer";
 import { SessionExpiryRedirect } from "@/components/session-expiry-redirect";
@@ -110,15 +109,13 @@ export function AppShell({
   // need to live somewhere on mobile too. They get tucked into the
   // footer of the More sheet so the desktop sidebar's full surface is
   // reachable from a phone.
+  // The language switcher used to sit here, permanently occupying the
+  // bottom of the sidebar with three buttons and a paragraph of
+  // explanation -- for a setting most people change once, if ever. It
+  // lives in account settings now, with the rest of the once-and-done
+  // configuration.
   const moreFooter = (
     <div className="space-y-3">
-      <LanguageSwitcher
-        locale={locale}
-        preference={localePreference}
-        label={messages.shell.languageLabel}
-        hint={messages.shell.languageHint}
-        autoLabel={messages.shell.languageAutoLabel}
-      />
       <form action={logoutAction}>
         <button className="tap-press w-full rounded-md border border-[var(--line)] bg-white/72 px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.16)] hover:bg-white hover:text-[var(--ink)]">
           {messages.shell.signOut}
@@ -149,13 +146,6 @@ export function AppShell({
       <SidebarNav groups={navGroups} />
 
       <div className="border-t border-[var(--line)] p-3 pb-16">
-        <LanguageSwitcher
-          locale={locale}
-          preference={localePreference}
-          label={messages.shell.languageLabel}
-          hint={messages.shell.languageHint}
-          autoLabel={messages.shell.languageAutoLabel}
-        />
         <div
           className="mt-2 truncate text-xs text-[var(--ink-soft)]"
           title={currentUserEmail}

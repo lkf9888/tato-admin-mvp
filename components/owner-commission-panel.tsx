@@ -1,6 +1,7 @@
 "use client";
 
 import { ActionSubmitButton } from "@/components/action-submit-button";
+import { InfoHint } from "@/components/info-hint";
 import { deleteOwnerCommissionAction, saveOwnerCommissionAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
 import { formatDate } from "@/lib/utils";
@@ -105,8 +106,10 @@ export function OwnerCommissionPanel({
   return (
     <section className="card space-y-4 p-6">
       <div>
-        <h2 className="font-serif text-[1.05rem] text-[var(--ink)]">{t.title}</h2>
-        <p className="mt-1 text-[12px] leading-5 text-[var(--ink-soft)]">{t.intro}</p>
+        <h2 className="flex items-center gap-1.5 font-serif text-[1.05rem] text-[var(--ink)]">
+          {t.title}
+          <InfoHint text={t.intro} />
+        </h2>
       </div>
 
       <p className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[12px] leading-5 text-[var(--ink)]">

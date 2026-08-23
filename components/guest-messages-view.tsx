@@ -98,6 +98,22 @@ const IMMINENT_HOURS = 12;
  * answer than an empty circle: it is stable per guest, so the eye
  * still uses it to tell one row from another while scrolling.
  */
+/** The matched run, marked. Same treatment the calendar search uses. */
+function highlight(value: string, query: string) {
+  if (!query) return value;
+  const index = value.toLowerCase().indexOf(query);
+  if (index === -1) return value;
+  return (
+    <>
+      {value.slice(0, index)}
+      <mark className="rounded bg-[rgba(255,231,122,0.72)] px-0.5 text-inherit">
+        {value.slice(index, index + query.length)}
+      </mark>
+      {value.slice(index + query.length)}
+    </>
+  );
+}
+
 function Avatar({ name, src, size = 36 }: { name: string; src?: string | null; size?: number }) {
   const initials = name
     .split(/\s+/)
@@ -161,6 +177,35 @@ export function GuestMessagesView({
   const router = useRouter();
 
   const [selectedKey, setSelectedKey] = useState<string | null>(threads[0]?.key ?? null);
+  const [search, setSearch] = useState("");
+
+  // Matched across everything a thread carries -- guest, car, plate,
+  // and the text of every message in both languages. Searching only
+  // names would miss "parking" and "P3", which is what someone is
+  // actually trying to find.
+  const normalizedSearch = search.trim().toLowerCase();
+  const visibleThreads = useMemo(() => {
+    if (!normalizedSearch) return threads;
+    return threads.filter((thread) =>
+      [
+        thread.guestName,
+        thread.vehicleLabel,
+        thread.vehiclePlate,
+        thread.latestSummary,
+        thread.latestSummaryZh,
+        ...thread.messages.flatMap((message) => [
+          message.subject,
+          message.guestText,
+          message.summary,
+          message.summaryZh,
+        ]),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearch),
+    );
+  }, [threads, normalizedSearch]);
   const [acknowledging, setAcknowledging] = useState(false);
 
   // Per-message drafts, keyed by message id: the operator answers one
@@ -386,8 +431,25 @@ export function GuestMessagesView({
       <section
         className={`flex min-h-0 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)] ${selected ? "hidden lg:flex" : ""}`}
       >
+        {/* Searching the conversations, not just the names. A guest
+            writes once about a parking spot and is remembered by what
+            they said, not by a name in a list of ninety. */}
+        <div className="border-b border-[var(--line)] p-2">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t.searchPlaceholder}
+            className="h-9 w-full rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 text-[13px] outline-none focus:border-[rgba(17,19,24,0.22)]"
+          />
+          {search.trim() ? (
+            <p className="mt-1 px-1 text-[11px] text-[var(--ink-soft)]">
+              {t.searchCount(visibleThreads.length)}
+            </p>
+          ) : null}
+        </div>
+
         <ul className="min-h-0 flex-1 divide-y divide-[var(--line)] lg:overflow-y-auto">
-          {threads.map((thread) => (
+          {visibleThreads.map((thread) => (
             <li key={thread.key}>
               <button
                 type="button"
@@ -400,7 +462,7 @@ export function GuestMessagesView({
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-2">
                     <span className="truncate text-[13px] font-bold text-[var(--ink)]">
-                      {thread.guestName}
+                      {highlight(thread.guestName, normalizedSearch)}
                     </span>
                     <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--ink-soft)]">
                       {formatWhen(thread.latestAt, locale)}
@@ -412,11 +474,19 @@ export function GuestMessagesView({
                       open threads to find out which car they are
                       about. */}
                   <span className="mt-0.5 block truncate text-[11.5px] text-[var(--ink-soft)]">
-                    {thread.vehicleLabel ?? t.noVehicle}
-                    {thread.vehiclePlate ? ` · ${thread.vehiclePlate}` : ""}
+                    {highlight(
+                      `${thread.vehicleLabel ?? t.noVehicle}${thread.vehiclePlate ? ` · ${thread.vehiclePlate}` : ""}`,
+                      normalizedSearch,
+                    )}
                   </span>
                   <span className="mt-0.5 block truncate text-[11.5px] leading-4 text-[var(--ink)]">
-                    {thread.latestSummaryZh ?? thread.latestSummary ?? thread.messages[0]?.subject}
+                    {highlight(
+                      thread.latestSummaryZh ??
+                        thread.latestSummary ??
+                        thread.messages[0]?.subject ??
+                        "",
+                      normalizedSearch,
+                    )}
                   </span>
 
                   {(() => {
@@ -693,12 +763,21 @@ export function GuestMessagesView({
                         </div>
 
                         <div className="mt-1 inline-block max-w-[88%] rounded-lg rounded-tl-sm bg-[var(--surface-muted)] px-3 py-2">
+                          {/* Marked here too. A search for "parking"
+                              matches a thread on words that only exist
+                              inside the conversation, so the list can
+                              narrow to the right guest and still show
+                              nothing highlighted -- the match is in the
+                              bubble, which is where it gets marked. */}
                           <p className="whitespace-pre-wrap text-[12.5px] leading-5 text-[var(--ink)]">
-                            {message.guestText ?? message.summary ?? message.subject}
+                            {highlight(
+                              message.guestText ?? message.summary ?? message.subject ?? "",
+                              normalizedSearch,
+                            )}
                           </p>
                           {chinese(message) ? (
                             <p className="mt-1.5 border-t border-[var(--line)] pt-1.5 text-[12.5px] leading-5 text-[var(--ink-mid)]">
-                              {chinese(message)}
+                              {highlight(chinese(message) ?? "", normalizedSearch)}
                             </p>
                           ) : null}
                         </div>

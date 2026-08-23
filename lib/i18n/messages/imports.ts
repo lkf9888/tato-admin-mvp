@@ -73,6 +73,8 @@ export const importsMessages = {
         turoAccountHint:
           "Leave blank for the main account. A co-hosted export must name its account, or its cars are filed as main-account vehicles and stop matching their own Turo mail.",
         turoAccountPlaceholder: "e.g. kevin",
+        turoAccountMain: "Main account",
+        turoAccountOther: "Another account…",
         autoCreateTitle: "Auto-create missing vehicles from CSV",
         autoCreateHint: "Recommended for first imports from a real Turo earnings export.",
         runImport: "Run import",
@@ -207,6 +209,8 @@ export const importsMessages = {
         turoAccountHint:
           "主账户留空。代管账户的导出必须填账户名，否则它的车会被当成主账户车辆，之后再也匹配不上自己的 Turo 邮件。",
         turoAccountPlaceholder: "例如 kevin",
+        turoAccountMain: "主账户",
+        turoAccountOther: "其他账户…",
         autoCreateTitle: "自动从 CSV 创建缺失车辆",
         autoCreateHint: "首次导入真实 Turo earnings 导出时建议开启。",
         runImport: "执行导入",

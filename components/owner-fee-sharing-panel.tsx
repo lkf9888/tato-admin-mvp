@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ActionSubmitButton } from "@/components/action-submit-button";
+import { InfoHint } from "@/components/info-hint";
 import { saveOwnerFeeSharingAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
 
@@ -101,9 +102,10 @@ export function OwnerFeeSharingPanel({
   return (
     <section className="card space-y-4 p-6">
       <div>
-        <h2 className="font-serif text-[1.05rem] text-[var(--ink)]">{t.title}</h2>
-        <p className="mt-1 text-[12px] leading-5 text-[var(--ink-soft)]">{t.intro}</p>
-        <p className="mt-1 text-[12px] leading-5 text-[var(--ink-soft)]">{t.defaultNote}</p>
+        <h2 className="flex items-center gap-1.5 font-serif text-[1.05rem] text-[var(--ink)]">
+          {t.title}
+          <InfoHint text={`${t.intro}\n\n${t.defaultNote}`} />
+        </h2>
       </div>
 
       <form action={saveOwnerFeeSharingAction} className="space-y-4">

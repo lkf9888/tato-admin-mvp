@@ -1,5 +1,6 @@
 import { saveTuroSyncSettingsAction } from "@/app/actions";
 import { CsvImportPanel } from "@/components/csv-import-panel";
+import { InfoHint } from "@/components/info-hint";
 import { SearchableSelect } from "@/components/searchable-select";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getWorkspaceBillingSnapshot } from "@/lib/billing";
@@ -33,6 +34,20 @@ export default async function ImportsPage({
 
   // Trips still to come whose car no plate has confirmed. This lives
   // on the imports page because importing the CSV is the fix.
+  // Every Turo account the fleet actually uses, straight from the
+  // vehicles. Derived rather than kept as its own list, so the options
+  // are exactly the strings the matcher compares against.
+  const knownTuroAccounts = (
+    await prisma.vehicle.findMany({
+      where: { workspaceId: workspace.id, turoAccount: { not: null } },
+      distinct: ["turoAccount"],
+      select: { turoAccount: true },
+      orderBy: { turoAccount: "asc" },
+    })
+  )
+    .map((row) => row.turoAccount)
+    .filter((account): account is string => Boolean(account));
+
   const [unconfirmed, unknownVehicles] = await Promise.all([
     findUnconfirmedAssignments(workspace.id, { limit: 25 }),
     findUnknownVehiclesFromImports(workspace.id),
@@ -190,12 +205,10 @@ export default async function ImportsPage({
           <p className="text-[10px] uppercase tracking-[0.22em] text-amber-800">
             {importMessages.unconfirmedKicker}
           </p>
-          <h3 className="mt-1 font-serif text-[1.05rem] text-[var(--ink)] sm:text-[1.25rem]">
+          <h3 className="mt-1 flex items-center gap-1.5 font-serif text-[1.05rem] text-[var(--ink)] sm:text-[1.25rem]">
             {importMessages.unconfirmedTitle(unconfirmed.length)}
+            <InfoHint text={importMessages.unconfirmedCopy} />
           </h3>
-          <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-amber-900">
-            {importMessages.unconfirmedCopy}
-          </p>
 
           {/* The count and the reason stay visible -- that is the
               warning. The rows behind it are for when someone acts on
@@ -264,6 +277,7 @@ export default async function ImportsPage({
           status: billingSnapshot.status,
         }}
         billingState={params.billing ?? null}
+        knownTuroAccounts={knownTuroAccounts}
       />
 
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">

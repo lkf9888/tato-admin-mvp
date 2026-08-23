@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
+
 import {
   updateAccountEmailAction,
   updateAccountPasswordAction,
@@ -9,7 +11,7 @@ import {
 } from "@/lib/account-settings-actions";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { getMessages } from "@/lib/i18n";
-import { getI18n } from "@/lib/i18n-server";
+import { getI18n, getLocalePreference } from "@/lib/i18n-server";
 import {
   getWorkspaceConnectSnapshot,
   isStripeConnectConfigured,
@@ -23,11 +25,13 @@ export default async function AccountSettingsPage({
 }: {
   searchParams: Promise<{ account?: string }>;
 }) {
-  const [{ messages }, { user, workspace }, params] = await Promise.all([
-    getI18n(),
-    requireCurrentAdminContext(),
-    searchParams,
-  ]);
+  const [{ locale, messages }, { user, workspace }, params, localePreference] =
+    await Promise.all([
+      getI18n(),
+      requireCurrentAdminContext(),
+      searchParams,
+      getLocalePreference(),
+    ]);
 
   const t = messages.accountSettingsPage;
   const connectSnapshot = await getWorkspaceConnectSnapshot(workspace.id);
@@ -286,6 +290,19 @@ export default async function AccountSettingsPage({
           an expensive slot. It lives here now, next to the other
           things configured once and then forgotten. The route is
           unchanged, so an existing bookmark of /agent still works. */}
+      {/* Moved out of the sidebar, where three buttons and a paragraph
+          of explanation held the bottom-left corner permanently for a
+          setting most people change once. */}
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
+        <LanguageSwitcher
+          locale={locale}
+          preference={localePreference}
+          label={messages.shell.languageLabel}
+          hint={messages.shell.languageHint}
+          autoLabel={messages.shell.languageAutoLabel}
+        />
+      </section>
+
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
           {t.turoReaderTitle}

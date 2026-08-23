@@ -9,6 +9,9 @@ export const guestMessagesMessages = {
       openBadge: "Needs reply",
       messageCount: (count: number) => (count === 1 ? "1 message" : `${count} messages`),
       noVehicle: "Car not identified",
+      searchPlaceholder: "Search guest, car, plate or message text",
+      searchCount: (count: number) =>
+        count === 1 ? "1 conversation" : `${count} conversations`,
       // Trip panel
       tripTitle: "Matching trip",
       tripNone: "No trip matched",
@@ -79,6 +82,8 @@ export const guestMessagesMessages = {
       openBadge: "待回复",
       messageCount: (count: number) => `${count} 条消息`,
       noVehicle: "未识别车辆",
+      searchPlaceholder: "搜索客人、车型、车牌或消息内容",
+      searchCount: (count: number) => `${count} 个会话`,
       tripTitle: "匹配到的订单",
       tripNone: "未匹配到订单",
       tripNoneCopy:

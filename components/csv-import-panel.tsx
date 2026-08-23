@@ -44,10 +44,16 @@ export function CsvImportPanel({
   locale,
   billingSnapshot,
   billingState,
+  knownTuroAccounts,
 }: {
   locale: Locale;
   billingSnapshot: BillingSnapshot;
   billingState: string | null;
+  /** Accounts already in use by vehicles in this fleet. Derived rather
+   *  than configured: these are the exact strings the matcher compares
+   *  against, so anything else is a typo waiting to file a car under
+   *  an account that does not exist. */
+  knownTuroAccounts: string[];
 }) {
   const messages = getMessages(locale);
   const panelMessages = messages.imports.panel;
@@ -127,7 +133,7 @@ export function CsvImportPanel({
             rows,
             mapping,
             createMissingVehicles,
-            turoAccount: turoAccount.trim() || null,
+            turoAccount: turoAccount === "__new__" ? null : turoAccount.trim() || null,
           }),
         });
 
@@ -266,7 +272,7 @@ export function CsvImportPanel({
             mapping,
             rows,
             createMissingVehicles,
-            turoAccount: turoAccount.trim() || null,
+            turoAccount: turoAccount === "__new__" ? null : turoAccount.trim() || null,
             selectedVehicleKeys,
           }),
         });
@@ -597,12 +603,32 @@ export function CsvImportPanel({
                 <span className="mt-0.5 block text-[11px] text-[color:var(--ink-soft)]">
                   {panelMessages.turoAccountHint}
                 </span>
-                <input
+                {/* Picked, not typed. The account name has to match the
+                    one already on the vehicles exactly -- "Kevin" and
+                    "kevin" are two different fleets to the matcher --
+                    and typing it fresh on every import is how that goes
+                    wrong. The list is what the fleet actually uses. */}
+                <select
                   value={turoAccount}
                   onChange={(event) => setTuroAccount(event.target.value)}
-                  placeholder={panelMessages.turoAccountPlaceholder}
                   className="mt-2 w-full rounded-md border border-[color:var(--line-strong)] bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--brand)]"
-                />
+                >
+                  <option value="">{panelMessages.turoAccountMain}</option>
+                  {knownTuroAccounts.map((account) => (
+                    <option key={account} value={account}>
+                      {account}
+                    </option>
+                  ))}
+                  <option value="__new__">{panelMessages.turoAccountOther}</option>
+                </select>
+                {turoAccount === "__new__" ? (
+                  <input
+                    autoFocus
+                    onChange={(event) => setTuroAccount(event.target.value)}
+                    placeholder={panelMessages.turoAccountPlaceholder}
+                    className="mt-2 w-full rounded-md border border-[color:var(--line-strong)] bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--brand)]"
+                  />
+                ) : null}
               </label>
 
               <label className="flex items-start gap-3 rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px]">

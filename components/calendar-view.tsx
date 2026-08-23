@@ -454,14 +454,6 @@ function SearchableFilterDropdown({
   );
 }
 
-function buildRangeTitle(rangeMode: "week" | "month" | "sixWeeks", rangeStart: Date, rangeEnd: Date, locale: Locale) {
-  if (rangeMode === "month") {
-    return formatMonthTitle(rangeStart, locale);
-  }
-
-  return `${formatDate(rangeStart, locale)} - ${formatDate(rangeEnd, locale)}`;
-}
-
 export function CalendarView({
   locale,
   orders,
@@ -1273,14 +1265,11 @@ export function CalendarView({
           )}
         >
           <div className="grid gap-x-3 gap-y-1.5 xl:grid-cols-[minmax(18rem,auto)_minmax(24rem,1fr)_minmax(14rem,auto)] xl:items-center">
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-              <h3 className="font-serif text-[1.05rem] font-semibold leading-none text-[color:var(--ink)] md:text-[1.2rem]">
-                {buildRangeTitle(rangeMode, rangeStart, rangeEndInclusive, locale)}
-              </h3>
-              <span className="text-[11px] text-[color:var(--ink-soft)]">
-                {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
-              </span>
-            </div>
+            {/* The range title and the vehicle/booking count are both
+                gone. Every column below is labelled with its own date,
+                so the range restated the header of the thing directly
+                underneath it, and the counts are repeated in the
+                timeline's own corner cell. */}
 
             <div className="flex min-w-0 items-center gap-2">
               <input
@@ -1327,22 +1316,14 @@ export function CalendarView({
               ) : null}
             </div>
           </div>
-          {/* Five dates on one 375px line overlap into an unreadable
-              smear. The quarter marks are the two that carry least --
-              the ends bound the scrubber and TODAY marks the middle --
-              so they are the ones that go. */}
-          <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
-            <span>{formatDate(addDays(today, -SCRUBBER_DAY_RANGE), locale)}</span>
-            <span className="hidden sm:inline">
-              {formatDate(addDays(today, -Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}
-            </span>
-            <span className="rounded-full bg-[rgba(89,60,251,0.12)] px-2 py-0.5 text-[color:var(--ink)]">
+          {/* Only TODAY survives from the tick row. The four dates
+              around it labelled the ends of a two-year scrubber -- a
+              bound nobody navigates to, printed permanently above a
+              calendar that already shows where it is. */}
+          <div className="mt-1.5 flex items-center justify-center">
+            <span className="rounded-full bg-[rgba(89,60,251,0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink)]">
               {calendarMessages.today}
             </span>
-            <span className="hidden sm:inline">
-              {formatDate(addDays(today, Math.round(SCRUBBER_DAY_RANGE / 2)), locale)}
-            </span>
-            <span>{formatDate(addDays(today, SCRUBBER_DAY_RANGE), locale)}</span>
           </div>
         </div>
       </section>
@@ -1389,10 +1370,14 @@ export function CalendarView({
                         todayColumn ? "bg-[rgba(89,60,251,0.14)]" : "",
                       )}
                     >
-                      <p className="truncate text-[9px] font-semibold uppercase tracking-[0.04em] text-[color:var(--ink-soft)] max-lg:text-[8px]">
+                      {/* Bigger. This row is the calendar's own axis --
+                          every bar below is read against it -- and it
+                          was set two steps smaller than the body text
+                          it labels. */}
+                      <p className="truncate text-[11px] font-semibold uppercase tracking-[0.04em] text-[color:var(--ink-soft)] max-lg:text-[9px]">
                         {formatWeekday(date, locale)}
                       </p>
-                      <p className="mt-0.5 whitespace-nowrap text-[12px] font-semibold leading-tight text-[color:var(--ink)] tabular-nums max-lg:text-[10px]">
+                      <p className="mt-0.5 whitespace-nowrap text-[14px] font-bold leading-tight text-[color:var(--ink)] tabular-nums max-lg:text-[11px]">
                         {formatTimelineDateLabel(date)}
                       </p>
                     </div>

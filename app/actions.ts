@@ -872,6 +872,25 @@ export async function saveOwnerAction(formData: FormData) {
         data: {
           ...ownerData,
           workspaceId: workspace.id,
+          // A new owner starts with every extra charge withheld.
+          //
+          // The workspace policy defaults to OWNER, which is the right
+          // default for a policy and the wrong one for a new
+          // relationship: an owner is credited a delivery fee or a
+          // late fee before anyone has decided they should be, and
+          // taking it back later is a conversation. Starting closed and
+          // opening what the contract actually covers is the safer
+          // direction to be wrong in.
+          //
+          // Written as explicit overrides so the owner's page shows
+          // them as the deliberate choices they are, and so a later
+          // change to the workspace policy does not silently reopen
+          // charges for owners already signed on the old terms.
+          feeShareOverrides: JSON.stringify(
+            Object.fromEntries(
+              SHAREABLE_FEE_COLUMNS.map((column) => [column, LedgerShareTarget.MANAGER]),
+            ),
+          ),
         },
       });
 

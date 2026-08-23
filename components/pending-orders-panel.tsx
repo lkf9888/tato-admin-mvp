@@ -1,6 +1,7 @@
 "use client";
 
 import { assignPendingOrderAction, dismissPendingOrderAction } from "@/app/actions";
+import { InfoHint } from "@/components/info-hint";
 import { SearchableSelect } from "@/components/searchable-select";
 import type { Locale } from "@/lib/i18n";
 import { formatDateTime } from "@/lib/utils";
@@ -95,11 +96,10 @@ export function PendingOrdersPanel({
   return (
     <section className="rounded-lg border border-amber-300 bg-amber-50 p-3 sm:p-4">
       <p className="text-[10px] uppercase tracking-[0.22em] text-amber-800">{t.kicker}</p>
-      <h3 className="mt-1 font-serif text-[1.05rem] text-[var(--ink)] sm:text-[1.25rem]">
+      <h3 className="mt-1 flex items-center gap-1.5 font-serif text-[1.05rem] text-[var(--ink)] sm:text-[1.25rem]">
         {t.title(rows.length)}
+        <InfoHint text={`${t.intro}\n\n${t.resolveHint}`} />
       </h3>
-      <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-amber-900">{t.intro}</p>
-      <p className="mt-1 max-w-3xl text-[12px] leading-5 text-amber-900">{t.resolveHint}</p>
 
       <ul className="mt-3 space-y-2">
         {rows.map((row) => {

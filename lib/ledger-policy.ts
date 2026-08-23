@@ -232,11 +232,81 @@ export const FEE_CATALOGUE: readonly FeeDefinition[] = [
   { column: "Sales tax", group: "other", category: null, sign: "credit" },
 ];
 
-/** Only the charges worth deciding about -- rent and discounts are the
- *  trip itself and are never withheld from an owner. */
+/**
+ * Every column the operator can decide about: all thirty charge
+ * columns the export carries, which is everything in the catalogue
+ * except `Trip price`.
+ *
+ * Boost price and the ten discount columns were held back at first, on
+ * the reasoning that rent is the trip rather than a charge on top of
+ * it and so is not anyone's to keep. That holds for the rent and not
+ * for the adjustments to it. An early-bird discount is a price the
+ * operator chose to offer; whether the owner or the operator carries
+ * that choice is exactly the sort of term an agreement settles, and
+ * leaving the columns out settled it silently, always the same way.
+ *
+ * `Trip price` stays out because it is the thing being divided, not a
+ * component of the division.
+ */
 export const SHAREABLE_FEE_COLUMNS: readonly string[] = FEE_CATALOGUE.filter(
-  (fee) => fee.group !== "rent" && fee.group !== "discount",
+  (fee) => fee.column !== "Trip price",
 ).map((fee) => fee.column);
+
+/**
+ * What a brand-new owner's fee sharing starts as.
+ *
+ * The charges that answer to a workspace category -- service,
+ * reimbursement, penalty -- start with the company: crediting an owner
+ * a delivery fee nobody agreed to hand over is a conversation to have
+ * before the money moves rather than after.
+ *
+ * Everything else starts with the owner, and the reason is worth
+ * stating because `sign` looks like it should decide this and must
+ * not. Turo writes several columns negative -- every discount, and
+ * also sales tax, the airport parking credit, cancellation fees and
+ * other fees, all of which the catalogue calls credits because a
+ * positive value there would be income. Defaulting those to the
+ * company would mean the operator silently absorbs them: on the export
+ * this was built against, sales tax alone is -16,019.43, and handing
+ * that to the company raises the owner's net by the same amount for an
+ * arrangement nobody agreed to. They are decidable on the page; they
+ * are not decided here.
+ */
+export function defaultOwnerFeeShares(): Record<string, LedgerShareTarget> {
+  return Object.fromEntries(
+    FEE_CATALOGUE.filter((fee) => fee.column !== "Trip price").map((fee) => [
+      fee.column,
+      fee.category ? LedgerShareTarget.MANAGER : LedgerShareTarget.OWNER,
+    ]),
+  );
+}
+
+/**
+ * Per-column totals across a set of orders.
+ *
+ * Feeds the net-earning calculator on the owner's page, which needs
+ * this owner's real numbers rather than a worked example -- a formula
+ * argued over in the abstract is a formula nobody checks.
+ */
+export function sumFeeColumns(
+  orders: Array<{ sourceMetadata: string | null }>,
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const fee of FEE_CATALOGUE) totals[fee.column] = 0;
+
+  for (const order of orders) {
+    const financials = parseImportedOrderMetadata(order.sourceMetadata)?.financials;
+    if (!financials) continue;
+    for (const fee of FEE_CATALOGUE) {
+      totals[fee.column] += parseNumberValue(financials[fee.column]) ?? 0;
+    }
+  }
+
+  for (const column of Object.keys(totals)) {
+    totals[column] = Math.round(totals[column] * 100) / 100;
+  }
+  return totals;
+}
 
 export type OrderFeeLine = {
   column: string;
@@ -269,9 +339,13 @@ export function getOrderFeeLines(sourceMetadata?: string | null): OrderFeeLine[]
  * Who a given charge belongs to, for one owner.
  *
  * Three layers, narrowest first: an explicit per-owner exception, then
- * the workspace policy for that fee's category, then the owner. Rent
- * and discounts have no category and are never withheld -- they are
- * the trip, not a charge on top of it.
+ * the workspace policy for that fee's category, then the owner.
+ *
+ * Columns with no category -- boost price, the discounts, sales tax,
+ * other fees -- have no workspace-level rule to fall back on, so they
+ * rest with the owner until someone decides otherwise on this page.
+ * They are decidable; they are just not part of the three-way split
+ * the workspace policy expresses.
  */
 export function resolveFeeTarget(
   column: string,
@@ -309,10 +383,17 @@ export function parseFeeShareOverrides(raw?: string | null): Record<string, stri
  * have not -- the per-fee resolution falls through to the category
  * policy, so the arithmetic is unchanged unless someone changed it.
  *
- * Negative amounts are left with the owner for the same reason as
- * before: a refunded delivery fee retained by the operator would be a
- * credit taken out of the owner's balance, which is not what "the
- * operator keeps the delivery fee" means.
+ * Amounts are taken with their sign. Skipping the negative ones was
+ * the earlier rule, to stop a refunded delivery fee from becoming a
+ * credit to the operator; but the sign already says who it lands on.
+ * A column marked "company keeps" is deducted from the owner's net
+ * exactly as the export writes it, so a positive amount is money the
+ * operator takes and a negative one is money the operator eats -- an
+ * operator who keeps delivery fees also carries delivery refunds,
+ * which is the only reading of that arrangement that stays honest in
+ * both directions. It is also what makes the discount columns mean
+ * anything: every one of them is negative, and under the old rule
+ * deciding about them changed nothing at all.
  */
 export function getManagerRetentionByFee(
   sourceMetadata: string | null | undefined,
@@ -327,7 +408,7 @@ export function getManagerRetentionByFee(
 
   for (const column of SHAREABLE_FEE_COLUMNS) {
     const amount = parseNumberValue(financials[column]) ?? 0;
-    if (amount <= 0.005) continue;
+    if (Math.abs(amount) < 0.005) continue;
     if (resolveFeeTarget(column, policy, overrides) !== LedgerShareTarget.MANAGER) continue;
     lines.push({ column, amount });
     total += amount;

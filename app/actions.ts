@@ -39,6 +39,7 @@ import {
   resolveFeeTarget,
   resolveWorkspaceLedgerPolicy,
   SHAREABLE_FEE_COLUMNS,
+  defaultOwnerFeeShares,
 } from "@/lib/ledger-policy";
 import { prisma } from "@/lib/prisma";
 import { foldLatinLookalikes } from "@/lib/utils";
@@ -886,11 +887,7 @@ export async function saveOwnerAction(formData: FormData) {
           // them as the deliberate choices they are, and so a later
           // change to the workspace policy does not silently reopen
           // charges for owners already signed on the old terms.
-          feeShareOverrides: JSON.stringify(
-            Object.fromEntries(
-              SHAREABLE_FEE_COLUMNS.map((column) => [column, LedgerShareTarget.MANAGER]),
-            ),
-          ),
+          feeShareOverrides: JSON.stringify(defaultOwnerFeeShares()),
         },
       });
 

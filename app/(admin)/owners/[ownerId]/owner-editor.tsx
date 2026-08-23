@@ -130,6 +130,9 @@ export function OwnerEditor({
   allVehicles,
   commissionRules,
   feeRows,
+  feeTotals,
+  payoutTotal,
+  feeOrderCount,
   locale,
 }: {
   owner: Owner;
@@ -137,6 +140,9 @@ export function OwnerEditor({
   allVehicles: VehicleRow[];
   commissionRules: CommissionRuleRow[];
   feeRows: FeeShareRow[];
+  feeTotals: Record<string, number>;
+  payoutTotal: number;
+  feeOrderCount: number;
   locale: Locale;
 }) {
   const labels = copy(locale);
@@ -337,7 +343,14 @@ export function OwnerEditor({
 
       {/* Straight after the commission, because the two together are
           the whole agreement: what percentage, and of what. */}
-      <OwnerFeeSharingPanel locale={locale} ownerId={owner.id} rows={feeRows} />
+      <OwnerFeeSharingPanel
+        locale={locale}
+        ownerId={owner.id}
+        rows={feeRows}
+        totals={feeTotals}
+        payoutTotal={payoutTotal}
+        orderCount={feeOrderCount}
+      />
 
       <section className="card space-y-3 p-6">
         <h2 className="text-lg font-semibold">{labels.sections.share}</h2>

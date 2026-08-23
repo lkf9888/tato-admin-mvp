@@ -10,7 +10,9 @@ import {
   parseFeeShareOverrides,
   resolveFeeTarget,
   resolveWorkspaceLedgerPolicy,
+  sumFeeColumns,
 } from "@/lib/ledger-policy";
+import { getOrderNetEarning } from "@/lib/utils";
 
 type Params = Promise<{ ownerId: string }>;
 
@@ -55,14 +57,35 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
   // workspace policy where there is not.
   const policy = resolveWorkspaceLedgerPolicy(workspace);
   const overrides = parseFeeShareOverrides(owner.feeShareOverrides);
-  const feeRows = FEE_CATALOGUE.filter(
-    (fee) => fee.group !== "rent" && fee.group !== "discount",
-  ).map((fee) => ({
+  const feeRows = FEE_CATALOGUE.filter((fee) => fee.column !== "Trip price").map((fee) => ({
     column: fee.column,
     group: fee.group,
+    sign: fee.sign,
     target: resolveFeeTarget(fee.column, policy, overrides),
     isOverride: Boolean(overrides?.[fee.column]),
   }));
+
+  // This owner's own numbers, so the calculator on the page works out
+  // a real figure rather than a worked example. Imported orders only:
+  // an offline booking has a price typed straight in and no component
+  // columns to divide, so including them would inflate the payout side
+  // of an arithmetic the fee rows cannot balance.
+  const ownerOrders = await prisma.order.findMany({
+    where: {
+      workspaceId: workspace.id,
+      vehicle: { ownerId: owner.id },
+      sourceMetadata: { not: null },
+    },
+    select: { sourceMetadata: true, totalPrice: true },
+  });
+  const feeTotals = sumFeeColumns(ownerOrders);
+  const payoutTotal =
+    Math.round(
+      ownerOrders.reduce(
+        (sum, order) => sum + (getOrderNetEarning(order.sourceMetadata, order.totalPrice) ?? 0),
+        0,
+      ) * 100,
+    ) / 100;
 
   const allVehicles = await prisma.vehicle.findMany({
     where: { workspaceId: workspace.id },
@@ -105,6 +128,9 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
         isCurrent: rule.id === currentRule?.id,
       }))}
       feeRows={feeRows}
+      feeTotals={feeTotals}
+      payoutTotal={payoutTotal}
+      feeOrderCount={ownerOrders.length}
       assignedVehicleIds={owner.vehicles.map((vehicle) => vehicle.id)}
       allVehicles={allVehicles.map((vehicle) => ({
         id: vehicle.id,

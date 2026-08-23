@@ -248,6 +248,35 @@ export function OwnerEditor({
         <div className="card border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>
       ) : null}
 
+      {/* First, not last. This is the page's only route to the thing
+          the settings below exist to produce -- and it was under a
+          profile form, a share-link block, commission terms and a
+          twenty-row fee table. */}
+      <section className="card space-y-2 p-6">
+        <h2 className="text-lg font-semibold">{labels.sections.ledger}</h2>
+        <p className="text-sm text-[var(--ink-soft)]">{labels.ledgerHint}</p>
+        <div className="flex flex-wrap gap-2 pt-2">
+          <Link href={`/owners/${owner.id}/ledger`} className="btn-secondary">
+            {labels.openLedger}
+          </Link>
+          {shareToken ? (
+            <a href={`/share/${shareToken}`} target="_blank" rel="noreferrer" className="btn-secondary">
+              {labels.viewAsOwner}
+            </a>
+          ) : null}
+          {shareToken ? (
+            <a href={`/share/${shareToken}?tab=statements`} target="_blank" rel="noreferrer" className="btn-secondary">
+              {labels.openStatements}
+            </a>
+          ) : null}
+          {shareToken ? (
+            <a href={`/share/${shareToken}?tab=calendar`} target="_blank" rel="noreferrer" className="btn-secondary">
+              {labels.openCalendar}
+            </a>
+          ) : null}
+        </div>
+      </section>
+
       <section className="card space-y-4 p-6">
         <h2 className="text-lg font-semibold">{labels.sections.profile}</h2>
         <div>
@@ -355,30 +384,6 @@ export function OwnerEditor({
         </div>
       </section>
 
-      <section className="card space-y-2 p-6">
-        <h2 className="text-lg font-semibold">{labels.sections.ledger}</h2>
-        <p className="text-sm text-[var(--ink-soft)]">{labels.ledgerHint}</p>
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Link href={`/owners/${owner.id}/ledger`} className="btn-secondary">
-            {labels.openLedger}
-          </Link>
-          {shareToken ? (
-            <a href={`/share/${shareToken}`} target="_blank" rel="noreferrer" className="btn-secondary">
-              {labels.viewAsOwner}
-            </a>
-          ) : null}
-          {shareToken ? (
-            <a href={`/share/${shareToken}?tab=statements`} target="_blank" rel="noreferrer" className="btn-secondary">
-              {labels.openStatements}
-            </a>
-          ) : null}
-          {shareToken ? (
-            <a href={`/share/${shareToken}?tab=calendar`} target="_blank" rel="noreferrer" className="btn-secondary">
-              {labels.openCalendar}
-            </a>
-          ) : null}
-        </div>
-      </section>
 
       <section className="card border-red-200 p-6">
         <h2 className="mb-2 text-lg font-semibold text-red-700">{labels.sections.danger}</h2>

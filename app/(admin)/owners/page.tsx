@@ -216,6 +216,23 @@ export default async function OwnersPage({
                     {owner.phone ? <span>{owner.phone}</span> : null}
                     {owner.companyName ? <span>{owner.companyName}</span> : null}
                   </div>
+                  {/* The plates, not just the count. "3 vehicles" tells
+                      you how many to reassign; the plates tell you
+                      which owner you are looking at, which is the
+                      question this list is usually scanned for. */}
+                  {owner.vehicles.length > 0 ? (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {owner.vehicles.map((vehicle) => (
+                        <span
+                          key={vehicle.id}
+                          className="rounded border border-[var(--line)] bg-[var(--surface-muted)] px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-[var(--ink-mid)]"
+                          title={`${vehicle.year} ${vehicle.brand} ${vehicle.model}`}
+                        >
+                          {vehicle.plateNumber}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="shrink-0 text-left text-xs text-[var(--ink-soft)] sm:text-right">
                   <div className="font-medium text-[var(--ink-mid)]">

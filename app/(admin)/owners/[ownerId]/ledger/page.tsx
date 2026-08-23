@@ -4,6 +4,12 @@ import { OwnerLedgerManager } from "@/components/owner-ledger-manager";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import {
+  getManagerRetentionByFee,
+  parseFeeShareOverrides,
+  resolveWorkspaceLedgerPolicy,
+} from "@/lib/ledger-policy";
+import { getNetEarningFromFinancials, parseImportedOrderMetadata } from "@/lib/utils";
 
 type Params = Promise<{ ownerId: string }>;
 
@@ -63,13 +69,46 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
           renterName: true,
           pickupDatetime: true,
           returnDatetime: true,
+          // Only for the internal breakdown below. It is deliberately
+          // not forwarded to the owner-facing share view.
+          sourceMetadata: true,
+          totalPrice: true,
         },
       },
     },
   });
 
+  // How each net-earning line was arrived at, for reconciling against
+  // Turo's own payout. Computed here rather than stored, and passed
+  // only to the admin component -- `owner-public-share-view` never
+  // receives it, which is what "internal" has to mean if it is going
+  // to mean anything.
+  const policy = resolveWorkspaceLedgerPolicy(workspace);
+  const overrides = parseFeeShareOverrides(owner.feeShareOverrides);
+  const breakdownByItemId: Record<
+    string,
+    { gross: number; withheld: Array<{ column: string; amount: number }>; net: number }
+  > = {};
+
+  for (const item of ledgerItems) {
+    if (item.kind !== "OWNER_NET_EARNING" || !item.order) continue;
+    const gross = getNetEarningFromFinancials(
+      parseImportedOrderMetadata(item.order.sourceMetadata)?.financials,
+      item.order.totalPrice,
+    );
+    if (gross == null) continue;
+    const retention = getManagerRetentionByFee(item.order.sourceMetadata, policy, overrides);
+    if (retention.lines.length === 0) continue;
+    breakdownByItemId[item.id] = {
+      gross,
+      withheld: retention.lines,
+      net: item.amount,
+    };
+  }
+
   return (
     <OwnerLedgerManager
+      netEarningBreakdown={breakdownByItemId}
       locale={locale}
       owners={owners}
       selectedOwner={{ id: owner.id, name: owner.name }}

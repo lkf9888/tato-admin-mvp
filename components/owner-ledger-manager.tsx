@@ -97,6 +97,10 @@ function copy(locale: Locale) {
         type: "类型",
         detail: "说明",
         credit: "收入（车主得款）",
+        balance: "余额",
+        breakdownToggle: "计算明细(内部)",
+        breakdownGross: "Turo 打款",
+        breakdownNet: "车主净收益",
         debit: "支出（车主抵扣）",
         auto: "auto",
         edit: "修改",
@@ -155,6 +159,10 @@ function copy(locale: Locale) {
         type: "Type",
         detail: "Description",
         credit: "Income",
+        balance: "Balance",
+        breakdownToggle: "How this was calculated (internal)",
+        breakdownGross: "Turo payout",
+        breakdownNet: "Owner net earning",
         debit: "Deductions",
         auto: "auto",
         edit: "Edit",
@@ -209,12 +217,19 @@ function sortLedgerItems(items: LedgerItem[]) {
   );
 }
 
+/** How a net-earning line was arrived at, keyed by ledger item id. */
+export type NetEarningBreakdown = Record<
+  string,
+  { gross: number; withheld: Array<{ column: string; amount: number }>; net: number }
+>;
+
 export function OwnerLedgerManager({
   locale,
   owners,
   selectedOwner,
   vehicles,
   items,
+  netEarningBreakdown = {},
   shareToken,
   ownerSelectRoute = "query",
 }: {
@@ -223,6 +238,8 @@ export function OwnerLedgerManager({
   selectedOwner: OwnerOption;
   vehicles: VehicleOption[];
   items: LedgerItem[];
+  /** How each net-earning line was arrived at. Admin view only. */
+  netEarningBreakdown?: NetEarningBreakdown;
   shareToken?: string | null;
   ownerSelectRoute?: "query" | "ledger";
 }) {
@@ -394,6 +411,7 @@ export function OwnerLedgerManager({
       </section>
 
       <LedgerRows
+        breakdown={netEarningBreakdown}
         labels={labels}
         locale={locale}
         rows={filteredItems}
@@ -423,12 +441,14 @@ function LedgerRows({
   labels,
   locale,
   rows,
+  breakdown,
   onEdit,
   onDelete,
 }: {
   labels: ReturnType<typeof copy>;
   locale: Locale;
   rows: LedgerItem[];
+  breakdown: NetEarningBreakdown;
   onEdit: (item: LedgerItem) => void;
   onDelete: (item: LedgerItem) => void;
 }) {
@@ -472,11 +492,16 @@ function LedgerRows({
               <th className="px-3 py-2 font-medium">{labels.detail}</th>
               <th className="px-3 py-2 text-right font-medium">{labels.credit}</th>
               <th className="px-3 py-2 text-right font-medium">{labels.debit}</th>
+              <th className="px-3 py-2 text-right font-medium">{labels.balance}</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--line)]">
-            {rows.map((item) => (
+            {/* Rows are newest-first, so the running balance is
+                accumulated from the bottom up -- the number on a row is
+                the balance as it stood after that entry, which is what
+                a statement is read against. */}
+            {rows.map((item, index) => (
               <tr key={item.id} className="group align-top hover:bg-[var(--surface-muted)]">
                 <td className="whitespace-nowrap px-3 py-3 text-[var(--ink-mid)]">
                   {formatDate(item.occurredAt, locale)}
@@ -486,12 +511,53 @@ function LedgerRows({
                 </td>
                 <td className="px-3 py-3">
                   <ItemDetail labels={labels} locale={locale} item={item} compact />
+                  {/* Internal only. The owner's copy of this statement
+                      is rendered by a different component that is never
+                      given this data, so "hidden from the owner" is a
+                      fact about the payload rather than about CSS. */}
+                  {breakdown[item.id] ? (
+                    <details className="mt-1">
+                      <summary className="cursor-pointer list-none text-[11px] font-semibold text-[var(--ink-soft)] underline underline-offset-2">
+                        {labels.breakdownToggle}
+                      </summary>
+                      <table className="mt-1.5 w-full max-w-sm text-[11px]">
+                        <tbody>
+                          <tr>
+                            <td className="py-0.5 text-[var(--ink-soft)]">{labels.breakdownGross}</td>
+                            <td className="py-0.5 text-right tabular-nums">
+                              {formatCurrency(breakdown[item.id].gross, locale)}
+                            </td>
+                          </tr>
+                          {breakdown[item.id].withheld.map((line) => (
+                            <tr key={line.column}>
+                              <td className="py-0.5 pl-2 text-[var(--ink-soft)]">− {line.column}</td>
+                              <td className="py-0.5 text-right tabular-nums text-amber-700">
+                                −{formatCurrency(line.amount, locale)}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="border-t border-[var(--line)]">
+                            <td className="py-0.5 font-semibold">{labels.breakdownNet}</td>
+                            <td className="py-0.5 text-right font-semibold tabular-nums">
+                              {formatCurrency(breakdown[item.id].net, locale)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </details>
+                  ) : null}
                 </td>
                 <td className="whitespace-nowrap px-3 py-3 text-right">
                   {item.amount > 0 ? <SignedAmount amount={item.amount} locale={locale} /> : null}
                 </td>
                 <td className="whitespace-nowrap px-3 py-3 text-right">
                   {item.amount < 0 ? <SignedAmount amount={item.amount} locale={locale} /> : null}
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-[var(--ink-mid)]">
+                  {formatCurrency(
+                    rows.slice(index).reduce((sum, row) => sum + row.amount, 0),
+                    locale,
+                  )}
                 </td>
                 <td className="whitespace-nowrap px-3 py-3 text-right">
                   <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100">

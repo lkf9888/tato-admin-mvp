@@ -146,28 +146,34 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
     note: string | null;
   }> = [];
 
-  if (netEarning != null && Math.abs(netEarning) >= 0.005) {
+  // Net of what the operator withheld, rather than gross with a
+  // deduction beside it.
+  //
+  // The retained charges are service fees and reimbursements billed to
+  // the guest that were never the owner's to begin with -- they are
+  // not something taken off the owner, they are money that is not part
+  // of the owner's revenue. Showing the gross and then subtracting
+  // them made the statement read as though the operator had clawed
+  // something back, and invited exactly that question.
+  //
+  // The arithmetic is not lost: the admin ledger expands this line
+  // into its components. The owner's copy shows the figure they are
+  // actually settled on.
+  const ownerRevenue = +((netEarning ?? 0) - retainedAmount).toFixed(2);
+
+  if (netEarning != null && Math.abs(ownerRevenue) >= 0.005) {
     desired.push({
       kind: OwnerLedgerKind.OWNER_NET_EARNING,
-      amount: +netEarning.toFixed(2),
+      amount: ownerRevenue,
       occurredAt: order.pickupDatetime,
       note: `${sourceLabel} net earning · ${order.renterName} · ${vehicleLabel}`,
     });
   }
 
-  if (retainedAmount > 0.005) {
-    // Named fee by fee. "reimbursements 41.20" told the owner a
-    // category was withheld; the fee names tell them which charge.
-    const detail = retention.lines
-      .map((entry) => `${entry.column} ${roundLedgerAmount(entry.amount).toFixed(2)}`)
-      .join(" + ");
-    desired.push({
-      kind: OwnerLedgerKind.EXPENSE_REIMBURSEMENT,
-      amount: -retainedAmount,
-      occurredAt: order.pickupDatetime,
-      note: `Retained by TATO · ${detail} · ${order.renterName} · ${vehicleLabel}`,
-    });
-  }
+  // No separate "Retained by TATO" line any more -- it is folded into
+  // the revenue above. Kept out of AUTO_KINDS below would have been
+  // wrong; it stays there so a resync deletes the ones already
+  // written.
 
   // When the guest paid the owner directly, we never held this money,
   // so crediting it and stopping there would say we owe it. The

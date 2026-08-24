@@ -4,7 +4,7 @@ import { ActionSubmitButton } from "@/components/action-submit-button";
 import { InfoHint } from "@/components/info-hint";
 import { deleteOwnerCommissionAction, saveOwnerCommissionAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
-import { formatDate } from "@/lib/utils";
+import { formatDate, todayDateInputValue } from "@/lib/utils";
 
 export type CommissionRuleRow = {
   id: string;
@@ -98,7 +98,7 @@ export function OwnerCommissionPanel({
 }) {
   const t = copy(locale);
   const current = rules.find((rule) => rule.isCurrent) ?? null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayDateInputValue();
 
   const settlementLabel = (settlement: CommissionRuleRow["settlement"]) =>
     settlement === "OWNER_COLLECTS" ? t.settlementOwner : t.settlementCompany;

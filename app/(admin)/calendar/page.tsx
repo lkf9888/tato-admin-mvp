@@ -4,6 +4,8 @@ import { MobileScheduleList } from "@/components/mobile-schedule-list";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import { getOrderFeeLines } from "@/lib/ledger-policy";
+import { resolveOrderCleaningFees } from "@/lib/owner-commission";
 import { getDisplayOrderNote, getOrderNetEarning } from "@/lib/utils";
 
 /**
@@ -65,7 +67,18 @@ export default async function CalendarPage() {
         pickupDatetime: { lte: to },
         returnDatetime: { gte: from },
       },
-      include: { vehicle: { include: { owner: true } } },
+      include: {
+        vehicle: {
+          include: {
+            owner: true,
+            // Needed to resolve this order's cleaning fee the same
+            // way the save endpoint does -- without it, the panel
+            // opened from the calendar always showed the fee box
+            // empty, whatever had actually been saved.
+            cleaningFeeRules: { orderBy: { effectiveFrom: "desc" } },
+          },
+        },
+      },
       orderBy: { pickupDatetime: "asc" },
     }),
   ]);
@@ -165,6 +178,8 @@ export default async function CalendarPage() {
         createdBy: order.createdBy,
         externalOrderId: order.externalOrderId,
         ownerLedgerSyncedAt: order.ownerLedgerSyncedAt?.toISOString() ?? null,
+        ...resolveOrderCleaningFees(order),
+        feeLines: getOrderFeeLines(order.sourceMetadata),
       }))}
     />
   );

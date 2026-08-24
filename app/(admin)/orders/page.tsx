@@ -10,6 +10,8 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { getOrderStatusOptions, getStatusLabel, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
+import { getOrderFeeLines } from "@/lib/ledger-policy";
+import { resolveOrderCleaningFees } from "@/lib/owner-commission";
 import { prisma } from "@/lib/prisma";
 import { PendingOrdersPanel } from "@/components/pending-orders-panel";
 import { matchVehiclesForEmail } from "@/lib/turo-message-match";
@@ -87,7 +89,19 @@ function buildWhereClause(
 async function fetchFilteredOrders(where: Prisma.OrderWhereInput) {
   return prisma.order.findMany({
     where,
-    include: { vehicle: { include: { owner: true } } },
+    include: {
+      vehicle: {
+        include: {
+          owner: true,
+          // The row list edits the cleaning fee straight from this
+          // page's data, so it needs the same dated rules the PATCH
+          // response resolves against -- without them every order
+          // opened here shows a blank fee regardless of what is
+          // actually saved.
+          cleaningFeeRules: { orderBy: { effectiveFrom: "desc" } },
+        },
+      },
+    },
     orderBy: { pickupDatetime: "desc" },
   });
 }
@@ -321,6 +335,8 @@ export default async function OrdersPage({
     createdBy: order.createdBy,
     externalOrderId: order.externalOrderId,
     ownerLedgerSyncedAt: order.ownerLedgerSyncedAt?.toISOString() ?? null,
+    ...resolveOrderCleaningFees(order),
+    feeLines: getOrderFeeLines(order.sourceMetadata),
   }));
   const orderVehicleOptions = vehicles.map((vehicle) => ({
     id: vehicle.id,

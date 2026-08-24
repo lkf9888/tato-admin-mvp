@@ -8,6 +8,29 @@ import { OwnerSettlementDirection } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 /**
+ * Calendar-date key, in UTC. Both callers below need "is this rule's
+ * start date on or before the date in question", not "did this many
+ * milliseconds elapse" -- and comparing raw instants made a rule
+ * effective "today" resolve as a future rule for roughly half of
+ * every day.
+ *
+ * Rules are written at a fixed noon-UTC timestamp for the date they
+ * name (see the order API's `cleaningFeeFrom` handling), specifically
+ * so this comparison would not have to reason about time zones. But
+ * `pickCommissionRule`/`resolveCleaningFee` were still comparing that
+ * timestamp against the exact instant of "now": for any save made
+ * before noon UTC on the effective date, or -- for anyone west of UTC
+ * -- during their own evening, when the UTC calendar date has already
+ * rolled to tomorrow, the rule just written compared as being in the
+ * future and was skipped. The owner's page showed the terms as "starts
+ * later" and the order panel showed the car's old cleaning fee, both
+ * moments after saving the new ones.
+ */
+function dateKey(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+/**
  * What the management agreement said on a given day.
  *
  * A commission rate is a term of a contract, not a property of a row,
@@ -48,10 +71,10 @@ export type EffectiveCommission = {
 export function pickCommissionRule<
   T extends { id: string; rate: number; settlement: OwnerSettlementDirection; effectiveFrom: Date },
 >(rules: T[], on: Date): T | null {
-  const at = on.getTime();
+  const onKey = dateKey(on);
   let best: T | null = null;
   for (const rule of rules) {
-    if (rule.effectiveFrom.getTime() > at) continue;
+    if (dateKey(rule.effectiveFrom) > onKey) continue;
     if (!best || rule.effectiveFrom.getTime() > best.effectiveFrom.getTime()) best = rule;
   }
   return best;
@@ -118,12 +141,41 @@ export function resolveCleaningFee(
   on: Date,
   fallbackAmount: number | null | undefined,
 ): { amount: number; ruleId: string | null } {
+  const onKey = dateKey(on);
   let best: { id: string; amount: number; effectiveFrom: Date } | null = null;
-  const at = on.getTime();
   for (const rule of rules) {
-    if (rule.effectiveFrom.getTime() > at) continue;
+    if (dateKey(rule.effectiveFrom) > onKey) continue;
     if (!best || rule.effectiveFrom.getTime() > best.effectiveFrom.getTime()) best = rule;
   }
   if (best) return { amount: best.amount, ruleId: best.id };
   return { amount: fallbackAmount ?? 0, ruleId: null };
+}
+
+/**
+ * The two cleaning-fee numbers an order screen needs: the car's price
+ * today, and the price this particular trip is actually charged.
+ *
+ * Pulled out because it was written once, correctly, inside the PATCH
+ * response the order panel saves against -- and nowhere in whatever
+ * first loads that panel. Opening an order read a plain object with no
+ * `cleaningFee` on it at all, which rendered exactly like an empty
+ * field: the amount was saved, the box was still blank, because the
+ * page that loaded the order had never been asked for it.
+ */
+export function resolveOrderCleaningFees(order: {
+  pickupDatetime: Date;
+  vehicle: {
+    cleaningFee: number | null;
+    cleaningFeeRules: Array<{ id: string; amount: number; effectiveFrom: Date }>;
+  };
+}): { cleaningFee: number; cleaningFeeOnTrip: number } {
+  return {
+    cleaningFee: resolveCleaningFee(order.vehicle.cleaningFeeRules, new Date(), order.vehicle.cleaningFee)
+      .amount,
+    cleaningFeeOnTrip: resolveCleaningFee(
+      order.vehicle.cleaningFeeRules,
+      order.pickupDatetime,
+      order.vehicle.cleaningFee,
+    ).amount,
+  };
 }

@@ -80,6 +80,24 @@ export function parseTimeInputDisplay(value: string) {
   return { hour, minute };
 }
 
+/**
+ * Today, as a browser date-input value ("yyyy-mm-dd") — in the
+ * viewer's own calendar, not UTC's.
+ *
+ * `new Date().toISOString().slice(0, 10)` reads the UTC date, and
+ * everyone west of Greenwich has hours where that is not today at
+ * all: from roughly 5pm local onward, Vancouver's UTC date has
+ * already rolled to tomorrow. A date input defaulted that way
+ * pre-fills "tomorrow" during the exact hours someone is most likely
+ * to be doing this after a normal workday, with nothing on screen
+ * suggesting the date is off by one.
+ */
+export function todayDateInputValue() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
 export function parseDateTimeInputParts(dateValue: string, timeValue: string) {
   const date = parseDateInputDisplay(dateValue);
   const time = parseTimeInputDisplay(timeValue);

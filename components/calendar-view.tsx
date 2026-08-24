@@ -185,13 +185,27 @@ function getTimelineBarClasses(
     // vehicles fill a phone screen, which defeats the view. It stays a
     // comfortable target because it is wide.
     compact ? "tap-compact px-1.5 text-[10px]" : "px-3.5 text-[13px]",
+    // Conflict and cancellation are the two states that need to stay
+    // findable regardless of anything else about the trip, so they
+    // still win outright. Below that, green now means "this trip's
+    // money is where it belongs" rather than "this trip is offline" --
+    // an owner-bound order goes green the moment it is synced to that
+    // owner's ledger, on the same reasoning offline orders were
+    // already green for: nothing about them is still owed to Turo's
+    // own accounting. A synced Turo order and an offline order are
+    // the same color on purpose; the source is still one tap away, on
+    // the badge inside the order itself, and blue is now specifically
+    // "there is money on this trip that has not reached an owner yet"
+    // -- the thing a fleet operator actually needs to spot at a glance.
     order.hasConflict
       ? "border-[#c61e22] bg-[#e5484d]"
       : order.status === "cancelled"
         ? "border-slate-500 bg-[var(--ink-soft)]"
-        : order.source === "turo"
-          ? "border-[#1f3aa8] bg-[#3456df]"
-          : "border-[#1f5b48] bg-[#2f7f67]",
+        : order.ownerId && order.ownerLedgerSyncedAt
+          ? "border-[#1f5b48] bg-[#2f7f67]"
+          : order.source === "turo"
+            ? "border-[#1f3aa8] bg-[#3456df]"
+            : "border-[#1f5b48] bg-[#2f7f67]",
     clippedStart ? "rounded-r-md rounded-l-md" : "rounded-l-md",
     clippedEnd ? "rounded-l-md rounded-r-md" : "rounded-r-md",
   );

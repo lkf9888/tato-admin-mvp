@@ -193,6 +193,7 @@ model Workspace {
   turoConversationMessages      TuroConversationMessage[]
   assistantThreads              AssistantThread[]
   assistantAlerts               AssistantAlert[]
+  messageTemplates              MessageTemplate[]
 }
 
 model User {
@@ -287,6 +288,7 @@ model Vehicle {
   staffTasks             StaffTask[]
   directBookingDocuments DirectBookingDocument[]
   cleaningFeeRules       VehicleCleaningFeeRule[]
+  messageTemplates       MessageTemplate[]
 
   @@index([workspaceId])
   inboundEmails          InboundEmail[]
@@ -1233,4 +1235,28 @@ model TuroConversationMessage {
   @@unique([workspaceId, reservationId, externalId])
   @@index([workspaceId, reservationId, sentAt])
   @@index([workspaceId, sentAt])
+}
+
+/// A canned reply, ready to paste into Turo's own message box.
+///
+/// TATO cannot send a Turo message on anyone's behalf -- write access
+/// to that channel does not exist -- so a template's job stops at
+/// being fast to find and easy to copy. `vehicleId` is what "locked to
+/// a car" means: null is a general template offered for any
+/// conversation, and a value narrows it to the one car it actually
+/// describes, for content that would be wrong on any other -- a gate
+/// code, a parking spot, a specific model's quirks.
+model MessageTemplate {
+  workspaceId String?
+  id          String     @id @default(cuid())
+  vehicleId   String?
+  label       String
+  content     String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  vehicle     Vehicle?   @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([vehicleId])
 }

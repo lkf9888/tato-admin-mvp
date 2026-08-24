@@ -62,6 +62,17 @@ export default async function GuestMessagesPage() {
     },
   });
 
+  // "PLATE · Nickname" everywhere a vehicle needs a short, unambiguous
+  // name -- the same shape the order and owner pages already use.
+  const vehicleLabel = (vehicle: (typeof fleet)[number]) =>
+    `${vehicle.plateNumber} · ${vehicle.nickname || `${vehicle.brand} ${vehicle.model} ${vehicle.year}`}`;
+
+  const messageTemplates = await prisma.messageTemplate.findMany({
+    where: { workspaceId: workspace.id },
+    orderBy: { createdAt: "desc" },
+  });
+  const fleetById = new Map(fleet.map((vehicle) => [vehicle.id, vehicle]));
+
   function explainUnmatched(subject: string): UnmatchedReason | null {
     const parsed = classifyTuroSubject(subject);
     const vehicleText = parsed?.vehicleText?.trim();
@@ -289,6 +300,23 @@ export default async function GuestMessagesPage() {
       <GuestMessagesView
         locale={locale}
         canDraft={isKimiConfigured()}
+        messageTemplates={messageTemplates.map((template) => {
+          const vehicle = template.vehicleId ? fleetById.get(template.vehicleId) : null;
+          return {
+            id: template.id,
+            label: template.label,
+            content: template.content,
+            vehicleId: template.vehicleId,
+            vehicleLabel: vehicle ? vehicleLabel(vehicle) : null,
+          };
+        })}
+        templateVehicleOptions={fleet.map((vehicle) => ({
+          id: vehicle.id,
+          label: vehicleLabel(vehicle),
+          searchText: [vehicle.plateNumber, vehicle.nickname, vehicle.brand, vehicle.model, String(vehicle.year)]
+            .filter(Boolean)
+            .join(" "),
+        }))}
         // Keyed by reservation, which is how Turo threads a
         // conversation. A thread reaches it through its matched trip's
         // externalOrderId; threads with no matched trip simply have no

@@ -12,6 +12,7 @@ export const guestMessagesMessages = {
       searchPlaceholder: "Search guest, car, plate or message text",
       searchCount: (count: number) =>
         count === 1 ? "1 conversation" : `${count} conversations`,
+      templatesButton: "Templates",
       // Trip panel
       tripTitle: "Matching trip",
       tripNone: "No trip matched",
@@ -84,6 +85,7 @@ export const guestMessagesMessages = {
       noVehicle: "未识别车辆",
       searchPlaceholder: "搜索客人、车型、车牌或消息内容",
       searchCount: (count: number) => `${count} 个会话`,
+      templatesButton: "消息模板",
       tripTitle: "匹配到的订单",
       tripNone: "未匹配到订单",
       tripNoneCopy:

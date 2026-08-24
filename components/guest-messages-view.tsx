@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { LayoutTemplate } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  MessageTemplatePanel,
+  type MessageTemplateRow,
+  type MessageTemplateVehicleOption,
+} from "@/components/message-template-panel";
 import { getMessages, type Locale } from "@/lib/i18n";
 
 type ThreadMessage = {
@@ -162,6 +168,8 @@ export function GuestMessagesView({
   threads,
   orders,
   conversations,
+  messageTemplates,
+  templateVehicleOptions,
 }: {
   locale: Locale;
   canDraft: boolean;
@@ -172,12 +180,15 @@ export function GuestMessagesView({
    *  without one falls back to the email-derived view, which shows
    *  what the guest said and nothing of what we replied. */
   conversations: Record<string, ConversationMessage[]>;
+  messageTemplates: MessageTemplateRow[];
+  templateVehicleOptions: MessageTemplateVehicleOption[];
 }) {
   const t = getMessages(locale).guestMessagesPage;
   const router = useRouter();
 
   const [selectedKey, setSelectedKey] = useState<string | null>(threads[0]?.key ?? null);
   const [search, setSearch] = useState("");
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   // Matched across everything a thread carries -- guest, car, plate,
   // and the text of every message in both languages. Searching only
@@ -383,9 +394,19 @@ export function GuestMessagesView({
 
   if (threads.length === 0) {
     return (
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-10 text-center">
-        <p className="text-[12.5px] text-[var(--ink-soft)]">{t.empty}</p>
-      </section>
+      <>
+        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-10 text-center">
+          <p className="text-[12.5px] text-[var(--ink-soft)]">{t.empty}</p>
+        </section>
+        {templatesOpen ? (
+          <MessageTemplatePanel
+            locale={locale}
+            templates={messageTemplates}
+            vehicleOptions={templateVehicleOptions}
+            onClose={() => setTemplatesOpen(false)}
+          />
+        ) : null}
+      </>
     );
   }
 
@@ -415,18 +436,19 @@ export function GuestMessagesView({
     : [];
 
   return (
-    // Two different layouts, deliberately.
-    //
-    // On a desktop the two panes are side by side and each scrolls
-    // inside itself, so the page never moves and both lists stay in
-    // view -- 13rem is the shell chrome above this grid.
-    //
-    // On a phone there is only ever one pane on screen, and capping it
-    // at 60dvh was the wrong instinct carried over from the desktop
-    // layout: it left the list occupying a little over half the screen
-    // with dead space beneath, and put a second scroll area inside a
-    // page that already scrolls. Below `lg` the lists simply flow and
-    // the page scrolls, so a conversation uses the whole screen.
+    <>
+    {/* Two different layouts, deliberately.
+
+        On a desktop the two panes are side by side and each scrolls
+        inside itself, so the page never moves and both lists stay in
+        view -- 13rem is the shell chrome above this grid.
+
+        On a phone there is only ever one pane on screen, and capping it
+        at 60dvh was the wrong instinct carried over from the desktop
+        layout: it left the list occupying a little over half the screen
+        with dead space beneath, and put a second scroll area inside a
+        page that already scrolls. Below `lg` the lists simply flow and
+        the page scrolls, so a conversation uses the whole screen. */}
     <div className="grid gap-3 lg:h-[calc(100dvh-13rem)] lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
       <section
         className={`flex min-h-0 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)] ${selected ? "hidden lg:flex" : ""}`}
@@ -435,12 +457,28 @@ export function GuestMessagesView({
             writes once about a parking spot and is remembered by what
             they said, not by a name in a list of ninety. */}
         <div className="border-b border-[var(--line)] p-2">
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t.searchPlaceholder}
-            className="h-9 w-full rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 text-[13px] outline-none focus:border-[rgba(17,19,24,0.22)]"
-          />
+          <div className="flex items-center gap-1.5">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t.searchPlaceholder}
+              className="h-9 min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 text-[13px] outline-none focus:border-[rgba(17,19,24,0.22)]"
+            />
+            {/* Canned replies live behind their own modal rather than a
+                third pane -- they are reached for occasionally, not
+                read continuously, and a pane that is empty ninety
+                percent of the time is just a narrower conversation
+                list the other ten. */}
+            <button
+              type="button"
+              onClick={() => setTemplatesOpen(true)}
+              title={t.templatesButton}
+              className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-2.5 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)]"
+            >
+              <LayoutTemplate className="h-3.5 w-3.5" aria-hidden />
+              <span className="hidden sm:inline">{t.templatesButton}</span>
+            </button>
+          </div>
           {search.trim() ? (
             <p className="mt-1 px-1 text-[11px] text-[var(--ink-soft)]">
               {t.searchCount(visibleThreads.length)}
@@ -834,5 +872,14 @@ export function GuestMessagesView({
         </section>
       )}
     </div>
+    {templatesOpen ? (
+      <MessageTemplatePanel
+        locale={locale}
+        templates={messageTemplates}
+        vehicleOptions={templateVehicleOptions}
+        onClose={() => setTemplatesOpen(false)}
+      />
+    ) : null}
+    </>
   );
 }

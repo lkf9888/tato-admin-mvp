@@ -192,6 +192,7 @@ function revalidateAdminPages() {
     "/imports",
     "/billing",
     "/share-links",
+    "/messages",
   ].forEach((path) => revalidatePath(path));
   // Dynamic routes are not covered by their parent path: revalidating
   // "/owners" leaves "/owners/<id>" -- the page these settings are
@@ -1840,4 +1841,89 @@ export async function unlockShareLinkAction(formData: FormData) {
   await resetAttempts({ scope: "share_unlock_ip", identifier: ip });
   await grantShareAccess(token, shareLink.passwordHash);
   redirect(`/share/${token}`);
+}
+
+
+/**
+ * A canned reply, saved or updated.
+ *
+ * One action for both: `templateId` present means this is an edit of
+ * an existing template, absent means a new one. The form is the same
+ * either way, which is what lets "edit" mean "open this template's
+ * values back into the add form" on the client rather than a second
+ * code path here.
+ *
+ * `vehicleId` empty means general -- offered for any conversation.
+ * Set, it has to resolve to a vehicle in this workspace, the same
+ * requirement every other vehicle-scoped write in this file makes.
+ */
+export async function saveMessageTemplateAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  const templateId = formData.get("templateId")?.toString() || null;
+  const label = cleanText(formData.get("label")?.toString());
+  const content = cleanText(formData.get("content")?.toString());
+  if (!label || !content) return;
+
+  const vehicleIdRaw = formData.get("vehicleId")?.toString();
+  let vehicleId: string | null = null;
+  if (vehicleIdRaw) {
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: vehicleIdRaw, workspaceId: workspace.id },
+      select: { id: true },
+    });
+    if (!vehicle) return;
+    vehicleId = vehicle.id;
+  }
+
+  if (templateId) {
+    const existing = await prisma.messageTemplate.findFirst({
+      where: { id: templateId, workspaceId: workspace.id },
+      select: { id: true },
+    });
+    if (!existing) return;
+    await prisma.messageTemplate.update({
+      where: { id: existing.id },
+      data: { label, content, vehicleId },
+    });
+  } else {
+    await prisma.messageTemplate.create({
+      data: { workspaceId: workspace.id, label, content, vehicleId },
+    });
+  }
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: templateId ? "message_template_updated" : "message_template_created",
+    entityType: "MessageTemplate",
+    entityId: templateId ?? label,
+    metadata: { label, vehicleId },
+  });
+
+  revalidatePath("/messages");
+}
+
+export async function deleteMessageTemplateAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  const templateId = formData.get("templateId")?.toString() ?? "";
+  const template = await prisma.messageTemplate.findFirst({
+    where: { id: templateId, workspaceId: workspace.id },
+    select: { id: true, label: true },
+  });
+  if (!template) return;
+
+  await prisma.messageTemplate.delete({ where: { id: template.id } });
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "message_template_deleted",
+    entityType: "MessageTemplate",
+    entityId: template.id,
+    metadata: { label: template.label },
+  });
+
+  revalidatePath("/messages");
 }

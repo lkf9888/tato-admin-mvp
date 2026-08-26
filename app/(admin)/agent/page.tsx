@@ -32,6 +32,7 @@ export default async function AgentPage() {
       id: true,
       name: true,
       tokenPrefix: true,
+      scopes: true,
       lastUsedAt: true,
       revokedAt: true,
       createdAt: true,
@@ -47,6 +48,7 @@ export default async function AgentPage() {
 
   return (
     <AgentSetupPanel
+      appUrl={getAppUrl()}
       bookmarklet={`javascript:${encodeURIComponent(buildBookmarkletSource(getAppUrl()))}`}
       tokens={tokens.map((token) => ({
         ...token,

@@ -18,7 +18,17 @@ import { prisma } from "@/lib/prisma";
  * record of when each was last used.
  */
 
-export const AGENT_SCOPES = ["messages:write", "orders:write"] as const;
+/**
+ * What a token may do.
+ *
+ * Coarse on purpose -- an agent that can write conversations has no
+ * business importing financials. `read` is deliberately separate from
+ * both writes rather than implied by them: the common case is an
+ * automation that only ever pulls data out, and a credential that can
+ * only read is one that cannot be turned into a wrong number by a
+ * confused model or a prompt injection carried in a guest's message.
+ */
+export const AGENT_SCOPES = ["read", "messages:write", "orders:write"] as const;
 export type AgentScope = (typeof AGENT_SCOPES)[number];
 
 function hashToken(token: string) {

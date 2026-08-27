@@ -224,7 +224,13 @@ export function AgentSetupPanel({
           writes conversations and this reads the account, and one
           credential doing both would mean revoking the laptop's token
           also breaks every automation. */}
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
+      {/* Anchored, because the way in is a link from account settings
+          and this sits below two screens of bookmarklet setup that
+          have nothing to do with it. */}
+      <section
+        id="api"
+        className="scroll-mt-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4"
+      >
         <h2 className="t-title text-[var(--ink)]">只读 API</h2>
         <p className="mt-1 text-[12px] leading-5 text-[var(--ink-soft)]">
           给 AI Agent 或脚本读取账户数据用。这个令牌<strong>只能读</strong>——

@@ -74,6 +74,10 @@ export const accountSettingsMessages = {
       turoReaderCopy:
         "Turo sends no notification when you reply, so guest conversations arriving by email are one-sided. The reader is a browser bookmark you click while signed in to Turo; it writes both halves of every conversation back to TATO. Set it up once.",
       turoReaderLink: "Set up the reader",
+      apiAccessTitle: "Read-only API for AI agents",
+      apiAccessCopy:
+        "Hand an AI agent or a script a token and it can read this account over HTTP: the fleet, trips and their charges, owners and their ledgers, guest conversations, and the bookings still waiting on a decision. The token is read-only — nothing it reaches can change an order, a price, or a ledger line.",
+      apiAccessLink: "Get an API token",
       ledgerTitle: "Owner revenue split",
       ledgerCopy:
         "Turo's payout bundles rental revenue together with reimbursements, service fees, and penalties. Choose who keeps each part when settling with a vehicle owner. Amounts you keep appear as an explicit deduction line on the owner's statement, and commission is charged only on what actually reaches them.",
@@ -166,6 +170,10 @@ export const accountSettingsMessages = {
       turoReaderCopy:
         "你回复客人的时候 Turo 不会发任何邮件通知，所以靠邮件同步过来的客人消息只有客人那一半。读取器是一个浏览器书签，在已经登录 Turo 的情况下点一下，就会把整段对话的双方消息都写回 TATO。设置一次即可。",
       turoReaderLink: "去设置读取器",
+      apiAccessTitle: "只读 API（给 AI Agent 用）",
+      apiAccessCopy:
+        "把令牌交给 AI Agent 或脚本，它就能通过 HTTP 读取这个账户：车队、订单和逐项收费、车主和分成流水账、客人会话，以及还没挂到车上的预订。令牌只能读——订单、金额、分成规则都改不了。",
+      apiAccessLink: "签发 API 令牌",
       ledgerTitle: "车主分账规则",
       ledgerCopy:
         "Turo 的打款把租金收入、代垫费用报销、增值服务收入和罚金混在一起。你可以分别决定每一类在和车主结算时归谁。归你的部分会作为一条明确的扣款行出现在车主对账单上，佣金只按真正到车主手里的金额收取。",

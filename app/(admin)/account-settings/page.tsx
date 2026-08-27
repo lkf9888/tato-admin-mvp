@@ -315,6 +315,23 @@ export default async function AccountSettingsPage({
         </Link>
       </section>
 
+      {/* Its own section, though it links to the same page as the
+          reader above. They share a credentials page because both are
+          agent tokens, and they are otherwise unrelated -- nobody
+          looking for an HTTP API would think to open something called
+          "Turo reader", which is exactly how it went missing. */}
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+          {t.apiAccessTitle}
+        </p>
+        <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
+          {t.apiAccessCopy}
+        </p>
+        <Link href="/agent#api" className="btn-secondary mt-3 inline-flex">
+          {t.apiAccessLink}
+        </Link>
+      </section>
+
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
           {t.ledgerTitle}

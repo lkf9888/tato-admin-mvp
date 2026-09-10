@@ -86,6 +86,19 @@ export const rentalEstimateMessages = {
 
 
       statsBadge: "{trips} trips · {vehicles} cars · {from} – {to}",
+
+      downloadAction: "Download PDF",
+      downloadingAction: "Building PDF…",
+      downloadFailed: "Could not build the PDF. Try again.",
+      reportTitle: "Rental income estimate",
+      reportVehicleValue: "Estimated value",
+      reportGeneratedAt: "Prepared {date}",
+      reportEvidenceDirect:
+        "Anchored on {months} months of our own operating history for this model.",
+      reportEvidenceSegment:
+        "Estimated from how cars of this value and body style perform across our fleet.",
+      reportBasis:
+        "Built from {trips} completed Turo trips across {vehicles} cars, {from} to {to}, all rented in Metro Vancouver. Holding out one car at a time, the median error on the first-year total is {error}.",
     },
   },
   zh: {
@@ -162,6 +175,17 @@ export const rentalEstimateMessages = {
 
 
       statsBadge: "{trips} 笔真实订单 · {vehicles} 台车 · {from} 至 {to}",
+
+      downloadAction: "下载 PDF 报告",
+      downloadingAction: "正在生成…",
+      downloadFailed: "PDF 生成失败，请重试。",
+      reportTitle: "车辆租金收入预估",
+      reportVehicleValue: "车辆估值",
+      reportGeneratedAt: "生成于 {date}",
+      reportEvidenceDirect: "该预估基于我们自己运营这款车型的 {months} 个「车-月」实际数据。",
+      reportEvidenceSegment: "该预估来自同等价值、同类车身的车辆在我们车队中的表现规律。",
+      reportBasis:
+        "基于 {trips} 笔已完成的 Turo 订单，覆盖 {vehicles} 台车，时间跨度 {from} 至 {to}，全部为大温地区实际出租记录。采用留一交叉验证，第一年总收入的中位误差为 {error}。",
     },
   },
 } as const;

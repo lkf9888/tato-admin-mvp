@@ -60,6 +60,8 @@ export function RentalEstimateTool({
   const [commission, setCommission] = useState(30);
   const [methodOpen, setMethodOpen] = useState(false);
   const [hovered, setHovered] = useState<number | null>(null);
+  const [building, setBuilding] = useState(false);
+  const [downloadError, setDownloadError] = useState(false);
 
   const models = useMemo(() => (make ? listModels(make, thisYear) : []), [make, thisYear]);
 
@@ -104,6 +106,104 @@ export function RentalEstimateTool({
   }, [locale]);
 
   const maxGross = estimate ? Math.max(...estimate.months.map((m) => m.gross)) : 1;
+
+  /**
+   * Build the leave-behind PDF.
+   *
+   * Both the renderer and pdf-lib load on click rather than with the
+   * page: pdf-lib is a few hundred kilobytes, and most visits here end
+   * with reading a number off the screen, not exporting it.
+   */
+  async function downloadReport() {
+    if (!estimate || building) return;
+    setBuilding(true);
+    setDownloadError(false);
+    try {
+      const [{ drawReport, PAGE_WIDTH, PAGE_HEIGHT }, { PDFDocument }] = await Promise.all([
+        import("@/lib/rental-estimate/report-canvas"),
+        import("pdf-lib"),
+      ]);
+
+      const canvas = drawReport({
+        estimate,
+        locale,
+        commission,
+        monthLabel,
+        currency: (value) => formatCurrencyCompact(value, locale),
+        copy: {
+          reportTitle: copy.reportTitle,
+          vehicleValueLabel: copy.reportVehicleValue,
+          headlineLabel: copy.headlineLabel,
+          headlineRange: copy.headlineRange,
+          netLabel: copy.netLabel,
+          grossLabel: copy.grossLabel,
+          commissionLabel: copy.commissionLabel,
+          chartTitle: copy.chartTitle,
+          statPeak: copy.statPeak,
+          statTrough: copy.statTrough,
+          statAverage: copy.statAverage,
+          evidenceTitle:
+            estimate.evidence.kind === "direct"
+              ? copy.evidenceDirectTitle
+              : copy.evidenceSegmentTitle,
+          evidenceBody:
+            estimate.evidence.kind === "direct"
+              ? fill(copy.reportEvidenceDirect, { months: estimate.evidence.vehicleMonths })
+              : copy.reportEvidenceSegment,
+          basis: fill(copy.reportBasis, {
+            trips: FIT_SUMMARY.trips.toLocaleString(getLocaleTag(locale)),
+            vehicles: FIT_SUMMARY.vehicles,
+            from: FIT_SUMMARY.from,
+            to: FIT_SUMMARY.to,
+            error: accuracy.error,
+          }),
+          assumptionsTitle: copy.assumptionsTitle,
+          assumptions: [copy.assumption1, copy.assumption2, copy.assumption3, copy.assumption4],
+          generatedAt: fill(copy.reportGeneratedAt, {
+            date: new Intl.DateTimeFormat(getLocaleTag(locale), {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }).format(now),
+          }),
+        },
+      });
+
+      const png = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error("toBlob returned null"))),
+          "image/png",
+        );
+      });
+
+      const pdf = await PDFDocument.create();
+      pdf.setTitle(`${copy.reportTitle} — ${estimate.year} ${estimate.make} ${estimate.model}`);
+      const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      const image = await pdf.embedPng(await png.arrayBuffer());
+      page.drawImage(image, { x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT });
+
+      const bytes = await pdf.save();
+      // `bytes` is a view onto a larger buffer; slice it so Blob gets
+      // exactly the PDF and not whatever else shares the allocation.
+      const url = URL.createObjectURL(
+        new Blob([bytes.slice().buffer as ArrayBuffer], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `TATO ${estimate.year} ${estimate.make} ${estimate.model}.pdf`;
+      // Firefox ignores a click on an anchor that is not in the document,
+      // and revoking the URL in the same tick can cancel the download
+      // before it starts. Attach, click, then clean up on a later turn.
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setDownloadError(true);
+    } finally {
+      setBuilding(false);
+    }
+  }
 
   const selectClass =
     "h-11 w-full rounded-[var(--control-radius)] border border-[var(--line-strong)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-soft)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:text-[var(--ink-soft)]";
@@ -410,6 +510,21 @@ export function RentalEstimateTool({
               <p className="mt-2 text-[13px] leading-6 text-[var(--warn-fg)]">
                 {copy.evidenceExtrapolated}
               </p>
+            ) : null}
+          </div>
+
+          {/* ---------- download ---------- */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <button
+              type="button"
+              onClick={downloadReport}
+              disabled={building}
+              className="inline-flex min-h-[var(--tap-min)] items-center justify-center rounded-[var(--control-radius)] bg-[var(--brand)] px-5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {building ? copy.downloadingAction : copy.downloadAction}
+            </button>
+            {downloadError ? (
+              <p className="text-[13px] text-[var(--bad-fg)]">{copy.downloadFailed}</p>
             ) : null}
           </div>
         </>

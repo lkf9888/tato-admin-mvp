@@ -13,6 +13,7 @@ break when Turo changes their site.
 | `model.json` | Fitted coefficients, seasonal curves, per-model adjustments | `scripts/build-rental-estimate-model.ts` |
 | `catalog.json` | 360 Canadian-market models → body segment + base MSRP (2024 CAD) | by hand |
 | `index.ts` | `estimateVehicle()` — puts them back together | by hand |
+| `report-canvas.ts` | Draws the one-page PDF report | by hand |
 
 ## What it's built from
 
@@ -114,6 +115,24 @@ The accuracy figures quoted on the page are read out of `model.json` at
 render time, so they follow a refit on their own. The prose describing
 the elasticity and the segment multipliers is not — check
 `lib/i18n/messages/rental-estimate.ts` against the script's output.
+
+## The PDF report
+
+"Download PDF" builds a one-page leave-behind for the owner who asked.
+It is drawn onto a canvas and embedded as a bitmap in a `pdf-lib` page,
+rather than laid out with pdf-lib's own text API, because that API's
+standard fonts are Latin-1 only — `lib/contract-documents.ts` runs
+every string through a `toWinAnsi` filter that turns anything outside
+that range into `?`, so a Chinese report would come out as rows of
+question marks. Embedding a CJK font instead means shipping ~10MB of
+Noto in the repo and the image; the browser already has the fonts.
+
+The trade is that the text is not selectable. For a one-page handout
+that is a fair price, and it renders correctly in all three locales.
+
+Both `report-canvas.ts` and `pdf-lib` load on click, not with the page —
+most visits end with reading a number off the screen. Output is Letter
+at 3x (~216 DPI), around 220KB.
 
 ## Eligibility
 

@@ -28,6 +28,7 @@ import { directBookingMessages } from "@/lib/i18n/messages/direct-booking";
 import { fleetMessages } from "@/lib/i18n/messages/fleet";
 import { importsMessages } from "@/lib/i18n/messages/imports";
 import { ordersMessages } from "@/lib/i18n/messages/orders";
+import { rentalEstimateMessages } from "@/lib/i18n/messages/rental-estimate";
 import { shareMessages } from "@/lib/i18n/messages/share";
 import { shellMessages } from "@/lib/i18n/messages/shell";
 
@@ -316,6 +317,7 @@ const messages = {
     ...fleetMessages.en,
     ...directBookingMessages.en,
     ...ordersMessages.en,
+    ...rentalEstimateMessages.en,
     ...importsMessages.en,
     ...billingMessages.en,
     ...calendarMessages.en,
@@ -334,6 +336,7 @@ const messages = {
     ...fleetMessages.zh,
     ...directBookingMessages.zh,
     ...ordersMessages.zh,
+    ...rentalEstimateMessages.zh,
     ...importsMessages.zh,
     ...billingMessages.zh,
     ...calendarMessages.zh,

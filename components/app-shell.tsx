@@ -63,6 +63,11 @@ export function AppShell({
       items: [
         { href: "/vehicles", label: messages.shell.nav.vehicles, icon: "vehicles" },
         { href: "/vehicle-roi", label: messages.shell.nav.vehicleRoi, icon: "vehicleRoi" },
+        {
+          href: "/rental-estimate",
+          label: messages.shell.nav.rentalEstimate,
+          icon: "rentalEstimate",
+        },
         { href: "/owners", label: messages.shell.nav.owners, icon: "owners" },
       ],
     },

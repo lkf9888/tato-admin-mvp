@@ -1,5 +1,6 @@
 import {
   Banknote,
+  BarChart3,
   Bot,
   Car,
   CalendarDays,
@@ -47,6 +48,7 @@ export const NAV_ICONS = {
   imports: Upload,
   vehicles: Car,
   vehicleRoi: TrendingUp,
+  rentalEstimate: BarChart3,
   owners: UsersRound,
   directBooking: Ticket,
   staffSchedule: ListChecks,

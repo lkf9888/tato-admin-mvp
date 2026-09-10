@@ -1,0 +1,2377 @@
+{
+ "models": {
+  "Acura|ILX": {
+   "make": "Acura",
+   "model": "ILX",
+   "msrp2024": 34000,
+   "seg": "lux_car",
+   "until": 2022
+  },
+  "Acura|Integra": {
+   "from": 2023,
+   "make": "Acura",
+   "model": "Integra",
+   "msrp2024": 38000,
+   "seg": "lux_car"
+  },
+  "Acura|MDX": {
+   "make": "Acura",
+   "model": "MDX",
+   "msrp2024": 62000,
+   "seg": "lux_suv"
+  },
+  "Acura|RDX": {
+   "make": "Acura",
+   "model": "RDX",
+   "msrp2024": 50000,
+   "seg": "lux_suv"
+  },
+  "Acura|TLX": {
+   "make": "Acura",
+   "model": "TLX",
+   "msrp2024": 48000,
+   "seg": "lux_car"
+  },
+  "Acura|ZDX": {
+   "from": 2024,
+   "make": "Acura",
+   "model": "ZDX",
+   "msrp2024": 70000,
+   "seg": "ev"
+  },
+  "Alfa Romeo|Giulia": {
+   "make": "Alfa Romeo",
+   "model": "Giulia",
+   "msrp2024": 55000,
+   "seg": "lux_car"
+  },
+  "Alfa Romeo|Stelvio": {
+   "make": "Alfa Romeo",
+   "model": "Stelvio",
+   "msrp2024": 62000,
+   "seg": "lux_suv"
+  },
+  "Audi|A3": {
+   "make": "Audi",
+   "model": "A3",
+   "msrp2024": 42000,
+   "seg": "lux_car"
+  },
+  "Audi|A4": {
+   "make": "Audi",
+   "model": "A4",
+   "msrp2024": 52000,
+   "seg": "lux_car"
+  },
+  "Audi|A5": {
+   "make": "Audi",
+   "model": "A5",
+   "msrp2024": 58000,
+   "seg": "lux_car"
+  },
+  "Audi|A6": {
+   "make": "Audi",
+   "model": "A6",
+   "msrp2024": 72000,
+   "seg": "lux_car"
+  },
+  "Audi|A7": {
+   "make": "Audi",
+   "model": "A7",
+   "msrp2024": 88000,
+   "seg": "lux_car"
+  },
+  "Audi|Q3": {
+   "make": "Audi",
+   "model": "Q3",
+   "msrp2024": 45000,
+   "seg": "lux_suv"
+  },
+  "Audi|Q5": {
+   "make": "Audi",
+   "model": "Q5",
+   "msrp2024": 55000,
+   "seg": "lux_suv"
+  },
+  "Audi|Q7": {
+   "make": "Audi",
+   "model": "Q7",
+   "msrp2024": 78000,
+   "seg": "lux_suv"
+  },
+  "Audi|Q8": {
+   "from": 2019,
+   "make": "Audi",
+   "model": "Q8",
+   "msrp2024": 90000,
+   "seg": "lux_suv"
+  },
+  "Audi|S4": {
+   "make": "Audi",
+   "model": "S4",
+   "msrp2024": 65000,
+   "seg": "sport"
+  },
+  "Audi|S5": {
+   "make": "Audi",
+   "model": "S5",
+   "msrp2024": 72000,
+   "seg": "sport"
+  },
+  "Audi|TT": {
+   "make": "Audi",
+   "model": "TT",
+   "msrp2024": 58000,
+   "seg": "sport",
+   "until": 2023
+  },
+  "Audi|e-tron": {
+   "from": 2019,
+   "make": "Audi",
+   "model": "e-tron",
+   "msrp2024": 85000,
+   "seg": "ev"
+  },
+  "BMW|2 Series": {
+   "make": "BMW",
+   "model": "2 Series",
+   "msrp2024": 45000,
+   "seg": "lux_car"
+  },
+  "BMW|3 Series": {
+   "make": "BMW",
+   "model": "3 Series",
+   "msrp2024": 55000,
+   "seg": "lux_car"
+  },
+  "BMW|4 Series": {
+   "make": "BMW",
+   "model": "4 Series",
+   "msrp2024": 62000,
+   "seg": "lux_car"
+  },
+  "BMW|5 Series": {
+   "make": "BMW",
+   "model": "5 Series",
+   "msrp2024": 72000,
+   "seg": "lux_car"
+  },
+  "BMW|7 Series": {
+   "make": "BMW",
+   "model": "7 Series",
+   "msrp2024": 120000,
+   "seg": "lux_car"
+  },
+  "BMW|M2": {
+   "from": 2016,
+   "make": "BMW",
+   "model": "M2",
+   "msrp2024": 75000,
+   "seg": "sport"
+  },
+  "BMW|M3": {
+   "make": "BMW",
+   "model": "M3",
+   "msrp2024": 95000,
+   "seg": "sport"
+  },
+  "BMW|X1": {
+   "make": "BMW",
+   "model": "X1",
+   "msrp2024": 48000,
+   "seg": "lux_suv"
+  },
+  "BMW|X2": {
+   "make": "BMW",
+   "model": "X2",
+   "msrp2024": 52000,
+   "seg": "lux_suv"
+  },
+  "BMW|X3": {
+   "make": "BMW",
+   "model": "X3",
+   "msrp2024": 58000,
+   "seg": "lux_suv"
+  },
+  "BMW|X4": {
+   "make": "BMW",
+   "model": "X4",
+   "msrp2024": 64000,
+   "seg": "lux_suv"
+  },
+  "BMW|X5": {
+   "make": "BMW",
+   "model": "X5",
+   "msrp2024": 78000,
+   "seg": "lux_suv"
+  },
+  "BMW|X6": {
+   "make": "BMW",
+   "model": "X6",
+   "msrp2024": 88000,
+   "seg": "lux_suv"
+  },
+  "BMW|X7": {
+   "make": "BMW",
+   "model": "X7",
+   "msrp2024": 105000,
+   "seg": "lux_suv"
+  },
+  "BMW|Z4": {
+   "make": "BMW",
+   "model": "Z4",
+   "msrp2024": 68000,
+   "seg": "sport"
+  },
+  "BMW|i4": {
+   "from": 2022,
+   "make": "BMW",
+   "model": "i4",
+   "msrp2024": 65000,
+   "seg": "ev"
+  },
+  "BMW|iX": {
+   "from": 2022,
+   "make": "BMW",
+   "model": "iX",
+   "msrp2024": 90000,
+   "seg": "ev"
+  },
+  "Buick|Enclave": {
+   "make": "Buick",
+   "model": "Enclave",
+   "msrp2024": 52000,
+   "seg": "suv_l"
+  },
+  "Buick|Encore": {
+   "make": "Buick",
+   "model": "Encore",
+   "msrp2024": 26000,
+   "seg": "cuv_s",
+   "until": 2022
+  },
+  "Buick|Encore GX": {
+   "from": 2020,
+   "make": "Buick",
+   "model": "Encore GX",
+   "msrp2024": 29000,
+   "seg": "cuv_s"
+  },
+  "Buick|Envision": {
+   "from": 2016,
+   "make": "Buick",
+   "model": "Envision",
+   "msrp2024": 42000,
+   "seg": "cuv_m"
+  },
+  "Buick|LaCrosse": {
+   "make": "Buick",
+   "model": "LaCrosse",
+   "msrp2024": 38000,
+   "seg": "fullsize",
+   "until": 2019
+  },
+  "Buick|Regal": {
+   "make": "Buick",
+   "model": "Regal",
+   "msrp2024": 32000,
+   "seg": "midsize",
+   "until": 2020
+  },
+  "Buick|Verano": {
+   "make": "Buick",
+   "model": "Verano",
+   "msrp2024": 25000,
+   "seg": "compact",
+   "until": 2017
+  },
+  "Cadillac|ATS": {
+   "make": "Cadillac",
+   "model": "ATS",
+   "msrp2024": 42000,
+   "seg": "lux_car",
+   "until": 2019
+  },
+  "Cadillac|CT4": {
+   "from": 2020,
+   "make": "Cadillac",
+   "model": "CT4",
+   "msrp2024": 42000,
+   "seg": "lux_car"
+  },
+  "Cadillac|CT5": {
+   "from": 2020,
+   "make": "Cadillac",
+   "model": "CT5",
+   "msrp2024": 48000,
+   "seg": "lux_car"
+  },
+  "Cadillac|Escalade": {
+   "make": "Cadillac",
+   "model": "Escalade",
+   "msrp2024": 95000,
+   "seg": "lux_suv"
+  },
+  "Cadillac|LYRIQ": {
+   "from": 2023,
+   "make": "Cadillac",
+   "model": "LYRIQ",
+   "msrp2024": 75000,
+   "seg": "ev"
+  },
+  "Cadillac|SRX": {
+   "make": "Cadillac",
+   "model": "SRX",
+   "msrp2024": 48000,
+   "seg": "lux_suv",
+   "until": 2016
+  },
+  "Cadillac|XT4": {
+   "from": 2019,
+   "make": "Cadillac",
+   "model": "XT4",
+   "msrp2024": 45000,
+   "seg": "lux_suv"
+  },
+  "Cadillac|XT5": {
+   "from": 2017,
+   "make": "Cadillac",
+   "model": "XT5",
+   "msrp2024": 52000,
+   "seg": "lux_suv"
+  },
+  "Cadillac|XT6": {
+   "from": 2020,
+   "make": "Cadillac",
+   "model": "XT6",
+   "msrp2024": 60000,
+   "seg": "lux_suv"
+  },
+  "Cadillac|XTS": {
+   "make": "Cadillac",
+   "model": "XTS",
+   "msrp2024": 50000,
+   "seg": "lux_car",
+   "until": 2019
+  },
+  "Chevrolet|Blazer": {
+   "from": 2019,
+   "make": "Chevrolet",
+   "model": "Blazer",
+   "msrp2024": 42000,
+   "seg": "cuv_m"
+  },
+  "Chevrolet|Bolt EUV": {
+   "from": 2022,
+   "make": "Chevrolet",
+   "model": "Bolt EUV",
+   "msrp2024": 42000,
+   "seg": "ev",
+   "until": 2023
+  },
+  "Chevrolet|Bolt EV": {
+   "make": "Chevrolet",
+   "model": "Bolt EV",
+   "msrp2024": 39000,
+   "seg": "ev",
+   "until": 2023
+  },
+  "Chevrolet|Camaro": {
+   "make": "Chevrolet",
+   "model": "Camaro",
+   "msrp2024": 40000,
+   "seg": "sport",
+   "until": 2024
+  },
+  "Chevrolet|Colorado": {
+   "make": "Chevrolet",
+   "model": "Colorado",
+   "msrp2024": 42000,
+   "seg": "truck"
+  },
+  "Chevrolet|Corvette": {
+   "make": "Chevrolet",
+   "model": "Corvette",
+   "msrp2024": 85000,
+   "seg": "sport"
+  },
+  "Chevrolet|Cruze": {
+   "make": "Chevrolet",
+   "model": "Cruze",
+   "msrp2024": 22000,
+   "seg": "compact",
+   "until": 2019
+  },
+  "Chevrolet|Equinox": {
+   "make": "Chevrolet",
+   "model": "Equinox",
+   "msrp2024": 33000,
+   "seg": "cuv_s"
+  },
+  "Chevrolet|Impala": {
+   "make": "Chevrolet",
+   "model": "Impala",
+   "msrp2024": 36000,
+   "seg": "fullsize",
+   "until": 2020
+  },
+  "Chevrolet|Malibu": {
+   "make": "Chevrolet",
+   "model": "Malibu",
+   "msrp2024": 29000,
+   "seg": "midsize",
+   "until": 2025
+  },
+  "Chevrolet|Orlando": {
+   "make": "Chevrolet",
+   "model": "Orlando",
+   "msrp2024": 24000,
+   "seg": "van",
+   "until": 2014
+  },
+  "Chevrolet|Silverado 1500": {
+   "make": "Chevrolet",
+   "model": "Silverado 1500",
+   "msrp2024": 50000,
+   "seg": "truck"
+  },
+  "Chevrolet|Sonic": {
+   "make": "Chevrolet",
+   "model": "Sonic",
+   "msrp2024": 19000,
+   "seg": "econ",
+   "until": 2020
+  },
+  "Chevrolet|Spark": {
+   "make": "Chevrolet",
+   "model": "Spark",
+   "msrp2024": 17000,
+   "seg": "econ",
+   "until": 2022
+  },
+  "Chevrolet|Suburban": {
+   "make": "Chevrolet",
+   "model": "Suburban",
+   "msrp2024": 72000,
+   "seg": "suv_l"
+  },
+  "Chevrolet|Tahoe": {
+   "make": "Chevrolet",
+   "model": "Tahoe",
+   "msrp2024": 68000,
+   "seg": "suv_l"
+  },
+  "Chevrolet|Trailblazer": {
+   "from": 2021,
+   "make": "Chevrolet",
+   "model": "Trailblazer",
+   "msrp2024": 28000,
+   "seg": "cuv_s"
+  },
+  "Chevrolet|Traverse": {
+   "make": "Chevrolet",
+   "model": "Traverse",
+   "msrp2024": 48000,
+   "seg": "suv_l"
+  },
+  "Chevrolet|Trax": {
+   "make": "Chevrolet",
+   "model": "Trax",
+   "msrp2024": 25000,
+   "seg": "cuv_s"
+  },
+  "Chevrolet|Volt": {
+   "make": "Chevrolet",
+   "model": "Volt",
+   "msrp2024": 39000,
+   "seg": "ev",
+   "until": 2019
+  },
+  "Chrysler|200": {
+   "make": "Chrysler",
+   "model": "200",
+   "msrp2024": 28000,
+   "seg": "midsize",
+   "until": 2017
+  },
+  "Chrysler|300": {
+   "make": "Chrysler",
+   "model": "300",
+   "msrp2024": 48000,
+   "seg": "fullsize",
+   "until": 2023
+  },
+  "Chrysler|Grand Caravan": {
+   "from": 2021,
+   "make": "Chrysler",
+   "model": "Grand Caravan",
+   "msrp2024": 38000,
+   "seg": "van",
+   "until": 2021
+  },
+  "Chrysler|Pacifica": {
+   "from": 2017,
+   "make": "Chrysler",
+   "model": "Pacifica",
+   "msrp2024": 50000,
+   "seg": "van"
+  },
+  "Chrysler|Town & Country": {
+   "make": "Chrysler",
+   "model": "Town & Country",
+   "msrp2024": 42000,
+   "seg": "van",
+   "until": 2016
+  },
+  "Chrysler|Voyager": {
+   "from": 2020,
+   "make": "Chrysler",
+   "model": "Voyager",
+   "msrp2024": 38000,
+   "seg": "van"
+  },
+  "Dodge|Avenger": {
+   "make": "Dodge",
+   "model": "Avenger",
+   "msrp2024": 26000,
+   "seg": "midsize",
+   "until": 2014
+  },
+  "Dodge|Caravan": {
+   "make": "Dodge",
+   "model": "Caravan",
+   "msrp2024": 34000,
+   "seg": "van",
+   "until": 2007
+  },
+  "Dodge|Challenger": {
+   "make": "Dodge",
+   "model": "Challenger",
+   "msrp2024": 45000,
+   "seg": "sport",
+   "until": 2023
+  },
+  "Dodge|Charger": {
+   "make": "Dodge",
+   "model": "Charger",
+   "msrp2024": 45000,
+   "seg": "fullsize",
+   "until": 2023
+  },
+  "Dodge|Dart": {
+   "make": "Dodge",
+   "model": "Dart",
+   "msrp2024": 22000,
+   "seg": "compact",
+   "until": 2016
+  },
+  "Dodge|Durango": {
+   "make": "Dodge",
+   "model": "Durango",
+   "msrp2024": 55000,
+   "seg": "suv_l"
+  },
+  "Dodge|Grand Caravan": {
+   "make": "Dodge",
+   "model": "Grand Caravan",
+   "msrp2024": 38000,
+   "seg": "van",
+   "until": 2020
+  },
+  "Dodge|Hornet": {
+   "from": 2023,
+   "make": "Dodge",
+   "model": "Hornet",
+   "msrp2024": 42000,
+   "seg": "cuv_s"
+  },
+  "Dodge|Journey": {
+   "make": "Dodge",
+   "model": "Journey",
+   "msrp2024": 30000,
+   "seg": "cuv_m",
+   "until": 2020
+  },
+  "Fiat|500": {
+   "make": "Fiat",
+   "model": "500",
+   "msrp2024": 20000,
+   "seg": "econ",
+   "until": 2019
+  },
+  "Fiat|500X": {
+   "from": 2016,
+   "make": "Fiat",
+   "model": "500X",
+   "msrp2024": 28000,
+   "seg": "cuv_s",
+   "until": 2023
+  },
+  "Ford|Bronco": {
+   "from": 2021,
+   "make": "Ford",
+   "model": "Bronco",
+   "msrp2024": 48000,
+   "seg": "suv_l"
+  },
+  "Ford|Bronco Sport": {
+   "from": 2021,
+   "make": "Ford",
+   "model": "Bronco Sport",
+   "msrp2024": 36000,
+   "seg": "cuv_s"
+  },
+  "Ford|C-MAX": {
+   "make": "Ford",
+   "model": "C-MAX",
+   "msrp2024": 26000,
+   "seg": "compact",
+   "until": 2018
+  },
+  "Ford|EcoSport": {
+   "from": 2018,
+   "make": "Ford",
+   "model": "EcoSport",
+   "msrp2024": 25000,
+   "seg": "cuv_s",
+   "until": 2022
+  },
+  "Ford|Edge": {
+   "make": "Ford",
+   "model": "Edge",
+   "msrp2024": 40000,
+   "seg": "cuv_m",
+   "until": 2024
+  },
+  "Ford|Escape": {
+   "make": "Ford",
+   "model": "Escape",
+   "msrp2024": 32000,
+   "seg": "cuv_s"
+  },
+  "Ford|Expedition": {
+   "make": "Ford",
+   "model": "Expedition",
+   "msrp2024": 68000,
+   "seg": "suv_l"
+  },
+  "Ford|Explorer": {
+   "make": "Ford",
+   "model": "Explorer",
+   "msrp2024": 45000,
+   "seg": "suv_l"
+  },
+  "Ford|F-150": {
+   "make": "Ford",
+   "model": "F-150",
+   "msrp2024": 50000,
+   "seg": "truck"
+  },
+  "Ford|F-150 Lightning": {
+   "from": 2022,
+   "make": "Ford",
+   "model": "F-150 Lightning",
+   "msrp2024": 70000,
+   "seg": "ev"
+  },
+  "Ford|F-250": {
+   "make": "Ford",
+   "model": "F-250",
+   "msrp2024": 62000,
+   "seg": "truck"
+  },
+  "Ford|Fiesta": {
+   "make": "Ford",
+   "model": "Fiesta",
+   "msrp2024": 18000,
+   "seg": "econ",
+   "until": 2019
+  },
+  "Ford|Flex": {
+   "make": "Ford",
+   "model": "Flex",
+   "msrp2024": 40000,
+   "seg": "suv_l",
+   "until": 2019
+  },
+  "Ford|Focus": {
+   "make": "Ford",
+   "model": "Focus",
+   "msrp2024": 21000,
+   "seg": "compact",
+   "until": 2018
+  },
+  "Ford|Fusion": {
+   "make": "Ford",
+   "model": "Fusion",
+   "msrp2024": 29000,
+   "seg": "midsize",
+   "until": 2020
+  },
+  "Ford|Maverick": {
+   "from": 2022,
+   "make": "Ford",
+   "model": "Maverick",
+   "msrp2024": 30000,
+   "seg": "truck"
+  },
+  "Ford|Mustang": {
+   "make": "Ford",
+   "model": "Mustang",
+   "msrp2024": 42000,
+   "seg": "sport"
+  },
+  "Ford|Mustang Mach-E": {
+   "from": 2021,
+   "make": "Ford",
+   "model": "Mustang Mach-E",
+   "msrp2024": 56000,
+   "seg": "ev"
+  },
+  "Ford|Ranger": {
+   "make": "Ford",
+   "model": "Ranger",
+   "msrp2024": 42000,
+   "seg": "truck"
+  },
+  "Ford|Taurus": {
+   "make": "Ford",
+   "model": "Taurus",
+   "msrp2024": 36000,
+   "seg": "fullsize",
+   "until": 2019
+  },
+  "Ford|Transit Connect": {
+   "make": "Ford",
+   "model": "Transit Connect",
+   "msrp2024": 38000,
+   "seg": "van",
+   "until": 2023
+  },
+  "GMC|Acadia": {
+   "make": "GMC",
+   "model": "Acadia",
+   "msrp2024": 46000,
+   "seg": "suv_l"
+  },
+  "GMC|Canyon": {
+   "make": "GMC",
+   "model": "Canyon",
+   "msrp2024": 44000,
+   "seg": "truck"
+  },
+  "GMC|Sierra 1500": {
+   "make": "GMC",
+   "model": "Sierra 1500",
+   "msrp2024": 52000,
+   "seg": "truck"
+  },
+  "GMC|Terrain": {
+   "make": "GMC",
+   "model": "Terrain",
+   "msrp2024": 34000,
+   "seg": "cuv_s"
+  },
+  "GMC|Yukon": {
+   "make": "GMC",
+   "model": "Yukon",
+   "msrp2024": 72000,
+   "seg": "suv_l"
+  },
+  "GMC|Yukon XL": {
+   "make": "GMC",
+   "model": "Yukon XL",
+   "msrp2024": 76000,
+   "seg": "suv_l"
+  },
+  "Genesis|G70": {
+   "from": 2019,
+   "make": "Genesis",
+   "model": "G70",
+   "msrp2024": 50000,
+   "seg": "lux_car"
+  },
+  "Genesis|G80": {
+   "make": "Genesis",
+   "model": "G80",
+   "msrp2024": 75000,
+   "seg": "lux_car"
+  },
+  "Genesis|GV70": {
+   "from": 2022,
+   "make": "Genesis",
+   "model": "GV70",
+   "msrp2024": 60000,
+   "seg": "lux_suv"
+  },
+  "Genesis|GV80": {
+   "from": 2021,
+   "make": "Genesis",
+   "model": "GV80",
+   "msrp2024": 78000,
+   "seg": "lux_suv"
+  },
+  "Honda|Accord": {
+   "make": "Honda",
+   "model": "Accord",
+   "msrp2024": 34000,
+   "seg": "midsize"
+  },
+  "Honda|Accord Hybrid": {
+   "from": 2017,
+   "make": "Honda",
+   "model": "Accord Hybrid",
+   "msrp2024": 39000,
+   "seg": "midsize"
+  },
+  "Honda|CR-V": {
+   "make": "Honda",
+   "model": "CR-V",
+   "msrp2024": 36000,
+   "seg": "cuv_s"
+  },
+  "Honda|CR-V Hybrid": {
+   "from": 2020,
+   "make": "Honda",
+   "model": "CR-V Hybrid",
+   "msrp2024": 42000,
+   "seg": "cuv_s"
+  },
+  "Honda|Civic": {
+   "make": "Honda",
+   "model": "Civic",
+   "msrp2024": 27000,
+   "seg": "compact"
+  },
+  "Honda|Civic Hatchback": {
+   "make": "Honda",
+   "model": "Civic Hatchback",
+   "msrp2024": 29000,
+   "seg": "compact"
+  },
+  "Honda|Civic Type R": {
+   "from": 2017,
+   "make": "Honda",
+   "model": "Civic Type R",
+   "msrp2024": 50000,
+   "seg": "sport"
+  },
+  "Honda|Element": {
+   "make": "Honda",
+   "model": "Element",
+   "msrp2024": 26000,
+   "seg": "cuv_s",
+   "until": 2011
+  },
+  "Honda|Fit": {
+   "make": "Honda",
+   "model": "Fit",
+   "msrp2024": 21000,
+   "seg": "econ",
+   "until": 2020
+  },
+  "Honda|HR-V": {
+   "make": "Honda",
+   "model": "HR-V",
+   "msrp2024": 31000,
+   "seg": "cuv_s"
+  },
+  "Honda|Insight": {
+   "from": 2019,
+   "make": "Honda",
+   "model": "Insight",
+   "msrp2024": 29000,
+   "seg": "compact",
+   "until": 2022
+  },
+  "Honda|Odyssey": {
+   "make": "Honda",
+   "model": "Odyssey",
+   "msrp2024": 48000,
+   "seg": "van"
+  },
+  "Honda|Passport": {
+   "from": 2019,
+   "make": "Honda",
+   "model": "Passport",
+   "msrp2024": 47000,
+   "seg": "cuv_m"
+  },
+  "Honda|Pilot": {
+   "make": "Honda",
+   "model": "Pilot",
+   "msrp2024": 52000,
+   "seg": "suv_l"
+  },
+  "Honda|Prologue": {
+   "from": 2024,
+   "make": "Honda",
+   "model": "Prologue",
+   "msrp2024": 57000,
+   "seg": "ev"
+  },
+  "Honda|Ridgeline": {
+   "make": "Honda",
+   "model": "Ridgeline",
+   "msrp2024": 48000,
+   "seg": "truck"
+  },
+  "Hyundai|Accent": {
+   "make": "Hyundai",
+   "model": "Accent",
+   "msrp2024": 20000,
+   "seg": "econ"
+  },
+  "Hyundai|Elantra": {
+   "make": "Hyundai",
+   "model": "Elantra",
+   "msrp2024": 24000,
+   "seg": "compact"
+  },
+  "Hyundai|Elantra GT": {
+   "make": "Hyundai",
+   "model": "Elantra GT",
+   "msrp2024": 24000,
+   "seg": "compact",
+   "until": 2020
+  },
+  "Hyundai|Elantra N": {
+   "from": 2022,
+   "make": "Hyundai",
+   "model": "Elantra N",
+   "msrp2024": 38000,
+   "seg": "sport"
+  },
+  "Hyundai|IONIQ 5": {
+   "from": 2022,
+   "make": "Hyundai",
+   "model": "IONIQ 5",
+   "msrp2024": 56000,
+   "seg": "ev"
+  },
+  "Hyundai|IONIQ 6": {
+   "from": 2023,
+   "make": "Hyundai",
+   "model": "IONIQ 6",
+   "msrp2024": 56000,
+   "seg": "ev"
+  },
+  "Hyundai|Kona": {
+   "from": 2018,
+   "make": "Hyundai",
+   "model": "Kona",
+   "msrp2024": 26000,
+   "seg": "cuv_s"
+  },
+  "Hyundai|Kona Electric": {
+   "from": 2019,
+   "make": "Hyundai",
+   "model": "Kona Electric",
+   "msrp2024": 45000,
+   "seg": "ev"
+  },
+  "Hyundai|Palisade": {
+   "from": 2020,
+   "make": "Hyundai",
+   "model": "Palisade",
+   "msrp2024": 48000,
+   "seg": "suv_l"
+  },
+  "Hyundai|Santa Cruz": {
+   "from": 2022,
+   "make": "Hyundai",
+   "model": "Santa Cruz",
+   "msrp2024": 40000,
+   "seg": "truck"
+  },
+  "Hyundai|Santa Fe": {
+   "make": "Hyundai",
+   "model": "Santa Fe",
+   "msrp2024": 40000,
+   "seg": "cuv_m"
+  },
+  "Hyundai|Santa Fe XL": {
+   "make": "Hyundai",
+   "model": "Santa Fe XL",
+   "msrp2024": 42000,
+   "seg": "suv_l",
+   "until": 2019
+  },
+  "Hyundai|Sonata": {
+   "make": "Hyundai",
+   "model": "Sonata",
+   "msrp2024": 31000,
+   "seg": "midsize"
+  },
+  "Hyundai|Tucson": {
+   "make": "Hyundai",
+   "model": "Tucson",
+   "msrp2024": 33000,
+   "seg": "cuv_s"
+  },
+  "Hyundai|Tucson Hybrid": {
+   "from": 2022,
+   "make": "Hyundai",
+   "model": "Tucson Hybrid",
+   "msrp2024": 39000,
+   "seg": "cuv_s"
+  },
+  "Hyundai|Veloster": {
+   "make": "Hyundai",
+   "model": "Veloster",
+   "msrp2024": 25000,
+   "seg": "compact",
+   "until": 2022
+  },
+  "Hyundai|Venue": {
+   "from": 2020,
+   "make": "Hyundai",
+   "model": "Venue",
+   "msrp2024": 22000,
+   "seg": "cuv_s"
+  },
+  "INFINITI|FX35": {
+   "make": "INFINITI",
+   "model": "FX35",
+   "msrp2024": 50000,
+   "seg": "lux_suv",
+   "until": 2013
+  },
+  "INFINITI|JX35": {
+   "make": "INFINITI",
+   "model": "JX35",
+   "msrp2024": 50000,
+   "seg": "lux_suv",
+   "until": 2013
+  },
+  "INFINITI|Q50": {
+   "make": "INFINITI",
+   "model": "Q50",
+   "msrp2024": 48000,
+   "seg": "lux_car"
+  },
+  "INFINITI|Q60": {
+   "from": 2017,
+   "make": "INFINITI",
+   "model": "Q60",
+   "msrp2024": 58000,
+   "seg": "lux_car",
+   "until": 2022
+  },
+  "INFINITI|QX50": {
+   "make": "INFINITI",
+   "model": "QX50",
+   "msrp2024": 50000,
+   "seg": "lux_suv"
+  },
+  "INFINITI|QX55": {
+   "from": 2022,
+   "make": "INFINITI",
+   "model": "QX55",
+   "msrp2024": 55000,
+   "seg": "lux_suv"
+  },
+  "INFINITI|QX60": {
+   "make": "INFINITI",
+   "model": "QX60",
+   "msrp2024": 58000,
+   "seg": "lux_suv"
+  },
+  "INFINITI|QX80": {
+   "make": "INFINITI",
+   "model": "QX80",
+   "msrp2024": 85000,
+   "seg": "lux_suv"
+  },
+  "Jaguar|E-PACE": {
+   "from": 2018,
+   "make": "Jaguar",
+   "model": "E-PACE",
+   "msrp2024": 52000,
+   "seg": "lux_suv"
+  },
+  "Jaguar|F-PACE": {
+   "make": "Jaguar",
+   "model": "F-PACE",
+   "msrp2024": 65000,
+   "seg": "lux_suv"
+  },
+  "Jaguar|I-PACE": {
+   "from": 2019,
+   "make": "Jaguar",
+   "model": "I-PACE",
+   "msrp2024": 95000,
+   "seg": "ev",
+   "until": 2024
+  },
+  "Jaguar|XE": {
+   "make": "Jaguar",
+   "model": "XE",
+   "msrp2024": 50000,
+   "seg": "lux_car"
+  },
+  "Jaguar|XF": {
+   "make": "Jaguar",
+   "model": "XF",
+   "msrp2024": 62000,
+   "seg": "lux_car"
+  },
+  "Jeep|Cherokee": {
+   "make": "Jeep",
+   "model": "Cherokee",
+   "msrp2024": 36000,
+   "seg": "cuv_m",
+   "until": 2023
+  },
+  "Jeep|Compass": {
+   "make": "Jeep",
+   "model": "Compass",
+   "msrp2024": 32000,
+   "seg": "cuv_s"
+  },
+  "Jeep|Gladiator": {
+   "from": 2020,
+   "make": "Jeep",
+   "model": "Gladiator",
+   "msrp2024": 52000,
+   "seg": "truck"
+  },
+  "Jeep|Grand Cherokee": {
+   "make": "Jeep",
+   "model": "Grand Cherokee",
+   "msrp2024": 50000,
+   "seg": "cuv_m"
+  },
+  "Jeep|Grand Cherokee L": {
+   "from": 2021,
+   "make": "Jeep",
+   "model": "Grand Cherokee L",
+   "msrp2024": 58000,
+   "seg": "suv_l"
+  },
+  "Jeep|Liberty": {
+   "make": "Jeep",
+   "model": "Liberty",
+   "msrp2024": 28000,
+   "seg": "cuv_s",
+   "until": 2012
+  },
+  "Jeep|Patriot": {
+   "make": "Jeep",
+   "model": "Patriot",
+   "msrp2024": 24000,
+   "seg": "cuv_s",
+   "until": 2017
+  },
+  "Jeep|Renegade": {
+   "from": 2015,
+   "make": "Jeep",
+   "model": "Renegade",
+   "msrp2024": 28000,
+   "seg": "cuv_s",
+   "until": 2023
+  },
+  "Jeep|Wrangler": {
+   "make": "Jeep",
+   "model": "Wrangler",
+   "msrp2024": 44000,
+   "seg": "suv_l"
+  },
+  "Jeep|Wrangler Unlimited": {
+   "make": "Jeep",
+   "model": "Wrangler Unlimited",
+   "msrp2024": 50000,
+   "seg": "suv_l"
+  },
+  "Kia|Carnival": {
+   "from": 2022,
+   "make": "Kia",
+   "model": "Carnival",
+   "msrp2024": 42000,
+   "seg": "van"
+  },
+  "Kia|EV6": {
+   "from": 2022,
+   "make": "Kia",
+   "model": "EV6",
+   "msrp2024": 56000,
+   "seg": "ev"
+  },
+  "Kia|EV9": {
+   "from": 2024,
+   "make": "Kia",
+   "model": "EV9",
+   "msrp2024": 65000,
+   "seg": "ev"
+  },
+  "Kia|Forte": {
+   "make": "Kia",
+   "model": "Forte",
+   "msrp2024": 23000,
+   "seg": "compact"
+  },
+  "Kia|K5": {
+   "from": 2021,
+   "make": "Kia",
+   "model": "K5",
+   "msrp2024": 31000,
+   "seg": "midsize"
+  },
+  "Kia|Niro": {
+   "from": 2017,
+   "make": "Kia",
+   "model": "Niro",
+   "msrp2024": 30000,
+   "seg": "cuv_s"
+  },
+  "Kia|Optima": {
+   "make": "Kia",
+   "model": "Optima",
+   "msrp2024": 29000,
+   "seg": "midsize",
+   "until": 2020
+  },
+  "Kia|Rio": {
+   "make": "Kia",
+   "model": "Rio",
+   "msrp2024": 20000,
+   "seg": "econ"
+  },
+  "Kia|Rondo": {
+   "make": "Kia",
+   "model": "Rondo",
+   "msrp2024": 24000,
+   "seg": "van",
+   "until": 2017
+  },
+  "Kia|Seltos": {
+   "from": 2021,
+   "make": "Kia",
+   "model": "Seltos",
+   "msrp2024": 27000,
+   "seg": "cuv_s"
+  },
+  "Kia|Sorento": {
+   "make": "Kia",
+   "model": "Sorento",
+   "msrp2024": 40000,
+   "seg": "cuv_m"
+  },
+  "Kia|Soul": {
+   "make": "Kia",
+   "model": "Soul",
+   "msrp2024": 24000,
+   "seg": "cuv_s"
+  },
+  "Kia|Sportage": {
+   "make": "Kia",
+   "model": "Sportage",
+   "msrp2024": 32000,
+   "seg": "cuv_s"
+  },
+  "Kia|Sportage Hybrid": {
+   "from": 2023,
+   "make": "Kia",
+   "model": "Sportage Hybrid",
+   "msrp2024": 40000,
+   "seg": "cuv_s"
+  },
+  "Kia|Stinger": {
+   "from": 2018,
+   "make": "Kia",
+   "model": "Stinger",
+   "msrp2024": 50000,
+   "seg": "sport",
+   "until": 2023
+  },
+  "Kia|Telluride": {
+   "from": 2020,
+   "make": "Kia",
+   "model": "Telluride",
+   "msrp2024": 50000,
+   "seg": "suv_l"
+  },
+  "Land Rover|Defender": {
+   "from": 2020,
+   "make": "Land Rover",
+   "model": "Defender",
+   "msrp2024": 78000,
+   "seg": "lux_suv"
+  },
+  "Land Rover|Discovery": {
+   "make": "Land Rover",
+   "model": "Discovery",
+   "msrp2024": 75000,
+   "seg": "lux_suv"
+  },
+  "Land Rover|Discovery Sport": {
+   "make": "Land Rover",
+   "model": "Discovery Sport",
+   "msrp2024": 55000,
+   "seg": "lux_suv"
+  },
+  "Land Rover|Range Rover": {
+   "make": "Land Rover",
+   "model": "Range Rover",
+   "msrp2024": 145000,
+   "seg": "lux_suv"
+  },
+  "Land Rover|Range Rover Evoque": {
+   "make": "Land Rover",
+   "model": "Range Rover Evoque",
+   "msrp2024": 58000,
+   "seg": "lux_suv"
+  },
+  "Land Rover|Range Rover Sport": {
+   "make": "Land Rover",
+   "model": "Range Rover Sport",
+   "msrp2024": 105000,
+   "seg": "lux_suv"
+  },
+  "Land Rover|Range Rover Velar": {
+   "from": 2018,
+   "make": "Land Rover",
+   "model": "Range Rover Velar",
+   "msrp2024": 78000,
+   "seg": "lux_suv"
+  },
+  "Lexus|ES": {
+   "make": "Lexus",
+   "model": "ES",
+   "msrp2024": 55000,
+   "seg": "lux_car"
+  },
+  "Lexus|GS": {
+   "make": "Lexus",
+   "model": "GS",
+   "msrp2024": 62000,
+   "seg": "lux_car",
+   "until": 2020
+  },
+  "Lexus|GX": {
+   "make": "Lexus",
+   "model": "GX",
+   "msrp2024": 85000,
+   "seg": "lux_suv"
+  },
+  "Lexus|IS": {
+   "make": "Lexus",
+   "model": "IS",
+   "msrp2024": 50000,
+   "seg": "lux_car"
+  },
+  "Lexus|LS": {
+   "make": "Lexus",
+   "model": "LS",
+   "msrp2024": 110000,
+   "seg": "lux_car"
+  },
+  "Lexus|LX": {
+   "make": "Lexus",
+   "model": "LX",
+   "msrp2024": 120000,
+   "seg": "lux_suv"
+  },
+  "Lexus|NX": {
+   "make": "Lexus",
+   "model": "NX",
+   "msrp2024": 52000,
+   "seg": "lux_suv"
+  },
+  "Lexus|RC": {
+   "make": "Lexus",
+   "model": "RC",
+   "msrp2024": 60000,
+   "seg": "sport",
+   "until": 2024
+  },
+  "Lexus|RX": {
+   "make": "Lexus",
+   "model": "RX",
+   "msrp2024": 65000,
+   "seg": "lux_suv"
+  },
+  "Lexus|TX": {
+   "from": 2024,
+   "make": "Lexus",
+   "model": "TX",
+   "msrp2024": 70000,
+   "seg": "lux_suv"
+  },
+  "Lexus|UX": {
+   "from": 2019,
+   "make": "Lexus",
+   "model": "UX",
+   "msrp2024": 42000,
+   "seg": "lux_suv"
+  },
+  "Lincoln|Aviator": {
+   "from": 2020,
+   "make": "Lincoln",
+   "model": "Aviator",
+   "msrp2024": 72000,
+   "seg": "lux_suv"
+  },
+  "Lincoln|Corsair": {
+   "from": 2020,
+   "make": "Lincoln",
+   "model": "Corsair",
+   "msrp2024": 50000,
+   "seg": "lux_suv"
+  },
+  "Lincoln|MKX": {
+   "make": "Lincoln",
+   "model": "MKX",
+   "msrp2024": 50000,
+   "seg": "lux_suv",
+   "until": 2018
+  },
+  "Lincoln|MKZ": {
+   "make": "Lincoln",
+   "model": "MKZ",
+   "msrp2024": 45000,
+   "seg": "lux_car",
+   "until": 2020
+  },
+  "Lincoln|Nautilus": {
+   "from": 2019,
+   "make": "Lincoln",
+   "model": "Nautilus",
+   "msrp2024": 60000,
+   "seg": "lux_suv"
+  },
+  "Lincoln|Navigator": {
+   "make": "Lincoln",
+   "model": "Navigator",
+   "msrp2024": 100000,
+   "seg": "lux_suv"
+  },
+  "MINI|Cooper": {
+   "make": "MINI",
+   "model": "Cooper",
+   "msrp2024": 30000,
+   "seg": "compact"
+  },
+  "MINI|Cooper Clubman": {
+   "make": "MINI",
+   "model": "Cooper Clubman",
+   "msrp2024": 35000,
+   "seg": "compact",
+   "until": 2024
+  },
+  "MINI|Cooper Countryman": {
+   "make": "MINI",
+   "model": "Cooper Countryman",
+   "msrp2024": 38000,
+   "seg": "cuv_s"
+  },
+  "Mazda|CX-3": {
+   "make": "Mazda",
+   "model": "CX-3",
+   "msrp2024": 25000,
+   "seg": "cuv_s",
+   "until": 2021
+  },
+  "Mazda|CX-30": {
+   "from": 2020,
+   "make": "Mazda",
+   "model": "CX-30",
+   "msrp2024": 30000,
+   "seg": "cuv_s"
+  },
+  "Mazda|CX-5": {
+   "make": "Mazda",
+   "model": "CX-5",
+   "msrp2024": 34000,
+   "seg": "cuv_s"
+  },
+  "Mazda|CX-50": {
+   "from": 2023,
+   "make": "Mazda",
+   "model": "CX-50",
+   "msrp2024": 38000,
+   "seg": "cuv_s"
+  },
+  "Mazda|CX-70": {
+   "from": 2025,
+   "make": "Mazda",
+   "model": "CX-70",
+   "msrp2024": 50000,
+   "seg": "suv_l"
+  },
+  "Mazda|CX-9": {
+   "make": "Mazda",
+   "model": "CX-9",
+   "msrp2024": 44000,
+   "seg": "suv_l",
+   "until": 2023
+  },
+  "Mazda|CX-90": {
+   "from": 2024,
+   "make": "Mazda",
+   "model": "CX-90",
+   "msrp2024": 52000,
+   "seg": "suv_l"
+  },
+  "Mazda|MX-5 Miata": {
+   "make": "Mazda",
+   "model": "MX-5 Miata",
+   "msrp2024": 37000,
+   "seg": "sport"
+  },
+  "Mazda|Mazda2": {
+   "make": "Mazda",
+   "model": "Mazda2",
+   "msrp2024": 18000,
+   "seg": "econ",
+   "until": 2014
+  },
+  "Mazda|Mazda3": {
+   "make": "Mazda",
+   "model": "Mazda3",
+   "msrp2024": 26000,
+   "seg": "compact"
+  },
+  "Mazda|Mazda3 Sport": {
+   "make": "Mazda",
+   "model": "Mazda3 Sport",
+   "msrp2024": 27000,
+   "seg": "compact"
+  },
+  "Mazda|Mazda5": {
+   "make": "Mazda",
+   "model": "Mazda5",
+   "msrp2024": 25000,
+   "seg": "van",
+   "until": 2017
+  },
+  "Mazda|Mazda6": {
+   "make": "Mazda",
+   "model": "Mazda6",
+   "msrp2024": 32000,
+   "seg": "midsize",
+   "until": 2021
+  },
+  "Mazda|Tribute": {
+   "make": "Mazda",
+   "model": "Tribute",
+   "msrp2024": 24000,
+   "seg": "cuv_s",
+   "until": 2011
+  },
+  "Mercedes-Benz|A-Class": {
+   "from": 2019,
+   "make": "Mercedes-Benz",
+   "model": "A-Class",
+   "msrp2024": 42000,
+   "seg": "lux_car",
+   "until": 2022
+  },
+  "Mercedes-Benz|C-Class": {
+   "make": "Mercedes-Benz",
+   "model": "C-Class",
+   "msrp2024": 56000,
+   "seg": "lux_car"
+  },
+  "Mercedes-Benz|CLA": {
+   "make": "Mercedes-Benz",
+   "model": "CLA",
+   "msrp2024": 48000,
+   "seg": "lux_car"
+  },
+  "Mercedes-Benz|E-Class": {
+   "make": "Mercedes-Benz",
+   "model": "E-Class",
+   "msrp2024": 75000,
+   "seg": "lux_car"
+  },
+  "Mercedes-Benz|EQB": {
+   "from": 2022,
+   "make": "Mercedes-Benz",
+   "model": "EQB",
+   "msrp2024": 62000,
+   "seg": "ev"
+  },
+  "Mercedes-Benz|EQE": {
+   "from": 2023,
+   "make": "Mercedes-Benz",
+   "model": "EQE",
+   "msrp2024": 85000,
+   "seg": "ev"
+  },
+  "Mercedes-Benz|G-Class": {
+   "make": "Mercedes-Benz",
+   "model": "G-Class",
+   "msrp2024": 175000,
+   "seg": "lux_suv"
+  },
+  "Mercedes-Benz|GLA-Class": {
+   "make": "Mercedes-Benz",
+   "model": "GLA-Class",
+   "msrp2024": 48000,
+   "seg": "lux_suv"
+  },
+  "Mercedes-Benz|GLB-Class": {
+   "from": 2020,
+   "make": "Mercedes-Benz",
+   "model": "GLB-Class",
+   "msrp2024": 52000,
+   "seg": "lux_suv"
+  },
+  "Mercedes-Benz|GLC-Class": {
+   "make": "Mercedes-Benz",
+   "model": "GLC-Class",
+   "msrp2024": 60000,
+   "seg": "lux_suv"
+  },
+  "Mercedes-Benz|GLE-Class": {
+   "make": "Mercedes-Benz",
+   "model": "GLE-Class",
+   "msrp2024": 80000,
+   "seg": "lux_suv"
+  },
+  "Mercedes-Benz|GLS-Class": {
+   "make": "Mercedes-Benz",
+   "model": "GLS-Class",
+   "msrp2024": 110000,
+   "seg": "lux_suv"
+  },
+  "Mercedes-Benz|S-Class": {
+   "make": "Mercedes-Benz",
+   "model": "S-Class",
+   "msrp2024": 135000,
+   "seg": "lux_car"
+  },
+  "Mercedes-Benz|Sprinter": {
+   "make": "Mercedes-Benz",
+   "model": "Sprinter",
+   "msrp2024": 65000,
+   "seg": "van"
+  },
+  "Mitsubishi|Eclipse Cross": {
+   "from": 2018,
+   "make": "Mitsubishi",
+   "model": "Eclipse Cross",
+   "msrp2024": 30000,
+   "seg": "cuv_s"
+  },
+  "Mitsubishi|Lancer": {
+   "make": "Mitsubishi",
+   "model": "Lancer",
+   "msrp2024": 21000,
+   "seg": "compact",
+   "until": 2017
+  },
+  "Mitsubishi|Mirage": {
+   "make": "Mitsubishi",
+   "model": "Mirage",
+   "msrp2024": 17000,
+   "seg": "econ"
+  },
+  "Mitsubishi|Outlander": {
+   "make": "Mitsubishi",
+   "model": "Outlander",
+   "msrp2024": 35000,
+   "seg": "cuv_m"
+  },
+  "Mitsubishi|Outlander PHEV": {
+   "from": 2018,
+   "make": "Mitsubishi",
+   "model": "Outlander PHEV",
+   "msrp2024": 47000,
+   "seg": "cuv_m"
+  },
+  "Mitsubishi|RVR": {
+   "make": "Mitsubishi",
+   "model": "RVR",
+   "msrp2024": 27000,
+   "seg": "cuv_s"
+  },
+  "Nissan|370Z": {
+   "make": "Nissan",
+   "model": "370Z",
+   "msrp2024": 42000,
+   "seg": "sport",
+   "until": 2020
+  },
+  "Nissan|Altima": {
+   "make": "Nissan",
+   "model": "Altima",
+   "msrp2024": 30000,
+   "seg": "midsize"
+  },
+  "Nissan|Ariya": {
+   "from": 2023,
+   "make": "Nissan",
+   "model": "Ariya",
+   "msrp2024": 55000,
+   "seg": "ev"
+  },
+  "Nissan|Armada": {
+   "make": "Nissan",
+   "model": "Armada",
+   "msrp2024": 65000,
+   "seg": "suv_l"
+  },
+  "Nissan|Frontier": {
+   "make": "Nissan",
+   "model": "Frontier",
+   "msrp2024": 42000,
+   "seg": "truck"
+  },
+  "Nissan|Juke": {
+   "make": "Nissan",
+   "model": "Juke",
+   "msrp2024": 24000,
+   "seg": "cuv_s",
+   "until": 2017
+  },
+  "Nissan|Kicks": {
+   "from": 2018,
+   "make": "Nissan",
+   "model": "Kicks",
+   "msrp2024": 24000,
+   "seg": "cuv_s"
+  },
+  "Nissan|LEAF": {
+   "make": "Nissan",
+   "model": "LEAF",
+   "msrp2024": 38000,
+   "seg": "ev"
+  },
+  "Nissan|Maxima": {
+   "make": "Nissan",
+   "model": "Maxima",
+   "msrp2024": 42000,
+   "seg": "fullsize",
+   "until": 2023
+  },
+  "Nissan|Micra": {
+   "from": 2015,
+   "make": "Nissan",
+   "model": "Micra",
+   "msrp2024": 16000,
+   "seg": "econ",
+   "until": 2019
+  },
+  "Nissan|Murano": {
+   "make": "Nissan",
+   "model": "Murano",
+   "msrp2024": 42000,
+   "seg": "cuv_m"
+  },
+  "Nissan|Pathfinder": {
+   "make": "Nissan",
+   "model": "Pathfinder",
+   "msrp2024": 47000,
+   "seg": "suv_l"
+  },
+  "Nissan|Qashqai": {
+   "from": 2017,
+   "make": "Nissan",
+   "model": "Qashqai",
+   "msrp2024": 28000,
+   "seg": "cuv_s"
+  },
+  "Nissan|Rogue": {
+   "make": "Nissan",
+   "model": "Rogue",
+   "msrp2024": 34000,
+   "seg": "cuv_s"
+  },
+  "Nissan|Sentra": {
+   "make": "Nissan",
+   "model": "Sentra",
+   "msrp2024": 24000,
+   "seg": "compact"
+  },
+  "Nissan|Titan": {
+   "make": "Nissan",
+   "model": "Titan",
+   "msrp2024": 52000,
+   "seg": "truck",
+   "until": 2024
+  },
+  "Nissan|Versa": {
+   "make": "Nissan",
+   "model": "Versa",
+   "msrp2024": 21000,
+   "seg": "econ"
+  },
+  "Nissan|Versa Note": {
+   "make": "Nissan",
+   "model": "Versa Note",
+   "msrp2024": 19000,
+   "seg": "econ",
+   "until": 2019
+  },
+  "Nissan|Z": {
+   "from": 2023,
+   "make": "Nissan",
+   "model": "Z",
+   "msrp2024": 50000,
+   "seg": "sport"
+  },
+  "Polestar|2": {
+   "from": 2021,
+   "make": "Polestar",
+   "model": "2",
+   "msrp2024": 60000,
+   "seg": "ev"
+  },
+  "Pontiac|G6": {
+   "make": "Pontiac",
+   "model": "G6",
+   "msrp2024": 26000,
+   "seg": "midsize",
+   "until": 2010
+  },
+  "Pontiac|Vibe": {
+   "make": "Pontiac",
+   "model": "Vibe",
+   "msrp2024": 22000,
+   "seg": "compact",
+   "until": 2010
+  },
+  "Porsche|718 Boxster": {
+   "make": "Porsche",
+   "model": "718 Boxster",
+   "msrp2024": 80000,
+   "seg": "sport"
+  },
+  "Porsche|718 Cayman": {
+   "make": "Porsche",
+   "model": "718 Cayman",
+   "msrp2024": 78000,
+   "seg": "sport"
+  },
+  "Porsche|911": {
+   "make": "Porsche",
+   "model": "911",
+   "msrp2024": 135000,
+   "seg": "sport"
+  },
+  "Porsche|Cayenne": {
+   "make": "Porsche",
+   "model": "Cayenne",
+   "msrp2024": 90000,
+   "seg": "lux_suv"
+  },
+  "Porsche|Macan": {
+   "make": "Porsche",
+   "model": "Macan",
+   "msrp2024": 70000,
+   "seg": "lux_suv"
+  },
+  "Porsche|Panamera": {
+   "make": "Porsche",
+   "model": "Panamera",
+   "msrp2024": 110000,
+   "seg": "lux_car"
+  },
+  "Porsche|Taycan": {
+   "from": 2020,
+   "make": "Porsche",
+   "model": "Taycan",
+   "msrp2024": 120000,
+   "seg": "ev"
+  },
+  "Ram|1500": {
+   "make": "Ram",
+   "model": "1500",
+   "msrp2024": 52000,
+   "seg": "truck"
+  },
+  "Ram|1500 Classic": {
+   "from": 2019,
+   "make": "Ram",
+   "model": "1500 Classic",
+   "msrp2024": 44000,
+   "seg": "truck",
+   "until": 2024
+  },
+  "Ram|2500": {
+   "make": "Ram",
+   "model": "2500",
+   "msrp2024": 65000,
+   "seg": "truck"
+  },
+  "Ram|ProMaster": {
+   "make": "Ram",
+   "model": "ProMaster",
+   "msrp2024": 50000,
+   "seg": "van"
+  },
+  "Ram|ProMaster City Cargo": {
+   "make": "Ram",
+   "model": "ProMaster City Cargo",
+   "msrp2024": 38000,
+   "seg": "van",
+   "until": 2022
+  },
+  "Rivian|R1S": {
+   "from": 2022,
+   "make": "Rivian",
+   "model": "R1S",
+   "msrp2024": 105000,
+   "seg": "ev"
+  },
+  "Rivian|R1T": {
+   "from": 2022,
+   "make": "Rivian",
+   "model": "R1T",
+   "msrp2024": 100000,
+   "seg": "ev"
+  },
+  "Saturn|Vue": {
+   "make": "Saturn",
+   "model": "Vue",
+   "msrp2024": 26000,
+   "seg": "cuv_s",
+   "until": 2010
+  },
+  "Subaru|Ascent": {
+   "make": "Subaru",
+   "model": "Ascent",
+   "msrp2024": 46000,
+   "seg": "suv_l"
+  },
+  "Subaru|BRZ": {
+   "make": "Subaru",
+   "model": "BRZ",
+   "msrp2024": 34000,
+   "seg": "sport"
+  },
+  "Subaru|Crosstrek": {
+   "make": "Subaru",
+   "model": "Crosstrek",
+   "msrp2024": 29000,
+   "seg": "cuv_s"
+  },
+  "Subaru|Forester": {
+   "make": "Subaru",
+   "model": "Forester",
+   "msrp2024": 34000,
+   "seg": "cuv_s"
+  },
+  "Subaru|Impreza": {
+   "make": "Subaru",
+   "model": "Impreza",
+   "msrp2024": 26000,
+   "seg": "compact"
+  },
+  "Subaru|Legacy": {
+   "make": "Subaru",
+   "model": "Legacy",
+   "msrp2024": 31000,
+   "seg": "midsize"
+  },
+  "Subaru|Outback": {
+   "make": "Subaru",
+   "model": "Outback",
+   "msrp2024": 36000,
+   "seg": "cuv_m"
+  },
+  "Subaru|Solterra": {
+   "make": "Subaru",
+   "model": "Solterra",
+   "msrp2024": 55000,
+   "seg": "ev"
+  },
+  "Subaru|WRX": {
+   "make": "Subaru",
+   "model": "WRX",
+   "msrp2024": 35000,
+   "seg": "sport"
+  },
+  "Suzuki|Grand Vitara": {
+   "make": "Suzuki",
+   "model": "Grand Vitara",
+   "msrp2024": 26000,
+   "seg": "cuv_s",
+   "until": 2013
+  },
+  "Suzuki|SX4": {
+   "make": "Suzuki",
+   "model": "SX4",
+   "msrp2024": 20000,
+   "seg": "compact",
+   "until": 2013
+  },
+  "Suzuki|Swift": {
+   "make": "Suzuki",
+   "model": "Swift",
+   "msrp2024": 17000,
+   "seg": "econ",
+   "until": 2013
+  },
+  "Tesla|Cybertruck": {
+   "from": 2024,
+   "make": "Tesla",
+   "model": "Cybertruck",
+   "msrp2024": 100000,
+   "seg": "ev"
+  },
+  "Tesla|Model 3": {
+   "from": 2018,
+   "make": "Tesla",
+   "model": "Model 3",
+   "msrp2024": 55000,
+   "seg": "ev"
+  },
+  "Tesla|Model S": {
+   "make": "Tesla",
+   "model": "Model S",
+   "msrp2024": 110000,
+   "seg": "ev"
+  },
+  "Tesla|Model X": {
+   "make": "Tesla",
+   "model": "Model X",
+   "msrp2024": 125000,
+   "seg": "ev"
+  },
+  "Tesla|Model Y": {
+   "from": 2020,
+   "make": "Tesla",
+   "model": "Model Y",
+   "msrp2024": 62000,
+   "seg": "ev"
+  },
+  "Toyota|4Runner": {
+   "make": "Toyota",
+   "model": "4Runner",
+   "msrp2024": 52000,
+   "seg": "suv_l"
+  },
+  "Toyota|Avalon": {
+   "make": "Toyota",
+   "model": "Avalon",
+   "msrp2024": 44000,
+   "seg": "fullsize",
+   "until": 2018
+  },
+  "Toyota|C-HR": {
+   "from": 2018,
+   "make": "Toyota",
+   "model": "C-HR",
+   "msrp2024": 27000,
+   "seg": "cuv_s",
+   "until": 2022
+  },
+  "Toyota|Camry": {
+   "make": "Toyota",
+   "model": "Camry",
+   "msrp2024": 32000,
+   "seg": "midsize"
+  },
+  "Toyota|Camry Hybrid": {
+   "make": "Toyota",
+   "model": "Camry Hybrid",
+   "msrp2024": 35000,
+   "seg": "midsize"
+  },
+  "Toyota|Corolla": {
+   "make": "Toyota",
+   "model": "Corolla",
+   "msrp2024": 25000,
+   "seg": "compact"
+  },
+  "Toyota|Corolla Cross": {
+   "from": 2022,
+   "make": "Toyota",
+   "model": "Corolla Cross",
+   "msrp2024": 29000,
+   "seg": "cuv_s"
+  },
+  "Toyota|Corolla Hatchback": {
+   "from": 2019,
+   "make": "Toyota",
+   "model": "Corolla Hatchback",
+   "msrp2024": 25500,
+   "seg": "compact"
+  },
+  "Toyota|Corolla Hybrid": {
+   "from": 2020,
+   "make": "Toyota",
+   "model": "Corolla Hybrid",
+   "msrp2024": 28000,
+   "seg": "compact"
+  },
+  "Toyota|Crown": {
+   "from": 2023,
+   "make": "Toyota",
+   "model": "Crown",
+   "msrp2024": 48000,
+   "seg": "fullsize"
+  },
+  "Toyota|Echo": {
+   "make": "Toyota",
+   "model": "Echo",
+   "msrp2024": 17000,
+   "seg": "econ",
+   "until": 2005
+  },
+  "Toyota|GR86": {
+   "from": 2022,
+   "make": "Toyota",
+   "model": "GR86",
+   "msrp2024": 35000,
+   "seg": "sport"
+  },
+  "Toyota|Grand Highlander": {
+   "from": 2024,
+   "make": "Toyota",
+   "model": "Grand Highlander",
+   "msrp2024": 52000,
+   "seg": "suv_l"
+  },
+  "Toyota|Highlander": {
+   "make": "Toyota",
+   "model": "Highlander",
+   "msrp2024": 47000,
+   "seg": "suv_l"
+  },
+  "Toyota|Land Cruiser": {
+   "from": 2024,
+   "make": "Toyota",
+   "model": "Land Cruiser",
+   "msrp2024": 82000,
+   "seg": "suv_l"
+  },
+  "Toyota|Matrix": {
+   "make": "Toyota",
+   "model": "Matrix",
+   "msrp2024": 20000,
+   "seg": "compact",
+   "until": 2014
+  },
+  "Toyota|Prius": {
+   "make": "Toyota",
+   "model": "Prius",
+   "msrp2024": 34000,
+   "seg": "compact"
+  },
+  "Toyota|Prius Prime": {
+   "from": 2017,
+   "make": "Toyota",
+   "model": "Prius Prime",
+   "msrp2024": 39000,
+   "seg": "compact"
+  },
+  "Toyota|RAV4": {
+   "make": "Toyota",
+   "model": "RAV4",
+   "msrp2024": 34000,
+   "seg": "cuv_s"
+  },
+  "Toyota|RAV4 Hybrid": {
+   "from": 2016,
+   "make": "Toyota",
+   "model": "RAV4 Hybrid",
+   "msrp2024": 38000,
+   "seg": "cuv_s"
+  },
+  "Toyota|RAV4 Prime": {
+   "from": 2021,
+   "make": "Toyota",
+   "model": "RAV4 Prime",
+   "msrp2024": 48000,
+   "seg": "cuv_s"
+  },
+  "Toyota|Sequoia": {
+   "make": "Toyota",
+   "model": "Sequoia",
+   "msrp2024": 72000,
+   "seg": "suv_l"
+  },
+  "Toyota|Sienna": {
+   "make": "Toyota",
+   "model": "Sienna",
+   "msrp2024": 44000,
+   "seg": "van"
+  },
+  "Toyota|Supra": {
+   "from": 2020,
+   "make": "Toyota",
+   "model": "Supra",
+   "msrp2024": 60000,
+   "seg": "sport"
+  },
+  "Toyota|Tacoma": {
+   "make": "Toyota",
+   "model": "Tacoma",
+   "msrp2024": 44000,
+   "seg": "truck"
+  },
+  "Toyota|Tundra": {
+   "make": "Toyota",
+   "model": "Tundra",
+   "msrp2024": 55000,
+   "seg": "truck"
+  },
+  "Toyota|Venza": {
+   "make": "Toyota",
+   "model": "Venza",
+   "msrp2024": 42000,
+   "seg": "cuv_m",
+   "until": 2024
+  },
+  "Toyota|Yaris": {
+   "make": "Toyota",
+   "model": "Yaris",
+   "msrp2024": 21000,
+   "seg": "econ",
+   "until": 2020
+  },
+  "Toyota|Yaris Hatchback": {
+   "make": "Toyota",
+   "model": "Yaris Hatchback",
+   "msrp2024": 20000,
+   "seg": "econ",
+   "until": 2020
+  },
+  "Toyota|bZ4X": {
+   "from": 2023,
+   "make": "Toyota",
+   "model": "bZ4X",
+   "msrp2024": 50000,
+   "seg": "ev"
+  },
+  "Volkswagen|Arteon": {
+   "from": 2019,
+   "make": "Volkswagen",
+   "model": "Arteon",
+   "msrp2024": 48000,
+   "seg": "lux_car",
+   "until": 2023
+  },
+  "Volkswagen|Atlas": {
+   "from": 2018,
+   "make": "Volkswagen",
+   "model": "Atlas",
+   "msrp2024": 47000,
+   "seg": "suv_l"
+  },
+  "Volkswagen|Atlas Cross Sport": {
+   "from": 2020,
+   "make": "Volkswagen",
+   "model": "Atlas Cross Sport",
+   "msrp2024": 45000,
+   "seg": "cuv_m"
+  },
+  "Volkswagen|Beetle": {
+   "make": "Volkswagen",
+   "model": "Beetle",
+   "msrp2024": 25000,
+   "seg": "compact",
+   "until": 2019
+  },
+  "Volkswagen|Golf": {
+   "make": "Volkswagen",
+   "model": "Golf",
+   "msrp2024": 26000,
+   "seg": "compact",
+   "until": 2021
+  },
+  "Volkswagen|Golf GTI": {
+   "make": "Volkswagen",
+   "model": "Golf GTI",
+   "msrp2024": 36000,
+   "seg": "sport"
+  },
+  "Volkswagen|ID.4": {
+   "from": 2021,
+   "make": "Volkswagen",
+   "model": "ID.4",
+   "msrp2024": 50000,
+   "seg": "ev"
+  },
+  "Volkswagen|Jetta": {
+   "make": "Volkswagen",
+   "model": "Jetta",
+   "msrp2024": 25000,
+   "seg": "compact"
+  },
+  "Volkswagen|Passat": {
+   "make": "Volkswagen",
+   "model": "Passat",
+   "msrp2024": 30000,
+   "seg": "midsize",
+   "until": 2022
+  },
+  "Volkswagen|Routan": {
+   "make": "Volkswagen",
+   "model": "Routan",
+   "msrp2024": 33000,
+   "seg": "van",
+   "until": 2014
+  },
+  "Volkswagen|Taos": {
+   "from": 2022,
+   "make": "Volkswagen",
+   "model": "Taos",
+   "msrp2024": 29000,
+   "seg": "cuv_s"
+  },
+  "Volkswagen|Tiguan": {
+   "make": "Volkswagen",
+   "model": "Tiguan",
+   "msrp2024": 35000,
+   "seg": "cuv_s"
+  },
+  "Volvo|EX30": {
+   "from": 2025,
+   "make": "Volvo",
+   "model": "EX30",
+   "msrp2024": 55000,
+   "seg": "ev"
+  },
+  "Volvo|S60": {
+   "make": "Volvo",
+   "model": "S60",
+   "msrp2024": 48000,
+   "seg": "lux_car"
+  },
+  "Volvo|S90": {
+   "make": "Volvo",
+   "model": "S90",
+   "msrp2024": 65000,
+   "seg": "lux_car"
+  },
+  "Volvo|V60": {
+   "make": "Volvo",
+   "model": "V60",
+   "msrp2024": 52000,
+   "seg": "lux_car"
+  },
+  "Volvo|XC40": {
+   "from": 2019,
+   "make": "Volvo",
+   "model": "XC40",
+   "msrp2024": 48000,
+   "seg": "lux_suv"
+  },
+  "Volvo|XC60": {
+   "make": "Volvo",
+   "model": "XC60",
+   "msrp2024": 58000,
+   "seg": "lux_suv"
+  },
+  "Volvo|XC90": {
+   "make": "Volvo",
+   "model": "XC90",
+   "msrp2024": 72000,
+   "seg": "lux_suv"
+  },
+  "smart|fortwo": {
+   "make": "smart",
+   "model": "fortwo",
+   "msrp2024": 22000,
+   "seg": "econ",
+   "until": 2019
+  }
+ },
+ "msrpInflation": 1.032,
+ "refYear": 2024
+}

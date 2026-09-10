@@ -6,6 +6,7 @@ const protectedPrefixes = [
   "/vehicles",
   "/vehicle-roi",
   "/rental-estimate",
+  "/investment-ranking",
   "/owners",
   "/orders",
   "/calendar",

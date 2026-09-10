@@ -26,6 +26,7 @@ import { join, resolve } from "node:path";
 import Papa from "papaparse";
 
 import catalogData from "../lib/rental-estimate/catalog.json";
+import { BRAND_RETENTION } from "../lib/rental-estimate/index";
 
 type CatalogEntry = { make: string; model: string; seg: string; msrp2024: number };
 const CATALOG = catalogData.models as Record<string, CatalogEntry>;
@@ -103,9 +104,20 @@ function parseTuroDate(raw: string | undefined) {
   return new Date(Number(y), Number(mo) - 1, Number(d), hour, Number(mi));
 }
 
+// Kept in step with `lib/rental-estimate/index.ts` deliberately: the fit
+// and the app must price a car identically, or the fitted coefficients
+// describe a value the app never computes.
 function retainedValueShare(age: number) {
   if (age <= 0) return 1;
-  return Math.max(0.82 * 0.885 ** (age - 1), 0.085);
+  return Math.max(0.85 * 0.915 ** (age - 1), 0.16);
+}
+
+function vehicleValue(entry: CatalogEntry, modelYear: number, year: number) {
+  const msrp = entry.msrp2024 * MSRP_INFLATION ** (modelYear - MSRP_REF_YEAR);
+  const age = Math.max(0, year - modelYear);
+  if (age === 0) return msrp;
+  const retained = 1 - (1 - retainedValueShare(age)) / (BRAND_RETENTION[entry.make] ?? 1);
+  return msrp * Math.max(retained, 0.1);
 }
 
 /**
@@ -334,11 +346,10 @@ function main() {
 
   const enriched: PanelRow[] = panel.map((row) => {
     const entry = CATALOG[`${row.make}|${row.model}`];
-    const msrp = entry.msrp2024 * MSRP_INFLATION ** (row.modelYear - MSRP_REF_YEAR);
     return {
       ...row,
       seg: entry.seg,
-      value: msrp * retainedValueShare(Math.max(0, row.year - row.modelYear)),
+      value: vehicleValue(entry, row.modelYear, row.year),
       deseasonalised: 0,
     };
   });

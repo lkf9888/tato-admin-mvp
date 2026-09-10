@@ -68,6 +68,11 @@ export function AppShell({
           label: messages.shell.nav.rentalEstimate,
           icon: "rentalEstimate",
         },
+        {
+          href: "/investment-ranking",
+          label: messages.shell.nav.investmentRanking,
+          icon: "investmentRanking",
+        },
         { href: "/owners", label: messages.shell.nav.owners, icon: "owners" },
       ],
     },

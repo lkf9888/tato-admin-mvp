@@ -1,12 +1,12 @@
 {
- "a": 2.66952,
- "b": 0.41922,
+ "a": 2.45584,
+ "b": 0.43207,
  "K": 10,
  "band": {
-  "p10": 0.467,
-  "p25": 0.762,
-  "p75": 1.242,
-  "p90": 1.463
+  "p10": 0.472,
+  "p25": 0.773,
+  "p75": 1.24,
+  "p90": 1.492
  },
  "family": {
   "econ": "small",
@@ -82,312 +82,312 @@
   }
  },
  "segEffect": {
-  "suv_l": 1.0423,
-  "truck": 1.0916,
-  "van": 1.0921,
-  "lux_car": 0.8867,
-  "cuv_m": 0.991,
-  "lux_suv": 0.9687,
-  "cuv_s": 0.9413,
-  "econ": 1.0148,
-  "compact": 1.0568,
-  "ev": 0.8339,
-  "midsize": 1.0195,
-  "sport": 0.9928,
-  "fullsize": 1.0195
+  "suv_l": 0.9853,
+  "truck": 1.0991,
+  "van": 1.0845,
+  "lux_car": 0.9166,
+  "cuv_m": 0.9772,
+  "lux_suv": 1.0498,
+  "cuv_s": 0.9376,
+  "econ": 1.0446,
+  "compact": 1.0434,
+  "ev": 0.861,
+  "midsize": 1.0074,
+  "sport": 0.997,
+  "fullsize": 1.0074
  },
  "modelAdj": {
   "Ford|Explorer": [
    65,
-   1.0676
+   1.0937
   ],
   "Ram|1500 Classic": [
    30,
-   1.0131
+   1.0045
   ],
   "Toyota|Sequoia": [
    52,
-   1.0524
+   0.976
   ],
   "Volkswagen|Routan": [
    24,
-   1.079
+   1.0898
   ],
   "BMW|3 Series": [
    17,
-   0.8816
+   0.9046
   ],
   "Nissan|Pathfinder": [
    21,
-   1.0121
+   1.0619
   ],
   "Dodge|Journey": [
    112,
-   1.0924
+   1.1174
   ],
   "INFINITI|JX35": [
    14,
-   1.0173
+   1.061
   ],
   "Land Rover|Range Rover Sport": [
    11,
-   1.1714
+   1.1549
   ],
   "Ford|Escape": [
    44,
-   1.1316
+   1.1195
   ],
   "Dodge|Grand Caravan": [
    126,
-   0.9453
+   0.9659
   ],
   "Mazda|CX-9": [
    32,
-   0.9065
+   0.8669
   ],
   "Lexus|NX": [
    22,
-   0.9224
+   0.851
   ],
   "Nissan|Micra": [
    20,
-   1.0817
+   1.075
   ],
   "Toyota|Sienna": [
    40,
-   1.0021
+   0.9148
   ],
   "Jeep|Compass": [
    30,
-   1.1468
+   1.0829
   ],
   "Kia|Sportage Hybrid": [
    24,
-   1.0076
+   1.0413
   ],
   "Ford|Fiesta": [
    50,
-   1.0512
+   1.007
   ],
   "GMC|Terrain": [
    55,
-   1.0054
+   0.922
   ],
   "Ford|Focus": [
    31,
-   1.1236
+   1.1241
   ],
   "Chevrolet|Cruze": [
    21,
-   0.9608
+   0.9752
   ],
   "Ford|Flex": [
    16,
-   0.8667
+   0.8897
   ],
   "GMC|Acadia": [
    4,
-   0.8478
+   0.839
   ],
   "Buick|Verano": [
    20,
-   0.9057
+   0.9446
   ],
   "Chevrolet|Equinox": [
    52,
-   0.9627
+   0.9563
   ],
   "Tesla|Model 3": [
    41,
-   0.9727
+   0.9914
   ],
   "Jeep|Patriot": [
    32,
-   0.9809
+   0.9281
   ],
   "Kia|Rondo": [
    13,
-   1.027
+   1.015
   ],
   "Chevrolet|Orlando": [
    26,
-   1.0597
+   1.0396
   ],
   "Mitsubishi|Mirage": [
    51,
-   0.8649
+   0.8724
   ],
   "Toyota|Venza": [
    28,
-   0.8786
+   0.7904
   ],
   "Mitsubishi|Outlander": [
    43,
-   0.9254
+   0.9745
   ],
   "Honda|Odyssey": [
    25,
-   0.994
+   1.0268
   ],
   "Chevrolet|Trax": [
    17,
-   0.9346
+   0.9799
   ],
   "Kia|Carnival": [
    17,
-   1.0247
+   1.0645
   ],
   "Chrysler|Town & Country": [
    12,
-   1.0406
+   1.1029
   ],
   "Hyundai|Tucson": [
    17,
-   0.9524
+   0.9356
   ],
   "Jeep|Wrangler Unlimited": [
    1,
-   1.0115
+   1.0169
   ],
   "Mercedes-Benz|GLS-Class": [
    5,
-   0.957
+   0.958
   ],
   "Land Rover|Range Rover": [
    14,
-   1.1341
+   1.1757
   ],
   "Toyota|RAV4": [
    11,
-   0.8908
+   0.8925
   ],
   "Tesla|Model S": [
    8,
-   0.9039
+   0.9093
   ],
   "Lexus|TX": [
    13,
-   1.0532
+   1.016
   ],
   "Volvo|XC40": [
    18,
-   0.9414
+   0.9264
   ],
   "Nissan|LEAF": [
    17,
-   0.9128
+   0.9083
   ],
   "Kia|Sorento": [
    10,
-   1.1339
+   1.1163
   ],
   "Toyota|C-HR": [
    4,
-   1.1464
+   1.1149
   ],
   "Toyota|Corolla Hatchback": [
    5,
-   0.8795
+   0.8965
   ],
   "Land Rover|Range Rover Velar": [
    3,
-   1.043
+   1.068
   ],
   "Tesla|Model Y": [
    19,
-   0.987
+   1.0002
   ],
   "Subaru|Outback": [
    4,
-   1.0441
+   1.0502
   ],
   "BMW|X3": [
    6,
-   1.0846
+   1.0818
   ],
   "Toyota|4Runner": [
    17,
-   0.9294
+   0.9167
   ],
   "Mitsubishi|RVR": [
    36,
-   0.8807
+   0.9331
   ],
   "Ford|F-150": [
    31,
-   1.1068
+   1.0992
   ],
   "Mazda|Mazda5": [
    16,
-   1.0027
+   0.9638
   ],
   "Ford|Ranger": [
    4,
-   0.9886
+   0.9917
   ],
   "Jaguar|F-PACE": [
    6,
-   0.9556
+   0.9857
   ],
   "Alfa Romeo|Stelvio": [
    5,
-   0.96
+   1.0689
   ],
   "Honda|CR-V": [
    6,
-   1.0614
+   1.0457
   ],
   "Toyota|Camry Hybrid": [
    3,
-   1.0386
+   1.0137
   ],
   "Mazda|CX-5": [
    8,
-   0.9921
+   0.9898
   ],
   "Nissan|Versa Note": [
    7,
-   1.0173
+   1.0109
   ],
   "Volkswagen|Atlas": [
    6,
-   1.0909
+   1.1185
   ],
   "Volkswagen|Taos": [
    6,
-   0.9865
+   1.0028
   ],
   "smart|fortwo": [
    5,
-   0.9678
+   1.0532
   ],
   "Mazda|CX-30": [
    5,
-   0.9717
+   0.9803
   ],
   "Jeep|Cherokee": [
    4,
-   1.0434
+   1.0109
   ],
   "Kia|Forte": [
    1,
-   0.9711
+   0.9756
   ],
   "Mercedes-Benz|GLC-Class": [
    3,
-   0.9758
+   0.9721
   ],
   "Audi|S4": [
    2,
-   0.9855
+   0.9935
   ],
   "Toyota|bZ4X": [
    2,
-   0.9591
+   0.953
   ],
   "BMW|5 Series": [
    1,
-   1.031
+   1.0362
   ]
  },
  "fit": {
@@ -397,7 +397,7 @@
   "trips": 5789,
   "from": "2023-12",
   "to": "2026-08",
-  "looAnnualMedianError": 0.1147,
-  "looAnnualWithin20": 0.8302
+  "looAnnualMedianError": 0.1005,
+  "looAnnualWithin20": 0.7358
  }
 }

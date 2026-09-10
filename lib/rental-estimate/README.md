@@ -14,6 +14,8 @@ break when Turo changes their site.
 | `catalog.json` | 360 Canadian-market models → body segment + base MSRP (2024 CAD) | by hand |
 | `index.ts` | `estimateVehicle()` — puts them back together | by hand |
 | `report-canvas.ts` | Draws the one-page PDF report | by hand |
+| `costs.ts` | Running-cost and reliability assumptions | by hand |
+| `roi.ts` | `rankVehicles()` — which car is worth buying | by hand |
 
 ## What it's built from
 
@@ -115,6 +117,42 @@ The accuracy figures quoted on the page are read out of `model.json` at
 render time, so they follow a refit on their own. The prose describing
 the elasticity and the segment multipliers is not — check
 `lib/i18n/messages/rental-estimate.ts` against the script's output.
+
+## The investment ranking
+
+`/investment-ranking` scores every eligible model-year — about 3,300 of
+them — on what it earns against what it costs to buy, run, repair and
+eventually sell:
+
+```
+net cash = revenue − maintenance − repairs − fixed costs
+total    = net cash − depreciation
+```
+
+Two inputs come from our own data. Revenue is the fitted income model.
+Distance is measured: across 9.24 million kilometres of completed trips
+a car covers ~115 km per rented day, and rented days are divided out of
+predicted revenue at a fitted $/day curve, so a car that earns more
+necessarily drives more and wears out faster. Median utilisation across
+the fleet is 55%, about 200 days a year, and annual distance lands
+between 21,000 and 30,000 km — 1.5-2x a private car, which is why
+per-kilometre costs dominate here.
+
+Everything else is a published average and is documented in
+`costs.ts`. Repairs are the widest source of error; the worst case is
+the one to plan against.
+
+**The fixed costs are load-bearing.** Because revenue scales with value
+at an elasticity below 0.5, return per dollar always favours cheap cars.
+Insurance, parking and licensing are charged per car rather than per
+dollar, and they are the only thing stopping the ranking from
+degenerating into "buy as many of the cheapest eligible car as the
+budget allows". Set them to what is actually paid.
+
+Purchase price is the denominator of every ratio and the weakest input
+in the model, so each row takes a typed price. An overridden row stays
+visible with its true rank even when it falls out of the top of the
+list — that is the whole point of typing a real quote in.
 
 ## The PDF report
 

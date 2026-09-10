@@ -27,6 +27,7 @@ import { dashboardMessages } from "@/lib/i18n/messages/dashboard";
 import { directBookingMessages } from "@/lib/i18n/messages/direct-booking";
 import { fleetMessages } from "@/lib/i18n/messages/fleet";
 import { importsMessages } from "@/lib/i18n/messages/imports";
+import { investmentRankingMessages } from "@/lib/i18n/messages/investment-ranking";
 import { ordersMessages } from "@/lib/i18n/messages/orders";
 import { rentalEstimateMessages } from "@/lib/i18n/messages/rental-estimate";
 import { shareMessages } from "@/lib/i18n/messages/share";
@@ -319,6 +320,7 @@ const messages = {
     ...ordersMessages.en,
     ...rentalEstimateMessages.en,
     ...importsMessages.en,
+    ...investmentRankingMessages.en,
     ...billingMessages.en,
     ...calendarMessages.en,
     ...shareMessages.en,
@@ -338,6 +340,7 @@ const messages = {
     ...ordersMessages.zh,
     ...rentalEstimateMessages.zh,
     ...importsMessages.zh,
+    ...investmentRankingMessages.zh,
     ...billingMessages.zh,
     ...calendarMessages.zh,
     ...shareMessages.zh,

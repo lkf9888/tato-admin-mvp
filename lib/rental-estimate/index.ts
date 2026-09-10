@@ -149,23 +149,103 @@ export function getCatalogEntry(make: string, model: string): CatalogEntry | nul
 }
 
 /**
- * Share of original MSRP a car still carries at a given age.
+ * Resale strength by brand, as a multiplier on the base retention curve.
  *
- * A steep first year, then a steady ~11.5%/year, with a floor: past
- * roughly fifteen years a car is worth what a running car is worth and
- * the curve stops mattering. Fitted shape rather than a book value —
- * it only has to be right on average across a fleet, and the revenue
- * elasticity of 0.42 damps any error in it by more than half.
+ * A single depreciation curve cannot describe both a Toyota and a Land
+ * Rover — five years in, one has given up a third of its price and the
+ * other more than two thirds. Residual value is among the most
+ * consistently published figures in the industry (ALG and Kelley Blue
+ * Book both hand out annual residual-value awards on it), and the
+ * ordering below is where those sources agree.
+ *
+ * This cuts both ways in a return calculation, which is why it belongs
+ * here: a Toyota costs more to buy for the same age and earns no more
+ * for it, so strong resale shows up as a *lower* yield and a smaller
+ * depreciation charge. Both are true.
+ */
+export const BRAND_RETENTION: Record<string, number> = {
+  Toyota: 1.22,
+  Honda: 1.18,
+  Subaru: 1.15,
+  Lexus: 1.15,
+  Acura: 1.05,
+  Mazda: 1.05,
+  Porsche: 1.05,
+  Jeep: 1.05,
+  Ram: 1.05,
+  GMC: 1.05,
+  Hyundai: 0.98,
+  Kia: 0.98,
+  Ford: 0.95,
+  Chevrolet: 0.95,
+  Nissan: 0.92,
+  Volkswagen: 0.92,
+  Dodge: 0.92,
+  Mitsubishi: 0.9,
+  Buick: 0.88,
+  Volvo: 0.85,
+  Audi: 0.85,
+  Genesis: 0.85,
+  Chrysler: 0.85,
+  MINI: 0.85,
+  // Repeated price cuts on new stock dragged used values down with them.
+  Tesla: 0.85,
+  BMW: 0.82,
+  "Mercedes-Benz": 0.82,
+  INFINITI: 0.82,
+  Cadillac: 0.8,
+  Lincoln: 0.8,
+  Rivian: 0.8,
+  smart: 0.75,
+  "Land Rover": 0.72,
+  Fiat: 0.72,
+  Polestar: 0.7,
+  Jaguar: 0.68,
+  "Alfa Romeo": 0.65,
+};
+
+export function brandRetention(make: string) {
+  return BRAND_RETENTION[make] ?? 1;
+}
+
+/**
+ * Share of original MSRP a car still carries at a given age, before the
+ * brand adjustment.
+ *
+ * A steep first year, then a steady ~8.5%/year with a floor. The decay
+ * is gentler than a textbook depreciation curve on purpose: used values
+ * across Canada stepped up sharply after 2020 and have only partly come
+ * back, and a curve calibrated on the old normal prices a ten-year-old
+ * car well under what one actually changes hands for here.
+ *
+ * It is still the softest number in the model. The elasticity of 0.42
+ * halves its effect on the income estimate, but a return calculation
+ * divides by it, so the ranking page takes a manual price per car and
+ * says plainly that it should be used before acting on a number.
  */
 export function retainedValueShare(age: number) {
   if (age <= 0) return 1;
-  return Math.max(0.82 * 0.885 ** (age - 1), 0.085);
+  return Math.max(0.85 * 0.915 ** (age - 1), 0.16);
 }
 
-/** Estimated market value today, in CAD, for a model year. */
+/**
+ * Estimated market value today, in CAD, for a model year.
+ *
+ * The brand adjustment scales the *loss*, not the remaining value.
+ * Multiplying retention directly and capping the result looked
+ * equivalent and was not: a strong-resale brand pinned itself to the cap
+ * for its first several years, so the value came out identical at age
+ * one and age two — and a car that loses nothing in a year reads as a
+ * free investment. Scaling depreciation keeps every curve monotone and
+ * every brand under 100% of new.
+ */
 export function estimateVehicleValue(entry: CatalogEntry, year: number, now: number) {
   const msrp = entry.msrp2024 * MSRP_INFLATION ** (year - MSRP_REF_YEAR);
-  return msrp * retainedValueShare(Math.max(0, now - year));
+  const age = Math.max(0, now - year);
+  if (age === 0) return msrp;
+  const base = retainedValueShare(age);
+  const retained = 1 - (1 - base) / brandRetention(entry.make);
+  return msrp * Math.max(retained, 0.1);
 }
 
 export type MonthEstimate = {

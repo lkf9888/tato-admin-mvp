@@ -3,12 +3,15 @@ set -euo pipefail
 
 # Build, sign and publish the Android APK.
 #
-# The app is a Trusted Web Activity: a thin Android shell that opens
-# tatocar.co with no browser chrome. It is not a copy of the site, so
-# this script is NOT part of shipping a web change -- deploying the
-# site updates what everyone sees inside the app immediately. Run this
-# only when the shell itself changes: its name, its icon, the URL it
-# opens, or the Android version it targets.
+# The app is a WebView shell that opens tatocar.co full-screen. It is
+# not a copy of the site, so this script is NOT part of shipping a web
+# change -- deploying the site updates what everyone sees inside the
+# app immediately. Run this only when the shell itself changes: its
+# name, its icon, the URL it opens, or the Android version it targets.
+#
+# Also note the final line of output. The signing certificate must keep
+# matching the fingerprint served at /.well-known/assetlinks.json, or
+# tatocar.co links stop opening in the app.
 #
 #   scripts/build-android-apk.sh [versionName] [versionCode]
 #
@@ -113,4 +116,5 @@ echo "sha256 $SHA"
 grep -A1 "Signer #1 certificate SHA-256 digest" "$WORK/verify.txt" | head -2
 echo
 echo "If the signing certificate above changed, update the fingerprint in"
-echo "app/.well-known/assetlinks.json/route.ts or the app will show a URL bar."
+echo "app/.well-known/assetlinks.json/route.ts or tatocar.co links stop"
+echo "opening in the app."

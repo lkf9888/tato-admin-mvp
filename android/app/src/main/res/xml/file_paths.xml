@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Camera captures only. Scoped to one directory inside the cache
+         so the provider cannot be talked into handing out anything
+         else the app stores. -->
+    <cache-path name="uploads" path="uploads/" />
+</paths>

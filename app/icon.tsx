@@ -1,44 +1,81 @@
 import { ImageResponse } from "next/og";
 
-// Next 15 file convention: `app/icon` is served as the PWA icon, also
-// linked from the manifest. We render it dynamically with ImageResponse
-// instead of shipping a PNG, so the icon stays in sync with the brand
-// without anyone having to open Figma.
+import { BRAND_MARK } from "@/components/brand-mark";
+
+// Next 15 file convention: `app/icon` is served as the PWA icon and is
+// linked from the manifest, which is in turn what the Android wrapper
+// reads its launcher icon from. Rendering it here rather than shipping
+// a PNG keeps one drawing behind the sidebar, the home screen and the
+// APK.
 //
-// 192x192 is one of the standard PWA sizes; the manifest lists this
-// same endpoint at 192x192 and 512x512 (browsers scale it).
+// 512 rather than the 192 this used to be: the manifest lists this
+// endpoint at both sizes, and an Android launcher asking for 512 was
+// getting a 192 upscaled.
+//
+// Drawn with divs, not SVG. Satori -- what ImageResponse renders with
+// -- covers the box model far more completely than it covers paths, so
+// the accent tail is a second box butted against the first rather than
+// the path the React component uses. `BRAND_MARK` is the shared
+// geometry that keeps the two in step.
 
-export const size = {
-  width: 192,
-  height: 192,
-};
-
+export const size = { width: BRAND_MARK.box, height: BRAND_MARK.box };
 export const contentType = "image/png";
 
 export default function Icon() {
+  const { box, ink, accent, bar, split, stem } = BRAND_MARK;
+  const barEnd = bar.x + bar.width;
+
   return new ImageResponse(
     (
       <div
         style={{
-          width: "100%",
-          height: "100%",
+          width: box,
+          height: box,
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#111318",
-          color: "#ffffff",
-          fontSize: 96,
-          fontWeight: 700,
-          letterSpacing: "-0.06em",
-          fontFamily:
-            "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+          position: "relative",
+          background: ink,
         }}
       >
-        T
+        {/* Crossbar, up to the stem's right edge. Rounded on the left
+            only: the right end is a butt joint with the accent. */}
+        <div
+          style={{
+            position: "absolute",
+            left: bar.x,
+            top: bar.y,
+            width: split - bar.x,
+            height: bar.height,
+            background: "#FFFFFF",
+            borderRadius: `${bar.radius}px 0 0 ${bar.radius}px`,
+          }}
+        />
+        {/* The next booking along, in the accent. */}
+        <div
+          style={{
+            position: "absolute",
+            left: split,
+            top: bar.y,
+            width: barEnd - split,
+            height: bar.height,
+            background: accent,
+            borderRadius: `0 ${bar.radius}px ${bar.radius}px 0`,
+          }}
+        />
+        {/* Stem. Its top sits inside the crossbar, so the two merge
+            into one letter instead of stacking as two shapes. */}
+        <div
+          style={{
+            position: "absolute",
+            left: stem.x,
+            top: stem.y,
+            width: stem.width,
+            height: stem.height,
+            background: "#FFFFFF",
+            borderRadius: stem.radius,
+          }}
+        />
       </div>
     ),
-    {
-      ...size,
-    },
+    { ...size },
   );
 }

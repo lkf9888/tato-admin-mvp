@@ -6,6 +6,7 @@ import { NavigationOptimizer } from "@/components/navigation-optimizer";
 import { SessionExpiryRedirect } from "@/components/session-expiry-redirect";
 import { SidebarNav } from "@/components/sidebar-nav";
 import type { NavIconName } from "@/components/nav-icons";
+import { BrandMark } from "@/components/brand-mark";
 import { getMessages, type Locale } from "@/lib/i18n";
 import { APP_VERSION_LABEL } from "@/lib/version";
 
@@ -140,9 +141,7 @@ export function AppShell({
   const sidebarContent = (
     <>
       <div className="flex items-center gap-2.5 border-b border-[var(--line)] px-4 py-5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-[var(--ink)] text-sm font-semibold text-white">
-          T
-        </div>
+        <BrandMark size={32} className="shrink-0 rounded" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-lg font-semibold leading-tight text-[var(--ink)]">
             {messages.shell.brandTitle}

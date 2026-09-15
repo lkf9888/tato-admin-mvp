@@ -16,3 +16,15 @@ tsconfig.tsbuildinfo
 # The browser agent's saved Turo session. A live login.
 agent/.state/
 agent/node_modules/
+
+# Android release signing. A credential, and the only copy — losing it
+# means a future APK cannot upgrade an installed one, only replace it
+# after an uninstall. Back this directory up somewhere safe.
+android-signing/
+
+# Android build outputs. The TWA project itself is committed so the APK
+# can be rebuilt from a clone; what Gradle generates from it is not.
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties

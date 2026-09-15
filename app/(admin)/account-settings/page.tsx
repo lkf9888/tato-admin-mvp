@@ -9,6 +9,7 @@ import {
   updateLedgerPolicyAction,
   updateStripePayoutBindingAction,
 } from "@/lib/account-settings-actions";
+import { ANDROID_RELEASE, formatBytes } from "@/lib/android-release";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { getMessages } from "@/lib/i18n";
 import { getI18n, getLocalePreference } from "@/lib/i18n-server";
@@ -330,6 +331,41 @@ export default async function AccountSettingsPage({
         <Link href="/agent#api" className="btn-secondary mt-3 inline-flex">
           {t.apiAccessLink}
         </Link>
+      </section>
+
+      {/* The APK. A plain anchor with `download`, not a Link: this
+          points at a file in `public/`, and Next's client router would
+          try to treat it as a route. */}
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+          {t.androidTitle}
+        </p>
+        <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
+          {t.androidCopy}
+        </p>
+        {ANDROID_RELEASE.sizeBytes > 0 ? (
+          <>
+            <a
+              href={ANDROID_RELEASE.path}
+              download={ANDROID_RELEASE.fileName}
+              className="btn-secondary mt-3 inline-flex"
+            >
+              {t.androidDownload}
+            </a>
+            <p className="mt-2 text-[11px] leading-4 text-[var(--ink-soft)] tabular-nums">
+              {t.androidMeta(
+                ANDROID_RELEASE.version,
+                formatBytes(ANDROID_RELEASE.sizeBytes),
+                ANDROID_RELEASE.builtAt,
+              )}
+            </p>
+            <p className="mt-1.5 max-w-3xl text-[11px] leading-4 text-[var(--ink-soft)]">
+              {t.androidSideload}
+            </p>
+          </>
+        ) : (
+          <p className="mt-3 text-[12px] text-[var(--ink-soft)]">{t.androidUnbuilt}</p>
+        )}
       </section>
 
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">

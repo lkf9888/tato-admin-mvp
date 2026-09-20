@@ -24,8 +24,15 @@ ENV PORT=3000
 # list disagree with the client-rendered detail modal about the same row.
 #
 # Aligning the container clock with the fleet's operating timezone makes
-# the two paths agree. Override TZ (and CSV_IMPORT_TIMEZONE with it) if
-# the fleet operates elsewhere.
+# the two paths agree. A third reader was added since: the notification
+# hub renders subscribe-message time fields through NOTIFY_TIMEZONE,
+# which falls back to CSV_IMPORT_TIMEZONE and then to America/Vancouver
+# -- deliberately never to the container clock, because a WeChat
+# reminder that is seven hours out looks like an ordinary message.
+#
+# So a fleet operating elsewhere sets TZ and CSV_IMPORT_TIMEZONE
+# together; NOTIFY_TIMEZONE follows unless it is set to disagree, which
+# nothing should want.
 ENV TZ=America/Vancouver
 
 EXPOSE 3000

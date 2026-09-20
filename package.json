@@ -1,12 +1,13 @@
 {
   "name": "turo-admin-mvp",
-  "version": "0.75.1",
+  "version": "0.75.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "check:docs": "tsx scripts/check-launch-checklist.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",

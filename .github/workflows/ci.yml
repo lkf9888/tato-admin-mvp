@@ -17,6 +17,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
+      - name: Launch checklist stays in sync
+        run: npm run check:docs
       - name: Type check
         run: npx tsc --noEmit
       - name: Production build

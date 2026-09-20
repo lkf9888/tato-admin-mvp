@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:24-slim
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN chmod +x ./scripts/docker-entrypoint.sh
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# node:20-slim defaults to UTC. That put two different time bases in one
+# node:24-slim defaults to UTC. That put two different time bases in one
 # database: CSV imports convert wall-clock times through
 # CSV_IMPORT_TIMEZONE (America/Vancouver), while offline orders created
 # in the admin UI go through `new Date("2026-04-22T09:00")`, which the

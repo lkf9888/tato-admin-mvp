@@ -155,6 +155,13 @@ struct CaptureView: View {
             if let trouble = model.coverage.trouble {
                 Chip(icon: "cube.transparent", text: trouble)
             }
+            // The shutter greys out for exactly two reasons, and shake is
+            // the only one that announced itself. A capture that never
+            // finishes would otherwise leave a dead button and no
+            // explanation anywhere on the screen.
+            if model.isCapturing {
+                Chip(icon: "hourglass", text: "正在保存这一张…")
+            }
             if model.torchRefused {
                 Chip(icon: "thermometer.high", text: "手电筒打不开 —— 多半是手机太热了")
             }

@@ -26,10 +26,16 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     private(set) var isTracking = false
     /// True when the device can measure the car at all.
     private(set) var canMeasure = false
-    /// True while something else holds the camera. Worth knowing because
-    /// ARKit and the photo capture session want the same back camera, and
-    /// whichever asks last gets it — an interrupted AR session is how that
-    /// contest announces itself.
+    /// Set by ARKit's interruption callback — a hint, and **only** a hint.
+    ///
+    /// ⚠️ Never read this on its own. `sessionWasInterrupted` fires when the
+    /// photo session takes the camera for a moment at launch and when the app
+    /// goes to the background, but `sessionInterruptionEnded` does *not* fire
+    /// afterwards if the session was paused and re-run rather than left to
+    /// recover by itself — which is exactly what this class does. Read alone
+    /// the flag latches true and never clears, and the app reports a conflict
+    /// that ended a second after launch, permanently, across relaunches.
+    /// `isLive` is the signal that cannot lie: see `trouble`.
     private(set) var isInterrupted = false
     /// Frames arriving from ARKit in the last second.
     ///
@@ -40,6 +46,36 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     /// it. Counting arrivals cannot be fooled that way.
     private(set) var framesPerSecond = 0
     private(set) var isLive = false
+    /// What ARKit said when it gave up, if it did.
+    ///
+    /// ⚠️ A failed session is **silent**. `sessionWasInterrupted` is for the
+    /// camera being borrowed and handed back; an outright failure — the
+    /// photo session taking the lens out from under a session that is still
+    /// starting up, say — arrives at `didFailWithError` and stops the
+    /// session for good. Not implementing that callback is how a tracker
+    /// ends up dead with nothing on screen but an absence of frames.
+    private(set) var failure: String?
+    var restarts = 0
+
+    /// True when tracking should be running and simply is not.
+    ///
+    /// ⚠️ This class cannot fix it by itself, and it used to try: re-running
+    /// the session against a camera the photo pipeline already holds fails
+    /// every time, however many times it is repeated. Recovery means
+    /// re-ordering *both* sessions, which only the owner of both can do —
+    /// see `CaptureSessionModel.recoverTracking`.
+    var needsHelp: Bool { canMeasure && hasHadTimeToStart && !isLive }
+
+    /// Starts tracking over, keeping whatever car has already been found.
+    func restart() {
+        guard let configuration else {
+            start()
+            return
+        }
+        session.pause()
+        session.run(configuration)
+        startWatchdog()
+    }
 
     private let session = ARSession()
     private var meshAnchors: [UUID: ARMeshAnchor] = [:]
@@ -85,6 +121,12 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     /// that is working from one that has silently lost the camera.
     private func startWatchdog() {
         startedAt = Date()
+        // Optimistic: whatever happened before this run is not evidence
+        // about this one. Frames arriving will confirm it; frames not
+        // arriving will contradict it within a second.
+        isInterrupted = false
+        failure = nil
+        restarts = 0
         watchdog?.cancel()
         watchdog = Task { [weak self] in
             while !Task.isCancelled {
@@ -94,6 +136,10 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
                 self.framesThisSecond = 0
                 let live = self.framesPerSecond > 0
                 if live != self.isLive { self.isLive = live }
+
+                if live {
+                    self.failure = nil
+                }
             }
         }
     }
@@ -114,19 +160,27 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
         guard canMeasure else {
             return "这台手机没有深度传感器 —— 只按张数计，不画车形图"
         }
-        if isInterrupted { return "被打断了 —— 摄像头被拍照占用" }
-        if !isLive { return hasHadTimeToStart ? "收不到空间数据（0 帧/秒）" : "正在启动…" }
-        if vehicleFrame == nil { return "正常，\(framesPerSecond) 帧/秒 —— 还没认出车" }
-        return "正常，\(framesPerSecond) 帧/秒 —— 已认出车"
+        // Frames first, every time. The interruption flag is only consulted
+        // to explain a silence, never to contradict an arriving frame.
+        if isLive {
+            return vehicleFrame == nil
+                ? "正常，\(framesPerSecond) 帧/秒 —— 还没认出车"
+                : "正常，\(framesPerSecond) 帧/秒 —— 已认出车"
+        }
+        guard hasHadTimeToStart else { return "正在启动…" }
+        let tried = restarts > 0 ? "，已重排 \(restarts) 次" : ""
+        if let failure { return "停了 —— \(failure)\(tried)" }
+        if isInterrupted { return "停了 —— 摄像头被拍照占用\(tried)" }
+        return "停了 —— 收不到空间数据（0 帧/秒）\(tried)"
     }
 
     /// Only the two states worth interrupting somebody mid-shoot for, and
     /// only once it is too late for them to be startup noise.
     var trouble: String? {
-        guard canMeasure, hasHadTimeToStart else { return nil }
-        if isInterrupted { return "车形图停了 —— 摄像头被拍照占用" }
-        if !isLive { return "车形图停了 —— 收不到空间数据" }
-        return nil
+        guard canMeasure, hasHadTimeToStart, !isLive else { return nil }
+        return isInterrupted
+            ? "车形图停了 —— 摄像头被拍照占用"
+            : "车形图停了 —— 收不到空间数据"
     }
 
     /// Picks tracking back up after the screen has been away.
@@ -261,10 +315,21 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
 
         Task { @MainActor in
             self.framesThisSecond += 1
+            // A session handing over frames is a session that holds the
+            // camera, whatever an older notification claimed.
+            if self.isInterrupted { self.isInterrupted = false }
             self.cameraPosition = position
             self.cameraForward = forward
             self.isTracking = usable
             if usable { self.attemptFit() }
+        }
+    }
+
+    nonisolated func session(_ session: ARSession, didFailWithError error: Error) {
+        let reason = (error as NSError).localizedDescription
+        Task { @MainActor in
+            self.failure = reason
+            self.isTracking = false
         }
     }
 

@@ -80,6 +80,7 @@ final class CaptureSessionModel {
     /// these. The blocks hold `self` weakly, so one that outlives the model
     /// does nothing rather than crashing.
     private var sessionObservers: [NSObjectProtocol] = []
+    private var trackingWatch: Task<Void, Never>?
 
     var progress: ShootingProgress {
         manifest?.progress() ?? ShootingProgress(coverage: 0, exteriorShots: 0, interiorShots: 0)
@@ -138,6 +139,20 @@ final class CaptureSessionModel {
 
         location.start()
         steadiness.start()
+        // A fresh budget of recovery attempts every time the screen comes
+        // back. Closing an app and opening it again is what anybody does
+        // when something looks stuck, and it should mean something.
+        coverage.restarts = 0
+
+        // ⚠️ Tracking goes first, and the asymmetry is the whole point.
+        //
+        // A tracking session already under way survives the photo session
+        // taking hold of the same back camera — measured, 60 frames a second
+        // with both live. One asked to start *against* a capture session that
+        // is already running does not: it is interrupted on the spot and
+        // never recovers, however many times it is re-run, because the lens
+        // is not available to it at all. Reversing these two lines looks
+        // tidier and silently kills the coverage diagram.
         coverage.resume()
 
         if !cameraConfigured {
@@ -156,6 +171,54 @@ final class CaptureSessionModel {
 
         await camera.start()
         if camera.session.isRunning { cameraNotice = nil }
+
+        watchTracking()
+    }
+
+    /// How long to wait before each attempt at putting tracking right.
+    ///
+    /// ⚠️ Bounded, and the bound is not timidity. Recovery makes the camera
+    /// let go and take hold again, which blinks the viewfinder — a preview
+    /// that flickers every half minute for the rest of a walk-around is a
+    /// worse app than one whose diagram is simply not filling in. Four tries
+    /// spread over half a minute, and then it stops and says so.
+    private static let recoveryDelays: [Duration] = [.seconds(4), .seconds(6), .seconds(10), .seconds(16)]
+
+    /// Waits for frames and re-sequences both sessions if none arrive.
+    ///
+    /// Nobody is asked to do this. It was briefly a button in the settings
+    /// screen, which is a confession rather than a feature: "重启车形图"
+    /// means nothing to somebody holding a phone in front of a car, and the
+    /// app knows perfectly well when it needs doing.
+    private func watchTracking() {
+        trackingWatch?.cancel()
+        guard coverage.canMeasure else { return }
+        trackingWatch = Task { [weak self] in
+            for delay in Self.recoveryDelays {
+                try? await Task.sleep(for: delay)
+                guard !Task.isCancelled, let self, self.coverage.needsHelp else { return }
+                await self.recoverTracking()
+                // A recovery that worked shows up as frames within a second.
+                try? await Task.sleep(for: .seconds(1.5))
+                guard !Task.isCancelled, self.coverage.needsHelp else { return }
+            }
+        }
+    }
+
+    /// Puts tracking back on its feet by rebuilding the order it needs.
+    ///
+    /// Re-running the AR session on its own cannot work while the photo
+    /// session holds the camera — that is what "已重启 6 次" was, six
+    /// identical failures. The camera has to let go first, tracking has to
+    /// take hold, and only then does the camera come back.
+    private func recoverTracking() async {
+        guard coverage.canMeasure else { return }
+        coverage.restarts += 1
+        await camera.stop()
+        coverage.restart()
+        // Long enough for ARKit to have the lens before it is asked to share.
+        try? await Task.sleep(for: .milliseconds(500))
+        await camera.start()
     }
 
     /// Lets go of the camera without throwing the session away. iOS takes it
@@ -166,6 +229,8 @@ final class CaptureSessionModel {
     /// app" true rather than merely intended. The flag is cleared here so
     /// the button tells the truth on the way back in.
     func sleep() async {
+        trackingWatch?.cancel()
+        trackingWatch = nil
         await camera.stop()
         isTorchOn = false
         torchRefused = false

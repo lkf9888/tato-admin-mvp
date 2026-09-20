@@ -426,6 +426,10 @@ docker compose -f docker-compose.public.yml up -d --build
 
 本仓库包含一个可用微信开发者工具打开的小程序项目：`wechat-miniprogram/`。
 
+> 从零上线的分阶段清单（注册主体、域名、模板、环境变量、初始化、发布、交接，
+> 外加 errcode 对照表）见
+> [`docs/wechat-mini-program-launch.md`](docs/wechat-mini-program-launch.md)。
+
 上线前需要在 Railway Variables 配置：
 
 ```env

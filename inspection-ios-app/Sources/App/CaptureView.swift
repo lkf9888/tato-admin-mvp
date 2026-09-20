@@ -78,16 +78,19 @@ struct CaptureView: View {
 
     private var topBar: some View {
         HStack {
+            // A lamp, not a flash. See `CaptureSessionModel.toggleTorch`
+            // for why continuous light is the faster of the two.
             Button {
-                model.flashMode = model.flashMode == .off ? .on : .off
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                Task { await model.toggleTorch() }
             } label: {
-                Image(systemName: model.flashMode == .off ? "bolt.slash.fill" : "bolt.fill")
+                Image(systemName: model.isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(model.flashMode == .off ? .white : .black)
+                    .foregroundStyle(model.isTorchOn ? .black : .white)
                     .frame(width: 32, height: 32)
-                    .background(Circle().fill(model.flashMode == .off ? Color.white.opacity(0.14) : Color.yellow))
+                    .background(Circle().fill(model.isTorchOn ? Color.yellow : Color.white.opacity(0.14)))
             }
+            .animation(.easeOut(duration: 0.15), value: model.isTorchOn)
 
             Spacer()
 
@@ -148,6 +151,9 @@ struct CaptureView: View {
             }
             if !model.steadiness.isSteady {
                 Chip(icon: "hand.raised.fill", text: "手机在晃，稳一下再拍")
+            }
+            if model.torchRefused {
+                Chip(icon: "thermometer.high", text: "手电筒打不开 —— 多半是手机太热了")
             }
             if let notice = model.cameraNotice {
                 FrozenBar(text: notice) { Task { await model.restartCamera() } }

@@ -65,7 +65,13 @@ final class CaptureSessionModel {
     /// reason is what turns "偶尔卡住" into a bug report.
     private(set) var cameraNotice: String?
 
-    var flashMode: AVCaptureDevice.FlashMode = .off
+    /// Whether the lamp is lit, as the hardware last reported it rather
+    /// than as the button last requested it.
+    private(set) var isTorchOn = false
+    /// Set when the torch was asked for and did not come on — almost always
+    /// heat. Said out loud, because a button that does nothing reads as a
+    /// broken app.
+    private(set) var torchRefused = false
 
     private let plateReader = PlateReader()
     private var cameraConfigured = false
@@ -155,8 +161,14 @@ final class CaptureSessionModel {
     /// Lets go of the camera without throwing the session away. iOS takes it
     /// back on the way to the background regardless; releasing it deliberately
     /// means the state on the way in is one we chose.
+    /// ⚠️ `camera.stop()` douses the torch as part of letting go of the
+    /// device, which is what makes "the lamp goes out when you leave the
+    /// app" true rather than merely intended. The flag is cleared here so
+    /// the button tells the truth on the way back in.
     func sleep() async {
         await camera.stop()
+        isTorchOn = false
+        torchRefused = false
         coverage.pause()
         steadiness.stop()
     }
@@ -237,6 +249,23 @@ final class CaptureSessionModel {
         }
     }
 
+    // MARK: - The lamp
+
+    /// One tap lights it and it stays lit, rather than firing per shot.
+    ///
+    /// A flash has to be metered for before every frame, which is a delay
+    /// the photographer feels on every single press — and asking for it
+    /// switches zero shutter lag off, so the frames come back softer as
+    /// well. Continuous light costs that nothing: the scene is already lit
+    /// when the shutter is pressed, and what is on screen is what will be in
+    /// the file.
+    func toggleTorch() async {
+        let wanted = !isTorchOn
+        let actual = await camera.setTorch(wanted)
+        isTorchOn = actual
+        torchRefused = wanted && !actual
+    }
+
     // MARK: - Lenses
 
     /// Switches glass, and tells the coverage tracker what the new glass can
@@ -271,7 +300,7 @@ final class CaptureSessionModel {
         )
 
         do {
-            let raw = try await camera.capturePhoto(stamp: stamp, flash: flashMode)
+            let raw = try await camera.capturePhoto(stamp: stamp)
             let finished = try MetadataFinisher.finish(captured: raw, stamp: stamp)
             let quality = try ImageQualityGate.evaluate(jpeg: finished.data)
 

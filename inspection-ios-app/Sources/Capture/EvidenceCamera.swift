@@ -104,6 +104,15 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
     /// here until the photo comes back.
     private var inFlight: [Int64: PhotoCaptureDelegate] = [:]
 
+    /// Whether the lamp is lit.
+    ///
+    /// ⚠️ The torch belongs to the *device*, not to the session, so it is
+    /// re-applied after every lens change — swapping the input drops it, and
+    /// a button that says the light is on while the car is dark is worse
+    /// than no button.
+    private(set) var isTorchOn = false
+    private var wantsTorch = false
+
     func configure() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             sessionQueue.async {
@@ -195,6 +204,46 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
         self.lens = lens
         horizontalFieldOfView = Self.screenHorizontalFieldOfView(of: camera.activeFormat)
         applyOutputPolicy(for: camera)
+        applyTorchOnQueue()
+    }
+
+    // MARK: - The lamp
+
+    /// Lights or douses the torch, and reports what actually happened.
+    ///
+    /// The hardware refuses when the phone is too hot, so the answer is read
+    /// back from the device rather than assumed from the request.
+    @discardableResult
+    func setTorch(_ on: Bool) async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            sessionQueue.async {
+                self.wantsTorch = on
+                self.applyTorchOnQueue()
+                continuation.resume(returning: self.isTorchOn)
+            }
+        }
+    }
+
+    private func applyTorchOnQueue() {
+        guard let device, device.hasTorch else {
+            isTorchOn = false
+            return
+        }
+        guard (try? device.lockForConfiguration()) != nil else {
+            isTorchOn = false
+            return
+        }
+        defer { device.unlockForConfiguration() }
+
+        if wantsTorch, device.isTorchAvailable {
+            // `setTorchModeOn(level:)` rather than `torchMode = .on`: the
+            // level form is the one that reports failure instead of quietly
+            // doing nothing.
+            try? device.setTorchModeOn(level: AVCaptureDevice.maxAvailableTorchLevel)
+        } else {
+            device.torchMode = .off
+        }
+        isTorchOn = device.torchMode == .on
     }
 
     /// ⚠️ Re-applied after every lens change, not just at startup.
@@ -263,6 +312,12 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
     func stop() async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             sessionQueue.async {
+                // Doused before the session goes down, not after: once the
+                // session stops, device configuration no longer sticks, and
+                // a torch left burning in somebody's pocket is a hot phone
+                // and a flat battery.
+                self.wantsTorch = false
+                self.applyTorchOnQueue()
                 if self.session.isRunning { self.session.stopRunning() }
                 continuation.resume()
             }
@@ -272,7 +327,7 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
     /// Takes one photograph and returns the file bytes, with `stamp`'s facts
     /// written in by AVFoundation as it flattens the photo — so the file is
     /// complete the first time and is never rewritten.
-    func capturePhoto(stamp: CaptureStamp, flash: AVCaptureDevice.FlashMode) async throws -> Data {
+    func capturePhoto(stamp: CaptureStamp) async throws -> Data {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
             sessionQueue.async {
                 guard self.device != nil else {
@@ -280,7 +335,7 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
                     return
                 }
 
-                let settings = self.makeSettings(flash: flash)
+                let settings = self.makeSettings()
                 // Captured as a plain Int64 so the closure does not hold the
                 // settings object itself across threads.
                 let uniqueID = settings.uniqueID
@@ -298,7 +353,7 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
         }
     }
 
-    private func makeSettings(flash: AVCaptureDevice.FlashMode) -> AVCapturePhotoSettings {
+    private func makeSettings() -> AVCapturePhotoSettings {
         let settings: AVCapturePhotoSettings
         if output.availablePhotoCodecTypes.contains(.jpeg) {
             settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
@@ -309,9 +364,14 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
         }
         settings.photoQualityPrioritization = .quality
         settings.maxPhotoDimensions = output.maxPhotoDimensions
-        if output.supportedFlashModes.contains(flash) {
-            settings.flashMode = flash
-        }
+        // ⚠️ Never the flash. Light comes from the torch instead, which is
+        // already on and already metered for, and the difference is not only
+        // the pre-flash delay: **asking for flash switches zero shutter lag
+        // off**, and zero shutter lag is what was removing a chunk of the
+        // motion blur the quality gate would otherwise reject. Trading it
+        // for a brighter, later frame is the wrong way round for an app
+        // whose whole problem is blurred photographs.
+        settings.flashMode = .off
         return settings
     }
 }

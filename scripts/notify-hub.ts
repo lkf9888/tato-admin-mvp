@@ -13,6 +13,7 @@
  *   npx tsx scripts/notify-hub.ts template:set --mini-program wx123 --key task \
  *       --template-id TMPL_X --fields '{"title":"thing1","due":"time2"}'
  *   npx tsx scripts/notify-hub.ts app:add --key tato --name TATO --mini-program wx123
+ *   npx tsx scripts/notify-hub.ts app:labels --app hosthub --labels '{"room":"房间"}'
  *   npx tsx scripts/notify-hub.ts key:mint --app tato --name "railway prod"
  *   npx tsx scripts/notify-hub.ts channel:add --app tato --key staff:abc --name "Zhang"
  */
@@ -20,6 +21,7 @@
 import { prisma } from "../lib/prisma";
 import { createNotifyApiKey, revokeNotifyApiKey } from "../lib/notify-hub/auth";
 import { ensureChannel } from "../lib/notify-hub/channels";
+import { assertValidFieldLabels } from "../lib/notify-hub/labels";
 
 function parseArgs(argv: string[]) {
   const args: Record<string, string> = {};
@@ -165,6 +167,18 @@ async function main() {
       return;
     }
 
+    case "app:labels": {
+      // What the mini program calls this app's fields. Merged over the
+      // shared defaults, so only the app's own vocabulary goes here.
+      const app = await resolveApp(required(args, "app"));
+      const labels = required(args, "labels");
+      assertValidFieldLabels(labels);
+      await prisma.notifyApp.update({ where: { id: app.id }, data: { fieldLabels: labels } });
+      console.log(`${app.key} field labels set: ${labels}`);
+      console.log("Takes effect on the next inbox read -- no mini program release.");
+      return;
+    }
+
     case "app:move": {
       // The whole reason NotifyApp carries a mini program id: selling
       // HostHub should be this command, not a release.
@@ -259,8 +273,8 @@ async function main() {
 
     default:
       console.log("Commands: status, mini-program:add, mini-program:set, template:set,");
-      console.log("          app:add, app:move, key:mint, key:revoke, channel:add,");
-      console.log("          channel:list, tato:sync");
+      console.log("          app:add, app:labels, app:move, key:mint, key:revoke,");
+      console.log("          channel:add, channel:list, tato:sync");
       process.exitCode = 1;
   }
 }

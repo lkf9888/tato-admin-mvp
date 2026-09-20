@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { resolveFieldLabels } from "@/lib/notify-hub/labels";
 import { authenticateSubscriber } from "@/lib/notify-hub/session";
 
 export const runtime = "nodejs";
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
       channel: { app: { miniProgramId: subscriber.miniProgramId } },
       ...(deliveryId ? { id: deliveryId } : {}),
     },
-    include: { channel: { include: { app: { select: { key: true, name: true } } } } },
+    include: { channel: { include: { app: { select: { key: true, name: true, fieldLabels: true } } } } },
     orderBy: { createdAt: "desc" },
     take: deliveryId ? 1 : MAX_ITEMS,
   });
@@ -63,11 +64,22 @@ export async function GET(request: NextRequest) {
     createdAt: delivery.createdAt.toISOString(),
   }));
 
+  // Labels ride at the response level, keyed by app, rather than on each
+  // item: one map per app beats the same map repeated fifty times, and
+  // the client already knows which app each item came from.
+  const labels: Record<string, Record<string, string>> = {};
+  for (const delivery of deliveries) {
+    const appKey = delivery.channel.app.key;
+    if (!labels[appKey]) {
+      labels[appKey] = resolveFieldLabels(delivery.channel.app.fieldLabels);
+    }
+  }
+
   if (deliveryId) {
     const item = items[0];
     if (!item) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
-    return NextResponse.json({ item });
+    return NextResponse.json({ item, labels });
   }
 
-  return NextResponse.json({ items });
+  return NextResponse.json({ items, labels });
 }

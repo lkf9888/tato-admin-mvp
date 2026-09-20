@@ -1345,6 +1345,15 @@ model NotifyApp {
   /// Stable slug used in logs and in channel keys.
   key           String  @unique
   name          String
+  /// JSON: logical field -> the label the mini program shows for it,
+  /// e.g. {"room":"房间"}. Merged over a built-in set covering the
+  /// fields every system sends.
+  ///
+  /// Here rather than in the mini program because each app owns its own
+  /// field vocabulary, and a label baked into the client would mean a
+  /// WeChat review every time a new system sends a field nobody had
+  /// named yet -- for the sake of one word.
+  fieldLabels   String  @default("{}")
   isActive      Boolean @default(true)
 
   createdAt DateTime @default(now())

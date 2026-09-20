@@ -8,25 +8,6 @@ const hub = require("../../utils/hub");
  * mean. It renders whatever fields the payload carries.
  */
 
-/**
- * Chinese labels for the field names the three systems send.
- *
- * The hub deliberately does not carry display labels -- it moves
- * values, not copy. Unknown keys fall through to the key itself, which
- * is ugly but never blank, and is the signal that a system has started
- * sending something new.
- */
-const FIELD_LABELS = {
-  title: "内容",
-  due: "时间",
-  vehicle: "车辆",
-  action: "类型",
-  details: "备注",
-  source: "来源",
-  amount: "金额",
-  location: "地点"
-};
-
 function formatTimestamp(value) {
   const date = new Date(value);
   if (isNaN(date.getTime())) return "";
@@ -34,11 +15,25 @@ function formatTimestamp(value) {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function toRows(fields) {
+/**
+ * Field labels come from the hub, per app, in the same response as the
+ * messages.
+ *
+ * They used to be a dictionary in this file, which meant a system
+ * sending a field nobody had named yet rendered as "room 302" until a
+ * new version of this client cleared WeChat review. Now naming it is a
+ * `app:labels` command against the hub and the next pull-to-refresh
+ * shows it.
+ *
+ * An unknown key still falls through to the key itself: never blank, and
+ * a visible sign that something new arrived and wants naming.
+ */
+function toRows(fields, labels) {
   if (!fields) return [];
+  var names = labels || {};
   return Object.keys(fields)
     .filter((key) => key !== "title")
-    .map((key) => ({ key, label: FIELD_LABELS[key] || key, value: fields[key] }));
+    .map((key) => ({ key, label: names[key] || key, value: fields[key] }));
 }
 
 /**
@@ -59,7 +54,7 @@ function resolveAction(appKey, link) {
   return null;
 }
 
-function decorate(item) {
+function decorate(item, allLabels) {
   const payload = item.payload || {};
   const fields = payload.fields || {};
   const link = (payload.link && payload.link.url) || (item.link && item.link.url) || "";
@@ -68,7 +63,7 @@ function decorate(item) {
     source: payload.source || item.appName,
     channel: item.channelName,
     title: fields.title || "(无标题)",
-    rows: toRows(fields),
+    rows: toRows(fields, (allLabels || {})[item.appKey]),
     link,
     action: resolveAction(item.appKey, link),
     time: formatTimestamp(item.createdAt),
@@ -119,8 +114,11 @@ Page({
       }
 
       const payload = await hub.listMessages();
+      const labels = payload.labels || {};
       this.setData({
-        items: (payload.items || []).map(decorate),
+        items: (payload.items || []).map(function (item) {
+          return decorate(item, labels);
+        }),
         loading: false
       });
     } catch (error) {

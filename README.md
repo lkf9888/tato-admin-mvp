@@ -509,6 +509,11 @@ curl -X POST https://tatocar.co/api/v1/notify \
 
 - 调用方不写模板 ID、appid 和小程序路径。`template` 是逻辑名（`task` /
   `alert` / `digest`），中枢按应用所属的小程序去查真实模板。
+- 字段的中文标签归 `NotifyApp.fieldLabels` 管，用 `app:labels` 设，小程序在读
+  收件箱时拿到。内置了一套通用的（内容/时间/车辆/类型/备注/来源/地点/金额），
+  应用自己的词汇（HostHub 的 `room`）加上去就行，也可以覆盖内置的。
+  **改标签不用重新发小程序版本**——这正是它在服务端的原因。没命名的字段显示
+  字段名本身，不会空白。
 - 字段长度由字段名推出来：`phrase4` 只收 5 个字，`thing1` 收 20 个，超了自动
   截断而不是被微信整条退回。`time2` 收 ISO 时间戳，按 `NOTIFY_TIMEZONE`
   （默认跟 `CSV_IMPORT_TIMEZONE` 走，也就是 `America/Vancouver`）渲染，
@@ -549,6 +554,7 @@ npm run notify-hub -- mini-program:add --app-id wx123 --name "Ops"
 npm run notify-hub -- template:set --mini-program wx123 --key task \
   --template-id TMPL_X --fields '{"title":"thing1","due":"time2"}'
 npm run notify-hub -- app:add --key hosthub --name HostHub --mini-program wx123
+npm run notify-hub -- app:labels --app hosthub --labels '{"room":"房间"}'
 npm run notify-hub -- key:mint --app hosthub --name "vercel prod"
 npm run notify-hub -- channel:add --app hosthub --key cleaning --name "保洁组"
 npm run notify-hub -- channel:list --app hosthub

@@ -26,6 +26,11 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     private(set) var isTracking = false
     /// True when the device can measure the car at all.
     private(set) var canMeasure = false
+    /// True while something else holds the camera. Worth knowing because
+    /// ARKit and the photo capture session want the same back camera, and
+    /// whichever asks last gets it — an interrupted AR session is how that
+    /// contest announces itself.
+    private(set) var isInterrupted = false
 
     private let session = ARSession()
     private var meshAnchors: [UUID: ARMeshAnchor] = [:]
@@ -33,6 +38,9 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     private var cameraPosition: SIMD3<Float>?
     private var cameraForward: SIMD3<Float>?
     private var lastFitAttempt = Date.distantPast
+    /// Kept so the session can be resumed without resetting tracking, which
+    /// would throw away a car that has already been found.
+    private var configuration: ARWorldTrackingConfiguration?
     /// Poses of photographs taken before the car was found, so the first
     /// successful fit can credit them rather than throwing them away.
     private var pendingPoses: [(position: SIMD3<Float>, forward: SIMD3<Float>)] = []
@@ -56,12 +64,34 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
             canMeasure = true
         }
         session.delegate = self
+        self.configuration = configuration
         session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+    }
+
+    /// Picks tracking back up after the screen has been away.
+    ///
+    /// ⚠️ Deliberately *not* `start()`: re-running with `.resetTracking`
+    /// would discard the fitted car and the painted coverage, so a
+    /// photographer who glanced at the settings sheet would come back to a
+    /// blank diagram and have to walk round again. Without the reset option
+    /// ARKit relocalises against what it already knows.
+    func resume() {
+        guard let configuration else {
+            start()
+            return
+        }
+        session.run(configuration)
+    }
+
+    func pause() {
+        session.pause()
+        isTracking = false
     }
 
     func stop() {
         session.pause()
         isTracking = false
+        configuration = nil
     }
 
     /// Restores a coverage map from a session being resumed.
@@ -169,6 +199,17 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
             self.isTracking = usable
             if usable { self.attemptFit() }
         }
+    }
+
+    nonisolated func sessionWasInterrupted(_ session: ARSession) {
+        Task { @MainActor in
+            self.isInterrupted = true
+            self.isTracking = false
+        }
+    }
+
+    nonisolated func sessionInterruptionEnded(_ session: ARSession) {
+        Task { @MainActor in self.isInterrupted = false }
     }
 
     nonisolated func session(_ session: ARSession, didAdd anchors: [ARAnchor]) { absorb(anchors) }

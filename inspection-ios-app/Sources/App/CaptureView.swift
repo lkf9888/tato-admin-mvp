@@ -15,6 +15,7 @@ import SwiftUI
 /// square in the corner is the last shot. Borrowing that layout means the
 /// only thing left to learn is the diagram — and the diagram is the app.
 struct CaptureView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model = CaptureSessionModel()
     @State private var showingFinish = false
     @State private var showingSettings = false
@@ -43,7 +44,19 @@ struct CaptureView: View {
         }
         .preferredColorScheme(.dark)
         .task { await model.begin() }
-        .onDisappear { Task { await model.end() } }
+        // ⚠️ `sleep()`, not `end()`. Tearing the session down here and
+        // guarding the rebuild behind "have we started before?" is what left
+        // the viewfinder frozen on a stale frame after any trip away from
+        // this screen. Letting go of the camera is fine; not picking it back
+        // up is the bug.
+        .onDisappear { Task { await model.sleep() } }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active: Task { await model.wake() }
+            case .background: Task { await model.sleep() }
+            default: break
+            }
+        }
         .onChange(of: model.outcome) { _, outcome in respond(to: outcome) }
         .sheet(isPresented: $showingFinish) {
             FinishView(model: model)
@@ -136,6 +149,9 @@ struct CaptureView: View {
             if !model.steadiness.isSteady {
                 Chip(icon: "hand.raised.fill", text: "手机在晃，稳一下再拍")
             }
+            if let notice = model.cameraNotice {
+                FrozenBar(text: notice) { Task { await model.restartCamera() } }
+            }
 
             if hasNotice {
                 notice
@@ -198,13 +214,21 @@ struct CaptureView: View {
 
     // MARK: - Bottom: last shot, shutter, and the way out
 
+    /// The shutter is centred by construction, not by balancing what sits
+    /// beside it.
+    ///
+    /// ⚠️ It used to be an `HStack` of three items with the side two pinned
+    /// to 60pt each. That looks symmetrical and is not: the trailing item is
+    /// `if progress.canFinish { ... }`, and until the floors are met that is
+    /// an empty view, which SwiftUI gives no width at all. 60pt on the left
+    /// against nothing on the right put the shutter 30pt right of centre for
+    /// the whole of every session — which is to say, for the entire time
+    /// anybody is actually shooting.
+    ///
+    /// Laying the side controls *over* a centred shutter means nothing about
+    /// them can move it, whatever they contain or fail to contain.
     private var shutterRow: some View {
-        HStack {
-            thumbnail
-                .frame(width: 60, alignment: .leading)
-
-            Spacer()
-
+        ZStack {
             Button(action: fire) {
                 ZStack {
                     Circle()
@@ -222,12 +246,12 @@ struct CaptureView: View {
             .animation(.easeOut(duration: 0.12), value: canShoot)
             .animation(.easeOut(duration: 0.12), value: model.isCapturing)
 
-            Spacer()
-
-            // Appears only once the floors are met. Before that there is
-            // nothing to press, which is the least ambiguous way to say
-            // "keep going".
-            Group {
+            HStack {
+                thumbnail
+                Spacer(minLength: 90)
+                // Appears only once the floors are met. Before that there is
+                // nothing to press, which is the least ambiguous way to say
+                // "keep going".
                 if model.progress.canFinish {
                     Button("完成") { showingFinish = true }
                         .font(.system(size: 15, weight: .semibold))
@@ -235,10 +259,11 @@ struct CaptureView: View {
                         .padding(.horizontal, 15)
                         .padding(.vertical, 9)
                         .background(Capsule().fill(.white))
+                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
             }
-            .frame(width: 60, alignment: .trailing)
         }
+        .frame(height: 74)
         .padding(.horizontal, 24)
         .padding(.vertical, 22)
         .animation(.easeOut(duration: 0.25), value: model.progress.canFinish)
@@ -393,6 +418,37 @@ private struct FocusSquare: View {
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) { scale = 1 }
                 withAnimation(.easeOut(duration: 0.15)) { opacity = 1 }
             }
+    }
+}
+
+/// Shown when the viewfinder has stopped being a viewfinder.
+///
+/// A frozen preview looks exactly like a working camera pointed at something
+/// still, so it has to say so — and it has to offer the fix, because the
+/// alternative is somebody photographing a car with a picture of that car
+/// from thirty seconds ago.
+private struct FrozenBar: View {
+    let text: String
+    let restart: () -> Void
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "video.slash.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.red)
+            Text(text)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+            Button("重启相机", action: restart)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Capsule().fill(.white))
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 9)
+        .background(Capsule().fill(.black.opacity(0.75)))
     }
 }
 

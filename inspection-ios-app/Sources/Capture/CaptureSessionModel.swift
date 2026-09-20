@@ -57,9 +57,23 @@ final class CaptureSessionModel {
     /// needs that the shutter did something.
     private(set) var lastThumbnail: UIImage?
 
+    /// Why the viewfinder is frozen, when it is.
+    ///
+    /// A capture session that has been interrupted stays frozen on its last
+    /// frame and says nothing, which is indistinguishable from a camera that
+    /// is working and pointed at something that is not moving. Naming the
+    /// reason is what turns "偶尔卡住" into a bug report.
+    private(set) var cameraNotice: String?
+
     var flashMode: AVCaptureDevice.FlashMode = .off
 
     private let plateReader = PlateReader()
+    private var cameraConfigured = false
+    /// Torn down in `end()` rather than in `deinit`: a `deinit` on a
+    /// `@MainActor` type runs outside that isolation and may not touch
+    /// these. The blocks hold `self` weakly, so one that outlives the model
+    /// does nothing rather than crashing.
+    private var sessionObservers: [NSObjectProtocol] = []
 
     var progress: ShootingProgress {
         manifest?.progress() ?? ShootingProgress(coverage: 0, exteriorShots: 0, interiorShots: 0)
@@ -74,8 +88,18 @@ final class CaptureSessionModel {
 
     // MARK: - Lifecycle
 
+    /// ⚠️ Called every time the camera screen appears, not only the first
+    /// time. It used to return early whenever an archive already existed,
+    /// while `end()` stopped the capture session — so a single
+    /// disappear-and-return left the viewfinder frozen on its last frame
+    /// with nothing ever restarting it. The archive is created once; the
+    /// camera is brought back every time.
     func begin() async {
-        guard archive == nil else { return }
+        if archive == nil { await openArchive() }
+        await wake()
+    }
+
+    private func openArchive() async {
         do {
             let parent = try ArchiveIndex.sessionsDirectory()
             // Named later. An empty label here is honest: nobody has said
@@ -94,25 +118,123 @@ final class CaptureSessionModel {
             let archive = try SessionArchive(parent: parent, manifest: manifest)
             self.archive = archive
             self.manifest = manifest
-
-            location.start()
-            steadiness.start()
-            coverage.start()
-            try await camera.configure()
-            lenses = camera.availableLenses
-            lens = camera.lens
-            coverage.fieldOfViewDegrees = camera.horizontalFieldOfView
-            await camera.start()
         } catch {
             startupError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
-    func end() async {
+    /// Brings everything back: on launch, on returning from the background,
+    /// and after the camera screen has been away behind something else.
+    ///
+    /// Safe to call when already awake — each piece checks for itself.
+    func wake() async {
+        guard archive != nil, startupError == nil else { return }
+
+        location.start()
+        steadiness.start()
+        coverage.resume()
+
+        if !cameraConfigured {
+            do {
+                try await camera.configure()
+                lenses = camera.availableLenses
+                lens = camera.lens
+                coverage.fieldOfViewDegrees = camera.horizontalFieldOfView
+                cameraConfigured = true
+                watchCaptureSession()
+            } catch {
+                startupError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                return
+            }
+        }
+
+        await camera.start()
+        if camera.session.isRunning { cameraNotice = nil }
+    }
+
+    /// Lets go of the camera without throwing the session away. iOS takes it
+    /// back on the way to the background regardless; releasing it deliberately
+    /// means the state on the way in is one we chose.
+    func sleep() async {
         await camera.stop()
-        location.stop()
+        coverage.pause()
         steadiness.stop()
+    }
+
+    func end() async {
+        await sleep()
+        location.stop()
         coverage.stop()
+        for observer in sessionObservers { NotificationCenter.default.removeObserver(observer) }
+        sessionObservers = []
+    }
+
+    /// What the photographer presses when the picture has stopped moving.
+    func restartCamera() async {
+        cameraNotice = nil
+        await camera.stop()
+        await camera.start()
+        if !camera.session.isRunning {
+            cameraNotice = "相机没能重新启动 —— 退出 App 重进一次"
+        }
+    }
+
+    // MARK: - When something else takes the camera
+
+    /// A capture session is interrupted by things this app does not control:
+    /// a phone call, Split View, the phone getting too hot, or another
+    /// session in this very process asking for the same lens. None of them
+    /// produce an error — the frames simply stop.
+    private func watchCaptureSession() {
+        let centre = NotificationCenter.default
+        let session = camera.session
+
+        sessionObservers = [
+            centre.addObserver(
+                forName: AVCaptureSession.wasInterruptedNotification,
+                object: session,
+                queue: .main
+            ) { note in
+                // Only a plain Int crosses into the Task: a Notification is
+                // not Sendable and has no business on another actor.
+                let raw = note.userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int
+                Task { @MainActor [weak self] in self?.noteInterruption(raw) }
+            },
+            centre.addObserver(
+                forName: AVCaptureSession.interruptionEndedNotification,
+                object: session,
+                queue: .main
+            ) { _ in
+                Task { @MainActor [weak self] in await self?.restartCamera() }
+            },
+            centre.addObserver(
+                forName: AVCaptureSession.runtimeErrorNotification,
+                object: session,
+                queue: .main
+            ) { _ in
+                Task { @MainActor [weak self] in await self?.restartCamera() }
+            },
+        ]
+    }
+
+    private func noteInterruption(_ rawReason: Int?) {
+        let reason = rawReason.flatMap(AVCaptureSession.InterruptionReason.init(rawValue:))
+        switch reason {
+        case .videoDeviceInUseByAnotherClient:
+            // The one worth spelling out. Inside this app the other client
+            // would be ARKit, which wants the same back camera for the
+            // coverage diagram -- see the note in DEVICE-CHECKLIST §B0.
+            cameraNotice = "摄像头被别的东西占用了"
+        case .videoDeviceNotAvailableWithMultipleForegroundApps:
+            cameraNotice = "分屏状态下相机不可用"
+        case .videoDeviceNotAvailableDueToSystemPressure:
+            cameraNotice = "手机过热，相机被系统收走了"
+        case .videoDeviceNotAvailableInBackground:
+            // Ordinary and self-correcting: the app went away and came back.
+            cameraNotice = nil
+        default:
+            cameraNotice = "画面停住了"
+        }
     }
 
     // MARK: - Lenses

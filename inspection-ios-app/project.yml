@@ -1,0 +1,56 @@
+name: TatoEvidence
+options:
+  bundleIdPrefix: co.tatocar
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+packages:
+  EvidenceCore:
+    path: EvidenceCore
+
+targets:
+  TatoEvidence:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    dependencies:
+      - package: EvidenceCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.tatocar.evidence
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        # iPhone only. Every device in the fleet is an iPhone 14 or newer,
+        # and a guided walk-around is not a thing anyone does on an iPad.
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: TATO Evidence
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        ITSAppUsesNonExemptEncryption: false
+        # Written for the App Store reviewer as much as for staff: the reason
+        # this app wants a location is that a claim photo without one is
+        # rejected unread.
+        NSCameraUsageDescription: >-
+          Photographs of the vehicle's condition are taken with the camera.
+        NSLocationWhenInUseUsageDescription: >-
+          Each photo records where it was taken. Insurance claims reject
+          photographs whose metadata has no location.
+        NSMotionUsageDescription: >-
+          Motion sensors detect camera shake, so you are asked to retake a
+          photo before it is too blurred to prove anything.
+        # Claims are filed from the Turo app, whose picker reads the photo
+        # library and nothing else, so the finished photographs have to be
+        # copied there. Read access is what lets the app check that the
+        # library handed them back unaltered.
+        NSPhotoLibraryAddUsageDescription: >-
+          Finished vehicle photos are copied into an album so you can attach
+          them to a claim from the Turo app.
+        NSPhotoLibraryUsageDescription: >-
+          Photos are read back after saving to confirm the system did not
+          re-encode them, which would invalidate them as evidence.

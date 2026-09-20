@@ -131,6 +131,19 @@ export function makeStaffTaskAttachmentPath(taskId: string, filename: string) {
   return path.posix.join("staff-tasks", taskId, `${stamp}${ext}`);
 }
 
+/**
+ * Where one vehicle-condition photograph lives.
+ *
+ * Built from the slot and the attempt rather than from the uploaded filename:
+ * the path is then deterministic, matches the row's unique key, and carries no
+ * client-chosen component beyond a sanitized slot id.
+ */
+export function makeInspectionShotPath(sessionId: string, slotId: string, attempt: number) {
+  const safeSlot = sanitizeFilename(slotId).replace(/\.+/g, "-") || "shot";
+  const safeAttempt = Math.max(1, Math.floor(attempt));
+  return path.posix.join("inspections", sessionId, `${safeSlot}-${safeAttempt}.jpg`);
+}
+
 export function makeDirectBookingDocumentPath(draftId: string, kind: string, filename: string) {
   const ext = extensionFromFilename(filename);
   const safeKind = sanitizeFilename(kind).replace(/\.+/g, "-") || "document";

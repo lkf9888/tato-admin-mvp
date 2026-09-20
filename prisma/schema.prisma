@@ -194,6 +194,8 @@ model Workspace {
   assistantThreads              AssistantThread[]
   assistantAlerts               AssistantAlert[]
   messageTemplates              MessageTemplate[]
+  inspectionSessions            InspectionSession[]
+  inspectionShots               InspectionShot[]
 }
 
 model User {
@@ -286,6 +288,7 @@ model Vehicle {
   ownerLedgerItems       OwnerLedgerItem[]
   attachments            OrderAttachment[]
   staffTasks             StaffTask[]
+  inspectionSessions     InspectionSession[]
   directBookingDocuments DirectBookingDocument[]
   cleaningFeeRules       VehicleCleaningFeeRule[]
   messageTemplates       MessageTemplate[]
@@ -329,6 +332,7 @@ model Order {
   directBookingDocuments DirectBookingDocument[]
   contractEnvelopes      ContractEnvelope[]
   inboundEmails          InboundEmail[]
+  inspectionSessions InspectionSession[]
 
   @@index([workspaceId])
   @@index([workspaceId, isArchived])
@@ -607,6 +611,7 @@ model StaffMember {
   updatedAt                 DateTime    @updatedAt
   workspace                 Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks                     StaffTask[]
+  inspectionSessions        InspectionSession[]
 
   @@index([workspaceId, isActive])
   @@index([workspaceId, isActive, sortOrder])
@@ -1259,4 +1264,127 @@ model MessageTemplate {
 
   @@index([workspaceId, createdAt])
   @@index([vehicleId])
+}
+
+/// A staff member's walk around one car, at one end of one trip.
+///
+/// The photographs themselves are the evidence; this is the index that makes
+/// them findable and the record of what the server made of them when they
+/// arrived. Turo rejects claim photos whose metadata lacks date, time or
+/// geolocation -- and rejected this fleet's once -- so every shot carries the
+/// server's own reading of those fields, taken from the bytes rather than
+/// from what the phone claimed.
+model InspectionSession {
+  workspaceId String?
+  id          String  @id @default(cuid())
+  /// The id the phone generated for its local archive. Uploads are idempotent
+  /// on this: a retry after a dropped connection resumes the same session
+  /// instead of starting a second one halfway through a walk-around.
+  clientSessionId String @unique
+  vehicleId    String?
+  orderId      String?
+  /// What the photographer typed. Kept even when `vehicleId` resolves, because
+  /// it is what they saw on the plate at the time.
+  vehicleLabel String
+  staffId      String?
+  staffLabel   String
+  kind         InspectionKind
+  deviceModel  String
+  appVersion   String
+  startedAt    DateTime
+  /// IANA zone the phone was in, so a local capture time can be placed.
+  timeZone     String
+  /// JSON array of the slot ids this walk-around is supposed to produce, sent
+  /// by the phone when the session opens.
+  ///
+  /// Stored so the server can decide completeness itself rather than taking
+  /// the phone's word for it -- and so a shot list that changes between app
+  /// versions does not silently reclassify old sessions as incomplete.
+  expectedSlotIds Json
+  /// Set only once the shot list is complete. An incomplete session is not
+  /// evidence of anything and must not read as one.
+  completedAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace?       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  vehicle   Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  order     Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  staff     StaffMember?     @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  shots     InspectionShot[]
+
+  @@index([workspaceId, startedAt])
+  @@index([vehicleId, startedAt])
+  @@index([orderId])
+  @@index([completedAt])
+}
+
+enum InspectionKind {
+  checkout
+  checkin
+}
+
+/// One photograph, and what the server independently found in it.
+model InspectionShot {
+  workspaceId String?
+  id          String  @id @default(cuid())
+  sessionId   String
+  slotId      String
+  /// 1 for the first go. Rejected attempts are kept: "this slot took four
+  /// tries" is the signal that says who needs retraining.
+  attempt     Int     @default(1)
+  /// Whether this is the attempt that counts for the slot.
+  accepted    Boolean @default(true)
+  pathname    String
+  filename    String
+  byteCount   Int
+  /// Computed here, over the bytes that actually arrived -- never copied from
+  /// the request. An archive whose digests came from the uploader would prove
+  /// nothing.
+  sha256      String
+
+  // --- What the server read out of the file ---------------------------------
+  capturedAt       DateTime?
+  /// The local timestamp exactly as written, e.g. `2026:09:09 17:26:40`.
+  localCaptureTime String?
+  utcOffset        String?
+  latitude         Float?
+  longitude        Float?
+  cameraMake       String?
+  cameraModel      String?
+  /// JSON array of what an insurer would find missing, e.g. `["noLocation"]`.
+  /// Empty is the only state that survives a claim unread.
+  evidenceGaps     Json
+  /// The phone's clock minus the server's at upload, in seconds. A phone clock
+  /// is user-settable, so EXIF times are only as good as the device that wrote
+  /// them; this is the one cross-check the server can make alone.
+  clockSkewSeconds Int?
+  receivedAt       DateTime @default(now())
+
+  // --- What the phone reported ----------------------------------------------
+  //
+  // Kept beside the server's own reading rather than instead of it. Where the
+  // two disagree, the server's wins and the disagreement is itself worth
+  // seeing.
+  reportedSharpness Float?
+  /// JSON array of quality problems the app detected, e.g. `["blurry"]`.
+  reportedIssues    Json
+  /// JSON array of problems a person waved through, with their name on it.
+  acceptedDespite   Json
+  /// Whether the photographer stood in the planned position. Null where
+  /// position tracking could not answer -- an interior shot, or tracking lost.
+  stationVerified   Boolean?
+  /// `writtenAtCapture` or `stampedAfterCapture`; which writer put the
+  /// metadata in. Per shot, because the answer is decided on the device.
+  metadataPath      String
+
+  createdAt DateTime @default(now())
+
+  session   InspectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  workspace Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, slotId, attempt])
+  @@index([workspaceId])
+  @@index([sessionId, accepted])
+  @@index([sha256])
 }

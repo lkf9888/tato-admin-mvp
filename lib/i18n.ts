@@ -27,6 +27,7 @@ import { dashboardMessages } from "@/lib/i18n/messages/dashboard";
 import { directBookingMessages } from "@/lib/i18n/messages/direct-booking";
 import { fleetMessages } from "@/lib/i18n/messages/fleet";
 import { importsMessages } from "@/lib/i18n/messages/imports";
+import { inspectionsMessages } from "@/lib/i18n/messages/inspections";
 import { investmentRankingMessages } from "@/lib/i18n/messages/investment-ranking";
 import { ordersMessages } from "@/lib/i18n/messages/orders";
 import { rentalEstimateMessages } from "@/lib/i18n/messages/rental-estimate";
@@ -307,6 +308,7 @@ export function getCsvFieldOptions(locale: Locale) {
 const messages = {
   en: {
     ...shellMessages.en,
+    ...inspectionsMessages.en,
     ...accountSettingsMessages.en,
     ...contactMessages.en,
     ...assistantMessages.en,
@@ -327,6 +329,7 @@ const messages = {
   },
   zh: {
     ...shellMessages.zh,
+    ...inspectionsMessages.zh,
     ...accountSettingsMessages.zh,
     ...contactMessages.zh,
     ...assistantMessages.zh,

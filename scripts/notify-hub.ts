@@ -9,6 +9,7 @@
  *
  *   npx tsx scripts/notify-hub.ts status
  *   npx tsx scripts/notify-hub.ts mini-program:add --app-id wx123 --name "Ops"
+ *   npx tsx scripts/notify-hub.ts mini-program:set --app-id wx123 --state formal
  *   npx tsx scripts/notify-hub.ts template:set --mini-program wx123 --key task \
  *       --template-id TMPL_X --fields '{"title":"thing1","due":"time2"}'
  *   npx tsx scripts/notify-hub.ts app:add --key tato --name TATO --mini-program wx123
@@ -109,6 +110,24 @@ async function main() {
       });
       console.log(`Mini program ${record.appId} added.`);
       console.log(`Set ${record.secretEnvVar} in the environment before sending.`);
+      return;
+    }
+
+    case "mini-program:set": {
+      // `miniprogram_state` used to be an environment variable. It is a
+      // column now, which is why this exists: a mini program goes from
+      // trial to formal on the day it is approved, and that day should
+      // not need a redeploy.
+      const miniProgram = await resolveMiniProgram(required(args, "app-id"));
+      const state = required(args, "state");
+      if (!["formal", "trial", "developer"].includes(state)) {
+        throw new Error(`--state must be formal | trial | developer, got ${state}`);
+      }
+      await prisma.notifyMiniProgram.update({
+        where: { id: miniProgram.id },
+        data: { state },
+      });
+      console.log(`${miniProgram.appId} now sends with miniprogram_state=${state}.`);
       return;
     }
 
@@ -239,8 +258,9 @@ async function main() {
     }
 
     default:
-      console.log("Commands: status, mini-program:add, template:set, app:add, app:move,");
-      console.log("          key:mint, key:revoke, channel:add, channel:list, tato:sync");
+      console.log("Commands: status, mini-program:add, mini-program:set, template:set,");
+      console.log("          app:add, app:move, key:mint, key:revoke, channel:add,");
+      console.log("          channel:list, tato:sync");
       process.exitCode = 1;
   }
 }

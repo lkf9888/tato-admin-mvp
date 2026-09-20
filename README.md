@@ -436,8 +436,11 @@ docker compose -f docker-compose.public.yml up -d --build
 WECHAT_MINIPROGRAM_APP_ID=wx_xxx
 WECHAT_MINIPROGRAM_APP_SECRET=xxx
 WECHAT_TASK_TEMPLATE_ID=xxx
-WECHAT_MINIPROGRAM_STATE=formal
 ```
+
+`WECHAT_MINIPROGRAM_STATE` 曾经在这里，现在没有代码读它了：`miniprogram_state`
+是 `NotifyMiniProgram` 的一列，用
+`npm run notify-hub -- mini-program:set --app-id wx... --state trial` 改。
 
 微信公众平台里还需要设置：
 

@@ -171,8 +171,19 @@
       和阶段 1 配的 request 合法域名一致
 - [ ] 真机走一遍完整流程 —— 模拟器发不出订阅消息。顺序： <!-- id:s5c -->
       打开小程序 → 输绑定码 → 授权提醒 → 让 admin 派个任务 → 微信里收到
-- [ ] 上传、提审、发布 —— 发布后 `WECHAT_MINIPROGRAM_STATE` 用 `formal`（默认值）； <!-- id:s5d -->
-      还在体验版阶段要改成 `trial`，否则消息发不到
+- [ ] 上传、提审、发布 <!-- id:s5d -->
+- [ ] 把发送状态切到对的档位 <!-- id:s5e -->
+
+      `miniprogram_state` 决定消息能发到哪种版本的小程序。审核通过前是体验版，
+      要设 `trial`，否则消息发不到；发布之后切回 `formal`。
+
+      ```bash
+      npm run notify-hub -- mini-program:set \
+        --app-id wx1a2b3c4d5e6f7890 --state trial
+      ```
+
+      **这不是环境变量。** 以前是 `WECHAT_MINIPROGRAM_STATE`，现在是
+      `NotifyMiniProgram` 上的一列，没有代码再读那个变量了——设了不生效。
 
 ## 6 · 交给员工
 

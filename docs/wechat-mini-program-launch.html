@@ -746,7 +746,19 @@ WECHAT_TASK_TEMPLATE_ID=<span class="c">// 老任务页还在用</span></code></
         <div>
           <label class="step-title" for="s5d">上传、提审、发布</label>
           <div class="step-body">
-            <p>审核前把体验版跑通。发布之后 <code>WECHAT_MINIPROGRAM_STATE</code> 用 <code>formal</code>（默认值）；还在体验版阶段要改成 <code>trial</code>，否则消息发不到。</p>
+            <p>审核前先把体验版跑通。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s5e">
+        <input type="checkbox" id="s5e">
+        <div>
+          <label class="step-title" for="s5e">把发送状态切到对的档位</label>
+          <div class="step-body">
+            <p><code>miniprogram_state</code> 决定消息能发到哪种版本的小程序。审核通过前是体验版，要设 <code>trial</code>，否则消息发不到；发布之后切回 <code>formal</code>。</p>
+            <pre><code>npm run notify-hub -- mini-program:set \
+  --app-id wx1a2b3c4d5e6f7890 --state trial</code></pre>
+            <p><strong>这不是环境变量。</strong>以前是 <code>WECHAT_MINIPROGRAM_STATE</code>，现在是 <code>NotifyMiniProgram</code> 上的一列，没有代码再读那个变量了——设了不生效。</p>
           </div>
         </div>
       </div>

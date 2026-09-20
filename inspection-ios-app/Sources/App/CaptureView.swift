@@ -207,15 +207,19 @@ struct CaptureView: View {
 
             Button(action: fire) {
                 ZStack {
-                    Circle().stroke(.white, lineWidth: 3.5).frame(width: 74, height: 74)
-                    Circle().fill(.white)
+                    Circle()
+                        .stroke(canShoot ? Color.white : Self.shutterDark, lineWidth: 3.5)
+                        .frame(width: 74, height: 74)
+                    Circle()
+                        .fill(canShoot ? Color.white : Self.shutterDark)
                         .frame(width: 62, height: 62)
                         .scaleEffect(model.isCapturing ? 0.86 : 1)
                         .opacity(model.isCapturing ? 0.6 : 1)
                 }
             }
             .buttonStyle(.plain)
-            .disabled(model.isCapturing)
+            .disabled(!canShoot)
+            .animation(.easeOut(duration: 0.12), value: canShoot)
             .animation(.easeOut(duration: 0.12), value: model.isCapturing)
 
             Spacer()
@@ -239,6 +243,20 @@ struct CaptureView: View {
         .padding(.vertical, 22)
         .animation(.easeOut(duration: 0.25), value: model.progress.canFinish)
     }
+
+    /// Grey, and not pressable, while the phone is moving enough to blur.
+    ///
+    /// Stopping the shot here costs nothing; stopping it afterwards costs a
+    /// retake, and a retake costs photographs. What makes this safe to do at
+    /// all is how quickly it lets go again — see `SteadinessGate`, which is
+    /// built to be reluctant to close and eager to open, and has a test
+    /// holding it to a 200ms recovery. A shutter that hesitates is worse
+    /// than one that occasionally passes a soft frame to the quality gate.
+    private var canShoot: Bool { model.steadiness.isSteady && !model.isCapturing }
+
+    /// Grey rather than a dimmed white: dimming reads as "the screen is
+    /// asleep", grey reads as "this button is off".
+    private static let shutterDark = Color(white: 0.4)
 
     private var thumbnail: some View {
         Group {
@@ -306,7 +324,7 @@ struct CaptureView: View {
     // MARK: - Actions
 
     private func fire() {
-        guard !model.isCapturing else { return }
+        guard canShoot else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         shutterBlink = true
         Task {

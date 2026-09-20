@@ -186,19 +186,37 @@ export async function findCounterpart(session: {
   });
 }
 
-export type ShotFlag = "missingMetadata" | "offStation" | "qualityOverridden" | "suspectClock";
+export type ShotFlag = "missingMetadata" | "qualityOverridden" | "suspectClock";
 
 /** What is worth saying about a photograph when somebody is looking at it. */
 export function shotFlags(shot: {
   evidenceGaps: unknown;
-  stationVerified: boolean | null;
   acceptedDespite: unknown;
   clockSkewSeconds: number | null;
 }): ShotFlag[] {
   const flags: ShotFlag[] = [];
   if (((shot.evidenceGaps as EvidenceGap[]) ?? []).length > 0) flags.push("missingMetadata");
-  if (shot.stationVerified === false) flags.push("offStation");
   if (((shot.acceptedDespite as string[]) ?? []).length > 0) flags.push("qualityOverridden");
   if (clockIsSuspect(shot.clockSkewSeconds)) flags.push("suspectClock");
   return flags;
+}
+
+/**
+ * The sharpest accepted photograph of each part of the car.
+ *
+ * A free-form walk-around produces several photographs of the same corner,
+ * which is exactly what it should produce — more photographs make a claim more
+ * likely to succeed. But a side-by-side comparison needs one per side, and
+ * "sharpest" is the only ordering that needs no human judgement.
+ */
+export function sharpestByRegion<T extends { region: string; reportedSharpness: number | null }>(
+  shots: T[],
+): Map<string, T> {
+  const best = new Map<string, T>();
+  for (const shot of shots) {
+    const current = best.get(shot.region);
+    if (current && (current.reportedSharpness ?? 0) >= (shot.reportedSharpness ?? 0)) continue;
+    best.set(shot.region, shot);
+  }
+  return best;
 }

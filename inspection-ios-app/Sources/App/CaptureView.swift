@@ -2,13 +2,16 @@ import AVFoundation
 import EvidenceCore
 import SwiftUI
 
+/// The app.
+///
+/// Not *a screen in* the app — the app. It opens straight into the camera
+/// with a session already running, and everything else is either an overlay on
+/// this or a sheet that appears once the work is done. Nobody is asked
+/// anything before they can take a photograph.
 struct CaptureView: View {
-    let vehicleLabel: String
-    let staffLabel: String
-    let kind: SessionKind
-
     @State private var model = CaptureSessionModel()
-    @Environment(\.dismiss) private var dismiss
+    @State private var showingFinish = false
+    @State private var showingSettings = false
 
     var body: some View {
         ZStack {
@@ -16,68 +19,89 @@ struct CaptureView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                header
-                CoverageStrip(model: model).padding(.top, 12)
+                topBar
                 Spacer()
                 warnings
                 controls
             }
         }
-        .task {
-            await model.begin(vehicleLabel: vehicleLabel, staffLabel: staffLabel, kind: kind)
-        }
+        .task { await model.begin() }
         .onDisappear { Task { await model.end() } }
-        // `sheet(item:)` rather than a constant binding, so SwiftUI and the
-        // model cannot end up disagreeing about whether the sheet is up.
         .sheet(item: Binding(get: { model.outcome }, set: { if $0 == nil { model.dismissOutcome() } })) { outcome in
             OutcomeSheet(model: model, outcome: outcome)
-                .presentationDetents([.height(280)])
-                .presentationDragIndicator(.hidden)
+                .presentationDetents([.height(260)])
                 .interactiveDismissDisabled()
+        }
+        .sheet(isPresented: $showingFinish) {
+            FinishView(model: model)
+        }
+        .sheet(isPresented: $showingSettings) {
+            NavigationStack { SettingsView() }
         }
         .alert(
             "相机打不开",
             isPresented: Binding(get: { model.startupError != nil }, set: { if !$0 { model.clearStartupError() } })
         ) {
-            Button("返回") { dismiss() }
+            Button("好") {}
         } message: {
             Text(model.startupError ?? "")
         }
     }
 
-    private var header: some View {
-        VStack(spacing: 6) {
-            Text(model.currentSlot.titleZH)
-                .font(.title2.bold())
-            Text(model.currentSlot.guidanceZH)
-                .font(.subheadline)
-                .multilineTextAlignment(.center)
-            Text("\(model.completedCount) / \(model.plan.count)")
+    // MARK: - Top: the car, and the one instruction
+
+    private var topBar: some View {
+        HStack(alignment: .top, spacing: 14) {
+            if model.coverage.canMeasure {
+                CoverageDiagram(coverage: model.coverage.coverage, isLive: model.coverage.hasFrame)
+                    .frame(width: 58, height: 92)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(model.progress.instruction)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 10) {
+                    Text("已拍 \(model.progress.totalShots) 张")
+                    if model.coverage.canMeasure && model.coverage.hasFrame {
+                        Text("覆盖 \(Int(model.progress.coverage * 100))%")
+                    }
+                }
                 .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.75))
+            }
+
+            Spacer(minLength: 0)
+
+            Button { showingSettings = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .frame(width: 40, height: 40)
+            }
         }
-        .foregroundStyle(.white)
-        .padding()
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .background(.black.opacity(0.45))
     }
 
-    /// Both of these are worth saying *before* the shutter, while the person
-    /// is still standing in the right place.
+    // MARK: - Things worth saying before the shutter
+
     @ViewBuilder private var warnings: some View {
         VStack(spacing: 8) {
             if !model.location.isReady {
-                WarningChip(
-                    icon: "location.slash",
-                    text: "定位未就绪 —— 没有位置信息的照片 Turo 会判无效"
-                )
+                Chip(icon: "location.slash", text: "定位未就绪 —— 没有位置信息的照片 Turo 会判无效")
             }
             if !model.steadiness.isSteady {
-                WarningChip(icon: "hand.raised", text: "手机在晃，稳一下再拍")
+                Chip(icon: "hand.raised", text: "手机在晃，稳一下再拍")
             }
         }
         .padding(.bottom, 12)
     }
+
+    // MARK: - Bottom: a shutter, and nothing else until it is earned
 
     private var controls: some View {
         HStack {
@@ -86,7 +110,7 @@ struct CaptureView: View {
             } label: {
                 Image(systemName: model.flashMode == .off ? "bolt.slash" : "bolt.fill")
                     .font(.title2)
-                    .frame(width: 56, height: 56)
+                    .frame(width: 60, height: 60)
             }
 
             Spacer()
@@ -96,28 +120,38 @@ struct CaptureView: View {
             } label: {
                 Circle()
                     .strokeBorder(.white, lineWidth: 4)
-                    .frame(width: 76, height: 76)
-                    .overlay(Circle().fill(.white).frame(width: 62, height: 62))
+                    .frame(width: 78, height: 78)
+                    .overlay(Circle().fill(.white).frame(width: 64, height: 64))
                     .opacity(model.isCapturing ? 0.4 : 1)
             }
             .disabled(model.isCapturing)
 
             Spacer()
 
-            NavigationLink {
-                SummaryView(model: model)
-            } label: {
-                Text("完成").frame(width: 56, height: 56)
+            // Appears only once the floors are met. Before that there is
+            // nothing to press, which is the least ambiguous way to say
+            // "keep going".
+            if model.progress.canFinish {
+                Button("完成") { showingFinish = true }
+                    .font(.headline)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(.white, in: Capsule())
+                    .frame(width: 60)
+            } else {
+                Color.clear.frame(width: 60, height: 60)
             }
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 24)
-        .padding(.bottom, 24)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+        .padding(.top, 8)
         .background(.black.opacity(0.45))
     }
 }
 
-private struct WarningChip: View {
+private struct Chip: View {
     let icon: String
     let text: String
 
@@ -126,12 +160,17 @@ private struct WarningChip: View {
             .font(.footnote.weight(.medium))
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(.yellow.opacity(0.9), in: Capsule())
+            .background(.yellow.opacity(0.92), in: Capsule())
             .foregroundStyle(.black)
+            .padding(.horizontal, 16)
     }
 }
 
-/// What the gate made of the shot, and what to do about it.
+/// What the gate made of the shot.
+///
+/// Passing says nothing and disappears on its own — a photographer who has to
+/// dismiss a confirmation after every photograph takes fewer photographs, and
+/// more photographs is the whole point.
 private struct OutcomeSheet: View {
     @Bindable var model: CaptureSessionModel
     let outcome: CaptureSessionModel.Outcome
@@ -139,26 +178,19 @@ private struct OutcomeSheet: View {
     var body: some View {
         VStack(spacing: 16) {
             switch outcome {
-            case .accepted(let record):
+            case .accepted:
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 44))
+                    .font(.system(size: 40))
                     .foregroundStyle(.green)
-                Text("这张可以")
-                    .font(.title3.bold())
-                if !record.evidence.isClaimReady {
-                    Text(gapDescription(record.evidence.gaps))
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                        .multilineTextAlignment(.center)
-                }
-                Button("下一张") { model.advance() }
+                Text("这张可以").font(.title3.bold())
+                Button("继续") { model.dismissOutcome() }
                     .buttonStyle(.borderedProminent)
 
             case .rejected(let record):
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 44))
+                    .font(.system(size: 40))
                     .foregroundStyle(.orange)
-                Text(issueDescription(record.quality.issues))
+                Text(describe(record.quality.issues))
                     .font(.title3.bold())
                     .multilineTextAlignment(.center)
                 HStack {
@@ -170,21 +202,23 @@ private struct OutcomeSheet: View {
                 }
 
             case .failed(let message):
-                Text("拍摄失败")
-                    .font(.title3.bold())
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                Button("重试") { model.dismissOutcome() }
+                Text("这张没拍成").font(.title3.bold())
+                Text(message).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Button("再来") { model.dismissOutcome() }
                     .buttonStyle(.borderedProminent)
-
             }
         }
         .padding(24)
+        .task {
+            // A good photograph needs no acknowledgement.
+            if case .accepted = outcome {
+                try? await Task.sleep(for: .milliseconds(700))
+                model.dismissOutcome()
+            }
+        }
     }
 
-    private func issueDescription(_ issues: [ImageQualityIssue]) -> String {
+    private func describe(_ issues: [ImageQualityIssue]) -> String {
         let names = issues.map { issue -> String in
             switch issue {
             case .blurry: return "糊了"
@@ -194,11 +228,5 @@ private struct OutcomeSheet: View {
             }
         }
         return names.isEmpty ? "需要重拍" : names.joined(separator: "、")
-    }
-
-    private func gapDescription(_ gaps: [EvidenceGap]) -> String {
-        gaps.contains(.noLocation)
-            ? "这张没有位置信息。交单前要到室外补拍，否则 Turo 会判无效。"
-            : "元数据不完整，交单前请复查。"
     }
 }

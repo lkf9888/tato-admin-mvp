@@ -24,13 +24,11 @@ final class SessionUploader {
     struct CompletionSummary: Equatable {
         var uploaded: Int
         var missingLocation: [String]
-        var takenOffStation: [String]
         var qualityOverridden: [String]
         var suspectClock: [String]
 
         var isClean: Bool {
-            missingLocation.isEmpty && takenOffStation.isEmpty
-                && qualityOverridden.isEmpty && suspectClock.isEmpty
+            missingLocation.isEmpty && qualityOverridden.isEmpty && suspectClock.isEmpty
         }
     }
 
@@ -45,7 +43,7 @@ final class SessionUploader {
         self.settings = settings
     }
 
-    func upload(archive: SessionArchive, manifest: SessionManifest, plan: [ShotSlot]) async {
+    func upload(archive: SessionArchive, manifest: SessionManifest) async {
         guard let baseURL = settings.endpoint, !settings.staffCode.isEmpty else {
             state = .failed(UploadError.notConfigured.errorDescription ?? "")
             return
@@ -57,7 +55,7 @@ final class SessionUploader {
             let records = manifest.acceptedRecords
 
             state = .working(done: 0, total: records.count)
-            let sessionID = try await client.openSession(manifest, plan: plan)
+            let sessionID = try await client.openSession(manifest)
 
             for (index, record) in records.enumerated() {
                 state = .working(done: index, total: records.count)
@@ -71,7 +69,6 @@ final class SessionUploader {
             state = .finished(CompletionSummary(
                 uploaded: records.count,
                 missingLocation: completion.missingLocation,
-                takenOffStation: completion.takenOffStation,
                 qualityOverridden: completion.qualityOverridden,
                 suspectClock: completion.suspectClock
             ))

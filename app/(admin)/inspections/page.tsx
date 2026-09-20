@@ -108,9 +108,10 @@ export default async function InspectionsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sessions.map((session) => {
-                  const expected = (session.expectedSlotIds as string[]) ?? [];
                   // Counted from the stored rows rather than from a column, so
                   // the number on screen is the number of files that exist.
+                  const interior = session.shots.filter((shot) => shot.region === "interior").length;
+                  const exterior = session.shots.length - interior;
                   const flagged = session.shots.filter((shot) => shotFlags(shot).length > 0).length;
                   return (
                     <tr key={session.id}>
@@ -125,7 +126,12 @@ export default async function InspectionsPage() {
                       <td className="px-4 py-3 text-slate-600">{formatDateTime(session.startedAt, locale)}</td>
                       <td className="px-4 py-3 text-slate-600">{session.staffLabel}</td>
                       <td className="px-4 py-3 text-slate-600">
-                        {session.shots.length} / {expected.length}
+                        <span className="tabular-nums">{exterior} + {interior}</span>
+                        {session.coverageFraction !== null ? (
+                          <div className="text-xs text-slate-400 tabular-nums">
+                            {Math.round(session.coverageFraction * 100)}%
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3">
                         {!session.completedAt ? (

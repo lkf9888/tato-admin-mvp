@@ -3,28 +3,32 @@ import EvidenceCore
 import Foundation
 import simd
 
-/// Drives one walk around one car: which shot is next, what the camera just
-/// produced, and whether it counts.
+/// One walk around one car.
+///
+/// **There is no setup.** The session opens as the camera does, before
+/// anybody has said which car it is or which end of the trip this is — both
+/// of those are answered at the end, when the app can usually answer them
+/// itself. The photographer's first interaction with this app is a shutter
+/// button.
 @MainActor
 @Observable
 final class CaptureSessionModel {
 
-    /// How many goes at a slot before the operator is allowed to overrule the
-    /// gate. Low enough not to trap anyone in front of a car, high enough
-    /// that "just press it again" is the path of least resistance.
-    static let attemptsBeforeOverride = 3
+    /// How many rejected shots in a row before the operator may overrule the
+    /// quality gate. Low enough not to trap anyone in front of a car.
+    static let rejectionsBeforeOverride = 3
 
     enum Outcome: Equatable, Identifiable {
+        case accepted(CaptureRecord)
+        case rejected(CaptureRecord)
+        case failed(String)
+
         var id: String {
             switch self {
             case .accepted(let record), .rejected(let record): return record.id
             case .failed(let message): return message
             }
         }
-
-        case accepted(CaptureRecord)
-        case rejected(CaptureRecord)
-        case failed(String)
     }
 
     let camera = EvidenceCamera()
@@ -34,36 +38,41 @@ final class CaptureSessionModel {
 
     private(set) var archive: SessionArchive?
     private(set) var manifest: SessionManifest?
-    private(set) var slotIndex = 0
     private(set) var outcome: Outcome?
     private(set) var isCapturing = false
     private(set) var startupError: String?
+    private(set) var consecutiveRejections = 0
+    private(set) var suggestedPlate: String?
+
     var flashMode: AVCaptureDevice.FlashMode = .off
 
-    let plan = ShotPlan.standard
+    private let plateReader = PlateReader()
 
-    var currentSlot: ShotSlot { plan[min(slotIndex, plan.count - 1)] }
-    var completedCount: Int { plan.count - (manifest?.outstandingSlots(in: plan).count ?? plan.count) }
-
-    /// The operator may overrule the quality gate once the camera has been
-    /// given a fair chance and the answer has not changed.
-    var mayOverride: Bool {
-        guard case .rejected = outcome else { return false }
-        return attemptsForCurrentSlot >= Self.attemptsBeforeOverride
+    var progress: ShootingProgress {
+        manifest?.progress() ?? ShootingProgress(coverage: 0, exteriorShots: 0, interiorShots: 0)
     }
 
-    private(set) var attemptsForCurrentSlot = 0
+    /// Whether the photographer may overrule a rejection, having given the
+    /// camera a fair chance and got the same answer.
+    var mayOverride: Bool {
+        guard case .rejected = outcome else { return false }
+        return consecutiveRejections >= Self.rejectionsBeforeOverride
+    }
 
     // MARK: - Lifecycle
 
-    func begin(vehicleLabel: String, staffLabel: String, kind: SessionKind) async {
+    func begin() async {
+        guard archive == nil else { return }
         do {
-            let parent = try Self.sessionsDirectory()
+            let parent = try ArchiveIndex.sessionsDirectory()
+            // Named later. An empty label here is honest: nobody has said
+            // which car this is yet, and inventing a placeholder would put a
+            // wrong answer in the archive.
             let manifest = SessionManifest(
                 sessionID: Self.makeSessionID(),
-                kind: kind,
-                vehicleLabel: vehicleLabel,
-                staffLabel: staffLabel,
+                kind: .checkin,
+                vehicleLabel: "",
+                staffLabel: "",
                 deviceModel: DeviceIdentity.machine,
                 appVersion: DeviceIdentity.appVersion,
                 startedAt: Date(),
@@ -77,6 +86,7 @@ final class CaptureSessionModel {
             steadiness.start()
             coverage.start()
             try await camera.configure()
+            coverage.fieldOfViewDegrees = camera.horizontalFieldOfView
             await camera.start()
         } catch {
             startupError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -106,117 +116,74 @@ final class CaptureSessionModel {
             deviceModel: DeviceIdentity.machine,
             software: DeviceIdentity.appVersion
         )
-        let slot = currentSlot
 
         do {
             let raw = try await camera.capturePhoto(stamp: stamp, flash: flashMode)
             let finished = try MetadataFinisher.finish(captured: raw, stamp: stamp)
-            let quality = try ImageQualityGate.evaluate(jpeg: finished.data, thresholds: slot.thresholds)
+            let quality = try ImageQualityGate.evaluate(jpeg: finished.data)
 
-            // Sharpness decides whether this photograph counts. A missing
-            // location does not block the shot — underground car parks exist,
-            // and stranding somebody mid-walk helps nobody — but it does
-            // block the session, on the summary screen, where it can be fixed
-            // by stepping outside rather than discovered months later by an
-            // insurer.
+            // Where the photograph turned out to be pointing, worked out from
+            // the camera's pose after the fact. Only credited to the car's
+            // surface when the gate passed: a blurred picture of a door
+            // documents nothing.
+            let region = quality.passes ? coverage.recordShot() : .front
+
             let record = try await archive.store(
                 jpeg: finished.data,
-                slot: slot,
+                region: region,
                 capturedAt: now,
                 quality: quality,
                 metadataPath: finished.path,
-                accepted: quality.passes,
-                stationVerified: stationVerification
+                accepted: quality.passes
             )
+            if quality.passes {
+                try await archive.updateCoverage(coverage.coverage)
+                consecutiveRejections = 0
+            } else {
+                consecutiveRejections += 1
+            }
             manifest = await archive.manifest
-            syncCoverageTargets()
-            attemptsForCurrentSlot = await archive.attempts(forSlot: slot.id)
             outcome = quality.passes ? .accepted(record) : .rejected(record)
+
+            // Read the plate off the photograph rather than asking for it.
+            Task.detached { [plateReader] in
+                await plateReader.read(jpeg: finished.data)
+            }
+            await refreshSuggestedPlate()
         } catch {
             outcome = .failed((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
         }
     }
 
-    /// Keep the photograph the gate turned down, with the reasons recorded
-    /// against it.
+    /// Keeps a photograph the gate turned down, with the reasons recorded.
     func acceptAnyway() async {
         guard let archive, case .rejected(let record) = outcome else { return }
         try? await archive.accept(record, despite: record.quality.issues)
+        coverage.recordShot()
+        try? await archive.updateCoverage(coverage.coverage)
         manifest = await archive.manifest
-        outcome = .accepted(record)
-    }
-
-    /// Whether the photographer was standing where this shot is meant to be
-    /// taken from. nil when the question cannot be answered honestly: an
-    /// interior shot, a car never calibrated, or tracking lost.
-    private var stationVerification: Bool? {
-        guard currentSlot.station != nil,
-              coverage.isCalibrated,
-              coverage.isTracking,
-              let placement = coverage.placement else { return nil }
-        return CoverageMatcher.station(for: placement, among: [currentSlot]) != nil
-    }
-
-    private func syncCoverageTargets() {
-        let outstanding = manifest?.outstandingSlots(in: plan) ?? plan
-        coverage.outstanding = outstanding.filter { $0.station != nil }
-    }
-
-    // MARK: - Calibration
-
-    func calibrateFromMesh() {
-        coverage.calibrateFromMesh()
-        syncCoverageTargets()
-    }
-
-    func markNose() {
-        pendingNose = coverage.currentPosition
-    }
-
-    func markTail() {
-        guard let nose = pendingNose, let tail = coverage.currentPosition else { return }
-        coverage.calibrateByHand(nose: nose, tail: tail)
-        pendingNose = nil
-        syncCoverageTargets()
-    }
-
-    private(set) var pendingNose: SIMD3<Float>?
-
-    var needsCalibration: Bool { currentSlot.station != nil && !coverage.isCalibrated }
-
-    func advance() {
-        outcome = nil
-        attemptsForCurrentSlot = 0
-        guard let manifest else { return }
-        // Jump to the first slot still outstanding rather than the next one
-        // in line, so a retake later on does not leave a hole behind it.
-        if let next = manifest.outstandingSlots(in: plan).first,
-           let index = plan.firstIndex(where: { $0.id == next.id }) {
-            slotIndex = index
-        } else {
-            slotIndex = plan.count - 1
-        }
-    }
-
-    func dismissOutcome() {
+        consecutiveRejections = 0
         outcome = nil
     }
 
-    func clearStartupError() {
-        startupError = nil
+    func dismissOutcome() { outcome = nil }
+
+    func clearStartupError() { startupError = nil }
+
+    private func refreshSuggestedPlate() async {
+        suggestedPlate = await plateReader.confident
     }
 
-    // MARK: - Session state
+    // MARK: - Finishing
 
-    var isComplete: Bool { manifest?.isComplete(in: plan) ?? false }
+    /// Names the car and the occasion, which is the only thing anybody is
+    /// ever asked to confirm.
+    func describe(vehicleLabel: String, staffLabel: String, kind: SessionKind) async {
+        guard let archive else { return }
+        try? await archive.describe(vehicleLabel: vehicleLabel, kind: kind)
+        manifest = await archive.manifest
+    }
 
-    /// Accepted photographs that an insurer would throw out unread. Almost
-    /// always a location that was not available where the car was parked.
-    var photosMissingEvidence: [CaptureRecord] { manifest?.recordsMissingEvidence ?? [] }
-
-    /// Sortable, unique, and safe as a folder name. UTC so that sessions
-    /// either side of a daylight-saving change still sort in the order they
-    /// happened.
     private static func makeSessionID() -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -224,15 +191,4 @@ final class CaptureSessionModel {
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         return formatter.string(from: Date()) + "-" + UUID().uuidString.prefix(8)
     }
-
-    private static func sessionsDirectory() throws -> URL {
-        let support = try FileManager.default.url(
-            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
-        )
-        let sessions = support.appendingPathComponent("sessions", isDirectory: true)
-        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
-        return sessions
-    }
 }
-
-

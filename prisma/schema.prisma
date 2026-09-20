@@ -1294,13 +1294,14 @@ model InspectionSession {
   startedAt    DateTime
   /// IANA zone the phone was in, so a local capture time can be placed.
   timeZone     String
-  /// JSON array of the slot ids this walk-around is supposed to produce, sent
-  /// by the phone when the session opens.
+  /// How much of the car's surface the phone reckons was photographed.
   ///
-  /// Stored so the server can decide completeness itself rather than taking
-  /// the phone's word for it -- and so a shot list that changes between app
-  /// versions does not silently reclassify old sessions as incomplete.
-  expectedSlotIds Json
+  /// ⚠️ Stored as a claim, not a finding. Coverage is computed from camera
+  /// poses that only ever existed on the device, so unlike the digest and the
+  /// EXIF there is nothing here to check it against. What the server *can*
+  /// verify -- and does, at completion -- is the photograph counts, because
+  /// it holds the photographs.
+  coverageFraction Float?
   /// Set only once the shot list is complete. An incomplete session is not
   /// evidence of anything and must not read as one.
   completedAt  DateTime?
@@ -1329,11 +1330,18 @@ model InspectionShot {
   workspaceId String?
   id          String  @id @default(cuid())
   sessionId   String
-  slotId      String
-  /// 1 for the first go. Rejected attempts are kept: "this slot took four
-  /// tries" is the signal that says who needs retraining.
-  attempt     Int     @default(1)
-  /// Whether this is the attempt that counts for the slot.
+  /// Which part of the car this photograph turned out to document, worked out
+  /// on the device from the camera's pose *after* the shutter.
+  ///
+  /// Never a slot the photographer was sent to: there is no shot list. It
+  /// exists so the review page can still put the handover and the return of
+  /// the same corner side by side.
+  region      String
+  /// Position in the session, from 1.
+  sequence    Int
+  /// Whether the photograph cleared the quality gate. A rejected one is still
+  /// archived -- it is part of the record of how the walk-around went -- but
+  /// it does not count towards the floors.
   accepted    Boolean @default(true)
   pathname    String
   filename    String
@@ -1371,9 +1379,6 @@ model InspectionShot {
   reportedIssues    Json
   /// JSON array of problems a person waved through, with their name on it.
   acceptedDespite   Json
-  /// Whether the photographer stood in the planned position. Null where
-  /// position tracking could not answer -- an interior shot, or tracking lost.
-  stationVerified   Boolean?
   /// `writtenAtCapture` or `stampedAfterCapture`; which writer put the
   /// metadata in. Per shot, because the answer is decided on the device.
   metadataPath      String
@@ -1383,8 +1388,9 @@ model InspectionShot {
   session   InspectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   workspace Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
-  @@unique([sessionId, slotId, attempt])
+  @@unique([sessionId, sequence])
   @@index([workspaceId])
   @@index([sessionId, accepted])
+  @@index([sessionId, region])
   @@index([sha256])
 }

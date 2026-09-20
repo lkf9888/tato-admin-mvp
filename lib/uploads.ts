@@ -134,14 +134,14 @@ export function makeStaffTaskAttachmentPath(taskId: string, filename: string) {
 /**
  * Where one vehicle-condition photograph lives.
  *
- * Built from the slot and the attempt rather than from the uploaded filename:
- * the path is then deterministic, matches the row's unique key, and carries no
- * client-chosen component beyond a sanitized slot id.
+ * Built from the sequence number and the region rather than from the uploaded
+ * filename: the path is then deterministic, matches the row's unique key, and
+ * carries no client-chosen component beyond a sanitized region name.
  */
-export function makeInspectionShotPath(sessionId: string, slotId: string, attempt: number) {
-  const safeSlot = sanitizeFilename(slotId).replace(/\.+/g, "-") || "shot";
-  const safeAttempt = Math.max(1, Math.floor(attempt));
-  return path.posix.join("inspections", sessionId, `${safeSlot}-${safeAttempt}.jpg`);
+export function makeInspectionShotPath(sessionId: string, region: string, sequence: number) {
+  const safeRegion = sanitizeFilename(region).replace(/\.+/g, "-") || "shot";
+  const safeSequence = Math.max(1, Math.floor(sequence));
+  return path.posix.join("inspections", sessionId, `${String(safeSequence).padStart(3, "0")}-${safeRegion}.jpg`);
 }
 
 export function makeDirectBookingDocumentPath(draftId: string, kind: string, filename: string) {

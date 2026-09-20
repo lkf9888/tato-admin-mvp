@@ -112,23 +112,24 @@ final class SessionArchiveTests: XCTestCase {
 
     private func store(
         _ archive: SessionArchive,
-        _ slot: ShotSlot,
-        jpeg: Data? = nil
+        _ region: CarRegion = .front,
+        jpeg: Data? = nil,
+        accepted: Bool = true
     ) async throws -> CaptureRecord {
         let data = try jpeg ?? stampedPhoto()
         return try await archive.store(
             jpeg: data,
-            slot: slot,
+            region: region,
             capturedAt: Date(timeIntervalSince1970: 1_789_000_000),
             quality: try ImageQualityGate.evaluate(jpeg: data),
-            metadataPath: .writtenAtCapture
+            metadataPath: .writtenAtCapture,
+            accepted: accepted
         )
     }
 
     func testStoredFileMatchesItsRecordedDigest() async throws {
         let archive = try makeArchive()
-        let slot = try XCTUnwrap(ShotPlan.slot(id: "front"))
-        let record = try await store(archive, slot)
+        let record = try await store(archive)
 
         let onDisk = try Data(contentsOf: archive.url(of: record))
 
@@ -141,44 +142,14 @@ final class SessionArchiveTests: XCTestCase {
     /// fails loudly instead of quietly invalidating the digest.
     func testOriginalsAreWrittenReadOnly() async throws {
         let archive = try makeArchive()
-        let record = try await store(archive, try XCTUnwrap(ShotPlan.slot(id: "front")))
+        let record = try await store(archive, .front)
 
         let url = archive.url(of: record)
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         XCTAssertEqual(attributes[.posixPermissions] as? NSNumber, 0o444)
     }
 
-    /// A retake supersedes its predecessor without erasing it: "this slot took
-    /// three goes" is the signal that tells a manager who needs retraining.
-    func testRetakesSupersedeButAreKept() async throws {
-        let archive = try makeArchive()
-        let slot = try XCTUnwrap(ShotPlan.slot(id: "roof"))
 
-        let first = try await store(archive, slot)
-        let second = try await store(archive, slot)
-
-        let manifest = await archive.manifest
-        XCTAssertEqual(second.attempt, 2)
-        XCTAssertEqual(manifest.records.count, 2)
-        XCTAssertEqual(manifest.acceptedRecord(forSlot: "roof")?.attempt, 2)
-        XCTAssertFalse(try XCTUnwrap(manifest.records.first { $0.attempt == 1 }).accepted)
-        let firstURL = archive.url(of: first)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: firstURL.path))
-    }
-
-    func testCompletionTracksTheWholePlan() async throws {
-        let archive = try makeArchive()
-        var outstanding = await archive.manifest.outstandingSlots()
-        XCTAssertEqual(outstanding.count, ShotPlan.standard.count)
-
-        _ = try await store(archive, try XCTUnwrap(ShotPlan.slot(id: "front")))
-        outstanding = await archive.manifest.outstandingSlots()
-
-        let complete = await archive.manifest.isComplete()
-        XCTAssertEqual(outstanding.count, ShotPlan.standard.count - 1)
-        XCTAssertFalse(complete)
-        XCTAssertFalse(outstanding.contains { $0.id == "front" })
-    }
 
     /// A photo taken with location services off is archived, not discarded —
     /// and it is flagged, because the fix is for someone to switch them on and
@@ -186,16 +157,16 @@ final class SessionArchiveTests: XCTestCase {
     func testAPhotoWithNoFixIsKeptAndFlagged() async throws {
         let archive = try makeArchive()
         let noFix = try ExifStamper.stamp(jpeg: TestImages.checkerboard(), with: .fixture(location: nil)).data
-        let record = try await store(archive, try XCTUnwrap(ShotPlan.slot(id: "front")), jpeg: noFix)
+        let record = try await store(archive, .front, jpeg: noFix)
 
-        let flagged = await archive.manifest.recordsMissingEvidence.map(\.slotID)
+        let flagged = await archive.manifest.recordsMissingEvidence.map(\.region)
         XCTAssertEqual(record.evidence.gaps, [.noLocation])
-        XCTAssertEqual(flagged, ["front"])
+        XCTAssertEqual(flagged, [.front])
     }
 
     func testVerificationCatchesAnAlteredFile() async throws {
         let archive = try makeArchive()
-        let record = try await store(archive, try XCTUnwrap(ShotPlan.slot(id: "front")))
+        let record = try await store(archive, .front)
         let clean = try await archive.verifyAcceptedFiles()
         XCTAssertEqual(clean, [])
 
@@ -209,7 +180,7 @@ final class SessionArchiveTests: XCTestCase {
 
     func testManifestSurvivesAReopen() async throws {
         let archive = try makeArchive()
-        _ = try await store(archive, try XCTUnwrap(ShotPlan.slot(id: "odometer")))
+        _ = try await store(archive, .interior)
 
         let reopened = try SessionArchive(existing: archive.root)
         let (reloaded, original) = (await reopened.manifest, await archive.manifest)
@@ -271,27 +242,25 @@ final class OverrideTrailTests: XCTestCase {
             deviceModel: "iPhone 16 Pro", appVersion: "0.1.0",
             startedAt: Date(timeIntervalSince1970: 1_789_000_000), timeZoneIdentifier: "America/Vancouver"
         ))
-        let slot = try XCTUnwrap(ShotPlan.slot(id: "front"))
         let jpeg = try ExifStamper.stamp(jpeg: TestImages.checkerboard(), with: .fixture()).data
         let quality = try ImageQualityGate.evaluate(jpeg: jpeg)
 
-        let good = try await archive.store(jpeg: jpeg, slot: slot, capturedAt: Date(),
+        let good = try await archive.store(jpeg: jpeg, region: .front, capturedAt: Date(),
                                            quality: quality, metadataPath: .writtenAtCapture)
-        let rejected = try await archive.store(jpeg: jpeg, slot: slot, capturedAt: Date(),
+        let rejected = try await archive.store(jpeg: jpeg, region: .front, capturedAt: Date(),
                                                quality: quality, metadataPath: .writtenAtCapture,
                                                accepted: false)
 
         var manifest = await archive.manifest
-        let attempts = await archive.attempts(forSlot: "front")
-        XCTAssertEqual(manifest.acceptedRecord(forSlot: "front")?.attempt, good.attempt)
-        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(manifest.records.count, 2)
+        XCTAssertEqual(manifest.acceptedRecords.count, 1, "the rejected one does not count")
+        XCTAssertEqual(manifest.acceptedRecords.first?.sequence, good.sequence)
 
         // Waved through by the operator: now it counts, and the reason it
         // should not have is recorded next to it.
         try await archive.accept(rejected, despite: [.blurry])
         manifest = await archive.manifest
-        XCTAssertEqual(manifest.acceptedRecord(forSlot: "front")?.attempt, rejected.attempt)
-        XCTAssertEqual(manifest.acceptedRecord(forSlot: "front")?.acceptedDespite, [.blurry])
-        XCTAssertEqual(manifest.records.filter(\.accepted).count, 1)
+        XCTAssertEqual(manifest.acceptedRecords.count, 2, "both now count")
+        XCTAssertEqual(manifest.records.first { $0.sequence == rejected.sequence }?.acceptedDespite, [.blurry])
     }
 }

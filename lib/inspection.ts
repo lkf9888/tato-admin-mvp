@@ -13,9 +13,8 @@ import { foldLatinLookalikes } from "@/lib/utils";
  * deciding whether it is finished.
  *
  * The server keeps its own opinion about every one of those. It re-derives the
- * digest and the metadata from the bytes, and it decides completeness from the
- * shot list the session declared rather than from the phone announcing it is
- * done. None of that is because the app is expected to lie; it is because this
+ * digest and the metadata from the bytes, and it counts the photographs itself
+ * rather than accepting the phone's announcement that the walk-around is done. None of that is because the app is expected to lie; it is because this
  * archive is also the record of how carefully staff did their job, and a
  * record that can be edited by the person it describes is not a record.
  */
@@ -28,9 +27,36 @@ export type OpenSessionInput = {
   appVersion: string;
   startedAt: Date;
   timeZone: string;
-  expectedSlotIds: string[];
+  coverageFraction?: number | null;
   orderId?: string | null;
 };
+
+/**
+ * Where on the car a photograph turned out to be pointing.
+ *
+ * Mirrors the app's `CarRegion`. Worked out on the device from the camera's
+ * pose after the shutter, never chosen beforehand -- there is no shot list.
+ */
+export const CAR_REGIONS = [
+  "front", "frontRight", "right", "rearRight", "rear",
+  "rearLeft", "left", "frontLeft", "roof", "interior",
+] as const;
+export type CarRegion = (typeof CAR_REGIONS)[number];
+
+export function isCarRegion(value: unknown): value is CarRegion {
+  return typeof value === "string" && (CAR_REGIONS as readonly string[]).includes(value);
+}
+
+/**
+ * Turo's published floors for host trip photos.
+ *
+ * These are the only completeness facts the server can check for itself: it
+ * holds the photographs, so it can count them. Surface coverage it cannot
+ * check -- that is computed from camera poses which only ever existed on the
+ * phone -- so coverage arrives as a claim and is stored as one.
+ */
+export const EXTERIOR_FLOOR = 15;
+export const INTERIOR_FLOOR = 8;
 
 /**
  * Matches what the photographer typed against the fleet.
@@ -86,28 +112,27 @@ export async function openSession(
       appVersion: input.appVersion,
       startedAt: input.startedAt,
       timeZone: input.timeZone,
-      expectedSlotIds: input.expectedSlotIds,
+      coverageFraction: input.coverageFraction ?? null,
     },
   });
   return { session, resumed: false };
 }
 
 export type ShotMetadata = {
-  slotId: string;
-  attempt: number;
+  region: CarRegion;
+  sequence: number;
   accepted: boolean;
   sha256: string;
   reportedSharpness?: number | null;
   reportedIssues?: string[];
   acceptedDespite?: string[];
-  stationVerified?: boolean | null;
   metadataPath: string;
   deviceClockAt?: string | null;
 };
 
 export type StoreShotOutcome =
   | { ok: true; shotId: string; sha256: string; gaps: EvidenceGap[]; clockSuspect: boolean; duplicate: boolean }
-  | { ok: false; rejection: UploadRejection | { error: "SLOT_CONFLICT"; status: number; detail?: string } };
+  | { ok: false; rejection: UploadRejection | { error: "SEQUENCE_CONFLICT"; status: number; detail?: string } };
 
 export async function storeShot(
   session: InspectionSession,
@@ -123,10 +148,10 @@ export async function storeShot(
 
   const { result } = verified;
 
-  // A retry of an upload that already landed. Same slot, same attempt, same
-  // bytes: hand back the row rather than failing the phone's retry loop.
+  // A retry of an upload that already landed. Same position in the session,
+  // same bytes: hand back the row rather than failing the phone's retry loop.
   const existing = await prisma.inspectionShot.findUnique({
-    where: { sessionId_slotId_attempt: { sessionId: session.id, slotId: meta.slotId, attempt: meta.attempt } },
+    where: { sessionId_sequence: { sessionId: session.id, sequence: meta.sequence } },
   });
   if (existing) {
     if (existing.sha256 === result.sha256) {
@@ -139,19 +164,19 @@ export async function storeShot(
         duplicate: true,
       };
     }
-    // Same slot and attempt, different bytes. One of them is not what it
-    // claims to be, and silently overwriting would destroy whichever was.
+    // Same position, different bytes. One of them is not what it claims to
+    // be, and silently overwriting would destroy whichever was.
     return {
       ok: false,
       rejection: {
-        error: "SLOT_CONFLICT",
+        error: "SEQUENCE_CONFLICT",
         status: 409,
-        detail: `${meta.slotId} attempt ${meta.attempt} already holds a different file`,
+        detail: `photo ${meta.sequence} already holds a different file`,
       },
     };
   }
 
-  const pathname = makeInspectionShotPath(session.id, meta.slotId, meta.attempt);
+  const pathname = makeInspectionShotPath(session.id, meta.region, meta.sequence);
   const absolutePath = resolveUploadPath(pathname);
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, bytes);
@@ -160,8 +185,8 @@ export async function storeShot(
     data: {
       workspaceId: session.workspaceId,
       sessionId: session.id,
-      slotId: meta.slotId,
-      attempt: meta.attempt,
+      region: meta.region,
+      sequence: meta.sequence,
       accepted: meta.accepted,
       pathname,
       filename: path.basename(pathname),
@@ -179,20 +204,10 @@ export async function storeShot(
       reportedSharpness: meta.reportedSharpness ?? null,
       reportedIssues: meta.reportedIssues ?? [],
       acceptedDespite: meta.acceptedDespite ?? [],
-      stationVerified: meta.stationVerified ?? null,
       metadataPath: meta.metadataPath,
     },
   });
 
-  // A newly accepted shot supersedes earlier attempts at the same slot. The
-  // earlier files stay on disk and in the table: "this slot took four goes" is
-  // exactly the thing a fleet manager wants to be able to see.
-  if (meta.accepted) {
-    await prisma.inspectionShot.updateMany({
-      where: { sessionId: session.id, slotId: meta.slotId, id: { not: shot.id } },
-      data: { accepted: false },
-    });
-  }
 
   return {
     ok: true,
@@ -205,52 +220,64 @@ export async function storeShot(
 }
 
 export type SessionStanding = {
-  missingSlotIds: string[];
-  shotsMissingLocation: string[];
-  shotsTakenOffStation: string[];
+  exteriorShots: number;
+  interiorShots: number;
+  /// What the phone reported, unverifiable here. Null before any session data.
+  coverageFraction: number | null;
+  shotsMissingEvidence: string[];
   shotsQualityOverridden: string[];
   shotsWithSuspectClock: string[];
+  shortOfExteriorBy: number;
+  shortOfInteriorBy: number;
 };
 
 /**
  * The server's own reading of how the session stands.
  *
- * Computed from the declared shot list and the stored rows, not from anything
- * the phone asserts at completion time.
+ * Counted from the stored rows, not from anything the phone asserts at
+ * completion time.
  */
 export async function sessionStanding(session: InspectionSession): Promise<SessionStanding> {
-  const expected = (session.expectedSlotIds as string[]) ?? [];
   const shots = await prisma.inspectionShot.findMany({
     where: { sessionId: session.id, accepted: true },
   });
-  const bySlot = new Map(shots.map((shot) => [shot.slotId, shot]));
+  const exterior = shots.filter((shot) => shot.region !== "interior").length;
+  const interior = shots.length - exterior;
+  const label = (shot: { region: string; sequence: number }) => `${shot.sequence}:${shot.region}`;
 
   return {
-    missingSlotIds: expected.filter((slotId) => !bySlot.has(slotId)),
-    shotsMissingLocation: shots
+    exteriorShots: exterior,
+    interiorShots: interior,
+    coverageFraction: session.coverageFraction,
+    shotsMissingEvidence: shots
       .filter((shot) => ((shot.evidenceGaps as EvidenceGap[]) ?? []).length > 0)
-      .map((shot) => shot.slotId),
-    shotsTakenOffStation: shots.filter((shot) => shot.stationVerified === false).map((shot) => shot.slotId),
+      .map(label),
     shotsQualityOverridden: shots
       .filter((shot) => ((shot.acceptedDespite as string[]) ?? []).length > 0)
-      .map((shot) => shot.slotId),
-    shotsWithSuspectClock: shots.filter((shot) => clockIsSuspect(shot.clockSkewSeconds)).map((shot) => shot.slotId),
+      .map(label),
+    shotsWithSuspectClock: shots.filter((shot) => clockIsSuspect(shot.clockSkewSeconds)).map(label),
+    shortOfExteriorBy: Math.max(0, EXTERIOR_FLOOR - exterior),
+    shortOfInteriorBy: Math.max(0, INTERIOR_FLOOR - interior),
   };
 }
 
 /**
  * Marks a session finished, if it is.
  *
- * Missing shots block; gaps do not. The reasoning is the same as in the app: an
- * incomplete set is not a set, whereas a photograph taken where there was no
- * satellite fix is still the only picture of that bumper on that day, and
- * refusing it destroys evidence we have in exchange for evidence we cannot get.
- * The gaps come back in the response so the phone can put them in front of
- * somebody who can still act on them.
+ * Counts block; gaps do not. An incomplete set is not a set, whereas a
+ * photograph taken where there was no satellite fix is still the only picture
+ * of that bumper on that day, and refusing it destroys evidence we have in
+ * exchange for evidence we cannot get. The gaps come back in the response so
+ * the phone can put them in front of somebody who can still act on them.
+ *
+ * Surface coverage is deliberately **not** a condition here. The server never
+ * saw the camera poses it was computed from, so gating on it would mean
+ * enforcing a number the phone is free to make up — the appearance of a check
+ * rather than a check. The counts are real, so those are what gate.
  */
 export async function completeSession(session: InspectionSession) {
   const standing = await sessionStanding(session);
-  if (standing.missingSlotIds.length > 0) {
+  if (standing.shortOfExteriorBy > 0 || standing.shortOfInteriorBy > 0) {
     return { ok: false as const, standing };
   }
   const completed = await prisma.inspectionSession.update({

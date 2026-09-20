@@ -2,132 +2,153 @@ import XCTest
 import ImageIO
 @testable import EvidenceCore
 
-private func makeManifest(with records: [CaptureRecord]) -> SessionManifest {
-    var manifest = SessionManifest(
+private func makeManifest(
+    _ records: [CaptureRecord] = [],
+    coverage: SurfaceCoverage = SurfaceCoverage()
+) -> SessionManifest {
+    SessionManifest(
         sessionID: "S9", kind: .checkin, vehicleLabel: "ABC 123", staffLabel: "Wei",
         deviceModel: "iPhone 16 Pro", appVersion: "TATO Evidence 0.1.0",
-        startedAt: Date(timeIntervalSince1970: 1_789_000_000), timeZoneIdentifier: "America/Vancouver"
+        startedAt: Date(timeIntervalSince1970: 1_789_000_000), timeZoneIdentifier: "America/Vancouver",
+        records: records, coverage: coverage
     )
-    manifest.records = records
-    return manifest
 }
 
 private func makeRecord(
-    _ slotID: String,
+    _ sequence: Int,
+    region: CarRegion = .front,
     gaps: [EvidenceGap] = [],
-    stationVerified: Bool? = true,
     despite: [ImageQualityIssue] = [],
-    attempt: Int = 1
+    accepted: Bool = true
 ) -> CaptureRecord {
     CaptureRecord(
-        slotID: slotID, attempt: attempt, filename: "\(slotID)-\(attempt).jpg", byteCount: 2_400_000,
-        sha256: String(repeating: "a", count: 64), capturedAt: Date(timeIntervalSince1970: 1_789_000_000),
+        region: region, sequence: sequence,
+        filename: String(format: "%03d-%@.jpg", sequence, region.rawValue),
+        byteCount: 2_400_000, sha256: String(repeating: "a", count: 64),
+        capturedAt: Date(timeIntervalSince1970: 1_789_000_000),
         quality: ImageQualityReport(laplacianVariance: 900, meanLuminance: 118, luminanceStdDev: 44,
                                     clippedHighlightFraction: 0.01, clippedShadowFraction: 0.02,
                                     issues: despite),
         evidence: EvidenceCheck(gaps: gaps), metadataPath: .writtenAtCapture,
-        accepted: true, acceptedDespite: despite, stationVerified: stationVerified
+        accepted: accepted, acceptedDespite: despite
     )
 }
 
-private var completeSet: [CaptureRecord] { ShotPlan.standard.map { makeRecord($0.id) } }
+/// A session that has cleared every floor: covered, and past both counts.
+private func finishedSession(coverageFraction: Double = 1.0) -> SessionManifest {
+    var coverage = SurfaceCoverage()
+    var patches = Set<CoveragePatch>()
+    let wanted = Int(Double(SurfaceCoverage.total) * coverageFraction)
+    outer: for sector in 0..<SurfaceCoverage.sectorCount {
+        for band in SurfaceBand.allCases {
+            if patches.count >= wanted { break outer }
+            patches.insert(CoveragePatch(sector: sector, band: band))
+        }
+    }
+    coverage.add(patches)
+
+    var records: [CaptureRecord] = []
+    for index in 1...15 { records.append(makeRecord(index, region: .front)) }
+    for index in 16...24 { records.append(makeRecord(index, region: .interior)) }
+    return makeManifest(records, coverage: coverage)
+}
 
 final class SessionReadinessTests: XCTestCase {
 
-    func testAnIncompleteSetCannotBeFinished() {
-        let readiness = makeManifest(with: [makeRecord("front")]).readiness()
+    func testAFreshSessionJustSaysKeepShooting() {
+        let readiness = makeManifest([makeRecord(1)]).readiness()
         XCTAssertFalse(readiness.canFinish)
-        XCTAssertEqual(readiness.blockers, [.shotsOutstanding(count: ShotPlan.standard.count - 1)])
+        XCTAssertEqual(readiness.blockers.count, 1)
     }
 
-    func testACleanSetFinishesWithNothingToSay() {
-        let readiness = makeManifest(with: completeSet).readiness()
+    func testACoveredSessionPastTheFloorsCanFinish() {
+        let readiness = finishedSession().readiness()
         XCTAssertTrue(readiness.canFinish)
         XCTAssertTrue(readiness.warnings.isEmpty)
-        XCTAssertFalse(readiness.needsAcknowledgement)
     }
 
-    /// Underground car parks exist and cars get wedged against walls. None of
-    /// these stops the job — they stop somebody walking off without knowing.
+    /// Underground car parks exist. None of these stops the job — they stop
+    /// somebody walking off without knowing.
     func testTheThingsThatWarnRatherThanBlock() {
-        var records = completeSet
-        records[0] = makeRecord(records[0].slotID, gaps: [.noLocation])
-        records[1] = makeRecord(records[1].slotID, stationVerified: false)
-        records[2] = makeRecord(records[2].slotID, despite: [.blurry])
+        var manifest = finishedSession()
+        manifest.records[0] = makeRecord(1, gaps: [.noLocation])
+        manifest.records[1] = makeRecord(2, despite: [.blurry])
 
-        let readiness = makeManifest(with: records).readiness()
+        let readiness = manifest.readiness()
         XCTAssertTrue(readiness.canFinish)
         XCTAssertTrue(readiness.needsAcknowledgement)
-        XCTAssertEqual(Set(readiness.warnings), [
-            .missingLocation(count: 1),
-            .takenOffStation(count: 1),
-            .qualityOverridden(count: 1),
-        ])
+        XCTAssertTrue(readiness.warnings.contains(.missingLocation(count: 1)))
+        XCTAssertTrue(readiness.warnings.contains(.qualityOverridden(count: 1)))
     }
 
-    /// A shot that was never position-tracked proves nothing either way, and
-    /// must not be reported as an offence.
-    func testUntrackedShotsAreNotCountedAgainstAnyone() {
-        let records = ShotPlan.standard.map { makeRecord($0.id, stationVerified: nil) }
-        XCTAssertTrue(makeManifest(with: records).readiness().warnings.isEmpty)
+    /// Finishable at 90% still means a tenth of the car was never
+    /// photographed, and the summary has to say so.
+    func testPartialCoverageIsSaidOutLoudEvenWhenItPasses() {
+        let readiness = finishedSession(coverageFraction: 0.93).readiness()
+        XCTAssertTrue(readiness.canFinish)
+        XCTAssertTrue(readiness.warnings.contains { warning in
+            if case .partialCoverage = warning { return true }
+            return false
+        })
+    }
+
+    func testRejectedPhotographsDoNotCountTowardsTheFloors() {
+        var manifest = finishedSession()
+        manifest.records = manifest.records.map { record in
+            var copy = record
+            if copy.region == .interior { copy.accepted = false }
+            return copy
+        }
+        XCTAssertEqual(manifest.interiorShots, 0)
+        XCTAssertFalse(manifest.readiness().canFinish)
     }
 }
 
 final class ExportManifestTests: XCTestCase {
 
     func testListsEveryDigestAndTheFileItCovers() {
-        let text = ExportManifest.plainText(for: makeManifest(with: completeSet))
-        for slot in ShotPlan.standard {
-            XCTAssertTrue(text.contains("\(slot.id)-1.jpg"), "\(slot.id) is missing from the manifest")
+        let manifest = finishedSession()
+        let text = ExportManifest.plainText(for: manifest)
+        for record in manifest.acceptedRecords {
+            XCTAssertTrue(text.contains(record.filename), "\(record.filename) is missing")
         }
         XCTAssertTrue(text.contains("ABC 123"))
         XCTAssertTrue(text.contains("Return from guest"))
-    }
-
-    func testNamesTheShotsThatWereNeverTaken() {
-        let text = ExportManifest.plainText(for: makeManifest(with: [makeRecord("front")]))
-        XCTAssertTrue(text.contains("MISSING   odometer"))
-        XCTAssertFalse(text.contains("MISSING   front "))
+        XCTAssertTrue(text.contains("15 exterior, 9 interior"))
     }
 
     /// A record that quietly omits its own weak points is worth less than one
     /// that lists them: the first thing an opponent does is look for what was
     /// left out.
     func testStatesTheWeakPointsInsteadOfBuryingThem() {
-        var records = completeSet
-        records[0] = makeRecord(records[0].slotID, gaps: [.noLocation], stationVerified: false,
-                            despite: [.blurry], attempt: 3)
-        let text = ExportManifest.plainText(for: makeManifest(with: records))
+        var manifest = finishedSession(coverageFraction: 0.93)
+        manifest.records[0] = makeRecord(1, gaps: [.noLocation], despite: [.blurry])
+        let text = ExportManifest.plainText(for: manifest)
 
         XCTAssertTrue(text.contains("no geolocation recorded"))
-        XCTAssertTrue(text.contains("not taken from the planned position"))
         XCTAssertTrue(text.contains("accepted despite: blurry"))
-        XCTAssertTrue(text.contains("attempt 3"))
+        XCTAssertTrue(text.contains("Least-covered area:"))
     }
 
     /// The audience is an adjuster or a lawyer, who will not read Chinese and
     /// will not run our software.
     func testIsInEnglishAndVerifiableWithStandardTools() {
-        let text = ExportManifest.plainText(for: makeManifest(with: completeSet))
+        let text = ExportManifest.plainText(for: finishedSession())
         XCTAssertTrue(text.contains("SHA-256"))
-        // `shasum -c` format: digest, two spaces, filename.
-        XCTAssertTrue(text.contains("\(String(repeating: "a", count: 64))  front-1.jpg"))
+        XCTAssertTrue(text.contains("\(String(repeating: "a", count: 64))  001-front.jpg"))
     }
 }
 
 final class ProvenanceTests: XCTestCase {
 
-    private var manifest: SessionManifest {
-        makeManifest(with: [makeRecord("front"), makeRecord("rear")])
-    }
-
+    private var manifest: SessionManifest { makeManifest([makeRecord(1), makeRecord(2, region: .rear)]) }
     private var knownDigest: String { String(repeating: "a", count: 64) }
     private var knownTime: Date { Date(timeIntervalSince1970: 1_789_000_000) }
 
     func testAMatchingDigestIsTheOriginal() {
         XCTAssertEqual(
             manifest.provenance(ofDigest: knownDigest, capturedAt: knownTime),
-            .original(filename: "front-1.jpg", vehicleLabel: "ABC 123")
+            .original(filename: "001-front.jpg", vehicleLabel: "ABC 123")
         )
     }
 
@@ -136,7 +157,7 @@ final class ProvenanceTests: XCTestCase {
     func testSameMomentDifferentBytesIsAltered() {
         XCTAssertEqual(
             manifest.provenance(ofDigest: String(repeating: "b", count: 64), capturedAt: knownTime),
-            .altered(filename: "front-1.jpg", vehicleLabel: "ABC 123")
+            .altered(filename: "001-front.jpg", vehicleLabel: "ABC 123")
         )
     }
 

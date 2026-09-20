@@ -16,6 +16,7 @@ final class ServerSettings {
         static let baseURL = "co.tatocar.evidence.baseURL"
         static let staffCode = "co.tatocar.evidence.staffCode"
         static let token = "co.tatocar.evidence.token"
+        static let photographer = "co.tatocar.evidence.photographer"
     }
 
     var baseURL: String {
@@ -26,6 +27,12 @@ final class ServerSettings {
     /// to re-enter it in a car park with cold hands.
     var staffCode: String {
         didSet { UserDefaults.standard.set(staffCode, forKey: Key.staffCode) }
+    }
+
+    /// Remembered so the finish screen comes pre-filled: the same person
+    /// photographs the same fleet all week.
+    var photographer: String {
+        didSet { UserDefaults.standard.set(photographer, forKey: Key.photographer) }
     }
 
     /// The session token. In the keychain rather than `UserDefaults` because
@@ -42,6 +49,7 @@ final class ServerSettings {
     init() {
         baseURL = UserDefaults.standard.string(forKey: Key.baseURL) ?? "https://tatocar.co"
         staffCode = UserDefaults.standard.string(forKey: Key.staffCode) ?? ""
+        photographer = UserDefaults.standard.string(forKey: Key.photographer) ?? ""
         token = Keychain.get(Key.token)
     }
 

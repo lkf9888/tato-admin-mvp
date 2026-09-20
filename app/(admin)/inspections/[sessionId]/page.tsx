@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import type { Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
-import { findCounterpart, shotFlags, type ShotFlag } from "@/lib/inspection-review";
+import { CAR_REGIONS } from "@/lib/inspection";
+import { findCounterpart, sharpestByRegion, shotFlags, type ShotFlag } from "@/lib/inspection-review";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 
@@ -14,8 +15,8 @@ type Params = Promise<{ sessionId: string }>;
 
 type ShotRow = {
   id: string;
-  slotId: string;
-  attempt: number;
+  region: string;
+  sequence: number;
   capturedAt: Date | null;
   latitude: number | null;
   longitude: number | null;
@@ -24,8 +25,8 @@ type ShotRow = {
   metadataPath: string;
   evidenceGaps: unknown;
   acceptedDespite: unknown;
-  stationVerified: boolean | null;
   clockSkewSeconds: number | null;
+  reportedSharpness: number | null;
 };
 
 /**
@@ -52,9 +53,14 @@ export default async function InspectionDetailPage({ params }: { params: Params 
   const [{ messages, locale }, counterpart] = await Promise.all([getI18n(), findCounterpart(session)]);
   const t = messages.inspections;
 
-  const expected = (session.expectedSlotIds as string[]) ?? [];
-  const bySlot = new Map(session.shots.map((shot) => [shot.slotId, shot]));
-  const counterpartBySlot = new Map((counterpart?.shots ?? []).map((shot) => [shot.slotId, shot]));
+  // One photograph per part of the car per side, chosen by sharpness. A
+  // free-form walk-around produces several of the same corner, which is what
+  // it should produce; a comparison needs one.
+  const own = sharpestByRegion(session.shots);
+  const other = sharpestByRegion(counterpart?.shots ?? []);
+  // Only the parts somebody actually photographed, in a fixed order so the
+  // page reads the same way every time.
+  const regions = CAR_REGIONS.filter((region) => own.has(region) || other.has(region));
 
   // The handover always renders on the left, whichever session was opened, so
   // the pair reads the same way round every time: before, then after.
@@ -62,7 +68,6 @@ export default async function InspectionDetailPage({ params }: { params: Params 
 
   const flagLabel: Record<ShotFlag, string> = {
     missingMetadata: t.flagMissingMetadata,
-    offStation: t.flagOffStation,
     qualityOverridden: t.flagQualityOverridden,
     suspectClock: t.flagSuspectClock,
   };
@@ -92,15 +97,17 @@ export default async function InspectionDetailPage({ params }: { params: Params 
       </header>
 
       <div className="space-y-4">
-        {expected.map((slotId) => {
-          const own = bySlot.get(slotId) ?? null;
-          const other = counterpartBySlot.get(slotId) ?? null;
-          const left = thisIsHandover ? own : other;
-          const right = thisIsHandover ? other : own;
+        {regions.map((region) => {
+          const mine = own.get(region) ?? null;
+          const theirs = other.get(region) ?? null;
+          const left = thisIsHandover ? mine : theirs;
+          const right = thisIsHandover ? theirs : mine;
 
           return (
-            <section key={slotId} className="rounded-lg border border-slate-200 bg-white p-4">
-              <h2 className="mb-3 text-sm font-medium text-slate-900">{slotId}</h2>
+            <section key={region} className="rounded-lg border border-slate-200 bg-white p-4">
+              <h2 className="mb-3 text-sm font-medium text-slate-900">
+                {t[`region_${region}` as keyof typeof t] ?? region}
+              </h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <ShotPane label={t.before} shot={left} t={t} locale={locale} flagLabel={flagLabel} />
                 <ShotPane label={t.after} shot={right} t={t} locale={locale} flagLabel={flagLabel} />
@@ -141,7 +148,7 @@ function ShotPane({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/api/inspection/shots/${shot.id}/file`}
-            alt={shot.slotId}
+            alt={shot.region}
             className="aspect-[4/3] w-full rounded-md border border-slate-200 object-cover"
             loading="lazy"
           />
@@ -168,9 +175,7 @@ function ShotPane({
             </div>
           </dl>
           <div className="flex flex-wrap items-center gap-1.5">
-            {shot.attempt > 1 ? (
-              <Badge tone="slate">{t.attempt.replace("{n}", String(shot.attempt))}</Badge>
-            ) : null}
+            <Badge tone="slate">{t.shotNumber.replace("{n}", String(shot.sequence))}</Badge>
             {shotFlags(shot).map((flag) => (
               <Badge key={flag} tone="orange">
                 {flagLabel[flag]}

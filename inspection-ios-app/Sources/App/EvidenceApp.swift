@@ -6,8 +6,11 @@ struct EvidenceApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ShotPlanView()
+            // Straight into the camera. There is no home screen, because a
+            // home screen is a page whose only job is to be got past.
+            CaptureView()
                 .environment(settings)
+                .preferredColorScheme(.dark)
         }
     }
 }

@@ -9,6 +9,10 @@ export const runtime = "nodejs";
 /**
  * Opens a vehicle-condition session, or resumes one already open.
  *
+ * Takes no shot list: there is not one. The phone reports how much of the
+ * car's surface it reckons was covered, which is stored as a claim, and the
+ * server counts the photographs for itself at completion.
+ *
  * The phone supplies the id, which makes this idempotent: a walk-around
  * interrupted by a dead spot resumes into the same session rather than
  * starting a second, half-finished one beside it.
@@ -30,20 +34,11 @@ export async function POST(request: NextRequest) {
   const vehicleLabel = typeof input.vehicleLabel === "string" ? input.vehicleLabel.trim() : "";
   const kind = input.kind === "checkout" ? InspectionKind.checkout : input.kind === "checkin" ? InspectionKind.checkin : null;
   const startedAt = typeof input.startedAt === "string" ? new Date(input.startedAt) : null;
-  const expectedSlotIds = Array.isArray(input.expectedSlotIds)
-    ? input.expectedSlotIds.filter((slot): slot is string => typeof slot === "string")
-    : [];
+  const coverageFraction = typeof input.coverageFraction === "number" ? input.coverageFraction : null;
 
   if (!clientSessionId || !vehicleLabel || !kind || !startedAt || Number.isNaN(startedAt.getTime())) {
     return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
   }
-  // Without the shot list the server cannot decide completeness on its own,
-  // which would leave "is this walk-around finished" as something the phone
-  // asserts rather than something anyone can check.
-  if (expectedSlotIds.length === 0) {
-    return NextResponse.json({ error: "NO_SHOT_LIST" }, { status: 400 });
-  }
-
   const { session, resumed } = await openSession(
     { id: staff.id, workspaceId: staff.workspaceId, name: staff.name },
     {
@@ -54,7 +49,7 @@ export async function POST(request: NextRequest) {
       appVersion: typeof input.appVersion === "string" ? input.appVersion : "unknown",
       startedAt,
       timeZone: typeof input.timeZone === "string" ? input.timeZone : "UTC",
-      expectedSlotIds,
+      coverageFraction,
       orderId: typeof input.orderId === "string" ? input.orderId : null,
     },
   );

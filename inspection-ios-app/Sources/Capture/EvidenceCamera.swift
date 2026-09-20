@@ -56,6 +56,11 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
     private let sessionQueue = DispatchQueue(label: "co.tatocar.evidence.camera")
     private let output = AVCapturePhotoOutput()
     private var device: AVCaptureDevice?
+    /// The lens's real horizontal field of view, which decides how much of
+    /// the car one photograph can be said to document. Read from the device
+    /// rather than assumed: it differs between the wide and ultra-wide, and
+    /// guessing would quietly skew every coverage calculation.
+    private(set) var horizontalFieldOfView: Double = 68
     /// AVFoundation holds its capture delegates weakly, so they have to live
     /// here until the photo comes back.
     private var inFlight: [Int64: PhotoCaptureDelegate] = [:]
@@ -83,6 +88,7 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
             throw CameraError.noCamera
         }
         device = camera
+        horizontalFieldOfView = Double(camera.activeFormat.videoFieldOfView)
 
         let input = try AVCaptureDeviceInput(device: camera)
         guard session.canAddInput(input) else { throw CameraError.cannotAddInput }

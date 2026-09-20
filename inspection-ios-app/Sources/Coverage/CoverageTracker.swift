@@ -2,77 +2,54 @@ import ARKit
 import EvidenceCore
 import Foundation
 
-enum CoverageCapability: String, Sendable {
-    /// The car's box is measured off the depth mesh. Pro-model iPhones.
-    case sceneReconstruction
-    /// Pose is tracked just as well; the car has to be marked by hand.
-    case visualInertial
-}
-
-enum CalibrationFailure: LocalizedError {
-    case notEnoughMesh
-    case nothingCarShaped
-    case markedPointsImplausible
-
-    var errorDescription: String? {
-        switch self {
-        case .notEnoughMesh:
-            return "还没扫到足够的车身，举着手机沿车走半圈再试。"
-        case .nothingCarShaped:
-            return "扫到的东西不像一台车，可能对着墙或者旁边那辆车了。手动标一下车头车尾。"
-        case .markedPointsImplausible:
-            return "车头车尾这两个点对不上一台车，重新标一次。"
-        }
-    }
-}
-
-/// Knows where the photographer is standing relative to the car, and which
-/// shot that makes it.
+/// Watches where the phone is and paints the car as it gets photographed.
 ///
-/// **One tracker, not two.** The obvious design is a LiDAR engine and a
-/// non-LiDAR engine, and it is the wrong one: pose tracking is ARKit's job and
-/// it is equally good either way. The only thing the depth sensor changes is
-/// how the car's box gets established — measured, or marked by hand. So that
-/// is the only thing that branches, and everything downstream is the shared,
-/// tested arithmetic in `EvidenceCore`.
+/// **No calibration step, by design.** The old build had a button that said
+/// "identify vehicle" and, on phones without a depth sensor, a two-tap ritual
+/// at the bumpers. Both were the app asking to be understood before it would
+/// do anything. Here the fit runs by itself while the photographer is already
+/// shooting, retries until it finds something car-shaped, and the coverage
+/// diagram simply appears when it does. Photographs taken before then are
+/// archived normally; they just do not count towards coverage, and the first
+/// successful fit sweeps up whatever poses were recorded in the meantime.
 ///
-/// This matters commercially as much as technically. The fleet is on Pro
-/// phones today; a Turo host who buys this from the App Store mostly is not.
-/// An app that needs LiDAR to function is unsellable to most of that market,
-/// and would also fail on a Pro in direct sunlight, where the infrared return
-/// washes out and reconstruction quietly stops.
+/// On a phone with no depth sensor there is nothing to fit, so no diagram
+/// appears and the session falls back to counting photographs against Turo's
+/// floors. That is a smaller feature, not a broken one — and it is what a
+/// consumer iPhone will do when this is sold to other hosts.
 @MainActor
 @Observable
 final class CoverageTracker: NSObject, ARSessionDelegate {
 
-    private(set) var capability: CoverageCapability = .visualInertial
     private(set) var vehicleFrame: VehicleFrame?
-    private(set) var placement: Placement?
-    private(set) var guidance: CoverageGuidance?
-    /// False while ARKit is initialising or has lost its bearings — the
-    /// guidance is meaningless until it is true again.
+    private(set) var coverage = SurfaceCoverage()
     private(set) var isTracking = false
-    private(set) var calibrationError: String?
-
-    var outstanding: [ShotSlot] = ShotPlan.exterior
+    /// True when the device can measure the car at all.
+    private(set) var canMeasure = false
 
     private let session = ARSession()
     private var meshAnchors: [UUID: ARMeshAnchor] = [:]
     private var groundY: Float?
     private var cameraPosition: SIMD3<Float>?
     private var cameraForward: SIMD3<Float>?
+    private var lastFitAttempt = Date.distantPast
+    /// Poses of photographs taken before the car was found, so the first
+    /// successful fit can credit them rather than throwing them away.
+    private var pendingPoses: [(position: SIMD3<Float>, forward: SIMD3<Float>)] = []
 
-    var isCalibrated: Bool { vehicleFrame != nil }
+    /// The iPhone wide camera's horizontal field of view. Overwritten with
+    /// the real figure once the capture device is configured.
+    var fieldOfViewDegrees: Double = 68
+
+    var hasFrame: Bool { vehicleFrame != nil }
 
     func start() {
         guard ARWorldTrackingConfiguration.isSupported else { return }
-
         let configuration = ARWorldTrackingConfiguration()
-        // Gives the ground plane, which is what heights are measured from.
         configuration.planeDetection = [.horizontal]
         if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
             configuration.sceneReconstruction = .mesh
-            capability = .sceneReconstruction
+            canMeasure = true
         }
         session.delegate = self
         session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
@@ -83,20 +60,70 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
         isTracking = false
     }
 
-    // MARK: - Calibration
+    /// Restores a coverage map from a session being resumed.
+    func resume(coverage: SurfaceCoverage) {
+        self.coverage = coverage
+    }
 
-    /// Measures the car off the depth mesh. Pro phones only.
+    // MARK: - Painting
+
+    /// Credits a photograph taken at the current pose.
     ///
-    /// Called once the photographer has walked far enough for the mesh to
-    /// have something in it — not on the first frame, when it holds a patch
-    /// of tarmac.
-    func calibrateFromMesh() {
-        guard capability == .sceneReconstruction,
-              let observer = cameraPosition,
-              let ground = groundY else {
-            calibrationError = CalibrationFailure.notEnoughMesh.errorDescription
-            return
+    /// Returns the region it turned out to document, which is what the
+    /// archive files it under — worked out after the shutter, never chosen
+    /// before it.
+    @discardableResult
+    func recordShot() -> CarRegion {
+        guard let position = cameraPosition, let forward = cameraForward else { return .front }
+
+        guard let frame = vehicleFrame else {
+            // Not fitted yet. Keep the pose; the first good fit will use it.
+            pendingPoses.append((position, forward))
+            if pendingPoses.count > 64 { pendingPoses.removeFirst() }
+            return .front
         }
+
+        if frame.contains(position) { return .interior }
+
+        let patches = CoverageProjection.patches(
+            seenFrom: position,
+            looking: forward,
+            horizontalFieldOfViewDegrees: fieldOfViewDegrees,
+            of: frame
+        )
+        coverage.add(patches)
+        return Self.dominantRegion(of: patches) ?? .front
+    }
+
+    /// Where to send the photographer next, in their own frame of reference:
+    /// signed degrees from where they are looking, positive to their right.
+    func bearingToThinnestRegion() -> (region: CarRegion, degrees: Double)? {
+        guard let frame = vehicleFrame,
+              let position = cameraPosition,
+              let forward = cameraForward,
+              let region = coverage.thinnestRegion() else { return nil }
+        guard let degrees = Bearing.relative(to: frame.lookAt(region), from: position, facing: forward) else {
+            return nil
+        }
+        return (region, degrees)
+    }
+
+    private static func dominantRegion(of patches: Set<CoveragePatch>) -> CarRegion? {
+        var tally: [CarRegion: Int] = [:]
+        for patch in patches {
+            tally[SurfaceCoverage.region(ofSector: patch.sector, band: patch.band), default: 0] += 1
+        }
+        return tally.max { $0.value < $1.value }?.key
+    }
+
+    // MARK: - Finding the car, without being asked
+
+    private func attemptFit() {
+        guard vehicleFrame == nil, canMeasure,
+              let observer = cameraPosition,
+              let ground = groundY,
+              Date().timeIntervalSince(lastFitAttempt) > 1.5 else { return }
+        lastFitAttempt = Date()
 
         // Only what is near the photographer. A car park mesh runs to
         // hundreds of thousands of vertices, nearly all of it other people's
@@ -104,69 +131,22 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
         let nearby = meshAnchors.values
             .flatMap { Self.worldVertices(of: $0) }
             .filter { simd_distance(SIMD3($0.x, 0, $0.z), SIMD3(observer.x, 0, observer.z)) < 8 }
-
-        guard nearby.count >= 256 else {
-            calibrationError = CalibrationFailure.notEnoughMesh.errorDescription
-            return
-        }
-        guard let frame = VehicleFrameFitter.fit(points: nearby, groundY: ground, observedFrom: observer) else {
-            calibrationError = CalibrationFailure.nothingCarShaped.errorDescription
-            return
-        }
+        guard nearby.count >= 256,
+              let frame = VehicleFrameFitter.fit(points: nearby, groundY: ground, observedFrom: observer)
+        else { return }
 
         vehicleFrame = frame
-        calibrationError = nil
-    }
-
-    /// The fallback for phones without a depth sensor: the photographer
-    /// stands at the front bumper, then at the rear bumper.
-    ///
-    /// Width is assumed rather than measured — 1.85m, a normal car. It only
-    /// feeds the distance calculation, where being 10cm out moves a station
-    /// by 10cm and the tolerance is a metre and a half.
-    func calibrateByHand(nose: SIMD3<Float>, tail: SIMD3<Float>) {
-        guard let ground = groundY ?? nose.y as Float? else { return }
-        let axis = SIMD3<Float>(nose.x - tail.x, 0, nose.z - tail.z)
-        let length = simd_length(axis)
-        guard length > 0.5 else {
-            calibrationError = CalibrationFailure.markedPointsImplausible.errorDescription
-            return
+        // Credit the photographs taken while the car was still being found.
+        for pose in pendingPoses {
+            guard !frame.contains(pose.position) else { continue }
+            coverage.add(CoverageProjection.patches(
+                seenFrom: pose.position,
+                looking: pose.forward,
+                horizontalFieldOfViewDegrees: fieldOfViewDegrees,
+                of: frame
+            ))
         }
-
-        let midpoint = (nose + tail) / 2
-        let frame = VehicleFrame(
-            centre: SIMD3(midpoint.x, ground, midpoint.z),
-            forward: axis,
-            length: length,
-            width: 1.85
-        )
-        guard frame.isPlausible else {
-            calibrationError = CalibrationFailure.markedPointsImplausible.errorDescription
-            return
-        }
-
-        vehicleFrame = frame
-        calibrationError = nil
-    }
-
-    /// The photographer's current position, for marking the bumpers.
-    var currentPosition: SIMD3<Float>? { cameraPosition }
-
-    /// Which way to point the arrow: signed degrees from where the camera is
-    /// looking to the next station. Positive is to the photographer's right.
-    var bearingToNextStation: Double? {
-        guard let frame = vehicleFrame,
-              let station = guidance?.nextSlot?.station,
-              let position = cameraPosition,
-              let forward = cameraForward else { return nil }
-        return Bearing.relative(to: frame.worldPosition(for: station), from: position, facing: forward)
-    }
-
-    func reset() {
-        vehicleFrame = nil
-        placement = nil
-        guidance = nil
-        calibrationError = nil
+        pendingPoses.removeAll()
     }
 
     // MARK: - ARSessionDelegate
@@ -177,26 +157,18 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
         // An ARKit camera looks along its own -Z.
         let forward = -SIMD3<Float>(transform.columns.2.x, transform.columns.2.y, transform.columns.2.z)
         let usable: Bool
-        switch frame.camera.trackingState {
-        case .normal: usable = true
-        default: usable = false
-        }
+        if case .normal = frame.camera.trackingState { usable = true } else { usable = false }
 
         Task { @MainActor in
             self.cameraPosition = position
             self.cameraForward = forward
             self.isTracking = usable
-            self.refreshGuidance(at: position)
+            if usable { self.attemptFit() }
         }
     }
 
-    nonisolated func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
-        absorb(anchors)
-    }
-
-    nonisolated func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
-        absorb(anchors)
-    }
+    nonisolated func session(_ session: ARSession, didAdd anchors: [ARAnchor]) { absorb(anchors) }
+    nonisolated func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) { absorb(anchors) }
 
     nonisolated func session(_ session: ARSession, didRemove anchors: [ARAnchor]) {
         let removed = anchors.map(\.identifier)
@@ -207,7 +179,6 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
 
     private nonisolated func absorb(_ anchors: [ARAnchor]) {
         let meshes = anchors.compactMap { $0 as? ARMeshAnchor }
-        // The lowest horizontal plane is the floor the car is standing on.
         let planeHeights = anchors
             .compactMap { $0 as? ARPlaneAnchor }
             .filter { $0.alignment == .horizontal }
@@ -215,21 +186,8 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
 
         Task { @MainActor in
             for mesh in meshes { self.meshAnchors[mesh.identifier] = mesh }
-            for height in planeHeights {
-                self.groundY = min(self.groundY ?? height, height)
-            }
+            for height in planeHeights { self.groundY = min(self.groundY ?? height, height) }
         }
-    }
-
-    private func refreshGuidance(at position: SIMD3<Float>) {
-        guard let frame = vehicleFrame, isTracking else {
-            placement = nil
-            guidance = nil
-            return
-        }
-        let here = frame.placement(ofCameraAt: position)
-        placement = here
-        guidance = CoverageMatcher.guidance(for: here, outstanding: outstanding)
     }
 
     // MARK: - Mesh reading

@@ -87,7 +87,7 @@ struct UploadClient: Sendable {
         return token
     }
 
-    func openSession(_ manifest: SessionManifest, plan: [ShotSlot]) async throws -> String {
+    func openSession(_ manifest: SessionManifest) async throws -> String {
         let body: [String: Any] = [
             "clientSessionId": manifest.sessionID,
             "vehicleLabel": manifest.vehicleLabel,
@@ -96,7 +96,9 @@ struct UploadClient: Sendable {
             "appVersion": manifest.appVersion,
             "startedAt": ISO8601DateFormatter().string(from: manifest.startedAt),
             "timeZone": manifest.timeZoneIdentifier,
-            "expectedSlotIds": plan.map(\.id),
+            "coverageFraction": manifest.coverage.fraction,
+            "exteriorShots": manifest.exteriorShots,
+            "interiorShots": manifest.interiorShots,
         ]
         let payload = try await send(
             path: "api/inspection/sessions",
@@ -114,14 +116,16 @@ struct UploadClient: Sendable {
         jpeg: Data,
     ) async throws -> ShotUploadResult {
         let meta: [String: Any] = [
-            "slotId": record.slotID,
-            "attempt": record.attempt,
+            // The server keeps calling this a slot; here it is the region the
+            // photograph turned out to document, which is what the review page
+            // pairs handover against return on.
+            "slotId": record.region.rawValue,
+            "attempt": record.sequence,
             "accepted": record.accepted,
             "sha256": record.sha256,
             "reportedSharpness": record.quality.laplacianVariance,
             "reportedIssues": record.quality.issues.map(\.rawValue),
             "acceptedDespite": record.acceptedDespite.map(\.rawValue),
-            "stationVerified": record.stationVerified as Any,
             "metadataPath": record.metadataPath.rawValue,
             // Sent so the server can compare this phone's clock with its own.
             // EXIF times are only as trustworthy as the device that wrote

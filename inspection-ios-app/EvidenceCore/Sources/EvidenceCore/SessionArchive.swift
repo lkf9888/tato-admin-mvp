@@ -14,9 +14,13 @@ public enum ArchiveError: Error, Equatable {
 /// ```
 /// <root>/<sessionID>/
 ///     manifest.json
-///     photos/front-1.jpg
-///     photos/front-2.jpg      ← the first attempt was blurred; both are kept
+///     photos/001-frontLeft.jpg
+///     photos/002-frontLeft.jpg   ← two of the same corner; both are kept
 /// ```
+///
+/// Numbered in sequence rather than named by slot. There are no slots: the
+/// photographer shoots wherever they like and as much as they like, and the
+/// region in the filename is worked out from the camera's pose afterwards.
 ///
 /// **Nothing here ever goes near the photo library.** An iOS photo library
 /// round trip can hand back a re-encoded copy — different bytes, different
@@ -57,16 +61,15 @@ public actor SessionArchive {
     @discardableResult
     public func store(
         jpeg: Data,
-        slot: ShotSlot,
+        region: CarRegion,
         capturedAt: Date,
         quality: ImageQualityReport,
         metadataPath: MetadataPath,
         accepted: Bool = true,
-        acceptedDespite: [ImageQualityIssue] = [],
-        stationVerified: Bool? = nil
+        acceptedDespite: [ImageQualityIssue] = []
     ) throws -> CaptureRecord {
-        let attempt = (manifest.records.filter { $0.slotID == slot.id }.map(\.attempt).max() ?? 0) + 1
-        let filename = "\(slot.id)-\(attempt).jpg"
+        let sequence = (manifest.records.map(\.sequence).max() ?? 0) + 1
+        let filename = String(format: "%03d-%@.jpg", sequence, region.rawValue)
         let destination = photosDirectory.appendingPathComponent(filename)
         let digest = EvidenceHash.sha256(jpeg)
 
@@ -81,8 +84,8 @@ public actor SessionArchive {
         try? FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: destination.path)
 
         let record = CaptureRecord(
-            slotID: slot.id,
-            attempt: attempt,
+            region: region,
+            sequence: sequence,
             filename: filename,
             byteCount: jpeg.count,
             sha256: digest,
@@ -91,40 +94,46 @@ public actor SessionArchive {
             evidence: EvidenceRequirements.check(jpeg: jpeg),
             metadataPath: metadataPath,
             accepted: accepted,
-            acceptedDespite: acceptedDespite,
-            stationVerified: stationVerified
+            acceptedDespite: acceptedDespite
         )
-
-        // A rejected attempt is filed but does not displace a good photo
-        // already taken for that slot.
-        if accepted { supersedeAccepted(forSlot: slot.id) }
         manifest.records.append(record)
         try persist()
         return record
     }
 
-    /// Promotes an attempt the gate turned down, on the operator's say-so.
+    /// Names the car and the occasion.
     ///
-    /// The override is recorded against the photograph rather than swallowed:
-    /// `acceptedDespite` is what lets a manager see that this slot went
-    /// through blurred, and who decided that.
-    public func accept(_ record: CaptureRecord, despite issues: [ImageQualityIssue]) throws {
-        guard let index = manifest.records.firstIndex(where: { $0.id == record.id }) else { return }
-        supersedeAccepted(forSlot: record.slotID)
-        manifest.records[index].accepted = true
-        manifest.records[index].acceptedDespite = issues
+    /// Set at the end rather than the beginning. Asking "which car, and are
+    /// you handing it over or taking it back?" before the first photograph is
+    /// a form standing between somebody and the thing they came to do — and
+    /// by the end the app can usually answer both itself, from the plate it
+    /// read and the trips the backend knows about.
+    public func describe(vehicleLabel: String, kind: SessionKind) throws {
+        manifest.vehicleLabel = vehicleLabel
+        manifest.kind = kind
         try persist()
     }
 
-    private func supersedeAccepted(forSlot slotID: String) {
-        for index in manifest.records.indices where manifest.records[index].slotID == slotID {
-            manifest.records[index].accepted = false
-        }
+    /// Records what the car's surface coverage looks like now.
+    ///
+    /// Persisted on every shot so a session survives the app being killed
+    /// mid-walk: coverage is derived from camera poses that no longer exist
+    /// once tracking restarts, so losing it would mean starting the car over.
+    public func updateCoverage(_ coverage: SurfaceCoverage) throws {
+        manifest.coverage = coverage
+        try persist()
     }
 
-    /// How many times this slot has been attempted.
-    public func attempts(forSlot slotID: String) -> Int {
-        manifest.records.filter { $0.slotID == slotID }.count
+    /// Counts a photograph the gate turned down, on the operator's say-so.
+    ///
+    /// The override is recorded against the photograph rather than swallowed:
+    /// `acceptedDespite` is what lets a manager see that a blurred shot went
+    /// through, and who decided that.
+    public func accept(_ record: CaptureRecord, despite issues: [ImageQualityIssue]) throws {
+        guard let index = manifest.records.firstIndex(where: { $0.id == record.id }) else { return }
+        manifest.records[index].accepted = true
+        manifest.records[index].acceptedDespite = issues
+        try persist()
     }
 
     /// Pure path arithmetic over `root`, so callers do not have to hop

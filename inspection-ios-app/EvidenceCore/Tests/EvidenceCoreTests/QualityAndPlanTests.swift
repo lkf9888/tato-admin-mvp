@@ -52,78 +52,12 @@ final class ImageQualityGateTests: XCTestCase {
         XCTAssertTrue(report.issues.contains(.blurry))
     }
 
-    func testTheOdometerIsHeldToAStricterBar() {
-        XCTAssertGreaterThan(
-            ImageQualityThresholds.legibleText.minLaplacianVariance,
-            ImageQualityThresholds.provisional.minLaplacianVariance
-        )
-        XCTAssertEqual(ShotPlan.slot(id: "odometer")?.thresholds, .legibleText)
-        XCTAssertEqual(ShotPlan.slot(id: "front")?.thresholds, .provisional)
-    }
 
     func testEvaluationNeverTouchesTheFile() throws {
         let jpeg = TestImages.checkerboard()
         let digestBefore = EvidenceHash.sha256(jpeg)
         _ = try ImageQualityGate.evaluate(jpeg: jpeg)
         XCTAssertEqual(EvidenceHash.sha256(jpeg), digestBefore)
-    }
-}
-
-final class ShotPlanTests: XCTestCase {
-
-    /// Turo's guidance for host trip photos is at least 15 exterior and at
-    /// least 8 interior. These floors exist so a later tidy-up of the list
-    /// cannot quietly drop the plan below what a claim needs.
-    func testMeetsTuroPhotoCountFloors() {
-        XCTAssertGreaterThanOrEqual(ShotPlan.exterior.count, 15)
-        XCTAssertGreaterThanOrEqual(ShotPlan.interior.count, 8)
-    }
-
-    func testCapturesTheTwoReadingsEveryClaimAsksFor() {
-        XCTAssertNotNil(ShotPlan.slot(id: "odometer"))
-        XCTAssertNotNil(ShotPlan.slot(id: "fuel_gauge"))
-        XCTAssertTrue(ShotPlan.slot(id: "odometer")!.requiresLegibleText)
-        XCTAssertTrue(ShotPlan.slot(id: "fuel_gauge")!.requiresLegibleText)
-    }
-
-    /// Turo does not cover undercarriage damage and a phone cannot photograph
-    /// one anyway. The lower bumpers and the ground under each tyre are what
-    /// stands in for it.
-    func testCoversLowerBumpersAndWheelsInsteadOfTheUndercarriage() {
-        XCTAssertNotNil(ShotPlan.slot(id: "bumper_front_lower"))
-        XCTAssertNotNil(ShotPlan.slot(id: "bumper_rear_lower"))
-        XCTAssertEqual(ShotPlan.exterior.filter { $0.id.hasPrefix("wheel_") }.count, 4)
-        XCTAssertTrue(ShotPlan.standard.allSatisfy { !$0.id.contains("undercarriage") })
-    }
-
-    func testEveryExteriorSlotHasAStationAndEveryInteriorSlotHasNone() {
-        for slot in ShotPlan.exterior {
-            XCTAssertNotNil(slot.station, "\(slot.id) needs a station for the coverage engine")
-        }
-        for slot in ShotPlan.interior {
-            XCTAssertNil(slot.station, "\(slot.id) is inside the car and has no station")
-        }
-    }
-
-    func testStationsRingTheWholeCar() {
-        let azimuths = ShotPlan.exterior.compactMap { $0.station?.azimuthDegrees }
-        for quadrant in stride(from: 0.0, to: 360.0, by: 90.0) {
-            XCTAssertTrue(
-                azimuths.contains { $0 >= quadrant && $0 < quadrant + 90 },
-                "nothing is shot from the \(Int(quadrant))°–\(Int(quadrant) + 90)° quadrant"
-            )
-        }
-    }
-
-    /// The roof is taken with the phone over the photographer's head, where the
-    /// screen cannot be seen. That slot has to be driven by speech and haptics.
-    func testTheRoofIsTheHandsFreeSlot() {
-        XCTAssertEqual(ShotPlan.standard.filter(\.handsFree).map(\.id), ["roof"])
-        XCTAssertEqual(ShotPlan.slot(id: "roof")?.station?.height, .overhead)
-    }
-
-    func testSlotIdentifiersAreUnique() {
-        XCTAssertEqual(Set(ShotPlan.standard.map(\.id)).count, ShotPlan.standard.count)
     }
 }
 

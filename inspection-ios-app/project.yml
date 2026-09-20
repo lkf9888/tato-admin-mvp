@@ -19,6 +19,11 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: co.tatocar.evidence
+        # Pinned here rather than picked in Xcode's UI: the .xcodeproj is
+        # generated, so a team chosen in the UI is wiped by the next
+        # `xcodegen generate` and signing silently breaks.
+        DEVELOPMENT_TEAM: VW85832VF2
+        CODE_SIGN_STYLE: Automatic
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"
@@ -54,3 +59,10 @@ targets:
         NSPhotoLibraryUsageDescription: >-
           Photos are read back after saving to confirm the system did not
           re-encode them, which would invalidate them as evidence.
+        # Lets the app reach a dev server on the same wifi over plain http
+        # (http://192.168.x.x:3000), which is how the upload path gets
+        # tested before there is a real server to point at. This key only
+        # covers local addresses -- App Transport Security still applies in
+        # full to anything on the public internet.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true

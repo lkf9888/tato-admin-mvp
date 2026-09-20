@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { storeShot, type ShotMetadata } from "@/lib/inspection";
+import { isCarRegion, storeShot, type ShotMetadata } from "@/lib/inspection";
 import { prisma } from "@/lib/prisma";
 import { getBearerToken, verifyStaffAppSession } from "@/lib/staff-app";
 import { MAX_UPLOAD_BYTES_PER_FILE } from "@/lib/uploads";
@@ -12,11 +12,11 @@ type Params = Promise<{ sessionId: string }>;
 /**
  * Files one photograph into a session.
  *
- * One shot per request on purpose. A walk-around is two dozen full-resolution
+ * One shot per request on purpose. A walk-around is dozens of full-resolution
  * photographs taken in a car park on mobile data, and batching them means one
  * dropped connection costs the whole set; per-shot uploads resume where they
- * stopped. The route is idempotent on (slot, attempt) so a retry that already
- * landed is not an error.
+ * stopped. The route is idempotent on the session's sequence number, so a
+ * retry that already landed is not an error.
  *
  * Everything the phone says about the file is re-derived here from the bytes.
  * See `lib/inspection-evidence.ts` for what that rejects and what it merely
@@ -55,18 +55,22 @@ export async function POST(request: NextRequest, { params }: { params: Params })
   let meta: ShotMetadata;
   try {
     const parsed = JSON.parse(rawMeta) as Record<string, unknown>;
-    if (typeof parsed.slotId !== "string" || typeof parsed.sha256 !== "string") {
+    // `slotId` and `attempt` are the wire names, kept so a phone that has
+    // not been updated still uploads; what they carry now is the region the
+    // photograph turned out to document and its position in the session.
+    const region = parsed.region ?? parsed.slotId;
+    const sequence = parsed.sequence ?? parsed.attempt;
+    if (!isCarRegion(region) || typeof parsed.sha256 !== "string" || typeof sequence !== "number") {
       return NextResponse.json({ error: "INVALID_META" }, { status: 400 });
     }
     meta = {
-      slotId: parsed.slotId,
-      attempt: typeof parsed.attempt === "number" ? parsed.attempt : 1,
+      region,
+      sequence,
       accepted: parsed.accepted !== false,
       sha256: parsed.sha256,
       reportedSharpness: typeof parsed.reportedSharpness === "number" ? parsed.reportedSharpness : null,
       reportedIssues: Array.isArray(parsed.reportedIssues) ? (parsed.reportedIssues as string[]) : [],
       acceptedDespite: Array.isArray(parsed.acceptedDespite) ? (parsed.acceptedDespite as string[]) : [],
-      stationVerified: typeof parsed.stationVerified === "boolean" ? parsed.stationVerified : null,
       metadataPath: typeof parsed.metadataPath === "string" ? parsed.metadataPath : "unknown",
       deviceClockAt: typeof parsed.deviceClockAt === "string" ? parsed.deviceClockAt : null,
     };

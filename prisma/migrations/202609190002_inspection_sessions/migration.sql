@@ -13,7 +13,7 @@ CREATE TABLE "InspectionSession" (
     "appVersion" TEXT NOT NULL,
     "startedAt" DATETIME NOT NULL,
     "timeZone" TEXT NOT NULL,
-    "expectedSlotIds" JSONB NOT NULL,
+    "coverageFraction" REAL,
     "completedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -28,8 +28,8 @@ CREATE TABLE "InspectionShot" (
     "workspaceId" TEXT,
     "id" TEXT NOT NULL PRIMARY KEY,
     "sessionId" TEXT NOT NULL,
-    "slotId" TEXT NOT NULL,
-    "attempt" INTEGER NOT NULL DEFAULT 1,
+    "region" TEXT NOT NULL,
+    "sequence" INTEGER NOT NULL,
     "accepted" BOOLEAN NOT NULL DEFAULT true,
     "pathname" TEXT NOT NULL,
     "filename" TEXT NOT NULL,
@@ -48,7 +48,6 @@ CREATE TABLE "InspectionShot" (
     "reportedSharpness" REAL,
     "reportedIssues" JSONB NOT NULL,
     "acceptedDespite" JSONB NOT NULL,
-    "stationVerified" BOOLEAN,
     "metadataPath" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "InspectionShot_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "InspectionSession" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -77,7 +76,10 @@ CREATE INDEX "InspectionShot_workspaceId_idx" ON "InspectionShot"("workspaceId")
 CREATE INDEX "InspectionShot_sessionId_accepted_idx" ON "InspectionShot"("sessionId", "accepted");
 
 -- CreateIndex
+CREATE INDEX "InspectionShot_sessionId_region_idx" ON "InspectionShot"("sessionId", "region");
+
+-- CreateIndex
 CREATE INDEX "InspectionShot_sha256_idx" ON "InspectionShot"("sha256");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "InspectionShot_sessionId_slotId_attempt_key" ON "InspectionShot"("sessionId", "slotId", "attempt");
+CREATE UNIQUE INDEX "InspectionShot_sessionId_sequence_key" ON "InspectionShot"("sessionId", "sequence");

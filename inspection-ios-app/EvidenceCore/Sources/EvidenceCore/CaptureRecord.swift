@@ -22,13 +22,18 @@ public enum SessionKind: String, Sendable, Codable {
 
 /// One photograph, and everything known about it at the moment it was taken.
 public struct CaptureRecord: Sendable, Codable, Equatable, Identifiable {
-    public var id: String { "\(slotID)-\(attempt)" }
+    public var id: String { "shot-\(sequence)" }
 
-    public var slotID: String
-    /// 1 for the first go. Retakes keep their predecessors: "this slot took
-    /// four attempts" is exactly the signal a fleet manager wants, and
-    /// deleting the rejects would erase it.
-    public var attempt: Int
+    /// Where on the car this photograph turned out to be pointing.
+    ///
+    /// **Derived from the camera's pose after the shutter, never chosen
+    /// before it.** The photographer shoots wherever they like; this is how
+    /// the review page can still put the handover and the return of the same
+    /// corner side by side afterwards.
+    public var region: CarRegion
+    /// Position in the session, from 1. Not a retake counter — there is
+    /// nothing to retake, because there are no slots to fill.
+    public var sequence: Int
     public var filename: String
     public var byteCount: Int
     public var sha256: String
@@ -36,25 +41,18 @@ public struct CaptureRecord: Sendable, Codable, Equatable, Identifiable {
     public var quality: ImageQualityReport
     public var evidence: EvidenceCheck
     public var metadataPath: MetadataPath
-    /// Whether this is the attempt that counts for the slot.
+    /// Whether the photograph cleared the quality gate. A rejected one is
+    /// still archived — it is part of the record of how the walk-around went
+    /// — but it does not count towards coverage or the floors.
     public var accepted: Bool
     /// Problems the operator was shown and waved through. Empty on a clean
     /// pass. Non-empty means somebody made a judgement call that is now on
     /// the record with their name against it.
     public var acceptedDespite: [ImageQualityIssue]
-    /// Whether the photographer was standing in the plan's station when the
-    /// shutter fired. `nil` where position tracking was unavailable — an
-    /// unsupported device, tracking lost, or the car never calibrated.
-    ///
-    /// Recorded rather than enforced. Blocking the shutter over a tracking
-    /// wobble would strand somebody in front of a car with a phone refusing
-    /// to take a picture; the session summary is the right place to say
-    /// "three of these were not taken from where they should have been".
-    public var stationVerified: Bool?
 
     public init(
-        slotID: String,
-        attempt: Int,
+        region: CarRegion,
+        sequence: Int,
         filename: String,
         byteCount: Int,
         sha256: String,
@@ -63,11 +61,10 @@ public struct CaptureRecord: Sendable, Codable, Equatable, Identifiable {
         evidence: EvidenceCheck,
         metadataPath: MetadataPath,
         accepted: Bool,
-        acceptedDespite: [ImageQualityIssue] = [],
-        stationVerified: Bool? = nil
+        acceptedDespite: [ImageQualityIssue] = []
     ) {
-        self.slotID = slotID
-        self.attempt = attempt
+        self.region = region
+        self.sequence = sequence
         self.filename = filename
         self.byteCount = byteCount
         self.sha256 = sha256
@@ -77,7 +74,6 @@ public struct CaptureRecord: Sendable, Codable, Equatable, Identifiable {
         self.metadataPath = metadataPath
         self.accepted = accepted
         self.acceptedDespite = acceptedDespite
-        self.stationVerified = stationVerified
     }
 }
 
@@ -96,6 +92,9 @@ public struct SessionManifest: Sendable, Codable, Equatable {
     public var startedAt: Date
     public var timeZoneIdentifier: String
     public var records: [CaptureRecord]
+    /// Which parts of the car have been photographed well enough to count.
+    /// Persisted so a session survives the app being killed mid-walk.
+    public var coverage: SurfaceCoverage
 
     public init(
         sessionID: String,
@@ -106,7 +105,8 @@ public struct SessionManifest: Sendable, Codable, Equatable {
         appVersion: String,
         startedAt: Date,
         timeZoneIdentifier: String,
-        records: [CaptureRecord] = []
+        records: [CaptureRecord] = [],
+        coverage: SurfaceCoverage = SurfaceCoverage()
     ) {
         self.sessionID = sessionID
         self.kind = kind
@@ -117,17 +117,21 @@ public struct SessionManifest: Sendable, Codable, Equatable {
         self.startedAt = startedAt
         self.timeZoneIdentifier = timeZoneIdentifier
         self.records = records
+        self.coverage = coverage
     }
 
     public var acceptedRecords: [CaptureRecord] { records.filter(\.accepted) }
 
-    public func acceptedRecord(forSlot slotID: String) -> CaptureRecord? {
-        records.first { $0.slotID == slotID && $0.accepted }
-    }
+    public var exteriorShots: Int { acceptedRecords.filter { $0.region != .interior }.count }
+    public var interiorShots: Int { acceptedRecords.filter { $0.region == .interior }.count }
 
-    /// Slots with no accepted photograph yet.
-    public func outstandingSlots(in plan: [ShotSlot] = ShotPlan.standard) -> [ShotSlot] {
-        plan.filter { acceptedRecord(forSlot: $0.id) == nil }
+    public func progress() -> ShootingProgress {
+        ShootingProgress(
+            coverage: coverage.fraction,
+            exteriorShots: exteriorShots,
+            interiorShots: interiorShots,
+            thinnestRegion: coverage.thinnestRegion()
+        )
     }
 
     /// Accepted photographs that would still be rejected unread — almost
@@ -136,15 +140,22 @@ public struct SessionManifest: Sendable, Codable, Equatable {
         acceptedRecords.filter { !$0.evidence.isClaimReady }
     }
 
-    /// Accepted photographs taken from somewhere other than the station they
-    /// were meant to be taken from — four shots of the same corner, rather
-    /// than a walk around the car. Excludes photographs where position was
-    /// never tracked, which prove nothing either way.
-    public var recordsTakenOffStation: [CaptureRecord] {
-        acceptedRecords.filter { $0.stationVerified == false }
+    /// Accepted photographs a person waved through after the gate turned
+    /// them down.
+    public var recordsQualityOverridden: [CaptureRecord] {
+        acceptedRecords.filter { !$0.acceptedDespite.isEmpty }
     }
 
-    public func isComplete(in plan: [ShotSlot] = ShotPlan.standard) -> Bool {
-        outstandingSlots(in: plan).isEmpty
+    /// The best photograph of each region, for the side-by-side review.
+    /// "Best" is the sharpest, which is the only ordering that needs no
+    /// human judgement.
+    public func sharpestByRegion() -> [CarRegion: CaptureRecord] {
+        var best: [CarRegion: CaptureRecord] = [:]
+        for record in acceptedRecords {
+            if let current = best[record.region],
+               current.quality.laplacianVariance >= record.quality.laplacianVariance { continue }
+            best[record.region] = record
+        }
+        return best
     }
 }

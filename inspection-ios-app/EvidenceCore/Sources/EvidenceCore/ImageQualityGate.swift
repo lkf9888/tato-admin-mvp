@@ -38,6 +38,11 @@ public struct ImageQualityThresholds: Sendable, Equatable {
         self.minLuminanceStdDev = minLuminanceStdDev
     }
 
+    /// One tier, because free-form shooting gives no signal for a second
+    /// one. The checklist could hold the odometer to a stricter bar because
+    /// it knew which shot that was; nothing here does. Bringing it back means
+    /// detecting text in the frame and tightening when digits are present —
+    /// worth doing after the thresholds are calibrated at all, not before.
     public static let provisional = ImageQualityThresholds(
         minLaplacianVariance: 120,
         maxClippedHighlightFraction: 0.12,
@@ -45,14 +50,6 @@ public struct ImageQualityThresholds: Sendable, Equatable {
         minLuminanceStdDev: 18
     )
 
-    /// For the odometer and the fuel gauge, where the photograph is worthless
-    /// unless the digits can actually be read.
-    public static let legibleText = ImageQualityThresholds(
-        minLaplacianVariance: 260,
-        maxClippedHighlightFraction: 0.06,
-        maxClippedShadowFraction: 0.12,
-        minLuminanceStdDev: 24
-    )
 }
 
 public struct ImageQualityReport: Sendable, Codable, Equatable {

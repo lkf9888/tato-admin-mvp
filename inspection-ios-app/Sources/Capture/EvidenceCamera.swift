@@ -24,6 +24,40 @@ enum CameraError: LocalizedError {
     }
 }
 
+/// Which piece of glass is taking the photograph.
+///
+/// Two physical lenses, not a zoom factor. Asking a virtual device such as
+/// `.builtInDualWideCamera` for "0.5×" hands iOS the choice of which
+/// constituent camera to actually use, and in poor light it will quietly
+/// serve a cropped frame from the main camera instead — the picture comes
+/// back with a different field of view than the one the coverage maths was
+/// told about. Naming the device leaves nothing to interpret.
+enum CameraLens: String, CaseIterable, Identifiable, Sendable {
+    /// The ultra-wide. Worth having in a tight car park, where there is no
+    /// room to step far enough back to get a whole flank in one frame.
+    case ultraWide
+    /// The main camera. The default, and the sharper of the two.
+    case wide
+
+    var id: String { rawValue }
+
+    var deviceType: AVCaptureDevice.DeviceType {
+        switch self {
+        case .ultraWide: return .builtInUltraWideCamera
+        case .wide: return .builtInWideAngleCamera
+        }
+    }
+
+    /// The same two spellings the iPhone camera uses: bare when it is one of
+    /// the choices, with the multiplication sign when it is the one in use.
+    func label(selected: Bool) -> String {
+        switch self {
+        case .ultraWide: return selected ? "0.5×" : ".5"
+        case .wide: return selected ? "1×" : "1"
+        }
+    }
+}
+
 /// The camera, configured so that what comes out is a file we can stand
 /// behind in a claim.
 ///
@@ -56,11 +90,16 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
     private let sessionQueue = DispatchQueue(label: "co.tatocar.evidence.camera")
     private let output = AVCapturePhotoOutput()
     private var device: AVCaptureDevice?
+    private var input: AVCaptureDeviceInput?
+    /// Which lenses this phone actually has, in the order they are offered.
+    /// Read once, after `configure()` returns.
+    private(set) var availableLenses: [CameraLens] = []
+    private(set) var lens: CameraLens = .wide
     /// The lens's real horizontal field of view, which decides how much of
     /// the car one photograph can be said to document. Read from the device
     /// rather than assumed: it differs between the wide and ultra-wide, and
     /// guessing would quietly skew every coverage calculation.
-    private(set) var horizontalFieldOfView: Double = 68
+    private(set) var horizontalFieldOfView: Double = 55
     /// AVFoundation holds its capture delegates weakly, so they have to live
     /// here until the photo comes back.
     private var inFlight: [Int64: PhotoCaptureDelegate] = [:]
@@ -84,29 +123,131 @@ final class EvidenceCamera: NSObject, @unchecked Sendable {
 
         session.sessionPreset = .photo
 
-        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
-            throw CameraError.noCamera
+        let discovered = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [CameraLens.ultraWide.deviceType, CameraLens.wide.deviceType],
+            mediaType: .video,
+            position: .back
+        ).devices
+        availableLenses = CameraLens.allCases.filter { lens in
+            discovered.contains { $0.deviceType == lens.deviceType }
         }
-        device = camera
-        horizontalFieldOfView = Double(camera.activeFormat.videoFieldOfView)
-
-        let input = try AVCaptureDeviceInput(device: camera)
-        guard session.canAddInput(input) else { throw CameraError.cannotAddInput }
-        session.addInput(input)
+        guard !availableLenses.isEmpty else { throw CameraError.noCamera }
 
         guard session.canAddOutput(output) else { throw CameraError.cannotAddOutput }
         session.addOutput(output)
 
-        // ⚠️ See the type comment. A proxy is not a photograph.
+        // The main camera unless this phone somehow has only the other one.
+        try attachOnQueue(availableLenses.contains(.wide) ? .wide : availableLenses[0])
+    }
+
+    /// Swaps which lens feeds the session.
+    ///
+    /// Returns the new field of view, because the coverage arithmetic is
+    /// wrong from the instant it is out of step with the glass — the caller
+    /// is expected to hand it straight to the coverage tracker.
+    @discardableResult
+    func select(_ lens: CameraLens) async throws -> Double {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Double, Error>) in
+            sessionQueue.async {
+                guard lens != self.lens, self.availableLenses.contains(lens) else {
+                    continuation.resume(returning: self.horizontalFieldOfView)
+                    return
+                }
+                self.session.beginConfiguration()
+                do {
+                    try self.attachOnQueue(lens)
+                    self.session.commitConfiguration()
+                    continuation.resume(returning: self.horizontalFieldOfView)
+                } catch {
+                    self.session.commitConfiguration()
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// Must be called inside a configuration transaction.
+    private func attachOnQueue(_ lens: CameraLens) throws {
+        guard let camera = AVCaptureDevice.default(lens.deviceType, for: .video, position: .back) else {
+            throw CameraError.noCamera
+        }
+
+        let previous = input
+        if let previous { session.removeInput(previous) }
+
+        let next: AVCaptureDeviceInput
+        do {
+            next = try AVCaptureDeviceInput(device: camera)
+            guard session.canAddInput(next) else { throw CameraError.cannotAddInput }
+        } catch {
+            // Put the old lens back rather than leaving the session with no
+            // camera at all. A lens that will not attach is an annoyance; a
+            // dead viewfinder halfway round a car is a lost walk-around.
+            if let previous, session.canAddInput(previous) {
+                session.addInput(previous)
+            }
+            throw error
+        }
+
+        session.addInput(next)
+        input = next
+        device = camera
+        self.lens = lens
+        horizontalFieldOfView = Self.screenHorizontalFieldOfView(of: camera.activeFormat)
+        applyOutputPolicy(for: camera)
+    }
+
+    /// ⚠️ Re-applied after every lens change, not just at startup.
+    ///
+    /// These belong to the *session configuration*, and iOS restores their
+    /// defaults when that configuration changes. Setting them once in
+    /// `configure()` and swapping the input later would quietly turn deferred
+    /// photo delivery back on partway through a walk-around, and a deferred
+    /// proxy is not a photograph. What is supported differs per lens as well:
+    /// the ultra-wide does not offer zero shutter lag on every model, and its
+    /// largest photo is nowhere near the main camera's.
+    private func applyOutputPolicy(for camera: AVCaptureDevice) {
         if output.isAutoDeferredPhotoDeliverySupported {
             output.isAutoDeferredPhotoDeliveryEnabled = false
         }
-        if output.isZeroShutterLagSupported {
-            output.isZeroShutterLagEnabled = true
-        }
+        output.isZeroShutterLagEnabled = output.isZeroShutterLagSupported
         output.maxPhotoQualityPrioritization = .quality
         if let largest = camera.activeFormat.supportedMaxPhotoDimensions.max(by: { $0.width < $1.width }) {
             output.maxPhotoDimensions = largest
+        }
+    }
+
+    /// The field of view across the screen, which is the angle the coverage
+    /// maths means by horizontal. See `CoverageProjection` for why the
+    /// figure AVFoundation hands over is not that angle.
+    private static func screenHorizontalFieldOfView(of format: AVCaptureDevice.Format) -> Double {
+        let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+        return CoverageProjection.portraitFieldOfView(
+            alongLongEdge: Double(format.videoFieldOfView),
+            edges: Double(dimensions.width),
+            Double(dimensions.height)
+        )
+    }
+
+    /// Focuses and meters on a point the photographer tapped, given in the
+    /// preview layer's normalised capture-device coordinates.
+    ///
+    /// Deliberately silent on failure: focus is a convenience, and a device
+    /// that will not take the request still takes photographs.
+    func focus(at point: CGPoint) {
+        sessionQueue.async {
+            guard let device = self.device else { return }
+            guard (try? device.lockForConfiguration()) != nil else { return }
+            defer { device.unlockForConfiguration() }
+
+            if device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
+                device.focusPointOfInterest = point
+                device.focusMode = .autoFocus
+            }
+            if device.isExposurePointOfInterestSupported, device.isExposureModeSupported(.autoExpose) {
+                device.exposurePointOfInterest = point
+                device.exposureMode = .autoExpose
+            }
         }
     }
 

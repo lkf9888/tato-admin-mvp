@@ -214,4 +214,51 @@ final class ShootingProgressTests: XCTestCase {
         XCTAssertTrue(many.outstanding.isEmpty)
         XCTAssertEqual(many.totalShots, 160)
     }
+
+    // MARK: - How wide a photograph actually is
+
+    /// The numbers an iPhone really reports, turned into the angle the
+    /// projection needs. Pinned because nothing on screen would look wrong
+    /// if they drifted -- the diagram would simply fill in faster.
+    func testAPortraitPhotographIsNarrowerThanTheLensSpecSays() {
+        // Main camera: ~68 deg across the sensor's long edge, 4:3.
+        let wide = CoverageProjection.portraitFieldOfView(alongLongEdge: 68, edges: 4032, 3024)
+        XCTAssertEqual(wide, 53.7, accuracy: 0.2)
+
+        // Ultra-wide: ~120 deg, same shape.
+        let ultra = CoverageProjection.portraitFieldOfView(alongLongEdge: 120, edges: 4032, 3024)
+        XCTAssertEqual(ultra, 104.8, accuracy: 0.2)
+
+        // Both are narrower than the figure AVFoundation hands over, and the
+        // gap is what would otherwise be credited to panels nobody shot.
+        XCTAssertLessThan(wide, 68)
+        XCTAssertLessThan(ultra, 120)
+    }
+
+    /// The edges are a ratio, not a measurement, and the caller should not
+    /// have to remember which one comes first.
+    func testTheEdgesMayArriveInEitherOrderAndAnyUnit() {
+        let asGiven = CoverageProjection.portraitFieldOfView(alongLongEdge: 68, edges: 4032, 3024)
+        let reversed = CoverageProjection.portraitFieldOfView(alongLongEdge: 68, edges: 3024, 4032)
+        let inMillimetres = CoverageProjection.portraitFieldOfView(alongLongEdge: 68, edges: 4, 3)
+        XCTAssertEqual(asGiven, reversed, accuracy: 0.0001)
+        XCTAssertEqual(asGiven, inMillimetres, accuracy: 0.0001)
+    }
+
+    /// A square sensor sees the same angle whichever way up it is held, and
+    /// nonsense in comes straight back out rather than becoming a plausible
+    /// wrong answer.
+    func testDegenerateInputsAreHandedBackUntouched() {
+        XCTAssertEqual(CoverageProjection.portraitFieldOfView(alongLongEdge: 68, edges: 1, 1), 68, accuracy: 0.0001)
+        XCTAssertEqual(CoverageProjection.portraitFieldOfView(alongLongEdge: 68, edges: 0, 3024), 68)
+        XCTAssertEqual(CoverageProjection.portraitFieldOfView(alongLongEdge: 0, edges: 4032, 3024), 0)
+    }
+
+    /// The whole reason the conversion exists: at 24 sectors the raw figure
+    /// paints a sector of car that was never photographed.
+    func testTheUncorrectedFigureOverPaintsByAWholeSector() {
+        let sectorWidth = 360.0 / Double(SurfaceCoverage.sectorCount)
+        let ultraError = 120 - CoverageProjection.portraitFieldOfView(alongLongEdge: 120, edges: 4032, 3024)
+        XCTAssertGreaterThan(ultraError, sectorWidth)
+    }
 }

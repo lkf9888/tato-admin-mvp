@@ -37,9 +37,13 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     /// successful fit can credit them rather than throwing them away.
     private var pendingPoses: [(position: SIMD3<Float>, forward: SIMD3<Float>)] = []
 
-    /// The iPhone wide camera's horizontal field of view. Overwritten with
-    /// the real figure once the capture device is configured.
-    var fieldOfViewDegrees: Double = 68
+    /// How wide an arc of the car one photograph documents, measured across
+    /// the screen rather than across the sensor. Overwritten with the real
+    /// figure once the capture device is configured, and again every time
+    /// the photographer switches between 0.5x and 1x -- the two lenses see
+    /// roughly twice as much of the car as each other, so a stale value here
+    /// paints the diagram green for panels nobody photographed.
+    var fieldOfViewDegrees: Double = 55
 
     var hasFrame: Bool { vehicleFrame != nil }
 

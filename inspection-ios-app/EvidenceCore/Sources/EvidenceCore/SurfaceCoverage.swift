@@ -146,6 +146,37 @@ public struct SurfaceCoverage: Sendable, Codable, Equatable {
 /// Works out which of the car's patches a photograph actually documents.
 public enum CoverageProjection {
 
+    /// The angle a photograph spans **across the screen**, given the lens's
+    /// field of view along the sensor's long edge.
+    ///
+    /// AVFoundation reports `videoFieldOfView` along a format's long edge,
+    /// and this app is locked to portrait, so that edge runs top to bottom.
+    /// Handing that figure straight to `patches(seenFrom:...)` as a
+    /// horizontal angle claims each photograph swept a wider arc of the car
+    /// than it did — roughly 13° too much on an iPhone's main camera and 15°
+    /// on its ultra-wide, which at 24 sectors is a whole sector per shot.
+    ///
+    /// The error only ever runs one way: it paints the diagram green over
+    /// panels nobody has photographed, which is the failure this app exists
+    /// to prevent. Under-claiming merely asks for another photograph, and
+    /// more photographs is what a claim wants anyway.
+    ///
+    /// Degrees in, degrees out. The edges may be given in pixels, points or
+    /// millimetres — only their ratio is used — and are accepted in either
+    /// order.
+    public static func portraitFieldOfView(
+        alongLongEdge degrees: Double,
+        edges first: Double,
+        _ second: Double
+    ) -> Double {
+        let shortEdge = min(first, second)
+        let longEdge = max(first, second)
+        guard degrees > 0, degrees < 180, shortEdge > 0, longEdge > 0 else { return degrees }
+
+        let halfTangent = tan(degrees / 2 * .pi / 180) * shortEdge / longEdge
+        return atan(halfTangent) * 2 * 180 / .pi
+    }
+
     /// A patch seen at a grazing angle shows no damage, so it does not count.
     ///
     /// 65° off the surface normal, which compresses a panel to about 40% of

@@ -1,6 +1,8 @@
 import AVFoundation
 import EvidenceCore
 import Foundation
+import ImageIO
+import UIKit
 import simd
 
 /// One walk around one car.
@@ -44,6 +46,17 @@ final class CaptureSessionModel {
     private(set) var consecutiveRejections = 0
     private(set) var suggestedPlate: String?
 
+    /// The lenses this phone turned out to have, and the one in use. Both
+    /// are snapshots taken once the capture session has finished
+    /// configuring, so the camera's own copies are never read across threads.
+    private(set) var lenses: [CameraLens] = []
+    private(set) var lens: CameraLens = .wide
+
+    /// The last frame taken, small. Shown where the iPhone camera shows it,
+    /// and for the same reason: it is the only confirmation a photographer
+    /// needs that the shutter did something.
+    private(set) var lastThumbnail: UIImage?
+
     var flashMode: AVCaptureDevice.FlashMode = .off
 
     private let plateReader = PlateReader()
@@ -86,6 +99,8 @@ final class CaptureSessionModel {
             steadiness.start()
             coverage.start()
             try await camera.configure()
+            lenses = camera.availableLenses
+            lens = camera.lens
             coverage.fieldOfViewDegrees = camera.horizontalFieldOfView
             await camera.start()
         } catch {
@@ -98,6 +113,22 @@ final class CaptureSessionModel {
         location.stop()
         steadiness.stop()
         coverage.stop()
+    }
+
+    // MARK: - Lenses
+
+    /// Switches glass, and tells the coverage tracker what the new glass can
+    /// see. The two go together: the field of view is the only thing that
+    /// turns a camera pose into an arc of painted car, and the ultra-wide's
+    /// is nearly twice the main camera's.
+    ///
+    /// A lens that refuses to attach leaves the working one in place, so the
+    /// walk-around continues on the lens that was already running.
+    func select(lens: CameraLens) async {
+        guard lens != self.lens, lenses.contains(lens) else { return }
+        guard let fieldOfView = try? await camera.select(lens) else { return }
+        self.lens = lens
+        coverage.fieldOfViewDegrees = fieldOfView
     }
 
     // MARK: - Capture
@@ -143,6 +174,9 @@ final class CaptureSessionModel {
                 consecutiveRejections += 1
             }
             manifest = await archive.manifest
+            // Shown whether or not the gate liked it: seeing the blurred
+            // frame is how somebody works out that they moved.
+            lastThumbnail = Self.thumbnail(of: finished.data)
             outcome = quality.passes ? .accepted(record) : .rejected(record)
 
             // Read the plate off the photograph rather than asking for it.
@@ -169,6 +203,24 @@ final class CaptureSessionModel {
     func dismissOutcome() { outcome = nil }
 
     func clearStartupError() { startupError = nil }
+
+    /// Reads the JPEG's own embedded preview rather than decoding it.
+    ///
+    /// A 48-megapixel frame takes a noticeable moment to decode, and every
+    /// camera JPEG already carries a thumbnail written by the hardware --
+    /// `...IfAbsent` takes that one when it is there, which it always is.
+    private static func thumbnail(of jpeg: Data, maxPixel: Int = 200) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(jpeg as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
+        return UIImage(cgImage: image)
+    }
 
     private func refreshSuggestedPlate() async {
         suggestedPlate = await plateReader.confident

@@ -3,6 +3,7 @@ import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import type { Prisma, StaffMember, StaffTaskStatus } from "@prisma/client";
 
+import { exchangeLoginCode, getAccessToken } from "@/lib/notify-hub/wechat";
 import { prisma } from "@/lib/prisma";
 import {
   assignStaffShareToken,
@@ -12,13 +13,6 @@ import {
 
 const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
-
-type WeChatAccessTokenCache = {
-  value: string;
-  expiresAt: number;
-};
-
-let accessTokenCache: WeChatAccessTokenCache | null = null;
 
 export type StaffMiniProgramTaskRecord = Prisma.StaffTaskGetPayload<{
   include: typeof staffShareTaskInclude;
@@ -51,7 +45,6 @@ type MiniProgramSessionPayload = {
 
 type WeChatLoginSession = {
   openid: string;
-  session_key?: string;
   unionid?: string;
 };
 
@@ -172,65 +165,26 @@ export async function exchangeWeChatLoginCode(code: string): Promise<WeChatLogin
     throw new Error("WECHAT_MINIPROGRAM_NOT_CONFIGURED");
   }
 
-  const url = new URL("https://api.weixin.qq.com/sns/jscode2session");
-  url.searchParams.set("appid", config.appId);
-  url.searchParams.set("secret", config.appSecret);
-  url.searchParams.set("js_code", code);
-  url.searchParams.set("grant_type", "authorization_code");
-
-  const response = await fetch(url);
-  const payload = (await response.json().catch(() => ({}))) as {
-    openid?: string;
-    session_key?: string;
-    unionid?: string;
-    errcode?: number;
-    errmsg?: string;
-  };
-
-  if (!response.ok || !payload.openid) {
-    throw new Error(`WECHAT_LOGIN_FAILED:${payload.errcode ?? response.status}:${payload.errmsg ?? ""}`);
-  }
-
-  return {
-    openid: payload.openid,
-    session_key: payload.session_key,
-    unionid: payload.unionid,
-  };
+  const session = await exchangeLoginCode({ appId: config.appId, secret: config.appSecret }, code);
+  return { openid: session.openId, unionid: session.unionId ?? undefined };
 }
 
+/**
+ * The mini program access token.
+ *
+ * Delegates to the hub, which asks WeChat for a *stable* token. The
+ * version this replaced called `/cgi-bin/token`, which mints a new
+ * token and invalidates the previous one -- harmless on one container
+ * and a source of intermittent 40001s the moment there are two, each
+ * refreshing on its own schedule and logging the other out.
+ */
 export async function getWeChatAccessToken() {
-  const now = Date.now();
-  if (accessTokenCache && accessTokenCache.expiresAt > now + 60_000) {
-    return accessTokenCache.value;
-  }
-
   const config = getWeChatMiniProgramConfig();
   if (!config) {
     throw new Error("WECHAT_MINIPROGRAM_NOT_CONFIGURED");
   }
 
-  const url = new URL("https://api.weixin.qq.com/cgi-bin/token");
-  url.searchParams.set("grant_type", "client_credential");
-  url.searchParams.set("appid", config.appId);
-  url.searchParams.set("secret", config.appSecret);
-
-  const response = await fetch(url);
-  const payload = (await response.json().catch(() => ({}))) as {
-    access_token?: string;
-    expires_in?: number;
-    errcode?: number;
-    errmsg?: string;
-  };
-
-  if (!response.ok || !payload.access_token) {
-    throw new Error(`WECHAT_ACCESS_TOKEN_FAILED:${payload.errcode ?? response.status}:${payload.errmsg ?? ""}`);
-  }
-
-  accessTokenCache = {
-    value: payload.access_token,
-    expiresAt: now + Math.max(60, payload.expires_in ?? 7200) * 1000,
-  };
-  return accessTokenCache.value;
+  return getAccessToken({ appId: config.appId, secret: config.appSecret });
 }
 
 export function createStaffMiniProgramSession(staffId: string, openId: string) {
@@ -359,102 +313,6 @@ export async function listStaffMiniProgramTasks(input: {
       baseUrl: input.baseUrl,
     }),
   );
-}
-
-function formatDateForWeChat(value: Date | null) {
-  const date = value ?? new Date();
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function truncateMessageValue(value: string, maxLength = 20) {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized;
-}
-
-function getSubscribeDataFields() {
-  const fallback = {
-    title: "thing1",
-    due: "time2",
-    vehicle: "thing3",
-    action: "phrase4",
-    details: "thing5",
-  };
-
-  const raw = process.env.WECHAT_TASK_MESSAGE_FIELDS?.trim();
-  if (!raw) return fallback;
-
-  try {
-    return { ...fallback, ...(JSON.parse(raw) as Partial<typeof fallback>) };
-  } catch {
-    return fallback;
-  }
-}
-
-export async function sendStaffTaskWeChatMessage(input: {
-  openId?: string | null;
-  notificationEnabled?: boolean | null;
-  taskId?: string;
-  taskTitle: string;
-  action: "created" | "updated" | "deleted" | "removed";
-  dueDatetime?: Date | null;
-  timeWindow?: string | null;
-  vehicleLabel?: string | null;
-  orderLabel?: string | null;
-  details?: string | null;
-}) {
-  if (!input.openId || !input.notificationEnabled) return { ok: false, reason: "not_subscribed" };
-
-  const templateId = getWeChatTaskTemplateId();
-  if (!templateId) return { ok: false, reason: "template_not_configured" };
-
-  const fields = getSubscribeDataFields();
-  const actionLabel = {
-    created: "新任务",
-    updated: "任务更新",
-    deleted: "任务删除",
-    removed: "任务移除",
-  }[input.action];
-  const data: Record<string, { value: string }> = {};
-  const add = (field: string | undefined, value: string | null | undefined, maxLength = 20) => {
-    if (!field || !value) return;
-    data[field] = { value: truncateMessageValue(value, maxLength) };
-  };
-
-  add(fields.title, input.taskTitle, 20);
-  if (fields.due) {
-    data[fields.due] = { value: formatDateForWeChat(input.dueDatetime ?? null) };
-  }
-  add(fields.vehicle, input.vehicleLabel || input.orderLabel, 20);
-  add(fields.action, actionLabel, 10);
-  add(fields.details, input.details || input.timeWindow || input.orderLabel || "请查看任务详情", 20);
-
-  try {
-    const accessToken = await getWeChatAccessToken();
-    const url = new URL("https://api.weixin.qq.com/cgi-bin/message/subscribe/send");
-    url.searchParams.set("access_token", accessToken);
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        touser: input.openId,
-        template_id: templateId,
-        page: input.taskId ? `pages/tasks/index?taskId=${encodeURIComponent(input.taskId)}` : "pages/tasks/index",
-        miniprogram_state: process.env.WECHAT_MINIPROGRAM_STATE?.trim() || "formal",
-        lang: "zh_CN",
-        data,
-      }),
-    });
-    const payload = (await response.json().catch(() => ({}))) as { errcode?: number; errmsg?: string };
-    if (!response.ok || payload.errcode) {
-      return { ok: false, reason: `wechat_${payload.errcode ?? response.status}:${payload.errmsg ?? ""}` };
-    }
-    return { ok: true };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : "wechat_send_failed";
-    return { ok: false, reason };
-  }
 }
 
 export function getTaskStatusFromMiniProgram(value: string | null | undefined): StaffTaskStatus | null {

@@ -6,7 +6,7 @@ import {
 } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { sendStaffTaskSms } from "@/lib/sms";
-import { sendStaffTaskWeChatMessage } from "@/lib/staff-mini-program";
+import { sendNotification, staffChannelKey } from "@/lib/notify-client";
 import {
   buildStaffTaskTemplateValues,
   normalizeStaffTaskNotificationTemplate,
@@ -19,11 +19,18 @@ type StaffTaskNotificationRecord = {
   title: string;
   details: string | null;
   dueDatetime: Date | null;
+  /** Discriminates one save from the next in the hub's dedupe key: a
+   *  retry of the same save is a duplicate, a genuine second edit is
+   *  not. */
+  updatedAt?: Date;
   timeWindow: string | null;
   staffLabel: string | null;
   vehicleLabel: string | null;
   orderLabel: string | null;
   staff?: {
+    /** Needed for the notification hub: the channel key is derived
+     *  from it, so a renamed staff member keeps their subscribers. */
+    id?: string;
     name: string;
     email: string | null;
     phone?: string | null;
@@ -38,6 +45,15 @@ type StaffTaskNotificationRecord = {
   order: {
     renterName: string;
   } | null;
+};
+
+/** What the notification calls each kind of change. Five characters or
+ *  fewer: the template's `phrase` field will not take more. */
+const ACTION_LABELS: Record<"created" | "updated" | "deleted" | "removed", string> = {
+  created: "新任务",
+  updated: "任务更新",
+  deleted: "任务删除",
+  removed: "任务移除",
 };
 
 function getBaseUrl(origin?: string) {
@@ -138,18 +154,35 @@ export async function notifyStaffTaskChange(
     });
   }
 
-  await sendStaffTaskWeChatMessage({
-    openId: task.staff.wechatOpenId,
-    notificationEnabled: task.staff.wechatNotificationEnabled,
-    taskId: task.id,
-    taskTitle: task.title,
-    action,
-    dueDatetime: task.dueDatetime,
-    timeWindow: task.timeWindow,
-    vehicleLabel,
-    orderLabel,
-    details: task.details,
-  });
+  // WeChat goes through the notification hub. TATO no longer knows a
+  // template id or an appid -- it names a channel and a logical
+  // template, and the hub works out the rest. `channelName` creates the
+  // channel on first use, so a staff member who has never been
+  // assigned anything does not need provisioning first.
+  //
+  // Deliberately last and deliberately not awaited for its result
+  // beyond this: email and SMS have already gone out, and a hub that
+  // is down must not fail the assignment that triggered it.
+  if (task.staff.id) {
+    await sendNotification({
+      channel: staffChannelKey(task.staff.id),
+      channelName: task.staff.name,
+      template: "task",
+      // Assignments and removals are what a person needs to see now; an
+      // edit to a task they already know about can wait for the next
+      // top-up if quota is short.
+      priority: action === "created" || action === "removed" ? "high" : "normal",
+      dedupeKey: task.id ? `task:${task.id}:${action}:${task.updatedAt?.getTime() ?? ""}` : undefined,
+      data: {
+        title: task.title,
+        due: task.dueDatetime ? task.dueDatetime.toISOString() : new Date().toISOString(),
+        vehicle: vehicleLabel,
+        action: ACTION_LABELS[action],
+        details: task.details || task.timeWindow || orderLabel || "请查看任务详情",
+      },
+      link: taskUrl ? { url: taskUrl } : null,
+    });
+  }
 }
 
 export async function notifyAdminsOfStaffTaskAction(input: {

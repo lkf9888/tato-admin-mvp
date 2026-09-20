@@ -1,0 +1,62 @@
+<view class="page message-page safe-bottom">
+  <view class="topbar">
+    <view class="kicker">通知</view>
+    <view class="headline">我的消息</view>
+    <view class="channel-line" wx:if="{{channels.length}}">
+      <text wx:for="{{channels}}" wx:key="subscriptionId" class="channel-chip">{{item.appName}} · {{item.channelName}}</text>
+    </view>
+    <view class="channel-line" wx:else>
+      <text class="channel-empty">还没有加入任何频道</text>
+    </view>
+    <view class="topbar-actions">
+      <button class="text-button" bindtap="goBind">添加频道</button>
+      <button class="text-button" bindtap="goTasks">我的任务</button>
+    </view>
+  </view>
+
+  <view class="quota-banner {{quota === 0 ? 'quota-empty' : ''}}" bindtap="enableReminders">
+    <view class="quota-text" wx:if="{{quota === 0}}">
+      微信提醒已用完，点这里重新开启
+    </view>
+    <view class="quota-text" wx:else>
+      还能收 {{quota}} 条微信提醒 · 点这里补充
+    </view>
+    <view class="quota-hint">微信规定一次授权只能收一条。勾选「总是保持以上选择」后就不会再弹窗。</view>
+  </view>
+
+  <view class="state" wx:if="{{loading}}">加载中…</view>
+  <view class="state error" wx:elif="{{error}}">{{error}}</view>
+  <view class="state" wx:elif="{{items.length === 0}}">还没有收到消息。</view>
+
+  <view class="list" wx:else>
+    <view
+      wx:for="{{items}}"
+      wx:key="id"
+      class="card {{focusId === item.id ? 'card-open' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="toggle"
+    >
+      <view class="card-head">
+        <text class="badge {{item.priority === 'high' ? 'badge-high' : ''}}">{{item.source}}</text>
+        <text class="card-time">{{item.time}}</text>
+      </view>
+      <view class="card-title">{{item.title}}</view>
+      <view class="card-channel">{{item.channel}}</view>
+
+      <view class="card-body" wx:if="{{focusId === item.id}}">
+        <view class="row" wx:for="{{item.rows}}" wx:for-item="row" wx:key="key">
+          <text class="row-label">{{row.label}}</text>
+          <text class="row-value">{{row.value}}</text>
+        </view>
+        <button
+          wx:if="{{item.link}}"
+          class="link-button"
+          catchtap="openLink"
+          data-url="{{item.link}}"
+        >
+          打开详情
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

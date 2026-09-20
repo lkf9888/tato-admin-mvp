@@ -2,6 +2,7 @@ import { checkRateLimit, getClientIp, recordFailedAttempt } from "@/lib/rate-lim
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { bridgeStaffSubscription } from "@/lib/notify-client";
 import { prisma } from "@/lib/prisma";
 import {
   createStaffMiniProgramSession,
@@ -108,6 +109,16 @@ export async function POST(request: NextRequest) {
       wechatOpenId: wechatSession.openid,
       wechatBoundAt: staff.wechatOpenId === wechatSession.openid ? staff.wechatBoundAt : new Date(),
     },
+  });
+
+  // Binding a staff code to a WeChat account is what the hub calls a
+  // subscription. Quota is granted separately, when the person actually
+  // authorises -- being on a channel and being owed a message are two
+  // different things.
+  await bridgeStaffSubscription({
+    staffId: updatedStaff.id,
+    staffName: updatedStaff.name,
+    openId: wechatSession.openid,
   });
 
   const token = createStaffMiniProgramSession(updatedStaff.id, wechatSession.openid);

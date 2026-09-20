@@ -3,6 +3,7 @@ import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { ensureStaffShareTokens } from "@/lib/staff-share";
+import { getStaffChannelStatus } from "@/lib/notify-client";
 import { ensureStaffMiniProgramCodes } from "@/lib/staff-mini-program";
 import { normalizeStaffTaskNotificationTemplate } from "@/lib/staff-task-notification-template";
 
@@ -87,6 +88,9 @@ export default async function StaffSchedulePage() {
   ]);
   const staffWithShareTokens = await ensureStaffShareTokens(staff);
   const staffWithMiniProgramCodes = await ensureStaffMiniProgramCodes(staffWithShareTokens);
+  // Same shape as the two lines above: the page is where a code gets
+  // generated, because that is the only screen anyone reads one from.
+  const channelStatus = await getStaffChannelStatus(staffWithMiniProgramCodes);
 
   return (
     <StaffScheduleClient
@@ -106,6 +110,9 @@ export default async function StaffSchedulePage() {
         miniProgramCode: member.miniProgramCode,
         wechatOpenId: member.wechatOpenId,
         wechatNotificationEnabled: member.wechatNotificationEnabled,
+        bindCode: channelStatus.get(member.id)?.bindCode ?? null,
+        channelSubscribers: channelStatus.get(member.id)?.subscribers ?? 0,
+        channelRemaining: channelStatus.get(member.id)?.remaining ?? 0,
       }))}
       initialTasks={tasks.map((task) => ({
         id: task.id,

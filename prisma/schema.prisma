@@ -1260,3 +1260,256 @@ model MessageTemplate {
   @@index([workspaceId, createdAt])
   @@index([vehicleId])
 }
+
+// ---------------------------------------------------------------------
+// Notification hub
+//
+// One WeChat mini program is the channel; three systems send through it
+// (TATO, HostHub, the wash bay), and eventually HostHub customers will
+// too. The hub owns the WeChat credentials, the subscriber bindings and
+// the subscribe-message quota, and knows nothing about what any caller's
+// message means.
+//
+// Nothing in this block relates to a model outside it. That is
+// deliberate: the hub is a shared dependency of systems that deploy
+// separately, so the day it moves into its own service should be a file
+// move and a connection string, not an untangling.
+// ---------------------------------------------------------------------
+
+/// A mini program the hub can send through.
+///
+/// More than one row exists so that "which mini program does this app
+/// send through" stays a configuration change. Today every app points at
+/// the same one; when HostHub is sold it gets its own appid under its
+/// own company, and the only edit is `NotifyApp.miniProgramId`.
+model NotifyMiniProgram {
+  id           String  @id @default(cuid())
+  /// The WeChat appid (wx...).
+  appId        String  @unique
+  name         String
+  /// Name of the environment variable holding the app secret, not the
+  /// secret itself -- a secret in the database is a secret in every
+  /// backup, and this table is one an admin screen will eventually edit.
+  secretEnvVar String  @default("WECHAT_MINIPROGRAM_APP_SECRET")
+  /// `miniprogram_state` on send: formal | trial | developer.
+  state        String  @default("formal")
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  apps      NotifyApp[]
+  templates NotifyTemplate[]
+  quotas    NotifySubscribeQuota[]
+}
+
+/// The mapping from a logical template name to a real WeChat template.
+///
+/// Callers ask for `"task"`, never for `tmpl_Xyz123`. Subscribe-message
+/// templates belong to an appid, so the same logical name resolves to a
+/// different id under a different mini program -- which is the whole
+/// reason callers are not allowed to name the real one.
+model NotifyTemplate {
+  id            String  @id @default(cuid())
+  miniProgramId String
+  /// Logical name: "task" | "alert" | "digest". Kept few on purpose --
+  /// a mini program has a ceiling on how many templates it may adopt,
+  /// and `requestSubscribeMessage` accepts at most three ids per call,
+  /// so three logical templates is what one tap can top up.
+  key           String
+  /// The template id from the WeChat console.
+  templateId    String
+  /// JSON object mapping logical field -> WeChat field, e.g.
+  /// {"title":"thing1","due":"time2","source":"thing3"}. WeChat field
+  /// names differ per template even for the same meaning, so the map
+  /// lives beside the template rather than in code.
+  fieldMap      String
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  miniProgram NotifyMiniProgram @relation(fields: [miniProgramId], references: [id], onDelete: Cascade)
+
+  @@unique([miniProgramId, key])
+}
+
+/// A sending system. Holds API keys, owns channels, sees nothing else.
+///
+/// Today: `tato`, `hosthub`, `washbay`. After HostHub is sold, one row
+/// per customer -- which is why isolation is enforced here rather than
+/// left to callers behaving.
+model NotifyApp {
+  id            String  @id @default(cuid())
+  miniProgramId String
+  /// Stable slug used in logs and in channel keys.
+  key           String  @unique
+  name          String
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  miniProgram NotifyMiniProgram @relation(fields: [miniProgramId], references: [id], onDelete: Cascade)
+  apiKeys     NotifyApiKey[]
+  channels    NotifyChannel[]
+  deliveries  NotifyDelivery[]
+
+  @@index([miniProgramId])
+}
+
+/// A credential belonging to one app.
+///
+/// Same shape as AgentToken and for the same reason: the wash bay's key
+/// lives on a machine in a car park, and losing that machine must not
+/// mean rotating HostHub's credentials too.
+model NotifyApiKey {
+  id          String    @id @default(cuid())
+  appId       String
+  /// Human label: which system, which deployment.
+  name        String
+  /// SHA-256 of the key. The plaintext is shown once at creation.
+  tokenHash   String    @unique
+  /// First characters, so a key can be identified in a list without
+  /// being usable from it.
+  tokenPrefix String
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  app NotifyApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@index([appId])
+}
+
+/// The routing unit: who a message is addressed to.
+///
+/// A channel is as coarse or as fine as the caller wants -- one per
+/// person ("staff:cl9x..."), one per role ("cleaning"), one per
+/// severity ("alerts"). Subscribers are many-to-many with it, so a
+/// channel can be shared by a whole crew and a person can watch
+/// channels belonging to several apps without those apps learning
+/// about each other.
+model NotifyChannel {
+  id       String  @id @default(cuid())
+  appId    String
+  /// Caller-chosen key, unique within the app. This is what `POST
+  /// /v1/notify` addresses.
+  key      String
+  name     String
+  /// Short code a person types, or a mini program QR encodes, to
+  /// subscribe. Unique across every app because the person typing it
+  /// has not told us which app they belong to yet.
+  bindCode String  @unique
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  app           NotifyApp            @relation(fields: [appId], references: [id], onDelete: Cascade)
+  subscriptions NotifySubscription[]
+  deliveries    NotifyDelivery[]
+
+  @@unique([appId, key])
+  @@index([bindCode])
+}
+
+/// One WeChat user watching one channel.
+model NotifySubscription {
+  id         String    @id @default(cuid())
+  channelId  String
+  /// openid, which is scoped to the mini program the channel's app
+  /// points at. Two rows may hold the same string for different people
+  /// if the apps sit under different mini programs, so this is never
+  /// looked up without a channel or a mini program in hand.
+  openId     String
+  /// Who this is, for the admin list. Supplied by the caller at bind
+  /// time; the hub has no user directory of its own.
+  label      String?
+  /// Set by the subscriber to stop messages without unbinding.
+  mutedUntil DateTime?
+
+  createdAt DateTime @default(now())
+
+  channel NotifyChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, openId])
+  @@index([openId])
+}
+
+/// Remaining subscribe-message sends for one person and one template.
+///
+/// WeChat's one-off subscription grants exactly one message per
+/// authorisation, and the grants accumulate. Without this table the
+/// server believes it may send forever, sends once, and then fails
+/// silently with 43101 for weeks -- which is what the first version of
+/// the TATO integration did.
+///
+/// Keyed on the mini program rather than the app: the quota belongs to
+/// the (openid, template) pair at WeChat, so two apps under one mini
+/// program genuinely do draw from the same pool, and pretending
+/// otherwise would only make the accounting lie.
+model NotifySubscribeQuota {
+  id            String    @id @default(cuid())
+  miniProgramId String
+  openId        String
+  /// Logical template key, matching NotifyTemplate.key.
+  templateKey   String
+  remaining     Int       @default(0)
+  lastGrantedAt DateTime?
+  lastSpentAt   DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  miniProgram NotifyMiniProgram @relation(fields: [miniProgramId], references: [id], onDelete: Cascade)
+
+  @@unique([miniProgramId, openId, templateKey])
+  @@index([openId])
+}
+
+/// One attempt to put one message in front of one person.
+///
+/// The hub is a channel, not a message store, and this row is the
+/// smallest thing that keeps that true: enough payload for the detail
+/// page to render without calling back to a system that may be on a
+/// private network, plus the delivery outcome that quota accounting,
+/// retries and deduplication all need. It expires on its own.
+model NotifyDelivery {
+  id          String    @id @default(cuid())
+  appId       String
+  channelId   String
+  openId      String
+  templateKey String
+  /// Caller-supplied idempotency key. Unique per app and person, since
+  /// one call to a shared channel fans out into one row per subscriber;
+  /// a retry after a timeout must not cost any of them a second
+  /// subscription.
+  dedupeKey   String?
+  /// high | normal | low. When quota is short, only `high` spends it.
+  priority    String    @default("normal")
+  /// JSON: the rendered fields, kept short by construction -- a
+  /// subscribe message has room for a title and a few values.
+  payload     String
+  /// JSON: where tapping the message goes.
+  page        String?
+  /// sent | no_quota | duplicate | muted | failed | skipped
+  status      String
+  /// WeChat errcode and message when the send failed.
+  errcode     String?
+  sentAt      DateTime?
+  /// When this row may be deleted. The detail page stops resolving
+  /// then, which is the intended lifetime of a notification.
+  expiresAt   DateTime
+
+  createdAt DateTime @default(now())
+
+  app     NotifyApp     @relation(fields: [appId], references: [id], onDelete: Cascade)
+  channel NotifyChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, dedupeKey, openId])
+  @@index([appId, dedupeKey])
+  @@index([openId, createdAt])
+  @@index([channelId, createdAt])
+  @@index([expiresAt])
+}

@@ -8,7 +8,7 @@ enum PhotoLibraryExportError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notAuthorised:
-            return "需要相册权限才能把照片交给 Turo App。到「设置 → TATO Evidence → 照片」里打开。"
+            return "需要相册权限才能把照片交给 Turo App。到「设置 → Walkaround → 照片」里打开。"
         case .saveFailed(let reason):
             return "存进相册失败：\(reason)"
         }

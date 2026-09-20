@@ -17,7 +17,7 @@
 每次构建要等审核排队，改一行等十分钟，验不动。
 
 ```bash
-cd inspection-ios-app && xcodegen generate && open TatoEvidence.xcodeproj
+cd inspection-ios-app && xcodegen generate && open Walkaround.xcodeproj
 ```
 
 Xcode 里：选 target → Signing & Capabilities → 勾 Automatically manage signing →
@@ -87,7 +87,7 @@ App 打开就是相机 —— 没有首页、没有表单。权限弹窗会依�
 > 对着自己的车随便拍满就行，第一次验的是文件本身，不是构图。
 
 只想拍一张就验的话，走 Xcode：Window → Devices and Simulators → 选手机 →
-TATO Evidence → 齿轮 → Download Container → 右键「显示包内容」→
+Walkaround → 齿轮 → Download Container → 右键「显示包内容」→
 `AppData/Library/Application Support/sessions/<批次>/photos/`
 
 ```bash

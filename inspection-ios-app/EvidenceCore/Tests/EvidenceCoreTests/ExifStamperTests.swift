@@ -84,7 +84,7 @@ final class ExifStamperTests: XCTestCase {
 
         XCTAssertEqual(exif.string(ExifReader.make, in: exif.ifd0), "Apple")
         XCTAssertEqual(exif.string(ExifReader.model, in: exif.ifd0), "iPhone 16 Pro")
-        XCTAssertEqual(exif.string(ExifReader.software, in: exif.ifd0), "TATO Evidence 0.1.0")
+        XCTAssertEqual(exif.string(ExifReader.software, in: exif.ifd0), "Walkaround 0.1.0")
     }
 
     /// AVFoundation's own timestamp is the authoritative one. Two disagreeing

@@ -1,4 +1,4 @@
-name: TatoEvidence
+name: Walkaround
 options:
   bundleIdPrefix: co.tatocar
   deploymentTarget:
@@ -10,7 +10,7 @@ packages:
     path: EvidenceCore
 
 targets:
-  TatoEvidence:
+  Walkaround:
     type: application
     platform: iOS
     sources: [Sources]
@@ -18,7 +18,12 @@ targets:
       - package: EvidenceCore
     settings:
       base:
+        # ⚠️ Left as `evidence` although the app is now called Walkaround.
+        # A bundle id is not user-visible, and changing it would install a
+        # second, empty copy beside the first rather than replacing it --
+        # orphaning every walk-around already archived in the old container.
         PRODUCT_BUNDLE_IDENTIFIER: co.tatocar.evidence
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Pinned here rather than picked in Xcode's UI: the .xcodeproj is
         # generated, so a team chosen in the UI is wiped by the next
         # `xcodegen generate` and signing silently breaks.
@@ -34,7 +39,7 @@ targets:
     info:
       path: Sources/Info.plist
       properties:
-        CFBundleDisplayName: TATO Evidence
+        CFBundleDisplayName: Walkaround
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false

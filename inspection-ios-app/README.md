@@ -1,8 +1,55 @@
-# TATO Evidence
+# Walkaround
 
 车况存证拍摄 App（独立 iOS App，bundle id `co.tatocar.evidence`）。
 
 引导员工按固定清单绕车拍照，当场判清晰度，**并保证交出去的是相机产出的原始文件**。
+
+## 名字和图标
+
+**Walkaround** —— 租车和车队行业对"绕车检查"这件事的标准叫法,代码里从头到尾用的也是这个词。
+
+### ⚠️ 为什么不叫 "Turo Camera"
+
+考虑过,不能用。**先撞上的不是 Turo,是 Apple。**
+
+App Store 审核指南 5.2.1 禁止应用名称、图标或元数据暗示与第三方存在关联。
+把别家品牌放进应用名 —— 尤其放在第一个词 —— 是常见的驳回理由,
+Turo 完全不需要知道这件事,这个名字就已经上不了架。
+
+商标层面同样成立,而且更重:Turo 是 Turo Inc. 的注册商标(美加均有);
+品牌词在首位会让人读成"Turo 官方出品";而这个产品**就在他们的业务领域内**,
+同领域的混淆可能性远高于跨领域。此外平台条款通常对 host 使用其商标另有限制。
+
+**想要的效果可以合法拿到:** 商标的指名性使用允许描述兼容性 ——
+名字里不放,而在描述里写 `Built for Turo hosts`。
+放在描述正文最安全,副标题次之;`Camera for Turo` 这种写法是灰区,审核时好时坏。
+
+> 这不是法律意见。真要花钱做品牌之前应该请人正式检索一次。
+> 但"名字里不要放别人的商标"这条不需要律师也足够确定。
+
+### 图标
+
+不是相机 —— 是**那张车形覆盖图本身**:俯视的车,外面一圈扇区,
+亮的是拍过的,暗的缺口是还没拍的。那个缺口是故意留的,因为这个 App 的全部意思
+就是"还差一块,走过去拍"。画相机的 App 有一万个,画这个的只有这一个。
+
+**纯灰阶,没有任何彩色**(104 万像素全部 R=G=B,`Tools/greycheck` 那段逻辑可以复验)。
+这里没有任何一个色相在承担意义:环说"拍过了"靠的是**亮**,不是靠绿。
+去掉颜色顺带去掉了一个误读 —— 有色的缺口看起来像故障,灰的缺口看起来像还没干完的活。
+
+图标是代码画的,不是设计稿:`Tools/make-icon.swift`,`swift Tools/make-icon.swift out.png` 重新生成。
+改颜色或改比例改那个文件,然后覆盖 `Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png`。
+
+⚠️ 画的过程中踩到两件事,都写在那个文件的注释里:
+**白色实心车身中间挖一块深色,在图标尺寸下读起来是一把锁**(线稿版本也一样);
+以及**轮子和后视镜不能画成深色** —— 它们伸出车身之后要和**背景**对比,
+画成近黑色就彻底看不见了。真正让人认出"这是车"的是**后视镜**,别的东西都没有耳朵。
+
+### bundle id 没跟着改
+
+`co.tatocar.evidence` 保持不动。bundle id 不面向用户,
+而改了它意味着装上去的是**第二个空 App**,而不是替换 ——
+旧容器里已经归档的绕车记录会全部变成孤儿。
 
 ## 为什么要有这个东西
 
@@ -150,10 +197,10 @@ cd inspection-ios-app/EvidenceCore && swift test
 ```
 
 ```bash
-cd inspection-ios-app && xcodegen generate && open TatoEvidence.xcodeproj
+cd inspection-ios-app && xcodegen generate && open Walkaround.xcodeproj
 ```
 
-`TatoEvidence.xcodeproj` 是 `project.yml` 生成的，已经 gitignore —— 改配置改 yml。
+`Walkaround.xcodeproj` 是 `project.yml` 生成的，已经 gitignore —— 改配置改 yml。
 
 ## 没有拍摄清单 —— 涂满一台车
 

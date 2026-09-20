@@ -8,7 +8,7 @@ private func makeManifest(
 ) -> SessionManifest {
     SessionManifest(
         sessionID: "S9", kind: .checkin, vehicleLabel: "ABC 123", staffLabel: "Wei",
-        deviceModel: "iPhone 16 Pro", appVersion: "TATO Evidence 0.1.0",
+        deviceModel: "iPhone 16 Pro", appVersion: "Walkaround 0.1.0",
         startedAt: Date(timeIntervalSince1970: 1_789_000_000), timeZoneIdentifier: "America/Vancouver",
         records: records, coverage: coverage
     )

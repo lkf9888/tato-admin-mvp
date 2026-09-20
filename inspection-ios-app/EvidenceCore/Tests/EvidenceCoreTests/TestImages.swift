@@ -134,7 +134,7 @@ extension CaptureStamp {
             location: location,
             deviceMake: "Apple",
             deviceModel: "iPhone 16 Pro",
-            software: "TATO Evidence 0.1.0"
+            software: "Walkaround 0.1.0"
         )
     }
 }

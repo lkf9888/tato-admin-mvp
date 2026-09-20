@@ -1,0 +1,45 @@
+<view class="page bind-page safe-bottom">
+  <view class="brand-block">
+    <view class="brand-mark">T</view>
+    <view>
+      <view class="eyebrow">TATO</view>
+      <view class="title">添加频道</view>
+      <view class="subtitle">输入管理员给你的绑定码，加入之后这个频道的消息会发到你的微信。</view>
+    </view>
+  </view>
+
+  <view class="panel">
+    <view class="field-label">绑定码</view>
+    <input
+      class="code-input"
+      value="{{bindCode}}"
+      maxlength="12"
+      placeholder="例如 8K3JX2PQ"
+      bindinput="onCodeInput"
+      confirm-type="done"
+      bindconfirm="submit"
+    />
+
+    <view class="field-label field-label-spaced">你的名字（可选）</view>
+    <input
+      class="text-input"
+      value="{{label}}"
+      maxlength="20"
+      placeholder="方便管理员认出是谁"
+      bindinput="onLabelInput"
+    />
+
+    <button class="primary-button" loading="{{loading}}" disabled="{{loading || !bindCode}}" bindtap="submit">
+      加入频道
+    </button>
+    <view class="hint">一个人可以加入多个频道。加入后会问一次微信提醒授权，勾上「总是保持以上选择」就不用每次再点。</view>
+  </view>
+
+  <view class="panel panel-spaced" wx:if="{{channels.length}}">
+    <view class="field-label">已加入</view>
+    <view class="channel-row" wx:for="{{channels}}" wx:key="subscriptionId">
+      <view class="channel-name">{{item.channelName}}</view>
+      <view class="channel-app">{{item.appName}}</view>
+    </view>
+  </view>
+</view>

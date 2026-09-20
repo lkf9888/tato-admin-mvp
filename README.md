@@ -426,27 +426,229 @@ docker compose -f docker-compose.public.yml up -d --build
 
 本仓库包含一个可用微信开发者工具打开的小程序项目：`wechat-miniprogram/`。
 
+> 从零上线的分阶段清单（注册主体、域名、模板、环境变量、初始化、发布、交接，
+> 外加 errcode 对照表）见
+> [`docs/wechat-mini-program-launch.md`](docs/wechat-mini-program-launch.md)。
+
 上线前需要在 Railway Variables 配置：
 
 ```env
 WECHAT_MINIPROGRAM_APP_ID=wx_xxx
 WECHAT_MINIPROGRAM_APP_SECRET=xxx
 WECHAT_TASK_TEMPLATE_ID=xxx
-WECHAT_MINIPROGRAM_STATE=formal
 ```
+
+`WECHAT_MINIPROGRAM_STATE` 曾经在这里，现在没有代码读它了：`miniprogram_state`
+是 `NotifyMiniProgram` 的一列，用
+`npm run notify-hub -- mini-program:set --app-id wx... --state trial` 改。
 
 微信公众平台里还需要设置：
 
 - 在「开发管理」把 `https://tatocar.co` 加到 request、uploadFile 和 downloadFile 合法域名。
 - 在「订阅消息」添加一个任务通知模板，默认字段建议为：`thing1=任务名称`、`time2=到期时间`、`thing3=车辆信息`、`phrase4=任务状态`、`thing5=备注`。
-- 如果实际模板字段不同，可在 Railway 加 `WECHAT_TASK_MESSAGE_FIELDS` 覆盖，例如：
-
-```env
-WECHAT_TASK_MESSAGE_FIELDS={"title":"thing1","due":"time2","vehicle":"thing3","action":"phrase4","details":"thing5"}
-```
+- 字段映射已经搬到中枢的 `NotifyTemplate.fieldMap`，用
+  `npm run notify-hub -- template:set --fields '{...}'` 设置。
+  老的 `WECHAT_TASK_MESSAGE_FIELDS` 现在没有代码在读，配了也不生效。
+- `WECHAT_TASK_TEMPLATE_ID` 还在用：老小程序靠它知道该申请哪个模板的授权。
+  等小程序换成中枢版本（模板 ID 由 `/v1/mp/session` 下发）之后就可以删了。
 
 员工使用流程：
 
 1. Admin 在线下员工排班里复制员工的「小程序 Code」。
 2. 员工第一次打开小程序输入 Code，系统会把该 Code 绑定到当前微信 openid。
 3. 员工在小程序里点击「开启新任务微信提醒」后，后续 admin 分配或修改任务时会尝试发送微信订阅消息。
+
+注意：微信的一次性订阅是**一次授权换一条消息**。员工点一次只够收一条，
+之后的发送会拿到 43101。现在服务端遇到 43101 会把该员工的
+`wechatNotificationEnabled` 关掉，排班页也就不再显示「已开启」——在小程序端
+改成反复补授权之前，这是让「收不到」变成看得见的最低保证。
+
+## 通知中枢（Notify hub）
+
+TATO 不是唯一要往微信发提醒的系统，HostHub 和洗车棚也要，而它们各自部署、
+各有数据库，洗车棚那台机器甚至没有公网地址。中枢把「怎么跟微信说话」收在一处：
+凭证、订阅者绑定、订阅额度都归它管，调用方只发一个 HTTP 请求。
+
+结构是三层：
+
+```
+小程序 (NotifyMiniProgram)   ← 一个 appid 一行，凭证和模板挂在这里
+└── 应用 (NotifyApp)          ← API key 的持有者：tato / hosthub / washbay
+    └── 频道 (NotifyChannel)  ← 路由单位，可以是一个人也可以是一个组
+        └── 订阅 (NotifySubscription) ← 一个频道多个微信用户，一个用户多个频道
+```
+
+`NotifyApp.miniProgramId` 是这套结构里最要紧的一列。今天三个应用指向同一个
+小程序；HostHub 将来要单独卖的时候，用它自己的主体注册一个小程序，跑一条
+`app:move` 就换过去了，代码不动。
+
+### 调用方接入
+
+```bash
+curl -X POST https://tatocar.co/api/v1/notify \
+  -H "Authorization: Bearer ntfy_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "channel": "staff:cl9x",
+    "channelName": "张师傅",
+    "template": "task",
+    "priority": "high",
+    "dedupeKey": "task-123-updated",
+    "data": {
+      "title": "半小时后交车",
+      "due": "2026-09-19T14:30:00.000Z",
+      "vehicle": "7ABC123 · Model 3",
+      "action": "任务更新",
+      "details": "客人已到停车场"
+    },
+    "link": { "url": "https://tatocar.co/staff-share/xxx" }
+  }'
+```
+
+几点约定：
+
+- 调用方不写模板 ID、appid 和小程序路径。`template` 是逻辑名（`task` /
+  `alert` / `digest`），中枢按应用所属的小程序去查真实模板。
+- 字段的中文标签归 `NotifyApp.fieldLabels` 管，用 `app:labels` 设，小程序在读
+  收件箱时拿到。内置了一套通用的（内容/时间/车辆/类型/备注/来源/地点/金额），
+  应用自己的词汇（HostHub 的 `room`）加上去就行，也可以覆盖内置的。
+  **改标签不用重新发小程序版本**——这正是它在服务端的原因。没命名的字段显示
+  字段名本身，不会空白。
+- 字段长度由字段名推出来：`phrase4` 只收 5 个字，`thing1` 收 20 个，超了自动
+  截断而不是被微信整条退回。`time2` 收 ISO 时间戳，按 `NOTIFY_TIMEZONE`
+  （默认跟 `CSV_IMPORT_TIMEZONE` 走，也就是 `America/Vancouver`）渲染，
+  **不是**服务器本地时区——Railway 上跑在 UTC，用本地时区会让每条提醒差七八个小时。
+- 返回 207 表示部分成功，逐个订阅者给出 `sent` / `no_quota` / `muted` /
+  `duplicate` / `failed`。中枢**不做兜底**：额度不够就如实返回 `no_quota`，
+  要不要改发邮件或短信由调用方自己决定。
+- `priority` 决定能不能动用最后几格额度：`high` 剩 1 格就发，`normal` 要剩 2
+  格，`low` 要剩 3 格。共用模板意味着共用额度池，这是防止洗车棚的例行消息
+  吃掉 TATO 急单那一格的办法。
+- `dedupeKey` 幂等。超时重试不会多花一次订阅额度。
+
+### 额度
+
+微信一次性订阅授权一次只能发一条，且可以累积，服务端查不到余额——所以中枢
+自己记账：小程序每次 `requestSubscribeMessage` 回来调 `/api/v1/mp/subscribe`
+上报，发送成功扣一格，收到 43101 就把该模板清零。记账会漂，但漂了会被 43101
+纠正，不会静默。
+
+### 小程序端接口
+
+| 接口 | 用途 |
+| --- | --- |
+| `POST /api/v1/mp/session` | `wx.login` 的 code 换中枢会话，返回频道、模板 ID 和余额 |
+| `POST /api/v1/mp/bind` | 用绑定码加入一个频道 |
+| `POST /api/v1/mp/subscribe` | 上报 `requestSubscribeMessage` 的授权结果 |
+| `GET /api/v1/mp/inbox` | 消息列表；带 `?d=<id>` 取被点开的那一条 |
+
+中枢只存够详情页渲染的短 payload（最多 12 个字段、每个 200 字符），默认 30 天
+过期。它不是消息中心：没有已读未读、没有搜索、没有历史。之所以要存一点，是因为
+洗车棚在内网，点开详情时回不了源。
+
+### 运维
+
+```bash
+npm run notify-hub -- status
+npm run notify-hub -- mini-program:add --app-id wx123 --name "Ops"
+npm run notify-hub -- template:set --mini-program wx123 --key task \
+  --template-id TMPL_X --fields '{"title":"thing1","due":"time2"}'
+npm run notify-hub -- app:add --key hosthub --name HostHub --mini-program wx123
+npm run notify-hub -- app:labels --app hosthub --labels '{"room":"房间"}'
+npm run notify-hub -- key:mint --app hosthub --name "vercel prod"
+npm run notify-hub -- channel:add --app hosthub --key cleaning --name "保洁组"
+npm run notify-hub -- channel:list --app hosthub
+npm run notify-hub -- app:move --app hosthub --mini-program wx999
+```
+
+API key 只在 `key:mint` 时明文打印一次，之后只存哈希。
+
+环境变量：
+
+```env
+# 小程序密钥按 NotifyMiniProgram.secretEnvVar 里写的变量名读取，
+# 默认就是下面这个，多小程序时每个一行。
+WECHAT_MINIPROGRAM_APP_SECRET=xxx
+NOTIFY_HUB_SESSION_SECRET=xxx      # 缺省回落到 SESSION_SECRET
+NOTIFY_TIMEZONE=America/Vancouver  # 缺省回落到 CSV_IMPORT_TIMEZONE
+WECHAT_API_BASE=                   # 只在测试或需要微信备用域名时设置
+```
+
+### TATO 怎么接的
+
+`lib/staff-task-notifications.ts` 里的微信那一路已经改成走中枢。TATO 自己不再
+知道模板 ID、appid 和小程序路径，只说「发给 `staff:<id>` 频道、用 `task`
+模板」。邮件和短信两路没动。
+
+频道按员工一人一个，`channelName` 让它在第一次派单时自动建出来，不需要预先
+开通。`dedupeKey` 用 `task:<id>:<action>:<updatedAt>`——同一次保存重试是重复，
+真正的第二次编辑不是。派单和移除用 `high`，普通编辑用 `normal`，额度紧张时
+急事才动用最后一格。
+
+传输方式看环境变量：设了 `NOTIFY_HUB_URL` 就走 HTTP，没设就直接在进程内调用。
+中枢现在就在这个 app 里，所以默认是进程内——给自己发一个 localhost 请求只会
+多一种失败方式。哪天中枢搬出去，加两个变量就行，代码不用动。
+
+发送失败永远不会抛：邮件短信都发完了才轮到微信，中枢挂了不能把派单变成 500。
+
+```env
+NOTIFY_APP_KEY=tato          # 对应 NotifyApp.key，缺省 tato
+NOTIFY_HUB_URL=              # 留空＝进程内调用
+NOTIFY_HUB_API_KEY=          # 只有走 HTTP 时需要
+```
+
+老小程序（`wechat-miniprogram/`）还没换，但已经用一座桥接到中枢上：绑定员工码
+时建订阅，点「开启提醒」时记一格额度。桥在 `lib/notify-client.ts` 末尾，标了
+transitional——等小程序改成调 `/v1/mp/bind` 和 `/v1/mp/subscribe`，桥和它的两个
+调用点一起删掉。
+
+已有员工的回填：
+
+```bash
+npm run notify-hub -- tato:sync
+```
+
+给每个在职员工建频道，已经绑过微信的顺带建订阅。额度不回填——没人做过的授权
+造不出来。
+
+### 小程序端
+
+`wechat-miniprogram/` 现在是中枢的客户端，不再是 TATO 专用的任务端。
+
+| 页面 | 作用 |
+| --- | --- |
+| `pages/message/index` | 首页，消息列表。**中枢发的每条订阅消息都跳这里**（`?d=<deliveryId>`），所以这个页面不能改名 |
+| `pages/bind/bind` | 输入绑定码加入频道，可以加多个 |
+| `pages/webview/webview` | 用 `web-view` 打开消息里带的链接 |
+| `pages/login/login`、`pages/tasks/index` | TATO 原来的员工码登录和任务页，没动 |
+
+`utils/hub.js` 是中枢的客户端，跟 TATO 自己的 `utils/api.js` 分开——同一个
+小程序也要服务 HostHub 和洗车棚，那两边没有「任务」这个概念。
+
+**补额度是这一版的重点。** `hub.topUp()` 做三件事：查哪些模板余额低于 3，
+挑余额最少的最多三个（`requestSubscribeMessage` 一次最多三个），把授权结果报给
+`/api/v1/mp/subscribe`。调用点有三处：
+
+- 每次打开首页（用户勾了「总是保持以上选择」之后这里会静默成功，这是余额唯一
+  能自动恢复的途径）
+- 加入频道成功之后（刚点过按钮，手势还在，弹窗也不突兀）
+- 首页顶部那条横幅，手动点
+
+余额为 0 时横幅变红，写明「微信提醒已用完」。这是让「收不到」变成看得见的
+最后一道——服务端记账、admin 界面、小程序横幅，三处都不再假装提醒是开着的。
+
+**两个注册限制**（代码解决不了，注册前要想清楚）：
+
+- `web-view` 对**个人主体小程序不开放**。真走个人主体的话，`pages/webview`
+  用不了，消息详情只能看中枢存的那几个字段，点不进各系统自己的页面。
+- 每个要在 `web-view` 里打开的域名都得在小程序后台配成业务域名。
+
+### 还没做的
+
+- 应用、密钥和模板还是只能从上面的 CLI 配。**频道和绑定码已经接到排班页了**：
+  展开员工卡片的「Code / 员工备注」就能看到绑定码（点一下复制）、已绑定人数，
+  以及还能收几条提醒；余额为 0 时会标红提示让员工重新授权。频道在页面渲染时
+  按需创建，跟旁边的「小程序 Code」是同一套做法。
+- 老的员工码登录（`pages/login`）和中枢的绑定码是两套身份，小程序里同时存在。
+  等所有人都迁到绑定码之后，`lib/notify-client.ts` 里那座桥、老的
+  `/api/wechat/staff/*` 路由和这两个页面可以一起删。

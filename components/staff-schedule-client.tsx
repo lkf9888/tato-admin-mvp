@@ -41,6 +41,11 @@ type StaffMember = {
   sortOrder: number;
   shareToken: string | null;
   miniProgramCode: string | null;
+  /** The notification hub's code for this person's channel. What a
+   *  staff member types into the mini program to start receiving. */
+  bindCode?: string | null;
+  channelSubscribers?: number;
+  channelRemaining?: number;
   wechatOpenId: string | null;
   wechatNotificationEnabled: boolean;
 };
@@ -208,6 +213,13 @@ function getStaffScheduleCopy(locale: Locale) {
         copyShareLink: "复制链接",
         shareCopied: "员工任务链接已复制。",
         miniProgramCode: "小程序 Code",
+        bindCode: "绑定码",
+        channelNobody: "没人绑定",
+        channelSubscribers: (count: number) => `${count} 人已绑定`,
+        channelRemaining: (count: number) => `还能收 ${count} 条`,
+        channelEmpty: "提醒已用完，让员工打开小程序重新授权",
+        bindCodeCopied: "绑定码已复制。",
+        copyFailed: "复制失败，请手动选中复制。",
         wechatBound: "已绑定微信",
         wechatNotBound: "未绑定微信",
         wechatNotifyOn: "微信提醒已开启",
@@ -325,6 +337,13 @@ function getStaffScheduleCopy(locale: Locale) {
         copyShareLink: "Copy link",
         shareCopied: "Staff task link copied.",
         miniProgramCode: "Mini Program Code",
+        bindCode: "Bind code",
+        channelNobody: "Nobody bound",
+        channelSubscribers: (count: number) => `${count} bound`,
+        channelRemaining: (count: number) => `${count} message${count === 1 ? "" : "s"} left`,
+        channelEmpty: "Out of reminders — ask them to reopen the mini program",
+        bindCodeCopied: "Bind code copied.",
+        copyFailed: "Copy failed — select the text and copy it manually.",
         wechatBound: "WeChat bound",
         wechatNotBound: "WeChat not bound",
         wechatNotifyOn: "WeChat alerts on",
@@ -739,8 +758,24 @@ export function StaffScheduleClient({
     }
 
     const url = `${window.location.origin}${href}`;
-    await navigator.clipboard.writeText(url);
-    setNotice(c.shareCopied);
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice(c.shareCopied);
+    } catch {
+      setNotice(c.copyFailed);
+    }
+  }
+
+  async function copyBindCode(member: StaffMember) {
+    if (!member.bindCode) return;
+    try {
+      await navigator.clipboard.writeText(member.bindCode);
+      setNotice(c.bindCodeCopied);
+    } catch {
+      // The code is on screen and selectable, so say so rather than
+      // failing into the console where nobody is looking.
+      setNotice(c.copyFailed);
+    }
   }
 
   function toggleStaffInfo(memberId: string) {
@@ -972,6 +1007,40 @@ export function StaffScheduleClient({
                 </button>
                 {openStaffInfoIds.has(member.id) ? (
                   <div className="space-y-1 border-t border-[var(--line)] bg-white/45 px-3 py-2 text-[11px] leading-5 text-[var(--ink-mid)]">
+                    {member.bindCode ? (
+                      <p>
+                        <span className="font-semibold text-[var(--ink)]">{c.bindCode}: </span>
+                        <button
+                          type="button"
+                          onClick={() => copyBindCode(member)}
+                          className="font-mono tracking-[0.18em] text-[var(--ink)] underline decoration-dotted underline-offset-2"
+                        >
+                          {member.bindCode}
+                        </button>
+                        <span className="mx-1.5 text-neutral-300">·</span>
+                        <span>
+                          {member.channelSubscribers
+                            ? c.channelSubscribers(member.channelSubscribers)
+                            : c.channelNobody}
+                        </span>
+                        {member.channelSubscribers ? (
+                          <>
+                            <span className="mx-1.5 text-neutral-300">·</span>
+                            <span
+                              className={
+                                member.channelRemaining
+                                  ? undefined
+                                  : "font-semibold text-[var(--danger,#dc2626)]"
+                              }
+                            >
+                              {member.channelRemaining
+                                ? c.channelRemaining(member.channelRemaining)
+                                : c.channelEmpty}
+                            </span>
+                          </>
+                        ) : null}
+                      </p>
+                    ) : null}
                     {member.miniProgramCode ? (
                       <p>
                         <span className="font-semibold text-[var(--ink)]">{c.miniProgramCode}: </span>
@@ -1950,6 +2019,29 @@ function StaffModal({
         <Field label={copy.notes}>
           <textarea className="input min-h-24" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
         </Field>
+        {staff?.bindCode ? (
+          <div className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-sm text-[var(--ink-mid)]">
+            <div>
+              <p className="text-xs font-semibold text-[var(--ink-soft)]">{copy.bindCode}</p>
+              <p className="font-mono text-base font-semibold tracking-[0.22em] text-[var(--ink)]">{staff.bindCode}</p>
+            </div>
+            <p className="mt-1 text-xs text-[var(--ink-soft)]">
+              {staff.channelSubscribers
+                ? copy.channelSubscribers(staff.channelSubscribers)
+                : copy.channelNobody}
+              {staff.channelSubscribers ? (
+                <>
+                  {" · "}
+                  <span className={staff.channelRemaining ? undefined : "font-semibold text-[#dc2626]"}>
+                    {staff.channelRemaining
+                      ? copy.channelRemaining(staff.channelRemaining)
+                      : copy.channelEmpty}
+                  </span>
+                </>
+              ) : null}
+            </p>
+          </div>
+        ) : null}
         {staff?.miniProgramCode ? (
           <div className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-sm text-[var(--ink-mid)]">
             <div>

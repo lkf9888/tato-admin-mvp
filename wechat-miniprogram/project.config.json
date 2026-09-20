@@ -1,5 +1,5 @@
 {
-  "description": "TATO staff task mini program",
+  "description": "Notification channel for TATO, HostHub and the wash bay",
   "setting": {
     "urlCheck": true,
     "es6": true,
@@ -10,6 +10,6 @@
   "compileType": "miniprogram",
   "libVersion": "latest",
   "appid": "wx-your-app-id",
-  "projectname": "tato-staff-tasks",
+  "projectname": "tato-notify",
   "condition": {}
 }

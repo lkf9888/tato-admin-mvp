@@ -1,0 +1,1000 @@
+<title>小程序上线清单</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ground: #edf0f4;
+    --surface: #ffffff;
+    --surface-sunk: #e4e8ee;
+    --ink: #14161b;
+    --ink-mid: #4f5663;
+    --ink-soft: #848c9b;
+    --line: #d4dae2;
+    --line-soft: #e3e7ed;
+    --accent: #1b6a4a;
+    --accent-tint: #e2efe9;
+    --warn: #8f5511;
+    --warn-tint: #f7ecdc;
+    --danger: #ab3527;
+    --code-bg: #1a1e25;
+    --code-ink: #dfe4ec;
+    --code-dim: #8a94a4;
+
+    --step: clamp(1.05rem, 0.98rem + 0.3vw, 1.18rem);
+    --sans: "IBM Plex Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101217;
+      --surface: #1a1d24;
+      --surface-sunk: #14171d;
+      --ink: #e9ecf1;
+      --ink-mid: #a4adbb;
+      --ink-soft: #717a89;
+      --line: #2b313b;
+      --line-soft: #232831;
+      --accent: #52ad81;
+      --accent-tint: #172a22;
+      --warn: #d29a51;
+      --warn-tint: #2a2318;
+      --danger: #e0705f;
+      --code-bg: #0b0d11;
+      --code-ink: #d5dbe4;
+      --code-dim: #6d7787;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #101217;
+    --surface: #1a1d24;
+    --surface-sunk: #14171d;
+    --ink: #e9ecf1;
+    --ink-mid: #a4adbb;
+    --ink-soft: #717a89;
+    --line: #2b313b;
+    --line-soft: #232831;
+    --accent: #52ad81;
+    --accent-tint: #172a22;
+    --warn: #d29a51;
+    --warn-tint: #2a2318;
+    --danger: #e0705f;
+    --code-bg: #0b0d11;
+    --code-ink: #d5dbe4;
+    --code-dim: #6d7787;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 47rem;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 0 72px;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { padding-block: 44px 28px; }
+
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 12px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.9rem, 1.4rem + 2.2vw, 2.6rem);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    margin: 14px 0 0;
+    color: var(--ink-mid);
+    font-size: var(--step);
+    max-width: 38em;
+  }
+
+  /* ---------- progress bar ---------- */
+
+  .progress {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 10;
+    background: color-mix(in srgb, var(--ground) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-block: 1px solid var(--line);
+    margin-inline: -20px;
+    padding: 12px 20px;
+  }
+
+  .progress-row {
+    max-width: 47rem;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .progress-count {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-mid);
+    white-space: nowrap;
+  }
+
+  .progress-count b { color: var(--ink); font-weight: 500; }
+
+  .progress-track {
+    flex: 1;
+    height: 4px;
+    background: var(--surface-sunk);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 999px;
+    transition: width 220ms ease;
+  }
+
+  .save-state {
+    font-size: 12px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    min-width: 3.4em;
+    text-align: right;
+  }
+
+  /* ---------- phases ---------- */
+
+  .phase { margin-top: 44px; }
+
+  .phase-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .phase-num {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .phase-head h2 {
+    margin: 0;
+    font-size: 1.32rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    flex: 1;
+  }
+
+  .phase-where {
+    font-size: 12px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .phase-note {
+    margin: 12px 0 0;
+    color: var(--ink-mid);
+  }
+
+  /* ---------- steps ---------- */
+
+  .steps { margin-top: 6px; }
+
+  .step {
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 14px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .step:last-child { border-bottom: none; }
+
+  .step input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 4px 0 0;
+    width: 20px;
+    height: 20px;
+    border: 1.5px solid var(--ink-soft);
+    border-radius: 5px;
+    background: var(--surface);
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    flex-shrink: 0;
+  }
+
+  .step input[type="checkbox"]::after {
+    content: "";
+    width: 10px;
+    height: 6px;
+    border-left: 2px solid var(--surface);
+    border-bottom: 2px solid var(--surface);
+    transform: rotate(-45deg) translate(1px, -1px) scale(0);
+    transition: transform 120ms ease;
+  }
+
+  .step input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .step input[type="checkbox"]:checked::after { transform: rotate(-45deg) translate(1px, -1px) scale(1); }
+
+  .step input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .step input[type="checkbox"]:disabled { cursor: default; opacity: 0.5; }
+
+  .step-title {
+    font-size: var(--step);
+    font-weight: 600;
+    line-height: 1.5;
+    cursor: pointer;
+  }
+
+  .step.is-done .step-title { color: var(--ink-soft); text-decoration: line-through; text-decoration-thickness: 1px; }
+  .step.is-done .step-body { opacity: 0.6; }
+
+  .step-body { margin: 6px 0 0; color: var(--ink-mid); }
+  .step-body p { margin: 0 0 8px; }
+  .step-body p:last-child { margin-bottom: 0; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--surface-sunk);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--ink);
+    word-break: break-word;
+  }
+
+  pre {
+    margin: 10px 0 0;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 14px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+  }
+
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  pre .c { color: var(--code-dim); }
+
+  /* ---------- callouts ---------- */
+
+  .callout {
+    margin: 18px 0 0;
+    padding: 16px 18px;
+    border-radius: 8px;
+    background: var(--warn-tint);
+    border-left: 3px solid var(--warn);
+  }
+
+  .callout.accent { background: var(--accent-tint); border-left-color: var(--accent); }
+
+  .callout h3 {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .callout p { margin: 0 0 8px; color: var(--ink-mid); }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ---------- decision fork ---------- */
+
+  .fork {
+    margin-top: 18px;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  }
+
+  .fork-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+
+  .fork-card h3 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .fork-verdict {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin: 0 0 10px;
+  }
+
+  .fork-card.ok .fork-verdict { color: var(--accent); }
+  .fork-card.limited .fork-verdict { color: var(--warn); }
+
+  .fork-card ul { margin: 0; padding-left: 1.1em; color: var(--ink-mid); }
+  .fork-card li { margin-bottom: 4px; }
+  .fork-card li:last-child { margin-bottom: 0; }
+
+  /* ---------- errcode table ---------- */
+
+  .table-scroll { overflow-x: auto; margin-top: 16px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 30rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 10px 14px 10px 0;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+
+  th {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    border-bottom-color: var(--line);
+  }
+
+  td:first-child {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--danger);
+  }
+
+  td:last-child, th:last-child { padding-right: 0; }
+
+  .colophon {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .colophon p { margin: 0 0 6px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">Tato · 通知中枢</p>
+    <h1>微信小程序上线清单</h1>
+    <p class="standfirst">
+      从「什么都没有」到「员工在微信里收到派单」。顺序是有依赖的——阶段 0 那个决定会影响后面一半的步骤，先定它。
+    </p>
+  </header>
+
+  <div class="progress">
+    <div class="progress-row">
+      <span class="progress-count">已完成 <b id="count-done">0</b> / <span id="count-total">0</span></span>
+      <div class="progress-track"><div class="progress-fill" id="fill"></div></div>
+      <span class="save-state" id="save-state"></span>
+    </div>
+  </div>
+
+  <!-- ============ PHASE 0 ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <span class="phase-num">00</span>
+      <h2>先定主体</h2>
+      <span class="phase-where">决定后面所有步骤</span>
+    </div>
+    <p class="phase-note">
+      <strong>已定：个人主体。</strong>对照留着，因为这个决定一年后会有人问「当初为什么」。
+    </p>
+
+    <div class="fork">
+      <div class="fork-card limited">
+        <h3>个人主体 ← 用这个</h3>
+        <p class="fork-verdict">已选</p>
+        <ul>
+          <li>不需要营业执照，注册最快</li>
+          <li>订阅消息照常能发</li>
+          <li><strong>不能用 <code>web-view</code></strong>，业务域名也配不了</li>
+        </ul>
+      </div>
+      <div class="fork-card ok">
+        <h3>企业主体</h3>
+        <p class="fork-verdict">未选</p>
+        <ul>
+          <li>需要营业执照</li>
+          <li>可以用 <code>web-view</code>，消息能点进 <code>/staff-share</code></li>
+          <li>要配业务域名（多一步校验文件）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout">
+      <h3>实际损失只有一处</h3>
+      <p>五个页面里只有 <code>pages/webview</code> 失效，已经从 <code>app.json</code> 摘掉。消息列表、绑定码、任务页（含<strong>传照片</strong>，走原生 <code>wx.uploadFile</code>）全部正常。</p>
+      <p>TATO 的通知显示「查看任务」直接跳原生任务页，只是不再一键落到 <code>/staff-share</code>。<strong>HostHub 和洗车系统没有原生页面兜底</strong>，它们的通知只会显示「复制链接」——这是这个决定真正的代价，接那两个系统前要想起来。</p>
+      <p>将来改企业主体：把 <code>pages/webview</code> 加回 <code>app.json</code>，<code>pages/message/index.js</code> 的 <code>resolveAction</code> 加一条 <code>kind: "web"</code> 分支。</p>
+    </div>
+
+    <div class="steps">
+      <div class="step" data-id="s0a">
+        <input type="checkbox" id="s0a">
+        <div>
+          <label class="step-title" for="s0a">确认用哪个主体注册 —— 个人主体</label>
+          <div class="step-body">
+            <p>已定。上面那张对照说明了代价。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s0b">
+        <input type="checkbox" id="s0b">
+        <div>
+          <label class="step-title" for="s0b">确认微信认证要不要做</label>
+          <div class="step-body">
+            <p>订阅消息本身不需要认证就能用。认证主要影响的是部分高级能力和搜索展示——先按不认证跑通，需要了再补。具体以公众平台后台当时显示的为准。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PHASE 1 ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <span class="phase-num">01</span>
+      <h2>注册与域名</h2>
+      <span class="phase-where">微信公众平台</span>
+    </div>
+
+    <div class="steps">
+      <div class="step" data-id="s1a">
+        <input type="checkbox" id="s1a">
+        <div>
+          <label class="step-title" for="s1a">注册小程序，记下 AppID</label>
+          <div class="step-body">
+            <p>mp.weixin.qq.com → 注册 → 小程序。形如 <code>wx1a2b3c4d5e6f7890</code>。</p>
+            <p>个人主体的名称不能用企业名或品牌词，「TATO」可能被判成品牌名——备一个替代名，比如「车队任务助手」。类目选工具类。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s1b">
+        <input type="checkbox" id="s1b">
+        <div>
+          <label class="step-title" for="s1b">生成 AppSecret 并立刻存好</label>
+          <div class="step-body">
+            <p>开发管理 → 开发设置 → 开发者 ID。<strong>只显示一次</strong>，关掉就要重置。直接贴进密码管理器，下一阶段要填到 Railway。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s1c">
+        <input type="checkbox" id="s1c">
+        <div>
+          <label class="step-title" for="s1c">配服务器域名</label>
+          <div class="step-body">
+            <p>开发管理 → 开发设置 → 服务器域名，三项都加 <code>https://tatocar.co</code>：</p>
+            <p><code>request</code> 合法域名——小程序所有接口调用都走它，不配全都失败。<br>
+               <code>uploadFile</code> / <code>downloadFile</code>——老任务页传照片、看附件要用。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s1d">
+        <input type="checkbox" id="s1d">
+        <div>
+          <label class="step-title" for="s1d">配业务域名 —— 个人主体跳过</label>
+          <div class="step-body">
+            <p>配不了也不需要。改成企业主体才要：加 <code>tatocar.co</code>，下载校验文件传到服务器根目录，再点校验。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PHASE 2 ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <span class="phase-num">02</span>
+      <h2>订阅消息模板</h2>
+      <span class="phase-where">微信公众平台</span>
+    </div>
+    <p class="phase-note">
+      模板决定消息长什么样。字段编号是微信分配的，不一定跟下面的例子一样——以后台实际显示为准，中枢那边按实际编号配。
+    </p>
+
+    <div class="steps">
+      <div class="step" data-id="s2a">
+        <input type="checkbox" id="s2a">
+        <div>
+          <label class="step-title" for="s2a">添加一个任务提醒模板</label>
+          <div class="step-body">
+            <p>功能 → 订阅消息 → 公共模板库，挑一个任务/待办类的模板。需要的五个字段：任务内容、时间、车辆、状态、备注。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s2b">
+        <input type="checkbox" id="s2b">
+        <div>
+          <label class="step-title" for="s2b">抄下模板 ID 和每个字段的编号</label>
+          <div class="step-body">
+            <p>模板 ID 是一长串。字段编号形如：</p>
+            <pre><code>thing1   任务内容
+time2    到期时间
+thing3   车辆信息
+phrase4  任务状态
+thing5   备注</code></pre>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s2c">
+        <input type="checkbox" id="s2c">
+        <div>
+          <label class="step-title" for="s2c">确认字段类型的长度限制</label>
+          <div class="step-body">
+            <p>中枢按字段名推长度限制，所以类型不能记错：<code>phrase</code> 只收 <strong>5 个字</strong>，<code>thing</code> 收 20 个，<code>character_string</code> 收 32 位。超了微信会整条退回 47003，不是截断。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PHASE 3 ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <span class="phase-num">03</span>
+      <h2>环境变量</h2>
+      <span class="phase-where">Railway</span>
+    </div>
+
+    <div class="steps">
+      <div class="step" data-id="s3a">
+        <input type="checkbox" id="s3a">
+        <div>
+          <label class="step-title" for="s3a">填上必需的四个</label>
+          <div class="step-body">
+            <pre><code>WECHAT_MINIPROGRAM_APP_ID=wx...
+WECHAT_MINIPROGRAM_APP_SECRET=...
+NOTIFY_HUB_SESSION_SECRET=<span class="c">// 随机长字符串</span>
+WECHAT_TASK_TEMPLATE_ID=<span class="c">// 老任务页还在用</span></code></pre>
+            <p><code>NOTIFY_HUB_SESSION_SECRET</code> 不设会回落到 <code>SESSION_SECRET</code>，但生产环境两个都没有会直接抛错。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s3b">
+        <input type="checkbox" id="s3b">
+        <div>
+          <label class="step-title" for="s3b">确认时区</label>
+          <div class="step-body">
+            <p>不设 <code>NOTIFY_TIMEZONE</code> 会回落到 <code>CSV_IMPORT_TIMEZONE</code>，再不设是 <code>America/Vancouver</code>。<strong>绝不能用服务器本地时区</strong>——Railway 跑在 UTC，会让每条提醒差七八个小时，而且看起来完全正常。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s3c">
+        <input type="checkbox" id="s3c">
+        <div>
+          <label class="step-title" for="s3c">确认 <code>WECHAT_API_BASE</code> 是空的</label>
+          <div class="step-body">
+            <p>这个只在测试时指向假服务器用。留空才会走 <code>api.weixin.qq.com</code>。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s3d">
+        <input type="checkbox" id="s3d">
+        <div>
+          <label class="step-title" for="s3d">别配 <code>WECHAT_TASK_MESSAGE_FIELDS</code></label>
+          <div class="step-body">
+            <p>已经没有代码在读它了。字段映射现在归中枢的 <code>NotifyTemplate.fieldMap</code> 管，见下一阶段。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PHASE 4 ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <span class="phase-num">04</span>
+      <h2>初始化中枢</h2>
+      <span class="phase-where">终端</span>
+    </div>
+    <p class="phase-note">
+      按顺序跑，后面的命令依赖前面建出来的记录。
+    </p>
+
+    <div class="steps">
+      <div class="step" data-id="s4a">
+        <input type="checkbox" id="s4a">
+        <div>
+          <label class="step-title" for="s4a">登记小程序</label>
+          <div class="step-body">
+            <pre><code>npm run notify-hub -- mini-program:add \
+  --app-id wx1a2b3c4d5e6f7890 \
+  --name "Ops"</code></pre>
+            <p>密钥不存数据库，只记变量名，默认就是 <code>WECHAT_MINIPROGRAM_APP_SECRET</code>。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s4b">
+        <input type="checkbox" id="s4b">
+        <div>
+          <label class="step-title" for="s4b">登记模板和字段映射</label>
+          <div class="step-body">
+            <pre><code>npm run notify-hub -- template:set \
+  --mini-program wx1a2b3c4d5e6f7890 \
+  --key task \
+  --template-id &lt;模板ID&gt; \
+  --fields '{"title":"thing1","due":"time2",
+             "vehicle":"thing3","action":"phrase4",
+             "details":"thing5"}'</code></pre>
+            <p>左边是调用方用的逻辑名，右边是阶段 02 抄下来的真实编号。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s4c">
+        <input type="checkbox" id="s4c">
+        <div>
+          <label class="step-title" for="s4c">建 Tato 这个应用</label>
+          <div class="step-body">
+            <pre><code>npm run notify-hub -- app:add \
+  --key tato --name "TATO" \
+  --mini-program wx1a2b3c4d5e6f7890</code></pre>
+            <p><code>--key tato</code> 要跟 <code>NOTIFY_APP_KEY</code> 对上（默认就是 <code>tato</code>）。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s4d">
+        <input type="checkbox" id="s4d">
+        <div>
+          <label class="step-title" for="s4d">回填员工频道</label>
+          <div class="step-body">
+            <pre><code>npm run notify-hub -- tato:sync</code></pre>
+            <p>给每个在职员工建一个频道。额度不会回填——没人做过的授权造不出来。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s4e">
+        <input type="checkbox" id="s4e">
+        <div>
+          <label class="step-title" for="s4e">检查一遍</label>
+          <div class="step-body">
+            <pre><code>npm run notify-hub -- status</code></pre>
+            <p>密钥那行要显示 <code>✓ present</code>。显示 <code>✗ MISSING</code> 就是 Railway 变量没生效，重新部署一次。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PHASE 5 ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <span class="phase-num">05</span>
+      <h2>小程序发布</h2>
+      <span class="phase-where">微信开发者工具</span>
+    </div>
+
+    <div class="steps">
+      <div class="step" data-id="s5a">
+        <input type="checkbox" id="s5a">
+        <div>
+          <label class="step-title" for="s5a">换掉占位的 AppID</label>
+          <div class="step-body">
+            <p>用微信开发者工具打开 <code>wechat-miniprogram/</code>，把 <code>project.config.json</code> 里的 <code>wx-your-app-id</code> 改成真的。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s5b">
+        <input type="checkbox" id="s5b">
+        <div>
+          <label class="step-title" for="s5b">确认接口地址</label>
+          <div class="step-body">
+            <p><code>app.js</code> 里的 <code>apiBaseUrl</code> 应该是 <code>https://tatocar.co</code>，和阶段 01 配的 request 合法域名一致。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s5c">
+        <input type="checkbox" id="s5c">
+        <div>
+          <label class="step-title" for="s5c">真机走一遍完整流程</label>
+          <div class="step-body">
+            <p>模拟器发不出订阅消息，必须用真机预览。顺序：打开小程序 → 输绑定码 → 授权提醒 → 让 admin 派个任务 → 微信里收到。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s5d">
+        <input type="checkbox" id="s5d">
+        <div>
+          <label class="step-title" for="s5d">上传、提审、发布</label>
+          <div class="step-body">
+            <p>审核前先把体验版跑通。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s5e">
+        <input type="checkbox" id="s5e">
+        <div>
+          <label class="step-title" for="s5e">把发送状态切到对的档位</label>
+          <div class="step-body">
+            <p><code>miniprogram_state</code> 决定消息能发到哪种版本的小程序。审核通过前是体验版，要设 <code>trial</code>，否则消息发不到；发布之后切回 <code>formal</code>。</p>
+            <pre><code>npm run notify-hub -- mini-program:set \
+  --app-id wx1a2b3c4d5e6f7890 --state trial</code></pre>
+            <p><strong>这不是环境变量。</strong>以前是 <code>WECHAT_MINIPROGRAM_STATE</code>，现在是 <code>NotifyMiniProgram</code> 上的一列，没有代码再读那个变量了——设了不生效。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PHASE 6 ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <span class="phase-num">06</span>
+      <h2>交给员工</h2>
+      <span class="phase-where">排班页</span>
+    </div>
+
+    <div class="steps">
+      <div class="step" data-id="s6a">
+        <input type="checkbox" id="s6a">
+        <div>
+          <label class="step-title" for="s6a">拿绑定码</label>
+          <div class="step-body">
+            <p>排班页展开员工卡片的「Code / 员工备注」，点绑定码就复制。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s6b">
+        <input type="checkbox" id="s6b">
+        <div>
+          <label class="step-title" for="s6b">让员工绑定</label>
+          <div class="step-body">
+            <p>打开小程序 → 添加频道 → 输码。一个人可以加多个频道，以后接 HostHub 和洗车系统就是再给一个码。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s6c">
+        <input type="checkbox" id="s6c">
+        <div>
+          <label class="step-title" for="s6c">交代他们勾「总是保持以上选择」</label>
+          <div class="step-body">
+            <p>这一步最容易漏，也最要紧。微信一次授权只够收<strong>一条</strong>消息。勾了这个框，以后每次打开小程序会静默补额度——这是余额能自动恢复的唯一办法。不勾就得每次手动点。</p>
+          </div>
+        </div>
+      </div>
+      <div class="step" data-id="s6d">
+        <input type="checkbox" id="s6d">
+        <div>
+          <label class="step-title" for="s6d">派一个真任务验收</label>
+          <div class="step-body">
+            <p>派完回排班页看那一行：应该显示「N 人已绑定 · 还能收 N 条」。显示红字就是额度用完了。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout accent">
+      <h3>额度是这套系统的核心约束</h3>
+      <p>微信的一次性订阅是「一次授权换一条消息」，授权可以累积，但服务端查不到余额。所以中枢自己记账：员工每次授权上报一次，发送成功扣一格，收到 43101 就清零。</p>
+      <p>三个地方都会显示余额：排班页那一行、小程序首页的横幅、以及发送接口按订阅者返回的 <code>no_quota</code>。哪个都别忽略——「收不到」以前是静默的，现在不是了。</p>
+    </div>
+  </section>
+
+  <!-- ============ TROUBLESHOOTING ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <span class="phase-num">⚑</span>
+      <h2>收不到消息时对照</h2>
+      <span class="phase-where">errcode</span>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>errcode</th><th>意思</th><th>怎么办</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>43101</td>
+            <td>用户没有未使用的授权了</td>
+            <td>正常现象。让员工打开小程序重新授权，并勾上「总是保持以上选择」</td>
+          </tr>
+          <tr>
+            <td>47003</td>
+            <td>字段超长或格式不对</td>
+            <td>多半是 <code>phrase</code> 超了 5 个字。检查阶段 02 记的字段类型</td>
+          </tr>
+          <tr>
+            <td>41030</td>
+            <td>page 路径不对</td>
+            <td>小程序没发布，或者 <code>pages/message/index</code> 不在 <code>app.json</code> 里</td>
+          </tr>
+          <tr>
+            <td>40001</td>
+            <td>access_token 失效</td>
+            <td>中枢用的是 <code>stable_token</code>，正常不该出现。真出现了检查 AppSecret 是不是被重置过</td>
+          </tr>
+          <tr>
+            <td>40003</td>
+            <td>openid 不合法</td>
+            <td>该 openid 属于别的小程序。换过 appid 的话员工要重新绑定</td>
+          </tr>
+          <tr>
+            <td>—</td>
+            <td>完全没反应</td>
+            <td>先跑 <code>status</code> 看密钥在不在，再看 <code>MINI_PROGRAM_SECRET_MISSING</code> 有没有出现在日志里</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="colophon">
+    <p>勾选状态会自动保存，换设备打开也在。</p>
+    <p id="updated-line"></p>
+  </div>
+</div>
+
+<script>
+  (function () {
+    "use strict";
+
+    var steps = Array.prototype.slice.call(document.querySelectorAll(".step"));
+    var total = steps.length;
+    var countDone = document.getElementById("count-done");
+    var countTotal = document.getElementById("count-total");
+    var fill = document.getElementById("fill");
+    var saveState = document.getElementById("save-state");
+    var updatedLine = document.getElementById("updated-line");
+
+    countTotal.textContent = String(total);
+
+    var state = { done: {}, updatedAt: null };
+    var artifact = null;
+    var readOnly = false;
+    var timer = null;
+
+    function paint() {
+      var n = 0;
+      steps.forEach(function (step) {
+        var box = step.querySelector('input[type="checkbox"]');
+        var on = !!state.done[step.dataset.id];
+        box.checked = on;
+        step.classList.toggle("is-done", on);
+        if (on) n += 1;
+      });
+      countDone.textContent = String(n);
+      fill.style.width = total ? (n / total) * 100 + "%" : "0%";
+      if (state.updatedAt) {
+        var d = new Date(state.updatedAt);
+        if (!isNaN(d.getTime())) {
+          updatedLine.textContent = "最后更新 " + d.toLocaleString("zh-CN", {
+            month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"
+          });
+        }
+      }
+    }
+
+    function setSaveState(text) {
+      saveState.textContent = text;
+    }
+
+    function save() {
+      if (readOnly || !artifact) return;
+      setSaveState("保存中");
+      state.updatedAt = new Date().toISOString();
+      artifact.publish({ "data.json": JSON.stringify(state) }).then(function () {
+        setSaveState("已保存");
+        paint();
+        setTimeout(function () {
+          if (saveState.textContent === "已保存") setSaveState("");
+        }, 1800);
+      }).catch(function (err) {
+        var code = err && err.code;
+        if (code === "conflict") {
+          // Someone else saved first; the shell is already reconciling.
+          setSaveState("");
+          return;
+        }
+        if (code === "not_writer" || code === "not_granted" || code === "capability_disabled" || code === "not_declared") {
+          goReadOnly();
+          return;
+        }
+        setSaveState("未保存");
+      });
+    }
+
+    function goReadOnly() {
+      readOnly = true;
+      steps.forEach(function (step) {
+        step.querySelector('input[type="checkbox"]').disabled = true;
+      });
+      setSaveState("只读");
+    }
+
+    steps.forEach(function (step) {
+      var box = step.querySelector('input[type="checkbox"]');
+      box.addEventListener("change", function () {
+        if (readOnly) { box.checked = !box.checked; return; }
+        if (box.checked) state.done[step.dataset.id] = true;
+        else delete state.done[step.dataset.id];
+        step.classList.toggle("is-done", box.checked);
+
+        var n = steps.filter(function (s) { return state.done[s.dataset.id]; }).length;
+        countDone.textContent = String(n);
+        fill.style.width = total ? (n / total) * 100 + "%" : "0%";
+
+        // Several ticks in a row become one version, not one each.
+        clearTimeout(timer);
+        timer = setTimeout(save, 1200);
+      });
+    });
+
+    // Saved state lives beside the page as data.json.
+    fetch("data.json", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (saved) {
+        if (saved && typeof saved === "object" && saved.done) {
+          state = { done: saved.done || {}, updatedAt: saved.updatedAt || null };
+          paint();
+        }
+      })
+      .catch(function () { /* first load, or offline: the blank checklist is correct */ });
+
+    if (window.claude && typeof window.claude.use === "function") {
+      window.claude.use("artifact").then(function (ns) {
+        if (!ns) { goReadOnly(); return; }
+        artifact = ns;
+      }).catch(function () { goReadOnly(); });
+    } else {
+      goReadOnly();
+    }
+  })();
+</script>

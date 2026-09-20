@@ -1,10 +1,12 @@
 {
   "pages": [
+    "pages/message/index",
+    "pages/bind/bind",
     "pages/login/login",
     "pages/tasks/index"
   ],
   "window": {
-    "navigationBarTitleText": "TATO Tasks",
+    "navigationBarTitleText": "TATO",
     "navigationBarBackgroundColor": "#111111",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#f4f4f5"

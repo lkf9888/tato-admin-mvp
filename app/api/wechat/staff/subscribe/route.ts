@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { bridgeStaffQuotaGrant, bridgeStaffSubscription } from "@/lib/notify-client";
 import { prisma } from "@/lib/prisma";
 import {
   getBearerToken,
@@ -43,6 +44,19 @@ export async function POST(request: NextRequest) {
       wechatSubscribedAt: parsed.accepted ? new Date() : null,
     },
   });
+
+  // The flag above is what the staff schedule reads; the hub is what
+  // actually sends. An accepted authorisation is worth exactly one
+  // message, so it is counted rather than treated as a switch -- this
+  // mini program predates the hub and still reports a tap as a boolean.
+  if (parsed.accepted && staff.wechatOpenId) {
+    await bridgeStaffSubscription({
+      staffId: staff.id,
+      staffName: updatedStaff.name,
+      openId: staff.wechatOpenId,
+    });
+    await bridgeStaffQuotaGrant(staff.wechatOpenId);
+  }
 
   return NextResponse.json({
     staff: serializeStaffMiniProgramStaff(updatedStaff),

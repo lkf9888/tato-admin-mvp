@@ -49,12 +49,13 @@
           <text class="row-value">{{row.value}}</text>
         </view>
         <button
-          wx:if="{{item.link}}"
+          wx:if="{{item.action}}"
           class="link-button"
           catchtap="openLink"
+          data-kind="{{item.action.kind}}"
           data-url="{{item.link}}"
         >
-          打开详情
+          {{item.action.label}}
         </button>
       </view>
     </view>

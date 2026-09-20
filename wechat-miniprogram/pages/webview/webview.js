@@ -1,4 +1,16 @@
 /**
+ * DORMANT. Not registered in app.json.
+ *
+ * This mini program is registered to an individual, and `web-view` is
+ * not available to that subject -- so the route is unregistered rather
+ * than left to fail at the tap. The file stays because the restriction
+ * is the subject's, not the code's: registering under a company makes
+ * this work again, and re-enabling it is adding the page back to
+ * app.json and routing `kind: "web"` at it from pages/message.
+ *
+ * If WeChat review objects to the file being present at all, delete the
+ * three `pages/webview/*` files -- git has them.
+ *
  * Opens a system's own page inside the mini program.
  *
  * The hub carries a link but not the content behind it, so TATO's task

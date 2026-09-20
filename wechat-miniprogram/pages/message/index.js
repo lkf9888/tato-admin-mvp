@@ -41,16 +41,36 @@ function toRows(fields) {
     .map((key) => ({ key, label: FIELD_LABELS[key] || key, value: fields[key] }));
 }
 
+/**
+ * What tapping a message can actually do.
+ *
+ * This mini program is registered to an individual, which means
+ * `web-view` is unavailable -- a notification cannot open the sending
+ * system's own page. TATO is the one system with a native page here, so
+ * its messages go to the task list; anything else hands the link over to
+ * be opened somewhere that can render it.
+ *
+ * If the subject ever becomes a company, `pages/webview` is still in the
+ * repo: put it back in app.json and route `kind: "web"` at it.
+ */
+function resolveAction(appKey, link) {
+  if (appKey === "tato") return { kind: "tasks", label: "查看任务" };
+  if (link) return { kind: "copy", label: "复制链接" };
+  return null;
+}
+
 function decorate(item) {
   const payload = item.payload || {};
   const fields = payload.fields || {};
+  const link = (payload.link && payload.link.url) || (item.link && item.link.url) || "";
   return {
     id: item.id,
     source: payload.source || item.appName,
     channel: item.channelName,
     title: fields.title || "(无标题)",
     rows: toRows(fields),
-    link: (payload.link && payload.link.url) || (item.link && item.link.url) || "",
+    link,
+    action: resolveAction(item.appKey, link),
     time: formatTimestamp(item.createdAt),
     priority: item.priority
   };
@@ -130,18 +150,27 @@ Page({
   },
 
   openLink(event) {
-    const url = event.currentTarget.dataset.url;
+    const { kind, url } = event.currentTarget.dataset;
+
+    if (kind === "tasks") {
+      wx.navigateTo({ url: "/pages/tasks/index" });
+      return;
+    }
+
     if (!url) return;
-    wx.navigateTo({
-      url: `/pages/webview/webview?url=${encodeURIComponent(url)}`,
-      // A mini program registered to an individual cannot use web-view
-      // at all. Saying so beats a blank screen.
-      fail() {
+    // Copying is the whole action, so it has to be said plainly: the
+    // person tapped "详情" and is getting a clipboard instead.
+    wx.setClipboardData({
+      data: url,
+      success() {
         wx.showModal({
-          title: "打不开详情页",
-          content: "这个小程序还不能打开网页。请复制链接到浏览器，或联系管理员。",
+          title: "链接已复制",
+          content: "这个小程序打不开网页，粘贴到浏览器里看。",
           showCancel: false
         });
+      },
+      fail() {
+        wx.showToast({ title: "复制失败", icon: "none" });
       }
     });
   },

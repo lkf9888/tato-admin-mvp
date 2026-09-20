@@ -2,7 +2,6 @@
   "pages": [
     "pages/message/index",
     "pages/bind/bind",
-    "pages/webview/webview",
     "pages/login/login",
     "pages/tasks/index"
   ],

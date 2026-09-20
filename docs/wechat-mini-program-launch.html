@@ -435,37 +435,44 @@
       <span class="phase-where">决定后面所有步骤</span>
     </div>
     <p class="phase-note">
-      注册小程序时选个人还是企业，决定了消息点开之后能看到什么。这个选完就很难改，所以放在最前面。
+      <strong>已定：个人主体。</strong>对照留着，因为这个决定一年后会有人问「当初为什么」。
     </p>
 
     <div class="fork">
-      <div class="fork-card ok">
-        <h3>企业主体</h3>
-        <p class="fork-verdict">功能完整</p>
-        <ul>
-          <li>需要营业执照</li>
-          <li>可以用 <code>web-view</code>，消息能点进 <code>/staff-share</code> 页面</li>
-          <li>要配业务域名（多一步校验文件）</li>
-        </ul>
-      </div>
       <div class="fork-card limited">
-        <h3>个人主体</h3>
-        <p class="fork-verdict">够用但受限</p>
+        <h3>个人主体 ← 用这个</h3>
+        <p class="fork-verdict">已选</p>
         <ul>
           <li>不需要营业执照，注册最快</li>
           <li>订阅消息照常能发</li>
-          <li><strong>不能用 <code>web-view</code></strong>——详情页只能看中枢存的那几个字段</li>
+          <li><strong>不能用 <code>web-view</code></strong>，业务域名也配不了</li>
         </ul>
       </div>
+      <div class="fork-card ok">
+        <h3>企业主体</h3>
+        <p class="fork-verdict">未选</p>
+        <ul>
+          <li>需要营业执照</li>
+          <li>可以用 <code>web-view</code>，消息能点进 <code>/staff-share</code></li>
+          <li>要配业务域名（多一步校验文件）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout">
+      <h3>实际损失只有一处</h3>
+      <p>五个页面里只有 <code>pages/webview</code> 失效，已经从 <code>app.json</code> 摘掉。消息列表、绑定码、任务页（含<strong>传照片</strong>，走原生 <code>wx.uploadFile</code>）全部正常。</p>
+      <p>TATO 的通知显示「查看任务」直接跳原生任务页，只是不再一键落到 <code>/staff-share</code>。<strong>HostHub 和洗车系统没有原生页面兜底</strong>，它们的通知只会显示「复制链接」——这是这个决定真正的代价，接那两个系统前要想起来。</p>
+      <p>将来改企业主体：把 <code>pages/webview</code> 加回 <code>app.json</code>，<code>pages/message/index.js</code> 的 <code>resolveAction</code> 加一条 <code>kind: "web"</code> 分支。</p>
     </div>
 
     <div class="steps">
       <div class="step" data-id="s0a">
         <input type="checkbox" id="s0a">
         <div>
-          <label class="step-title" for="s0a">确认用哪个主体注册</label>
+          <label class="step-title" for="s0a">确认用哪个主体注册 —— 个人主体</label>
           <div class="step-body">
-            <p>选个人主体的话，<code>pages/webview</code> 那个页面就是死的，员工看不到任务详情页、也传不了照片。业务上能不能接受，现在就要想清楚。</p>
+            <p>已定。上面那张对照说明了代价。</p>
           </div>
         </div>
       </div>
@@ -496,6 +503,7 @@
           <label class="step-title" for="s1a">注册小程序，记下 AppID</label>
           <div class="step-body">
             <p>mp.weixin.qq.com → 注册 → 小程序。形如 <code>wx1a2b3c4d5e6f7890</code>。</p>
+            <p>个人主体的名称不能用企业名或品牌词，「TATO」可能被判成品牌名——备一个替代名，比如「车队任务助手」。类目选工具类。</p>
           </div>
         </div>
       </div>
@@ -522,9 +530,9 @@
       <div class="step" data-id="s1d">
         <input type="checkbox" id="s1d">
         <div>
-          <label class="step-title" for="s1d">配业务域名（只有企业主体需要）</label>
+          <label class="step-title" for="s1d">配业务域名 —— 个人主体跳过</label>
           <div class="step-body">
-            <p>加 <code>tatocar.co</code>，下载校验文件传到服务器根目录，再点校验。这是 <code>web-view</code> 能打开详情页的前提。个人主体跳过这步。</p>
+            <p>配不了也不需要。改成企业主体才要：加 <code>tatocar.co</code>，下载校验文件传到服务器根目录，再点校验。</p>
           </div>
         </div>
       </div>

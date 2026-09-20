@@ -62,7 +62,7 @@ struct CaptureView: View {
             FinishView(model: model)
         }
         .sheet(isPresented: $showingSettings) {
-            NavigationStack { SettingsView() }
+            NavigationStack { SettingsView(coverage: model.coverage) }
         }
         .alert(
             "相机打不开",
@@ -151,6 +151,9 @@ struct CaptureView: View {
             }
             if !model.steadiness.isSteady {
                 Chip(icon: "hand.raised.fill", text: "手机在晃，稳一下再拍")
+            }
+            if let trouble = model.coverage.trouble {
+                Chip(icon: "cube.transparent", text: trouble)
             }
             if model.torchRefused {
                 Chip(icon: "thermometer.high", text: "手电筒打不开 —— 多半是手机太热了")

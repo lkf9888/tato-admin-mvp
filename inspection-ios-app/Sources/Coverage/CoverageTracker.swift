@@ -31,6 +31,15 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     /// whichever asks last gets it — an interrupted AR session is how that
     /// contest announces itself.
     private(set) var isInterrupted = false
+    /// Frames arriving from ARKit in the last second.
+    ///
+    /// ⚠️ The only honest answer to "is the tracker alive". `isTracking`
+    /// says what the *last* frame reported, which on a session that has
+    /// stopped delivering frames altogether is a reading from whenever that
+    /// was — a dead session and a well-tracked one look identical through
+    /// it. Counting arrivals cannot be fooled that way.
+    private(set) var framesPerSecond = 0
+    private(set) var isLive = false
 
     private let session = ARSession()
     private var meshAnchors: [UUID: ARMeshAnchor] = [:]
@@ -41,6 +50,9 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     /// Kept so the session can be resumed without resetting tracking, which
     /// would throw away a car that has already been found.
     private var configuration: ARWorldTrackingConfiguration?
+    private var framesThisSecond = 0
+    private var startedAt: Date?
+    private var watchdog: Task<Void, Never>?
     /// Poses of photographs taken before the car was found, so the first
     /// successful fit can credit them rather than throwing them away.
     private var pendingPoses: [(position: SIMD3<Float>, forward: SIMD3<Float>)] = []
@@ -66,6 +78,55 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
         session.delegate = self
         self.configuration = configuration
         session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+        startWatchdog()
+    }
+
+    /// Counts frames once a second, which is all it takes to tell a tracker
+    /// that is working from one that has silently lost the camera.
+    private func startWatchdog() {
+        startedAt = Date()
+        watchdog?.cancel()
+        watchdog = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self else { return }
+                self.framesPerSecond = self.framesThisSecond
+                self.framesThisSecond = 0
+                let live = self.framesPerSecond > 0
+                if live != self.isLive { self.isLive = live }
+            }
+        }
+    }
+
+    /// Long enough for ARKit to have started; before this, silence means
+    /// "not yet" rather than "never".
+    private var hasHadTimeToStart: Bool {
+        guard let startedAt else { return false }
+        return Date().timeIntervalSince(startedAt) > 2.5
+    }
+
+    /// One line for the settings screen: what the tracker is doing, in terms
+    /// somebody standing next to a car can act on.
+    var status: String {
+        guard ARWorldTrackingConfiguration.isSupported else {
+            return "这台手机不支持空间追踪"
+        }
+        guard canMeasure else {
+            return "这台手机没有深度传感器 —— 只按张数计，不画车形图"
+        }
+        if isInterrupted { return "被打断了 —— 摄像头被拍照占用" }
+        if !isLive { return hasHadTimeToStart ? "收不到空间数据（0 帧/秒）" : "正在启动…" }
+        if vehicleFrame == nil { return "正常，\(framesPerSecond) 帧/秒 —— 还没认出车" }
+        return "正常，\(framesPerSecond) 帧/秒 —— 已认出车"
+    }
+
+    /// Only the two states worth interrupting somebody mid-shoot for, and
+    /// only once it is too late for them to be startup noise.
+    var trouble: String? {
+        guard canMeasure, hasHadTimeToStart else { return nil }
+        if isInterrupted { return "车形图停了 —— 摄像头被拍照占用" }
+        if !isLive { return "车形图停了 —— 收不到空间数据" }
+        return nil
     }
 
     /// Picks tracking back up after the screen has been away.
@@ -81,17 +142,22 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
             return
         }
         session.run(configuration)
+        startWatchdog()
     }
 
     func pause() {
         session.pause()
+        watchdog?.cancel()
+        watchdog = nil
         isTracking = false
+        isLive = false
+        framesPerSecond = 0
     }
 
     func stop() {
-        session.pause()
-        isTracking = false
+        pause()
         configuration = nil
+        startedAt = nil
     }
 
     /// Restores a coverage map from a session being resumed.
@@ -194,6 +260,7 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
         if case .normal = frame.camera.trackingState { usable = true } else { usable = false }
 
         Task { @MainActor in
+            self.framesThisSecond += 1
             self.cameraPosition = position
             self.cameraForward = forward
             self.isTracking = usable

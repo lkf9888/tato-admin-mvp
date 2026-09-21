@@ -8,6 +8,15 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { VehicleEditDialog, type VehicleEditDialogVehicle } from "@/components/vehicle-edit-dialog";
 import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-button";
+import {
+  CANVAS_FUTURE_DAYS,
+  CANVAS_PAST_DAYS,
+  chunkIndexesForRange,
+  chunkRange,
+  DAY_IN_MS as CHUNK_DAY_IN_MS,
+  PREFETCH_LEAD_DAYS,
+  toDayParam,
+} from "@/lib/calendar-window";
 import { getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
 import { cn, foldLatinLookalikes, formatCurrencyInputText, formatCurrencyInputValue, formatDate, formatDateInputDisplay, formatTime as formatTime24, formatTimeInputDisplay, parseDateTimeInputParts } from "@/lib/utils";
 
@@ -114,8 +123,32 @@ const COMPACT_LANE_HEIGHT = 22;
 const COMPACT_BAR_HEIGHT = 20;
 const COMPACT_MIN_ROW_HEIGHT = 31;
 const MIN_ROW_HEIGHT = 44;
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const DAY_IN_MS = CHUNK_DAY_IN_MS;
 const SCRUBBER_DAY_RANGE = 365;
+
+/**
+ * The canvas is one long strip of dates, not a page of them.
+ *
+ * It used to be exactly 42 days starting on the Monday of whatever
+ * week you had focused, and prev/next swapped one 42-day block for
+ * another. That makes "is this car free the week after next" a
+ * navigation problem: you cannot see across the seam, and a trip that
+ * straddles it is drawn twice, clipped, in two different views.
+ *
+ * Now every date the calendar can show exists at once and you scroll
+ * to it. Which costs nothing in DOM, because of two decisions below:
+ * the day cells inside a row are painted as a repeating gradient
+ * rather than one element per day (123 cars x 580 days is 71,000
+ * divs, and that is what made a long canvas impossible before), and
+ * the header cells and booking bars are rendered only for the dates
+ * near the viewport.
+ */
+const CANVAS_START_OFFSET_DAYS = CANVAS_PAST_DAYS;
+const CANVAS_TOTAL_DAYS = CANVAS_PAST_DAYS + CANVAS_FUTURE_DAYS;
+
+/** Columns drawn either side of the viewport, so a fast drag does not
+ *  outrun the render. */
+const COLUMN_OVERSCAN = 10;
 
 function startOfDay(value: Date | string) {
   const date = new Date(value);
@@ -211,11 +244,23 @@ function getTimelineBarClasses(
   );
 }
 
+/**
+ * Pack a row's trips into lanes, and say which of them to draw.
+ *
+ * The packing runs over every loaded trip on the row, not just the
+ * ones on screen. Lane assignment is greedy and order-dependent, so
+ * packing only the visible subset gives a trip a different lane
+ * depending on what else happens to be in view -- which reads as bars
+ * jumping between rows, and rows changing height, while you scroll.
+ * `renderFrom`/`renderTo` narrow the result afterwards instead.
+ */
 function assignTimelineBars(
   orders: CalendarOrder[],
   rangeStart: Date,
   rangeEndExclusive: Date,
   dayColumnWidth: number,
+  renderFrom: Date,
+  renderToExclusive: Date,
 ) {
   const laneEndTimes: number[] = [];
   const visibleBars: TimelineBar[] = [];
@@ -241,6 +286,12 @@ function assignTimelineBars(
       laneEndTimes.push(visibleEnd);
     } else {
       laneEndTimes[lane] = visibleEnd;
+    }
+
+    if (actualEnd <= renderFrom.getTime() || actualStart >= renderToExclusive.getTime()) {
+      // Packed into a lane above, so the row keeps its height and every
+      // other bar keeps its place -- just not drawn.
+      continue;
     }
 
     visibleBars.push({
@@ -470,14 +521,20 @@ function SearchableFilterDropdown({
 
 export function CalendarView({
   locale,
-  orders,
+  orders: serverOrders,
+  loadedChunkIndexes = [],
   vehicleOptions,
   ownerOptions,
   readOnly = false,
   maskSensitive = false,
 }: {
   locale: Locale;
+  /** The chunks the server already rendered, so the grid opens with
+   *  bars on it rather than fetching its own first screen. */
   orders: CalendarOrder[];
+  /** Which chunks those orders cover. Without it the grid would not
+   *  know what it already has and would re-fetch its own first paint. */
+  loadedChunkIndexes?: number[];
   vehicleOptions: VehicleTimelineOption[];
   ownerOptions: Array<{ id: string; label: string }>;
   readOnly?: boolean;
@@ -494,29 +551,6 @@ export function CalendarView({
   const [ownerFilterQuery, setOwnerFilterQuery] = useState("");
   const [sourceFilterQuery, setSourceFilterQuery] = useState("");
   const [customDayWidth, setCustomDayWidth] = useState(DEFAULT_CUSTOM_DAY_WIDTH);
-  // v0.22.1: removed the Week / Month / 6-week segmented pill from the
-  // toolbar. It was redundant with the day-width slider, which already
-  // covers "show more dates at once" (slimmer columns) vs. "show fewer
-  // dates at higher detail" (wider columns). We pin the underlying
-  // range to `sixWeeks` so the timeline always covers ~42 days of
-  // context — wide enough that scrubbing through a season feels
-  // natural, while the slider lets the user fit anywhere from a
-  // couple of weeks (wider columns) to all 42 days (narrower columns)
-  // inside the viewport.
-  //
-  // Held in `useState` (no setter destructured) instead of a plain
-  // `const`. TypeScript's strict-equality control-flow narrowing
-  // folds `const x: Union = "sixWeeks"` back to the literal type
-  // `"sixWeeks"` at every usage site, which makes each
-  // `rangeMode === "week"` / `=== "month"` branch — prev/next stride,
-  // range start/end derivation, day-column width floor — fail to
-  // compile with "comparison appears unintentional, the types have
-  // no overlap" (Railway's v0.22.1 build flagged exactly this).
-  // `useState`'s generic argument anchors the declared type as the
-  // full union so those branches type-check; they're dead at runtime,
-  // which is the intent — the slider replaces the segmented pill.
-  const [rangeMode] = useState<"week" | "month" | "sixWeeks">("sixWeeks");
-  const [focusDate, setFocusDate] = useState(() => new Date());
   const [selectedOrder, setSelectedOrder] = useState<CalendarOrder | null>(null);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [orderDraft, setOrderDraft] = useState<ManualOrderDraft>(() =>
@@ -546,40 +580,94 @@ export function CalendarView({
     moved: boolean;
   } | null>(null);
   const momentumRef = useRef<number | null>(null);
+  // The "back N days" readout during a drag. A ref and direct DOM
+  // writes, not state: the whole reason the drag handler works on refs
+  // is that re-rendering several hundred bars at pointer rate turns a
+  // smooth drag into a stuttering one, and routing a label through
+  // React would undo exactly that.
+  const panPillRef = useRef<HTMLDivElement | null>(null);
+  const panPillLabelRef = useRef<(days: number) => string>(() => "");
+  const dayColumnWidthRef = useRef(DEFAULT_CUSTOM_DAY_WIDTH);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState<number | null>(null);
   const [orderPopover, setOrderPopover] = useState<OrderPopoverState | null>(null);
   const [isTuroSyncing, setIsTuroSyncing] = useState(false);
   const [turoSyncNotice, setTuroSyncNotice] = useState<TuroSyncNotice | null>(null);
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem(DAY_WIDTH_STORAGE_KEY);
-    const parsed = stored ? Number(stored) : NaN;
-    if (Number.isFinite(parsed)) {
-      setCustomDayWidth(Math.min(MAX_CUSTOM_DAY_WIDTH, Math.max(MIN_CUSTOM_DAY_WIDTH, parsed)));
+  // --- Orders that arrive as you scroll -------------------------------
+  //
+  // Two stores, because they are filled at different times. The
+  // server's chunks are built during render -- effects do not run on
+  // the server, so seeding them in one would ship a grid with no bars
+  // on it and fill them in only after hydration. Chunks fetched here
+  // live in a ref, written from async callbacks that must not race
+  // each other; `chunkTick` is what asks React to paint once one lands.
+  //
+  // Per chunk rather than one flat list so a refetch can replace a
+  // stretch of calendar wholesale. A flat merge cannot express
+  // deletion: an order removed on the server would stay on screen
+  // forever, because "not in the new response" is indistinguishable
+  // from "not in this response's date range".
+  const serverChunks = useMemo(() => {
+    const store = new Map<number, CalendarOrder[]>();
+    for (const index of loadedChunkIndexes) store.set(index, []);
+    for (const order of serverOrders) {
+      for (const index of chunkIndexesForRange(
+        new Date(order.pickupDatetime),
+        new Date(order.returnDatetime),
+      )) {
+        // Only into chunks the server actually covered. A long rental
+        // reaching past the server's window must not mark the chunk it
+        // reaches into as loaded -- that chunk holds other orders the
+        // server never sent.
+        store.get(index)?.push(order);
+      }
     }
-  }, []);
+    return store;
+  }, [serverOrders, loadedChunkIndexes]);
 
+  const fetchedChunksRef = useRef(new Map<number, CalendarOrder[]>());
+  const inFlightChunksRef = useRef(new Set<number>());
+  // Two counters, because they answer different questions. `chunkTick`
+  // means "a chunk landed, repaint". `storeVersion` means "everything
+  // you hold may be stale, fetch it again" -- only a fresh render of
+  // the page sets that, and the fetcher watches it.
+  const [chunkTick, setChunkTick] = useState(0);
+  const [storeVersion, setStoreVersion] = useState(0);
+  const [isLoadingChunks, setIsLoadingChunks] = useState(false);
+  const [chunkError, setChunkError] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  // Horizontal scroll position, sampled once per frame. Three things
+  // read it: which header cells to render, which bars to render, and
+  // which chunks to fetch next.
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  // A fresh render of the page -- which is what `router.refresh()`
+  // produces after any edit -- makes everything fetched here possibly
+  // stale, so it is dropped and the prefetch effect reloads whatever
+  // is on screen.
   useEffect(() => {
-    window.localStorage.setItem(DAY_WIDTH_STORAGE_KEY, String(customDayWidth));
-  }, [customDayWidth]);
+    fetchedChunksRef.current = new Map();
+    inFlightChunksRef.current.clear();
+    setChunkError(false);
+    setStoreVersion((version) => version + 1);
+  }, [serverChunks]);
 
-  const normalizedFocusDate = startOfDay(focusDate);
-  const rangeStart =
-    rangeMode === "week"
-      ? startOfWeek(normalizedFocusDate)
-      : rangeMode === "month"
-        ? startOfMonth(normalizedFocusDate)
-        : startOfWeek(normalizedFocusDate);
-  const visibleDayCount =
-    rangeMode === "week"
-      ? 7
-      : rangeMode === "month"
-        ? getDaysInMonth(normalizedFocusDate)
-        : 42;
-  const days = enumerateDates(rangeStart, visibleDayCount);
-  const rangeEndExclusive = addDays(rangeStart, visibleDayCount);
-  const rangeEndInclusive = addDays(rangeEndExclusive, -1);
-  const today = startOfDay(new Date());
+  // Everything held, from both stores, de-duplicated. An order that
+  // straddles a chunk boundary is filed under both, so the map is what
+  // keeps it from being drawn twice.
+  const orders = useMemo(() => {
+    const byId = new Map<string, CalendarOrder>();
+    for (const bucket of serverChunks.values()) {
+      for (const order of bucket) byId.set(order.id, order);
+    }
+    for (const bucket of fetchedChunksRef.current.values()) {
+      for (const order of bucket) byId.set(order.id, order);
+    }
+    return Array.from(byId.values());
+    // chunkTick is the signal that the fetched store changed; it is a
+    // ref precisely so a landing chunk does not re-render twice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverChunks, chunkTick, storeVersion]);
 
   // Grab the timeline and throw it.
   //
@@ -687,9 +775,15 @@ export function CalendarView({
         }
         node.style.cursor = "grabbing";
         node.style.userSelect = "none";
+        if (panPillRef.current) panPillRef.current.style.opacity = "1";
       }
 
       node.scrollLeft = drag.startScrollLeft - dx;
+
+      if (panPillRef.current) {
+        const movedDays = Math.round(-dx / Math.max(dayColumnWidthRef.current, 1));
+        panPillRef.current.textContent = panPillLabelRef.current(movedDays);
+      }
 
       const dt = event.timeStamp - drag.lastT;
       if (dt > 0) {
@@ -708,6 +802,7 @@ export function CalendarView({
       dragRef.current = null;
       node.style.cursor = "";
       node.style.userSelect = "";
+      if (panPillRef.current) panPillRef.current.style.opacity = "0";
       try {
         if (node.hasPointerCapture(event.pointerId)) node.releasePointerCapture(event.pointerId);
       } catch {
@@ -785,6 +880,37 @@ export function CalendarView({
     return () => observer.disconnect();
   }, []);
 
+  // Horizontal scroll position, sampled once per frame.
+  //
+  // `scroll` fires far faster than React can usefully re-render a grid
+  // this size, and every sample that is not painted is wasted work on
+  // the exact gesture that most needs the frame budget. One rAF per
+  // burst, and only when the value actually moved a whole pixel.
+  useEffect(() => {
+    const node = timelineViewportRef.current;
+    if (!node) return;
+    let frame: number | null = null;
+
+    const sample = () => {
+      frame = null;
+      setScrollLeft((previous) =>
+        Math.abs(previous - node.scrollLeft) < 1 ? previous : node.scrollLeft,
+      );
+    };
+
+    const onScroll = () => {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(sample);
+    };
+
+    sample();
+    node.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      node.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
   useEffect(() => {
     if (!selectedOrder) return;
 
@@ -854,6 +980,25 @@ export function CalendarView({
     ],
     [locale],
   );
+  // Fixed for the session rather than recomputed each render. Every
+  // date on the canvas is positioned relative to it, so a value that
+  // moved would shift the whole strip under the viewport.
+  const today = useMemo(() => startOfDay(new Date()), []);
+  // Anchored to a Monday. The weekend shading below is a repeating
+  // gradient, which only works if the phase of the week is known from
+  // the canvas origin.
+  const canvasStart = useMemo(
+    () => startOfWeek(addDays(today, -CANVAS_START_OFFSET_DAYS)),
+    [today],
+  );
+  const visibleDayCount = CANVAS_TOTAL_DAYS;
+  const days = useMemo(
+    () => enumerateDates(canvasStart, visibleDayCount),
+    [canvasStart, visibleDayCount],
+  );
+  const rangeStart = canvasStart;
+  const rangeEndExclusive = addDays(rangeStart, visibleDayCount);
+
   const normalizedVehicleFilterQuery = normalizeFilterText(vehicleFilterQuery);
   const normalizedOwnerFilterQuery = normalizeFilterText(ownerFilterQuery);
   const normalizedSourceFilterQuery = normalizeFilterText(sourceFilterQuery);
@@ -940,9 +1085,6 @@ export function CalendarView({
     return true;
   });
 
-  const visibleOrders = filteredOrders.filter((order) =>
-    orderIntersectsRange(order, rangeStart, rangeEndExclusive),
-  );
 
   const compact =
     timelineViewportWidth !== null && timelineViewportWidth < COMPACT_VIEWPORT_WIDTH;
@@ -964,34 +1106,302 @@ export function CalendarView({
           COMPACT_MIN_DAY_COLUMN_WIDTH,
           Math.floor(fittedTimelineWidth / COMPACT_VISIBLE_DAYS),
         )
-      : Math.max(
-          MIN_DAY_COLUMN_WIDTHS[rangeMode],
-          rangeMode === "week" && fittedTimelineWidth > 0
-            ? Math.max(Math.floor(fittedTimelineWidth / days.length), customDayWidth)
-            : customDayWidth || DAY_COLUMN_WIDTHS[rangeMode],
-        );
+      : Math.max(MIN_CUSTOM_DAY_WIDTH, customDayWidth || DEFAULT_CUSTOM_DAY_WIDTH);
   const timelineWidth = days.length * dayColumnWidth;
   const tableWidth = Math.max(vehicleColumnWidth + timelineWidth, timelineViewportWidth ?? 0);
 
-  // Seven columns fit, so which seven matters. A six-week range starts
-  // on the Monday of the focused week, which on a Friday leaves four of
-  // the seven already spent -- so the viewport is scrolled to put the
-  // focused day at the left edge and the week ahead beside it.
+  // --- What is actually on screen ------------------------------------
   //
-  // Keyed on the focused day rather than on mount, so prev / next /
-  // today land where the operator asked to be. Their own sideways
-  // scrolling changes none of these, so this never fights it.
+  // One derivation, three consumers: the header renders these columns,
+  // the rows render the bars that fall inside them, and the fetcher
+  // loads the chunks they touch. Everything else on the 580-day canvas
+  // is real, positioned and scrollable -- it simply is not in the DOM
+  // until you scroll to it.
+  const viewportDays = Math.max(
+    1,
+    Math.ceil(Math.max(fittedTimelineWidth, 1) / Math.max(dayColumnWidth, 1)),
+  );
+  const firstVisibleDayIndex = Math.max(
+    0,
+    Math.floor(scrollLeft / Math.max(dayColumnWidth, 1)) - COLUMN_OVERSCAN,
+  );
+  const lastVisibleDayIndex = Math.min(
+    days.length - 1,
+    firstVisibleDayIndex + viewportDays + COLUMN_OVERSCAN * 2,
+  );
+  const visibleDays = useMemo(
+    () =>
+      days
+        .slice(firstVisibleDayIndex, lastVisibleDayIndex + 1)
+        .map((date, offset) => ({ date, index: firstVisibleDayIndex + offset })),
+    [days, firstVisibleDayIndex, lastVisibleDayIndex],
+  );
+  const visibleRangeStart = days[firstVisibleDayIndex] ?? rangeStart;
+  const visibleRangeEndInclusive = days[lastVisibleDayIndex] ?? rangeStart;
+  // A screenful, minus a couple of days of overlap so the edge you were
+  // reading is still on screen after the jump.
+  const pageStrideDays = Math.max(1, viewportDays - 2);
+
+  // Where the calendar currently is, as a date. Read from the scroll
+  // position rather than held as its own state: the two were the same
+  // thing, and keeping both meant the scrubber showed where you had
+  // last pressed a button rather than where you had since scrolled to.
+  const leadingDayIndex = Math.max(
+    0,
+    Math.min(days.length - 1, Math.round(scrollLeft / Math.max(dayColumnWidth, 1))),
+  );
+  const normalizedFocusDate = days[leadingDayIndex] ?? today;
+
+  // Bars are drawn a screen either side of the viewport, so a fling
+  // does not outrun the render and leave blank rows behind it.
+  const barWindowStart = addDays(visibleRangeStart, -viewportDays);
+  const barWindowEndExclusive = addDays(visibleRangeEndInclusive, viewportDays + 1);
+
+  // What the corner count and the search summary are about: the trips
+  // actually on screen. Everything ever scrolled past stays loaded, so
+  // counting the loaded set would answer a question nobody asked.
+  const visibleOrders = filteredOrders.filter((order) =>
+    orderIntersectsRange(order, visibleRangeStart, addDays(visibleRangeEndInclusive, 1)),
+  );
+
+  // The row background: a hairline at every day boundary, and a warm
+  // band over Saturday and Sunday. Both repeat on a seven-day cycle,
+  // which is only in phase because the canvas starts on a Monday.
+  const weekWidth = dayColumnWidth * 7;
+  const dayGridBackground = [
+    `repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px ${dayColumnWidth}px)`,
+    `repeating-linear-gradient(to right, transparent 0 ${dayColumnWidth * 5}px, rgba(245,238,229,0.78) ${
+      dayColumnWidth * 5
+    }px ${weekWidth}px)`,
+  ].join(", ");
+  dayColumnWidthRef.current = dayColumnWidth;
+  panPillLabelRef.current = calendarMessages.panByDrag;
+  const todayOffsetDays = Math.round((today.getTime() - canvasStart.getTime()) / DAY_IN_MS);
+  const todayColumnOffset =
+    todayOffsetDays >= 0 && todayOffsetDays < days.length
+      ? todayOffsetDays * dayColumnWidth
+      : null;
+
+  // --- Fetching the chunks you are scrolling toward -------------------
+  //
+  // Keyed on the chunk indexes rather than on the scroll position, so
+  // it runs when the set of needed chunks changes and not on every
+  // frame of a drag. Reaching a chunk's dates and *then* asking for
+  // them would show empty rows for the length of a round-trip, which
+  // is indistinguishable from "this car has nothing booked" -- hence
+  // the lead: the fetch starts while the dates are still off-screen.
+  const neededChunkIndexes = useMemo(
+    () =>
+      chunkIndexesForRange(
+        addDays(visibleRangeStart, -PREFETCH_LEAD_DAYS),
+        addDays(visibleRangeEndInclusive, PREFETCH_LEAD_DAYS),
+      ),
+    [visibleRangeStart, visibleRangeEndInclusive],
+  );
+  const neededChunkKey = neededChunkIndexes.join(",");
+
   useEffect(() => {
-    const node = timelineViewportRef.current;
-    if (!node || !compact) return;
-
-    const offsetDays = Math.round(
-      (normalizedFocusDate.getTime() - rangeStart.getTime()) / DAY_IN_MS,
+    const missing = neededChunkIndexes.filter(
+      (index) =>
+        !serverChunks.has(index) &&
+        !fetchedChunksRef.current.has(index) &&
+        !inFlightChunksRef.current.has(index),
     );
-    if (offsetDays < 0) return;
+    if (missing.length === 0) return;
 
-    node.scrollTo({ left: offsetDays * dayColumnWidth, behavior: "auto" });
-  }, [compact, normalizedFocusDate, rangeStart, dayColumnWidth]);
+    let cancelled = false;
+    for (const index of missing) inFlightChunksRef.current.add(index);
+    setIsLoadingChunks(true);
+
+    const load = async () => {
+      // One request per chunk, deliberately: a chunk that fails leaves
+      // its neighbours loaded, and a chunk that lands paints without
+      // waiting for the rest. Batching them into one range would make
+      // the whole window all-or-nothing.
+      await Promise.all(
+        missing.map(async (index) => {
+          const { start, end } = chunkRange(index);
+          try {
+            const response = await fetch(
+              `/api/calendar/orders?from=${toDayParam(start)}&to=${toDayParam(
+                new Date(end.getTime() - DAY_IN_MS),
+              )}`,
+              { headers: { Accept: "application/json" } },
+            );
+            if (!response.ok) throw new Error(String(response.status));
+            const data = (await response.json()) as { orders?: CalendarOrder[] };
+            // Kept even if this effect pass was superseded mid-flight.
+            // The bytes are already here and the store is a ref, so
+            // throwing them away only guarantees fetching them again.
+            fetchedChunksRef.current.set(index, data.orders ?? []);
+          } catch {
+            // Left out of the store on purpose, so scrolling back over
+            // these dates retries instead of trusting a gap.
+            if (!cancelled) setChunkError(true);
+          } finally {
+            inFlightChunksRef.current.delete(index);
+          }
+        }),
+      );
+      // Outside the cancelled guard: a superseded pass still has to put
+      // the spinner down, or it spins for the rest of the session.
+      setIsLoadingChunks(inFlightChunksRef.current.size > 0);
+      if (cancelled) return;
+      setChunkTick((tick) => tick + 1);
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+      for (const index of missing) inFlightChunksRef.current.delete(index);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [neededChunkKey, storeVersion, serverChunks]);
+
+  /** Scroll the canvas so `date` sits a little in from the left edge. */
+  const scrollToDate = (date: Date, behavior: ScrollBehavior = "smooth") => {
+    const node = timelineViewportRef.current;
+    if (!node) return;
+    const offsetDays = Math.round(
+      (startOfDay(date).getTime() - canvasStart.getTime()) / DAY_IN_MS,
+    );
+    const maxScroll = Math.max(0, days.length * dayColumnWidth - node.clientWidth);
+    const target = Math.max(0, Math.min(offsetDays * dayColumnWidth, maxScroll));
+    node.scrollTo({ left: target, behavior });
+  };
+
+  /**
+   * Reload the orders, and nothing else.
+   *
+   * `router.refresh()` alone re-renders the page, which reseeds the
+   * server chunks -- but everything the grid fetched for itself would
+   * survive as cached chunks and stay stale. Clearing the store first
+   * makes the prefetch effect re-request whatever is on screen, so
+   * "refresh" means the same thing wherever you have scrolled to.
+   *
+   * Zoom, scroll position, filters and search are all untouched: they
+   * live in this component, and nothing here unmounts it.
+   */
+  const handleRefresh = () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    setChunkError(false);
+    fetchedChunksRef.current = new Map();
+    inFlightChunksRef.current.clear();
+    setStoreVersion((version) => version + 1);
+    router.refresh();
+    window.setTimeout(() => setIsRefreshing(false), 800);
+  };
+
+  const panByDays = (amount: number) => {
+    const node = timelineViewportRef.current;
+    if (!node) return;
+    node.scrollTo({
+      left: Math.max(
+        0,
+        Math.min(
+          node.scrollLeft + amount * dayColumnWidth,
+          Math.max(0, days.length * dayColumnWidth - node.clientWidth),
+        ),
+      ),
+      behavior: "smooth",
+    });
+  };
+
+  // Where the canvas opens.
+  //
+  // Scroll position zero is 180 days before today, so without this the
+  // calendar would open on last winter. `?start=` wins when present --
+  // that is what makes a calendar link land on the date it names.
+  //
+  // Runs once, and only once the column width is settled: scrolling to
+  // a date before the width is known lands on the wrong one, and
+  // re-running it on every width change would yank the view back to
+  // today each time the zoom slider moved.
+  const didInitialScrollRef = useRef(false);
+  useEffect(() => {
+    if (didInitialScrollRef.current) return;
+    const node = timelineViewportRef.current;
+    // Zero width means the pane is not laid out -- on a phone the
+    // List/Timeline switch hides it with `display: none`, and the
+    // scroll would land on 0 and then never be retried, because this
+    // runs once. Wait for the resize observer to report a real width.
+    if (!node || !timelineViewportWidth) return;
+
+    const requested = new URLSearchParams(window.location.search).get("start");
+    const parsed = requested ? new Date(`${requested}T00:00:00`) : null;
+    const target =
+      parsed && !Number.isNaN(parsed.getTime()) ? startOfDay(parsed) : addDays(today, -2);
+
+    // Retried, not fired once.
+    //
+    // `scrollTo` is clamped by the browser to the element's *current*
+    // scrollWidth, and on the first frames after mount the 30,000px
+    // strip inside has not been laid out yet -- so a perfectly correct
+    // target silently becomes 0, and the calendar opens six months
+    // before the date it was asked for. Whether that happens depends
+    // on how the frame falls, which is why it looked intermittent.
+    // Keep asking until it takes.
+    didInitialScrollRef.current = true;
+    const offsetDays = Math.round((target.getTime() - canvasStart.getTime()) / DAY_IN_MS);
+    const wanted = Math.max(0, offsetDays * dayColumnWidth);
+    let attempts = 0;
+    const settle = () => {
+      if (!timelineViewportRef.current) return;
+      const current = timelineViewportRef.current;
+      current.scrollLeft = wanted;
+      attempts += 1;
+      if (Math.abs(current.scrollLeft - wanted) > 1 && attempts < 30) {
+        requestAnimationFrame(settle);
+      }
+    };
+    settle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timelineViewportWidth, dayColumnWidth]);
+
+  // The address bar follows the calendar, so a refresh, a bookmark or
+  // a link pasted to a colleague all land where you were rather than
+  // back on today.
+  //
+  // `history.replaceState`, not the router: this page reads none of
+  // these on the server, so going through Next would cost an RSC
+  // round-trip per keystroke to change a string the server ignores.
+  useEffect(() => {
+    if (!didInitialScrollRef.current) return;
+    const handle = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      params.set("start", toDayParam(normalizedFocusDate));
+      const setOrDelete = (key: string, value: string) => {
+        if (value && value !== "all") params.set(key, value);
+        else params.delete(key);
+      };
+      setOrDelete("vehicle", selectedVehicleId);
+      setOrDelete("owner", selectedOwnerId);
+      setOrDelete("source", selectedSource);
+      setOrDelete("q", calendarSearchQuery.trim());
+      window.history.replaceState(null, "", `${window.location.pathname}?${params}`);
+    }, 400);
+    return () => window.clearTimeout(handle);
+  }, [
+    normalizedFocusDate,
+    selectedVehicleId,
+    selectedOwnerId,
+    selectedSource,
+    calendarSearchQuery,
+  ]);
+
+  // Filters restored from the address bar, once, on mount.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const vehicle = params.get("vehicle");
+    const owner = params.get("owner");
+    const source = params.get("source");
+    const query = params.get("q");
+    if (vehicle) setSelectedVehicleId(vehicle);
+    if (owner) setSelectedOwnerId(owner);
+    if (source) setSelectedSource(source);
+    if (query) setCalendarSearchQuery(query);
+  }, []);
   // v0.19.3 visual refresh: dropped the heavy dark glass-pill container
   // language entirely. The previous styles relied on placing
   // `bg-rgba(255,255,255,0.76)` buttons on top of an
@@ -1149,35 +1559,36 @@ export function CalendarView({
             <div className="inline-flex rounded-md border border-[var(--line)] bg-white p-0.5">
               <button
                 type="button"
-                aria-label="Previous range"
-                onClick={() => {
-                  setFocusDate((current) =>
-                    rangeMode === "month"
-                      ? addMonths(current, -1)
-                      : addDays(current, rangeMode === "week" ? -7 : -42),
-                  );
-                }}
+                aria-label={calendarMessages.panEarlier(pageStrideDays)}
+                title={calendarMessages.panEarlier(pageStrideDays)}
+                onClick={() => panByDays(-pageStrideDays)}
                 className="rounded-md px-2.5 py-1 text-[14px] font-semibold leading-none text-[var(--ink-soft)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]"
               >
                 &#8249;
               </button>
               <button
                 type="button"
-                aria-label="Next range"
-                onClick={() => {
-                  setFocusDate((current) =>
-                    rangeMode === "month"
-                      ? addMonths(current, 1)
-                      : addDays(current, rangeMode === "week" ? 7 : 42),
-                  );
-                }}
+                aria-label={calendarMessages.panLater(pageStrideDays)}
+                title={calendarMessages.panLater(pageStrideDays)}
+                onClick={() => panByDays(pageStrideDays)}
                 className="rounded-md px-2.5 py-1 text-[14px] font-semibold leading-none text-[var(--ink-soft)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]"
               >
                 &#8250;
               </button>
             </div>
-            <button type="button" onClick={() => setFocusDate(new Date())} className={secondaryActionClass}>
+            <button type="button" onClick={() => scrollToDate(today)} className={secondaryActionClass}>
               {calendarMessages.today}
+            </button>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              title={calendarMessages.refreshHint}
+              className={secondaryActionClass}
+            >
+              {isRefreshing || isLoadingChunks
+                ? calendarMessages.refreshingAction
+                : calendarMessages.refreshAction}
             </button>
             <button
               type="button"
@@ -1213,8 +1624,8 @@ export function CalendarView({
                 locale={locale}
                 vehicleOptions={vehicleOptions}
                 preferredVehicleId={selectedVehicleId !== "all" ? selectedVehicleId : filteredVehicles[0]?.id}
-                rangeStart={rangeStart.toISOString()}
-                rangeEnd={rangeEndInclusive.toISOString()}
+                rangeStart={visibleRangeStart.toISOString()}
+                rangeEnd={visibleRangeEndInclusive.toISOString()}
               />
             ) : null}
           </div>
@@ -1294,6 +1705,18 @@ export function CalendarView({
           </div>
         ) : null}
 
+        {/* A gap in the data has to say so. An empty row is otherwise
+            indistinguishable from a car with nothing booked, and the
+            second is a thing operators act on. */}
+        {chunkError ? (
+          <div
+            role="status"
+            className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900"
+          >
+            {calendarMessages.ordersLoadFailed}
+          </div>
+        ) : null}
+
         {/* Scrubber + range title combined into one compact row. The
          * full date title was redundant when the scrubber thumb +
          * range buttons already convey the same info. */}
@@ -1324,7 +1747,7 @@ export function CalendarView({
                   ),
                 )}
                 onChange={(event) => {
-                  setFocusDate(addDays(today, Number(event.target.value)));
+                  scrollToDate(addDays(today, Number(event.target.value)), "auto");
                 }}
                 aria-label={calendarMessages.scrubberLabel}
                 className="min-w-0 flex-1 cursor-pointer appearance-none bg-transparent accent-[var(--accent)] [&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-[linear-gradient(90deg,rgba(17,19,24,0.08),rgba(89,60,251,0.18),rgba(17,19,24,0.08))] [&::-webkit-slider-thumb]:-mt-[7px] [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[var(--accent)] [&::-webkit-slider-thumb]:shadow-[0_8px_20px_-10px_rgba(89,60,251,0.9)] [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-[rgba(17,19,24,0.12)] [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[var(--accent)]"
@@ -1373,6 +1796,14 @@ export function CalendarView({
             {calendarMessages.noVehicles}
           </div>
         ) : (
+          <div className="relative">
+          {/* Says how far the drag has gone, while it is going. Fades
+              rather than unmounts, so it never reflows the grid. */}
+          <div
+            ref={panPillRef}
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-[rgba(17,19,24,0.82)] px-3 py-1 text-[11px] font-semibold text-white opacity-0 transition-opacity duration-150"
+          />
           <div
             ref={timelineViewportRef}
             /* Two of these classes are the sideways gesture working at
@@ -1390,7 +1821,7 @@ export function CalendarView({
               <div
                 className="sticky top-0 z-40 grid border-b border-[color:var(--line)] bg-[rgba(255,251,246,0.92)] backdrop-blur"
                 style={{
-                  gridTemplateColumns: `${vehicleColumnWidth}px repeat(${days.length}, ${dayColumnWidth}px)`,
+                  gridTemplateColumns: `${vehicleColumnWidth}px ${timelineWidth}px`,
                 }}
               >
                 <div className="sticky left-0 z-50 border-r border-[color:var(--line)] bg-[linear-gradient(180deg,#ffffff,#f7f7f7)] px-3 py-3 max-lg:px-2 max-lg:py-2">
@@ -1405,18 +1836,23 @@ export function CalendarView({
                     {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
                   </p>
                 </div>
-                {days.map((date, index) => {
+                {/* Only the columns near the viewport exist. The strip
+                    is the full canvas width, so the scrollbar and every
+                    bar position below stay honest. */}
+                <div className="relative" style={{ width: timelineWidth }}>
+                {visibleDays.map(({ date, index }) => {
                   const weekend = [0, 6].includes(date.getDay());
                   const todayColumn = isSameDay(date, today);
 
                   return (
                     <div
-                      key={date.toISOString()}
+                      key={index}
                       className={cn(
-                        "border-r border-[color:var(--line)] px-1 py-1.5 text-center",
+                        "absolute inset-y-0 border-r border-[color:var(--line)] px-1 py-1.5 text-center",
                         weekend ? "bg-[#f3ede4]" : "bg-[rgba(255,251,246,0.9)]",
                         todayColumn ? "bg-[rgba(89,60,251,0.14)]" : "",
                       )}
+                      style={{ left: index * dayColumnWidth, width: dayColumnWidth }}
                     >
                       {/* Bigger. This row is the calendar's own axis --
                           every bar below is read against it -- and it
@@ -1431,15 +1867,20 @@ export function CalendarView({
                     </div>
                   );
                 })}
+                </div>
               </div>
 
               {filteredVehicles.map((vehicle, index) => {
-                const vehicleOrders = visibleOrders.filter((order) => order.vehicleId === vehicle.id);
+                const vehicleOrders = filteredOrders.filter(
+                  (order) => order.vehicleId === vehicle.id,
+                );
                 const { bars, laneCount } = assignTimelineBars(
                   vehicleOrders,
                   rangeStart,
                   rangeEndExclusive,
                   dayColumnWidth,
+                  barWindowStart,
+                  barWindowEndExclusive,
                 );
                 const rowHeight = Math.max(minRowHeight, laneCount * laneHeight + 8);
                 const alternateRow = index % 2 === 1;
@@ -1507,25 +1948,25 @@ export function CalendarView({
                       )}
                       style={{ height: rowHeight }}
                     >
-                      {days.map((date, dayIndex) => {
-                        const weekend = [0, 6].includes(date.getDay());
-                        const todayColumn = isSameDay(date, today);
-
-                        return (
-                          <div
-                            key={date.toISOString()}
-                            className={cn(
-                              "absolute inset-y-0 border-r border-[color:var(--line)]",
-                              weekend ? "bg-[#f5eee5]/78" : "bg-transparent",
-                              todayColumn ? "bg-[rgba(89,60,251,0.08)]" : "",
-                            )}
-                            style={{
-                              left: dayIndex * dayColumnWidth,
-                              width: dayColumnWidth,
-                            }}
-                          />
-                        );
-                      })}
+                      {/* Day columns and weekend shading are painted,
+                          not built. One div per day per car is 71,000
+                          elements on this canvas; two gradients cost
+                          nothing and look identical. The weekend band
+                          is only correct because the canvas starts on
+                          a Monday -- see CANVAS_START_OFFSET_DAYS. */}
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0"
+                        style={{ backgroundImage: dayGridBackground, backgroundRepeat: "repeat" }}
+                      />
+                      {/* Today is one column, so it stays an element. */}
+                      {todayColumnOffset !== null ? (
+                        <div
+                          aria-hidden
+                          className="pointer-events-none absolute inset-y-0 bg-[rgba(89,60,251,0.08)]"
+                          style={{ left: todayColumnOffset, width: dayColumnWidth }}
+                        />
+                      ) : null}
 
                       {bars.length === 0 ? (
                         <div className="absolute inset-y-0 left-3 flex items-center text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/70">
@@ -1573,6 +2014,7 @@ export function CalendarView({
                 );
               })}
             </div>
+          </div>
           </div>
         )}
       </section>

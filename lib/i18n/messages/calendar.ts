@@ -70,6 +70,17 @@ export const calendarMessages = {
       sixWeeks: "6 Weeks",
       day: "Day",
       scrubberLabel: "Scroll to a date",
+      panEarlier: (days: number) => `\u2190 Back ${days} day${days === 1 ? "" : "s"}`,
+      panLater: (days: number) => `${days} day${days === 1 ? "" : "s"} forward \u2192`,
+      panByDrag: (days: number) =>
+        days < 0
+          ? `\u2190 Back ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"}`
+          : `${days} day${days === 1 ? "" : "s"} forward \u2192`,
+      refreshAction: "Refresh",
+      refreshingAction: "Refreshing...",
+      refreshHint: "Reloads orders only \u2014 keeps your zoom, scroll position and search.",
+      ordersLoadFailed:
+        "Some dates could not be loaded \u2014 the rows may look emptier than they are. Scroll over them again to retry.",
       conflictSuffix: "Conflict",
       createDialogTitle: "Create a manual order",
       editDialogTitle: "Update offline order",
@@ -168,6 +179,15 @@ export const calendarMessages = {
       sixWeeks: "六周",
       day: "日",
       scrubberLabel: "滑动跳转日期",
+      panEarlier: (days: number) => `\u2190 回退 ${days} 天`,
+      panLater: (days: number) => `前进 ${days} 天 \u2192`,
+      panByDrag: (days: number) =>
+        days < 0 ? `\u2190 回退 ${Math.abs(days)} 天` : `前进 ${days} 天 \u2192`,
+      refreshAction: "刷新",
+      refreshingAction: "刷新中…",
+      refreshHint: "只重新载入订单，保留当前缩放、滚动位置和搜索。",
+      ordersLoadFailed:
+        "有些日期没能加载出来——这些行看起来可能比实际更空。滑回去一下会自动重试。",
       conflictSuffix: "冲突",
       createDialogTitle: "手动创建订单",
       editDialogTitle: "修改线下订单",

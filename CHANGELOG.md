@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.83.0 - 2026-09-21
+
+### The calendar is one long strip you scroll, not a page you turn
+
+The grid used to be exactly 42 days starting on the Monday of whatever week you had focused, and prev/next swapped one 42-day block for another. Worse, the server only ever sent three months either side of today, so anything older simply was not on the calendar — the page's own comment pointed you at /orders for it.
+
+Now every date exists at once and you scroll to it: 180 days back, 400 forward. The server still renders the chunks around today, so the grid opens with bars already drawn; everything else is fetched from a new `GET /api/calendar/orders` in 60-day chunks as you scroll toward them, 45 days ahead of arriving, so the dates are populated before they reach the viewport. A chunk that fails to load says so in a banner rather than leaving rows that look empty — an empty row and a car with nothing booked are otherwise identical, and only one of them is worth acting on.
+
+Two decisions make a canvas that long cost nothing. The day columns and weekend bands inside a row are painted as repeating gradients instead of one element per day — 123 cars × 580 days is 71,000 divs, and that is what made a long canvas impossible before. And the day headers and booking bars are only rendered near the viewport (40-odd of 580 header cells at a typical width). Lane packing still runs over every loaded trip on a row, not just the visible ones: packing the visible subset gives a trip a different lane depending on what else happens to be on screen, which reads as bars hopping between rows while you scroll.
+
+### The calendar remembers where it was
+
+The address bar now carries the date you are looking at, plus the vehicle, owner, source and search filters — so a refresh, a bookmark, or a link pasted to a colleague all land where you were instead of back on today. Written with `history.replaceState` rather than through the router, since the server reads none of it and going through Next would cost a round-trip per keystroke.
+
+The date shown beside the scrubber is now read from the scroll position rather than held separately, so it tracks where you have scrolled to and not merely where you last pressed a button.
+
+### Refresh, without losing your place
+
+A **Refresh** button that reloads orders only and keeps your zoom, scroll position, filters and search. Every other path to fresh data re-rendered the page and threw those away.
+
+### Prev / next move a screenful, and a drag says how far it went
+
+With no fixed block left to page through, prev/next now move one screenful of days — computed from the viewport width and the current zoom, minus two days of overlap so the edge you were reading is still on screen. The buttons say how far they will go ("← Back 11 days"). Dragging the timeline shows the same readout live, written straight to the DOM so a drag still never re-renders the grid.
+
+
 ## v0.26.0 - 2026-08-18
 
 ### Fleet assistant

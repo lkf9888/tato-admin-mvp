@@ -4,44 +4,38 @@ import { MobileScheduleList } from "@/components/mobile-schedule-list";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
-import { getOrderFeeLines } from "@/lib/ledger-policy";
-import { resolveOrderCleaningFees } from "@/lib/owner-commission";
-import { getDisplayOrderNote, getOrderNetEarning } from "@/lib/utils";
+import {
+  CALENDAR_ORDER_INCLUDE,
+  calendarOrderWhere,
+  toCalendarOrderPayload,
+} from "@/lib/calendar-orders";
+import { initialChunkIndexes, spanForChunks } from "@/lib/calendar-window";
 
 /**
- * How far either side of today the calendar loads.
+ * The calendar no longer decides in advance how much history it will
+ * ever show.
  *
- * It used to load every non-cancelled order the workspace had ever
+ * It used to load every non-cancelled order the workspace had
  * imported. Measured on production: 5,013 orders, 14.9 MB of HTML,
  * 9,998 script tags -- Next streams the RSC payload in chunks and
  * emits one `<script>` per chunk -- and three seconds of server time.
- * On a laptop that reads as "a bit slow". On a phone over cellular it
- * is tens of seconds and tens of megabytes of the operator's data, for
- * a screen that shows a few weeks.
+ * The fix was a fixed three-months-either-side window, which kept the
+ * page fast at the cost of making anything older simply absent.
  *
- * Nine months of window covers what this page is for: what is out now,
- * what is coming, and enough of the recent past to reconcile against.
- * Anything older is a lookup, and /orders does lookups properly with
- * search and filters.
+ * Now the server renders the chunks around today so the grid opens
+ * with bars already on it, and the grid fetches further chunks from
+ * /api/calendar/orders as you scroll toward them. The payload is the
+ * same size as the fixed window was; the difference is that scrolling
+ * past its edge now loads more instead of showing nothing.
  */
-const CALENDAR_PAST_MONTHS = 3;
-const CALENDAR_FUTURE_MONTHS = 3;
-
-function calendarWindow() {
-  const from = new Date();
-  from.setMonth(from.getMonth() - CALENDAR_PAST_MONTHS);
-  from.setHours(0, 0, 0, 0);
-
-  const to = new Date();
-  to.setMonth(to.getMonth() + CALENDAR_FUTURE_MONTHS);
-  to.setHours(23, 59, 59, 999);
-
-  return { from, to };
+function initialWindow() {
+  const indexes = initialChunkIndexes(new Date());
+  return { ...spanForChunks(indexes), indexes };
 }
 
 export default async function CalendarPage() {
   const workspace = await requireCurrentWorkspace();
-  const { from, to } = calendarWindow();
+  const { from, to, indexes } = initialWindow();
   const [{ locale, messages }, vehicles, owners, orders] = await Promise.all([
     getI18n(),
     prisma.vehicle.findMany({
@@ -54,31 +48,8 @@ export default async function CalendarPage() {
       orderBy: { name: "asc" },
     }),
     prisma.order.findMany({
-      where: {
-        workspaceId: workspace.id,
-        isArchived: false,
-        status: {
-          not: "cancelled",
-        },
-        // Overlap, not containment: a trip that started before the
-        // window and ends inside it is still on the calendar, and a
-        // long rental spanning the whole window must not vanish
-        // because neither of its endpoints falls in range.
-        pickupDatetime: { lte: to },
-        returnDatetime: { gte: from },
-      },
-      include: {
-        vehicle: {
-          include: {
-            owner: true,
-            // Needed to resolve this order's cleaning fee the same
-            // way the save endpoint does -- without it, the panel
-            // opened from the calendar always showed the fee box
-            // empty, whatever had actually been saved.
-            cleaningFeeRules: { orderBy: { effectiveFrom: "desc" } },
-          },
-        },
-      },
+      where: calendarOrderWhere(workspace.id, from, to),
+      include: CALENDAR_ORDER_INCLUDE,
       orderBy: { pickupDatetime: "asc" },
     }),
   ]);
@@ -101,7 +72,13 @@ export default async function CalendarPage() {
   scheduleHorizon.setDate(scheduleHorizon.getDate() + 30);
 
   const scheduleOrders = orders
-    .filter((order) => order.pickupDatetime <= scheduleHorizon)
+    // Cancelled trips reach this page now (the grid draws them as a
+    // thin strip so a cancellation is visible rather than absent), but
+    // the phone's list is "what is happening", and a cancelled trip is
+    // not happening.
+    .filter(
+      (order) => order.status !== "cancelled" && order.pickupDatetime <= scheduleHorizon,
+    )
     .map((order) => ({
     id: order.id,
     vehicleName: order.vehicle.nickname,
@@ -154,33 +131,8 @@ export default async function CalendarPage() {
         id: owner.id,
         label: owner.name,
       }))}
-      orders={orders.map((order) => ({
-        id: order.id,
-        source: order.source,
-        status: order.status,
-        hasConflict: order.hasConflict,
-        vehicleId: order.vehicleId,
-        vehicleName: order.vehicle.nickname,
-        vehiclePlateNumber: order.vehicle.plateNumber,
-        ownerId: order.vehicle.ownerId,
-        ownerName: order.vehicle.owner?.name,
-        renterName: order.renterName,
-        renterPhone: order.renterPhone,
-        pickupDatetime: order.pickupDatetime.toISOString(),
-        returnDatetime: order.returnDatetime.toISOString(),
-        totalPrice: getOrderNetEarning(order.sourceMetadata, order.totalPrice),
-        depositAmount: order.depositAmount,
-        pickupLocation: order.pickupLocation,
-        returnLocation: order.returnLocation,
-        paymentMethod: order.paymentMethod,
-        contractNumber: order.contractNumber,
-        notes: getDisplayOrderNote(order.notes, order.source),
-        createdBy: order.createdBy,
-        externalOrderId: order.externalOrderId,
-        ownerLedgerSyncedAt: order.ownerLedgerSyncedAt?.toISOString() ?? null,
-        ...resolveOrderCleaningFees(order),
-        feeLines: getOrderFeeLines(order.sourceMetadata),
-      }))}
+      orders={orders.map(toCalendarOrderPayload)}
+      loadedChunkIndexes={indexes}
     />
   );
 

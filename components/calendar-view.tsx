@@ -7,6 +7,7 @@ import { type EditableOrder, OrderDetailModal } from "@/components/order-detail-
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { VehicleEditDialog, type VehicleEditDialogVehicle } from "@/components/vehicle-edit-dialog";
+import { VehicleMonthCalendar } from "@/components/vehicle-month-calendar";
 import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-button";
 import {
   CANVAS_FUTURE_DAYS,
@@ -38,6 +39,10 @@ type VehicleTimelineOption = {
   secondaryLabel?: string | null;
   ownerId?: string | null;
   ownerName?: string | null;
+  /** Whether this car is actually listed on Turo. Not "has a Turo
+   *  order" -- a car can be sold through Turo and have no trips yet,
+   *  and a car can have historical Turo trips after being delisted. */
+  turoLinked?: boolean;
   editVehicle?: VehicleEditDialogVehicle;
 };
 
@@ -120,6 +125,20 @@ const MIN_DAY_COLUMN_WIDTHS = {
   sixWeeks: 28,
 } as const;
 const DAY_WIDTH_STORAGE_KEY = "tato:calendar-day-width";
+const SORT_STORAGE_KEY = "tato:calendar-sort";
+
+/** How the rows are ordered. Plate first because that is how an
+ *  operator names a car out loud; by owner when the question is
+ *  "what does this owner have out". */
+const ROW_SORTS = ["plate", "plateDesc", "owner"] as const;
+type RowSort = (typeof ROW_SORTS)[number];
+
+/** "9900-2" before "9900-10". A plain string compare puts the ten
+ *  first, which looks like the list is not sorted at all. */
+const naturalCompare = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+}).compare;
 const MIN_CUSTOM_DAY_WIDTH = 30;
 const MAX_CUSTOM_DAY_WIDTH = 104;
 const DEFAULT_CUSTOM_DAY_WIDTH = 52;
@@ -161,6 +180,12 @@ const COLUMN_OVERSCAN = 10;
 
 /** The note band's own height, and the room a row reserves for it. */
 const NOTE_BAND_HEIGHT = 16;
+
+/** Shorter than a note: a cancelled trip is history, not something to
+ *  read. It is there so a cancellation can be seen and checked at all
+ *  -- the calendar used to drop them server-side, which made "this
+ *  trip was cancelled" and "this trip never existed" identical. */
+const CANCELLED_BAND_HEIGHT = 12;
 
 function startOfDay(value: Date | string) {
   const date = new Date(value);
@@ -574,6 +599,9 @@ export function CalendarView({
   const [ownerFilterQuery, setOwnerFilterQuery] = useState("");
   const [sourceFilterQuery, setSourceFilterQuery] = useState("");
   const [customDayWidth, setCustomDayWidth] = useState(DEFAULT_CUSTOM_DAY_WIDTH);
+  const [rowSort, setRowSort] = useState<RowSort>("plate");
+  const [isAddVehicleOpen, setIsAddVehicleOpen] = useState(false);
+  const [monthCalendarFor, setMonthCalendarFor] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<CalendarOrder | null>(null);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [orderDraft, setOrderDraft] = useState<ManualOrderDraft>(() =>
@@ -1118,6 +1146,9 @@ export function CalendarView({
   });
 
   const filteredOrders = orders.filter((order) => {
+    // Cancelled trips are handled separately, below: they are drawn as
+    // a strip rather than a bar, and they must not take a lane or the
+    // row would grow for a trip that is not happening.
     if (order.status === "cancelled") return false;
     if (selectedVehicleId !== "all" && order.vehicleId !== selectedVehicleId) return false;
     if (
@@ -1160,6 +1191,42 @@ export function CalendarView({
     // not match are dimmed instead -- dropping them leaves gaps that
     // read as "this car is free then", which is the one thing the
     // calendar must never say wrongly.
+    return true;
+  });
+
+  // Sorted after filtering, not before: the server hands rows over in
+  // plate order, and re-sorting a filtered list is cheap while sorting
+  // the whole fleet on every keystroke is not.
+  const sortedVehicles = useMemo(() => {
+    const rows = [...filteredVehicles];
+    const plateOf = (vehicle: VehicleTimelineOption) => vehicle.plateNumber || vehicle.label;
+    if (rowSort === "plateDesc") {
+      rows.sort((left, right) => naturalCompare(plateOf(right), plateOf(left)));
+    } else if (rowSort === "owner") {
+      // Cars with no owner go last rather than sorting as an empty
+      // string, which would put them first -- the opposite of what
+      // "group by owner" is for.
+      rows.sort((left, right) => {
+        const leftOwner = left.ownerName ?? "";
+        const rightOwner = right.ownerName ?? "";
+        if (!leftOwner !== !rightOwner) return leftOwner ? -1 : 1;
+        const byOwner = naturalCompare(leftOwner, rightOwner);
+        return byOwner !== 0 ? byOwner : naturalCompare(plateOf(left), plateOf(right));
+      });
+    } else {
+      rows.sort((left, right) => naturalCompare(plateOf(left), plateOf(right)));
+    }
+    return rows;
+  }, [filteredVehicles, rowSort]);
+
+  // The same filters, for the trips that were called off. Kept apart
+  // from `filteredOrders` so they never take a lane, never count as
+  // "bookings in view", and never make a row taller.
+  const cancelledOrders = orders.filter((order) => {
+    if (order.status !== "cancelled") return false;
+    if (selectedVehicleId !== "all" && order.vehicleId !== selectedVehicleId) return false;
+    if (selectedSource !== "all" && order.source !== selectedSource) return false;
+    if (!readOnly && selectedOwnerId !== "all" && order.ownerId !== selectedOwnerId) return false;
     return true;
   });
 
@@ -1892,6 +1959,31 @@ export function CalendarView({
               </button>
             ) : null}
             {!readOnly ? (
+              <VehicleEditDialog
+                locale={locale}
+                owners={ownerOptions}
+                open={isAddVehicleOpen}
+                onOpenChange={setIsAddVehicleOpen}
+                // An empty id is what tells the save action to create
+                // rather than update.
+                vehicle={{
+                  id: "",
+                  ownerId: null,
+                  plateNumber: "",
+                  nickname: "",
+                  brand: "",
+                  model: "",
+                  year: new Date().getFullYear(),
+                  status: "available",
+                }}
+                trigger={calendarMessages.addVehicleAction}
+                triggerClassName={cn(
+                  secondaryActionClass,
+                  mobileControlsOpen ? "" : "max-lg:hidden",
+                )}
+              />
+            ) : null}
+            {!readOnly ? (
               <VehicleOrdersExportButton
                 className={mobileControlsOpen ? undefined : "max-lg:hidden"}
                 locale={locale}
@@ -2046,7 +2138,7 @@ export function CalendarView({
               </label>
               {normalizedCalendarSearchQuery ? (
                 <span className="rounded-full bg-[rgba(255,231,122,0.58)] px-2.5 py-0.5 text-[11px] font-semibold text-[color:var(--ink)]">
-                  {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
+                  {calendarMessages.summary(sortedVehicles.length, visibleOrders.length)}
                 </span>
               ) : null}
             </div>
@@ -2082,6 +2174,31 @@ export function CalendarView({
         >
           {bulkMode ? calendarMessages.bulkModeHint : calendarMessages.selectionHint}
         </p>
+      ) : null}
+
+      {monthCalendarFor ? (
+        <VehicleMonthCalendar
+          locale={locale}
+          vehicleId={monthCalendarFor}
+          vehicleLabel={
+            (() => {
+              const vehicle = vehicleOptions.find((item) => item.id === monthCalendarFor);
+              return [vehicle?.plateNumber || vehicle?.label, vehicle?.secondaryLabel]
+                .filter(Boolean)
+                .join(" \u00b7 ");
+            })()
+          }
+          onClose={() => setMonthCalendarFor(null)}
+          onSelectOrder={(order) => {
+            // The month view hands back a trimmed record; the panel
+            // wants the full one, which the grid already holds.
+            const full = orders.find((item) => item.id === order.id);
+            if (!full) return;
+            setMonthCalendarFor(null);
+            setSelectedOrder(full);
+            setOrderPopover({ isOpen: true });
+          }}
+        />
       ) : null}
 
       {/* One bar, two selections. It is fixed rather than in flow so it
@@ -2182,7 +2299,7 @@ export function CalendarView({
       ) : null}
 
       <section className="calendar-dense overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
-        {filteredVehicles.length === 0 ? (
+        {sortedVehicles.length === 0 ? (
           <div className="rounded-lg bg-[rgba(255,255,255,0.72)] px-4 py-10 text-sm text-[color:var(--ink-soft)]">
             {calendarMessages.noVehicles}
           </div>
@@ -2216,15 +2333,31 @@ export function CalendarView({
                 }}
               >
                 <div className="sticky left-0 z-50 border-r border-[color:var(--line)] bg-[linear-gradient(180deg,#ffffff,#f7f7f7)] px-3 py-3 max-lg:px-2 max-lg:py-2">
-                  <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
-                    {messages.shell.nav.vehicles}
-                  </p>
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
+                      {messages.shell.nav.vehicles}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRowSort(
+                          (current) =>
+                            ROW_SORTS[(ROW_SORTS.indexOf(current) + 1) % ROW_SORTS.length],
+                        )
+                      }
+                      title={calendarMessages.sortHint(rowSort)}
+                      aria-label={calendarMessages.sortHint(rowSort)}
+                      className="tap-compact shrink-0 rounded border border-[var(--line)] bg-white px-1 text-[10px] font-semibold leading-[16px] text-[color:var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.22)] hover:text-[var(--ink)]"
+                    >
+                      {rowSort === "plate" ? "\u2193A" : rowSort === "plateDesc" ? "\u2191A" : "\u2691"}
+                    </button>
+                  </div>
                   {/* The count wraps to three lines in a 104px column
                       and pushes every bar down by roughly a row for
                       information the page states again below. Desktop
                       keeps it; the phone gets the bars sooner. */}
                   <p className="mt-1.5 hidden text-[12px] font-semibold text-[color:var(--ink)] lg:block">
-                    {calendarMessages.summary(filteredVehicles.length, visibleOrders.length)}
+                    {calendarMessages.summary(sortedVehicles.length, visibleOrders.length)}
                   </p>
                 </div>
                 {/* Only the columns near the viewport exist. The strip
@@ -2261,7 +2394,7 @@ export function CalendarView({
                 </div>
               </div>
 
-              {filteredVehicles.map((vehicle, index) => {
+              {sortedVehicles.map((vehicle, index) => {
                 const vehicleOrders = filteredOrders.filter(
                   (order) => order.vehicleId === vehicle.id,
                 );
@@ -2274,9 +2407,15 @@ export function CalendarView({
                   barWindowEndExclusive,
                 );
                 const rowNotes = notes.filter((note) => note.vehicleId === vehicle.id);
+                const rowCancelled = cancelledOrders.filter(
+                  (order) =>
+                    order.vehicleId === vehicle.id &&
+                    orderIntersectsRange(order, barWindowStart, barWindowEndExclusive),
+                );
                 const rowHeight =
                   Math.max(minRowHeight, laneCount * laneHeight + 8) +
-                  (rowNotes.length > 0 ? NOTE_BAND_HEIGHT + 2 : 0);
+                  (rowNotes.length > 0 ? NOTE_BAND_HEIGHT + 2 : 0) +
+                  (rowCancelled.length > 0 ? CANCELLED_BAND_HEIGHT + 2 : 0);
                 const alternateRow = index % 2 === 1;
                 const rowSelection =
                   daySelection?.vehicleId === vehicle.id ? daySelection.days : null;
@@ -2305,6 +2444,7 @@ export function CalendarView({
                         .filter(Boolean)
                         .join(" · ")}
                     >
+                      <span className="flex min-w-0 items-center gap-1">
                       {!readOnly && vehicle.editVehicle ? (
                         <VehicleEditDialog
                           locale={locale}
@@ -2322,6 +2462,30 @@ export function CalendarView({
                           {highlightText(vehicle.plateNumber || vehicle.label, vehicleFilterQuery)}
                         </p>
                       )}
+                      {/* Says the car is on Turo, which the presence of
+                          Turo orders does not: a car can be listed with
+                          no trips yet, and can keep old Turo trips long
+                          after being delisted. */}
+                      {!readOnly ? (
+                        <button
+                          type="button"
+                          onClick={() => setMonthCalendarFor(vehicle.id)}
+                          title={calendarMessages.monthViewAction}
+                          aria-label={`${vehicle.plateNumber || vehicle.label} \u2014 ${calendarMessages.monthViewAction}`}
+                          className="tap-compact shrink-0 rounded border border-[var(--line)] bg-white px-1 text-[10px] leading-[14px] text-[color:var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.22)] hover:text-[var(--ink)]"
+                        >
+                          {"\u25a6"}
+                        </button>
+                      ) : null}
+                      {vehicle.turoLinked ? (
+                        <span
+                          title={calendarMessages.turoLinkedHint}
+                          className="shrink-0 rounded-[3px] bg-[rgba(52,86,223,0.12)] px-1 text-[9px] font-bold leading-[14px] text-[#3456df]"
+                        >
+                          T
+                        </span>
+                      ) : null}
+                      </span>
                       {/* The plate is the column, on every size now.
                           Model and owner were a second line under it,
                           and in a grid whose job is "which car is free
@@ -2397,6 +2561,44 @@ export function CalendarView({
                           style={{ left: todayColumnOffset, width: dayColumnWidth }}
                         />
                       ) : null}
+
+                      {rowCancelled.map((order) => {
+                        const start = new Date(order.pickupDatetime).getTime();
+                        const end = new Date(order.returnDatetime).getTime();
+                        const from = Math.max(start, canvasStart.getTime());
+                        const to = Math.min(end, rangeEndExclusive.getTime());
+                        if (to <= from) return null;
+                        const left = ((from - canvasStart.getTime()) / DAY_IN_MS) * dayColumnWidth;
+                        const width = Math.max(((to - from) / DAY_IN_MS) * dayColumnWidth, 14);
+                        return (
+                          <button
+                            key={order.id}
+                            type="button"
+                            data-calendar-cancelled="true"
+                            title={`${order.renterName} \u00b7 ${getStatusLabel("cancelled", locale)}`}
+                            onClick={() => {
+                              if (bulkMode) return;
+                              setSelectedOrder(order);
+                              setOrderPopover({ isOpen: true });
+                            }}
+                            className={cn(
+                              "absolute z-10 flex items-center overflow-hidden rounded-sm border border-dashed px-1 text-left text-[9px] leading-none line-through",
+                              "border-[rgba(17,19,24,0.28)] bg-[rgba(17,19,24,0.10)] text-[color:var(--ink-soft)] transition hover:bg-[rgba(17,19,24,0.18)]",
+                              !orderMatchesSearch(order) ? "opacity-15" : "",
+                            )}
+                            style={{
+                              left,
+                              width,
+                              // Above the note band when there is one, so
+                              // the two never sit on top of each other.
+                              bottom: (rowNotes.length > 0 ? NOTE_BAND_HEIGHT + 3 : 0) + 1,
+                              height: CANCELLED_BAND_HEIGHT,
+                            }}
+                          >
+                            <span className="truncate">{order.renterName}</span>
+                          </button>
+                        );
+                      })}
 
                       {rowNotes.map((note) => {
                         const from = Math.round(

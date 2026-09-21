@@ -70,6 +70,21 @@ export const calendarMessages = {
       sixWeeks: "6 Weeks",
       day: "Day",
       scrubberLabel: "Scroll to a date",
+      turoLinkedHint: "Listed on Turo",
+      addVehicleAction: "+ Add vehicle",
+      monthViewAction: "Month view",
+      monthSubtitle: (count: number) =>
+        `${count} trip${count === 1 ? "" : "s"} in this range`,
+      monthLoading: "Loading trips...",
+      monthEarlier: "\u2191 Earlier months",
+      monthLater: "\u2193 Later months",
+      monthMaxReached: "Showing the maximum number of months",
+      sortHint: (sort: string) =>
+        sort === "plate"
+          ? "Sorted by plate \u2014 click for reverse"
+          : sort === "plateDesc"
+            ? "Reverse plate order \u2014 click to group by owner"
+            : "Grouped by owner \u2014 click to sort by plate",
       selectionCount: (days: number) => `${days} day${days === 1 ? "" : "s"} selected`,
       selectionClear: "Cancel",
       selectionHint:
@@ -204,6 +219,20 @@ export const calendarMessages = {
       sixWeeks: "六周",
       day: "日",
       scrubberLabel: "滑动跳转日期",
+      turoLinkedHint: "已在 Turo 上架",
+      addVehicleAction: "+ 新建车辆",
+      monthViewAction: "月历",
+      monthSubtitle: (count: number) => `这个区间内有 ${count} 笔订单`,
+      monthLoading: "加载订单中…",
+      monthEarlier: "\u2191 更早的月份",
+      monthLater: "\u2193 更晚的月份",
+      monthMaxReached: "已显示到最大月份数",
+      sortHint: (sort: string) =>
+        sort === "plate"
+          ? "按车牌排序 — 点击切换降序"
+          : sort === "plateDesc"
+            ? "车牌降序 — 点击改为按车主分组"
+            : "按车主分组 — 点击改回车牌排序",
       selectionCount: (days: number) => `已选 ${days} 天`,
       selectionClear: "取消",
       selectionHint: "点一天选中它，再点另一天填满中间，点已选中的那天可取消。",

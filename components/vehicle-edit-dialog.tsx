@@ -100,10 +100,17 @@ export function VehicleEditDialog({
       <div className="relative max-h-[90vh] w-[min(58rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-[var(--line)] bg-white shadow-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-[var(--ink)]">{messages.editVehicle}</h2>
-            <p className="mt-0.5 truncate text-xs text-[var(--ink-soft)]">
-              {vehicle.plateNumber} · {vehicle.nickname}
-            </p>
+            {/* The same dialog creates and edits -- `saveVehicleAction`
+                keys off whether an id came with the form -- so it has
+                to say which one it is doing. A blank id is a new car. */}
+            <h2 className="truncate text-base font-semibold text-[var(--ink)]">
+              {vehicle.id ? messages.editVehicle : messages.addVehicle}
+            </h2>
+            {vehicle.id ? (
+              <p className="mt-0.5 truncate text-xs text-[var(--ink-soft)]">
+                {vehicle.plateNumber} · {vehicle.nickname}
+              </p>
+            ) : null}
           </div>
           <button
             type="button"

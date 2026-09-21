@@ -105,6 +105,9 @@ export default async function CalendarPage() {
         secondaryLabel: `${vehicle.brand} ${vehicle.model} ${vehicle.year}`,
         ownerId: vehicle.ownerId,
         ownerName: vehicle.owner?.name,
+        // Either identifier means somebody has actually connected this
+        // car to a Turo listing. Having Turo orders does not.
+        turoLinked: Boolean(vehicle.turoVehicleCode || vehicle.turoListingName),
         editVehicle: {
           id: vehicle.id,
           ownerId: vehicle.ownerId,

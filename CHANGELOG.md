@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.85.0 - 2026-09-21
+
+### A month view for one car
+
+Every row gets a ▦ button that opens that car's calendar as months rather than a strip. The main grid is wide because it compares cars — it answers "which car is free next Tuesday". A single month on it is three screens wide at a readable column width, and nine on a phone, so "what does August look like for this car" was a question the timeline could not answer.
+
+It opens scrolled to the current month, covering two months back and nine forward, with buttons to load six more at either end. Bookings carry the same colours as the grid, cancelled stays are struck through, and clicking a day with a trip on it opens that trip. Deliberately not infinite-scrolling in both directions: this is something you open, read and close.
+
+### Cancelled trips are visible again
+
+They used to be filtered out on the server, which made "this trip was cancelled" and "this trip never existed" identical on the calendar — and there was no way to see or check one here at all. A cancelled trip now draws a thin dashed strip along the bottom of its row with the renter's name struck through. It takes no lane, so it never makes a row taller, and it is not counted in "bookings in view".
+
+### Row order, and two things the vehicle column now says
+
+- **A sort toggle** in the Vehicles header cycles plate ascending → plate descending → grouped by owner, and remembers the choice. Plates sort naturally, so "9900-2" comes before "9900-10" rather than after it. Cars with no owner sort last under owner grouping, not first.
+- **A blue T badge** on cars that are actually listed on Turo (they have a Turo vehicle code or listing name). Having Turo *orders* does not mean a car is currently listed: it can be listed with no trips yet, and it can keep old Turo trips long after being delisted.
+- **+ Add vehicle** in the toolbar, opening the same dialog the rows use. It already created a vehicle when handed a blank id; it just never said so, and now it titles itself accordingly.
+
+### Fixes
+
+- **Weekday headers in the month view were one day out.** They were generated from `Date.UTC(2024, 0, 1)` — a Monday in UTC, but Sunday 31 December once rendered anywhere west of Greenwich. In Vancouver the header row came out Sunday-first while the cells were laid out Monday-first, so every date sat under the wrong weekday name.
+
+
 ## v0.84.0 - 2026-09-21
 
 ### Pick days on the grid, and do something with them

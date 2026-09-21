@@ -58,6 +58,7 @@ export const inspectionsMessages = {
       region_interior: "Interior",
       metadataWrittenAtCapture: "Metadata written by the camera",
       metadataStampedAfterCapture: "Metadata completed after capture",
+      metadataEncodedFromCameraPixels: "Encoded by the app from the camera's pixels",
     },
   },
   zh: {
@@ -113,6 +114,7 @@ export const inspectionsMessages = {
       region_interior: "车内",
       metadataWrittenAtCapture: "元数据由相机直接写入",
       metadataStampedAfterCapture: "元数据在拍摄后补齐",
+      metadataEncodedFromCameraPixels: "由 App 用相机像素编码",
     },
   },
 };

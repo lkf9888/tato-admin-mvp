@@ -7,6 +7,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let coverage: CoverageTracker
+    let lastStillSize: String?
 
     var body: some View {
         List {
@@ -16,13 +17,15 @@ struct SettingsView: View {
             // indistinguishable from a check that was never wired up.
             Section {
                 LabeledContent("状态", value: coverage.status)
+                LabeledContent("画面格式", value: coverage.videoFormatSummary)
+                LabeledContent("上一张照片", value: lastStillSize ?? "还没拍")
             } header: {
-                Text("车形图")
+                Text("相机")
             } footer: {
-                Text("车形图靠 ARKit 的空间追踪画出来，而它和拍照用的是同一颗后置摄像头。"
-                     + "抢起来的话 App 会自己重排两者的启动顺序再试，不用管它。"
-                     + "这里持续写「停了」才说明真的没抢过来 —— 照片照拍不误，"
-                     + "只是完整度要靠张数判断。")
+                Text("照片和车形图都出自同一个 ARKit 会话 —— 它们抢不起来，因为只有一个。"
+                     + "「画面格式」决定了照片的分辨率：写着「支持高分辨率取帧」时照片比画面大，"
+                     + "没写就是画面多大照片多大。这里持续写「停了」才需要管，"
+                     + "那时照片照拍不误，只是完整度要靠张数判断。")
             }
 
             Section {

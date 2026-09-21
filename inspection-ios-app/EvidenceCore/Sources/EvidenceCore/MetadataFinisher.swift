@@ -40,4 +40,18 @@ public enum MetadataFinisher {
             evidence: EvidenceRequirements.check(jpeg: result.data)
         )
     }
+
+    /// The ARKit path, where the file was built here rather than handed over.
+    ///
+    /// Nothing to stamp — `PhotoEncoder` already wrote everything while
+    /// making the JPEG. What still has to be answered is whether the facts
+    /// actually landed in the bytes, and that question is asked of the
+    /// finished file exactly as it is on the other path: by parsing it back.
+    public static func finish(encoded: Data) -> Outcome {
+        Outcome(
+            data: encoded,
+            path: .encodedFromCameraPixels,
+            evidence: EvidenceRequirements.check(jpeg: encoded)
+        )
+    }
 }

@@ -13,6 +13,15 @@ public enum MetadataPath: String, Sendable, Codable {
     /// The file came out short of something and was stamped afterwards.
     /// Still lossless, but worth knowing about if a phone does it every time.
     case stampedAfterCapture
+    /// There was no file to begin with. ARKit handed over the camera's
+    /// processed pixels and its EXIF, and this app encoded the JPEG.
+    ///
+    /// Recorded rather than glossed over. The pixels and the metadata are
+    /// the camera's, and it is a first encode rather than a re-encode — but
+    /// "the camera wrote this file" is no longer true, and an archive that
+    /// implied otherwise would be lying about the one thing it exists to be
+    /// precise about. See `PhotoEncoder`.
+    case encodedFromCameraPixels
 }
 
 public enum SessionKind: String, Sendable, Codable {

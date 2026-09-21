@@ -19,8 +19,6 @@ struct CaptureView: View {
     @State private var model = CaptureSessionModel()
     @State private var showingFinish = false
     @State private var showingSettings = false
-    @State private var focusPoint: CGPoint?
-    @State private var focusGeneration = 0
     @State private var noticeGeneration = 0
     @State private var shutterBlink = false
 
@@ -37,7 +35,6 @@ struct CaptureView: View {
             VStack(spacing: 0) {
                 topBar
                 viewfinder
-                lensRow
                 Spacer(minLength: 0)
                 shutterRow
             }
@@ -62,7 +59,9 @@ struct CaptureView: View {
             FinishView(model: model)
         }
         .sheet(isPresented: $showingSettings) {
-            NavigationStack { SettingsView(coverage: model.coverage) }
+            NavigationStack {
+                SettingsView(coverage: model.coverage, lastStillSize: model.lastStillSize)
+            }
         }
         .alert(
             "相机打不开",
@@ -82,7 +81,7 @@ struct CaptureView: View {
             // for why continuous light is the faster of the two.
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                Task { await model.toggleTorch() }
+                model.toggleTorch()
             } label: {
                 Image(systemName: model.isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                     .font(.system(size: 14, weight: .semibold))
@@ -120,16 +119,12 @@ struct CaptureView: View {
     // MARK: - The frame itself
 
     private var viewfinder: some View {
-        CameraPreview(
-            session: model.camera.session,
-            onFocusTap: { device, view in focus(devicePoint: device, viewPoint: view) }
-        )
+        CameraPreview(session: model.coverage.session)
             .aspectRatio(frameAspect, contentMode: .fit)
             .frame(maxWidth: .infinity)
             .clipped()
             .overlay(alignment: .topLeading) { diagram }
             .overlay(alignment: .bottom) { hud }
-            .overlay { focusSquare }
             .overlay { Color.black.opacity(shutterBlink ? 1 : 0).allowsHitTesting(false) }
     }
 
@@ -165,9 +160,6 @@ struct CaptureView: View {
             if model.torchRefused {
                 Chip(icon: "thermometer.high", text: "手电筒打不开 —— 多半是手机太热了")
             }
-            if let notice = model.cameraNotice {
-                FrozenBar(text: notice) { Task { await model.restartCamera() } }
-            }
 
             if hasNotice {
                 notice
@@ -184,48 +176,6 @@ struct CaptureView: View {
         .padding(.horizontal, 14)
         .padding(.bottom, 14)
         .animation(.easeOut(duration: 0.2), value: model.outcome)
-    }
-
-    @ViewBuilder private var focusSquare: some View {
-        if let focusPoint {
-            FocusSquare()
-                .position(focusPoint)
-                .id(focusGeneration)
-                .allowsHitTesting(false)
-        }
-    }
-
-    // MARK: - Lenses
-
-    /// The iPhone's zoom pill, with the two lenses this app actually uses.
-    ///
-    /// There is no pinch-to-zoom and no 2×: digital zoom is a crop of the
-    /// same sensor, so it throws away the pixels a claim assessor would use
-    /// to see the scratch while telling the coverage maths a narrower story.
-    /// Two real lenses, nothing in between.
-    @ViewBuilder private var lensRow: some View {
-        if model.lenses.count > 1 {
-            HStack(spacing: 4) {
-                ForEach(model.lenses) { lens in
-                    let selected = lens == model.lens
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        Task { await model.select(lens: lens) }
-                    } label: {
-                        Text(lens.label(selected: selected))
-                            .font(.system(size: selected ? 14 : 12, weight: .semibold))
-                            .foregroundStyle(selected ? Color.yellow : .white)
-                            .frame(width: selected ? 40 : 34, height: selected ? 40 : 34)
-                            .background(Circle().fill(.black.opacity(selected ? 0.5 : 0)))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(4)
-            .background(Capsule().fill(.white.opacity(0.12)))
-            .animation(.easeOut(duration: 0.15), value: model.lens)
-            .padding(.top, 14)
-        }
     }
 
     // MARK: - Bottom: last shot, shutter, and the way out
@@ -375,18 +325,6 @@ struct CaptureView: View {
         Task { await model.capture() }
     }
 
-    private func focus(devicePoint: CGPoint, viewPoint: CGPoint) {
-        model.camera.focus(at: devicePoint)
-        focusGeneration += 1
-        let generation = focusGeneration
-        withAnimation(.easeOut(duration: 0.12)) { focusPoint = viewPoint }
-        Task {
-            try? await Task.sleep(for: .seconds(1.3))
-            guard focusGeneration == generation else { return }
-            withAnimation(.easeIn(duration: 0.3)) { focusPoint = nil }
-        }
-    }
-
     private func respond(to outcome: CaptureSessionModel.Outcome?) {
         guard let outcome else { return }
         switch outcome {
@@ -415,56 +353,6 @@ struct CaptureView: View {
             }
         }
         return names.isEmpty ? "这张需要重拍" : names.joined(separator: "、") + " —— 这张不算"
-    }
-}
-
-/// The iPhone's focus reticle: lands slightly large, settles, fades.
-private struct FocusSquare: View {
-    @State private var scale: CGFloat = 1.4
-    @State private var opacity: Double = 0.4
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .stroke(Color.yellow, lineWidth: 1.2)
-            .frame(width: 74, height: 74)
-            .scaleEffect(scale)
-            .opacity(opacity)
-            .shadow(color: .black.opacity(0.4), radius: 2)
-            .onAppear {
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) { scale = 1 }
-                withAnimation(.easeOut(duration: 0.15)) { opacity = 1 }
-            }
-    }
-}
-
-/// Shown when the viewfinder has stopped being a viewfinder.
-///
-/// A frozen preview looks exactly like a working camera pointed at something
-/// still, so it has to say so — and it has to offer the fix, because the
-/// alternative is somebody photographing a car with a picture of that car
-/// from thirty seconds ago.
-private struct FrozenBar: View {
-    let text: String
-    let restart: () -> Void
-
-    var body: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "video.slash.fill")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.red)
-            Text(text)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-            Button("重启相机", action: restart)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.black)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(.white))
-        }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 9)
-        .background(Capsule().fill(.black.opacity(0.75)))
     }
 }
 

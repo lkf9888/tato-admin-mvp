@@ -34,6 +34,8 @@ public struct ExifReader {
     public static let software: UInt16 = 0x0131
     public static let dateTime: UInt16 = 0x0132
     // Exif sub-IFD
+    public static let exposureTime: UInt16 = 0x829A
+    public static let fNumber: UInt16 = 0x829D
     public static let dateTimeOriginal: UInt16 = 0x9003
     public static let dateTimeDigitized: UInt16 = 0x9004
     public static let offsetTimeOriginal: UInt16 = 0x9011

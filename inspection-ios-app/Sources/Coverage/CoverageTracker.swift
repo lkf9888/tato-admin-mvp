@@ -46,6 +46,16 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     /// it. Counting arrivals cannot be fooled that way.
     private(set) var framesPerSecond = 0
     private(set) var isLive = false
+    /// What the stream is running at, and whether that format can hand back
+    /// a still worth calling a photograph.
+    ///
+    /// Surfaced because it decides the resolution of every piece of evidence
+    /// this app produces, and it is chosen by the system rather than by us:
+    /// `recommendedVideoFormatForHighResolutionFrameCapturing` may simply not
+    /// exist for a configuration that also wants scene reconstruction, and
+    /// then the photographs are whatever the video stream is.
+    private(set) var videoFormatSummary = "未知"
+    private(set) var canCaptureHighResolution = false
     /// What ARKit said when it gave up, if it did.
     ///
     /// ⚠️ A failed session is **silent**. `sessionWasInterrupted` is for the
@@ -77,7 +87,10 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
         startWatchdog()
     }
 
-    private let session = ARSession()
+    /// ⚠️ Handed out, because this session is now the camera for the whole
+    /// app: the viewfinder renders it and the photographs are cut from it.
+    /// Nothing else may run or pause it — see `CameraPreview`.
+    let session = ARSession()
     private var meshAnchors: [UUID: ARMeshAnchor] = [:]
     private var groundY: Float?
     private var cameraPosition: SIMD3<Float>?
@@ -111,6 +124,24 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
             configuration.sceneReconstruction = .mesh
             canMeasure = true
         }
+
+        // The photographs come out of this session, so the format is an
+        // evidence decision, not a rendering one. Ask for the one that can
+        // hand back a still bigger than the stream; fall back rather than
+        // fail, because a lower-resolution walk-around still beats none.
+        if let highResolution = ARWorldTrackingConfiguration.recommendedVideoFormatForHighResolutionFrameCapturing,
+           ARWorldTrackingConfiguration.supportedVideoFormats.contains(highResolution) {
+            configuration.videoFormat = highResolution
+        }
+        let format = configuration.videoFormat
+        canCaptureHighResolution = format.isRecommendedForHighResolutionFrameCapturing
+        videoFormatSummary = String(
+            format: "%.0f×%.0f @%ldfps%@",
+            format.imageResolution.width,
+            format.imageResolution.height,
+            format.framesPerSecond,
+            canCaptureHighResolution ? "，支持高分辨率取帧" : "，照片就是这个分辨率"
+        )
         session.delegate = self
         self.configuration = configuration
         session.run(configuration, options: [.resetTracking, .removeExistingAnchors])

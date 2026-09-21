@@ -602,6 +602,12 @@ export function CalendarView({
   const [rowSort, setRowSort] = useState<RowSort>("plate");
   const [isAddVehicleOpen, setIsAddVehicleOpen] = useState(false);
   const [monthCalendarFor, setMonthCalendarFor] = useState<string | null>(null);
+  // --- Searching every trip, not just the loaded ones -----------------
+  const [searchHits, setSearchHits] = useState<CalendarOrder[]>([]);
+  const [searchTruncated, setSearchTruncated] = useState(false);
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
+  const [searchListOpen, setSearchListOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<CalendarOrder | null>(null);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [orderDraft, setOrderDraft] = useState<ManualOrderDraft>(() =>
@@ -998,9 +1004,21 @@ export function CalendarView({
     }
 
     if (!refreshedOrder) {
-      setSelectedOrder(null);
+      // Absent from the loaded data means "deleted" only if we would
+      // have loaded it. A trip found by searching all history sits
+      // outside the fetched chunks by definition, and closing its
+      // panel the instant it opened made every out-of-window search
+      // result look like a dead link.
+      const chunks = chunkIndexesForRange(
+        new Date(selectedOrder.pickupDatetime),
+        new Date(selectedOrder.returnDatetime),
+      );
+      const wouldHaveLoaded = chunks.some(
+        (index) => serverChunks.has(index) || fetchedChunksRef.current.has(index),
+      );
+      if (wouldHaveLoaded) setSelectedOrder(null);
     }
-  }, [orders, selectedOrder]);
+  }, [orders, selectedOrder, serverChunks]);
 
   useEffect(() => {
     if (!selectedOrder) {
@@ -1406,6 +1424,72 @@ export function CalendarView({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [neededChunkKey, storeVersion, serverChunks]);
+
+  // The grid's own search filters what it has loaded, which is the
+  // dates near where you have scrolled. That narrows the view; it does
+  // not find things. This asks the server about every trip in the
+  // workspace, so a renter from last winter is reachable.
+  //
+  // Debounced, because it is a database query per keystroke otherwise,
+  // and skipped entirely below two characters where every query
+  // matches half the table.
+  useEffect(() => {
+    const query = calendarSearchQuery.trim();
+    if (readOnly || query.length < 2) {
+      setSearchHits([]);
+      setSearchTruncated(false);
+      setSearchFailed(false);
+      setSearchBusy(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearchBusy(true);
+    const handle = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/calendar/search?q=${encodeURIComponent(query)}`, {
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) throw new Error(String(response.status));
+        const data = (await response.json()) as {
+          orders?: CalendarOrder[];
+          truncated?: boolean;
+        };
+        if (cancelled) return;
+        setSearchHits(data.orders ?? []);
+        setSearchTruncated(Boolean(data.truncated));
+        setSearchFailed(false);
+      } catch {
+        if (!cancelled) setSearchFailed(true);
+      } finally {
+        if (!cancelled) setSearchBusy(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [calendarSearchQuery, readOnly]);
+
+  /** Take the calendar to a trip, wherever it is. */
+  function openSearchHit(order: CalendarOrder) {
+    // The hit carries its whole record, so the panel can open even for
+    // dates the grid has never fetched -- no second round-trip, and no
+    // empty panel while one is in flight.
+    setSelectedOrder(order);
+    setOrderPopover({ isOpen: true });
+
+    // Only move the grid if the trip is somewhere the grid can go. The
+    // canvas is 180 days back and 400 forward; a trip from two years
+    // ago is off it entirely, and scrolling to the clamped edge would
+    // claim to have found it a place on screen that it does not have.
+    // The panel still opens, which is what searching for a trip is for.
+    const pickup = startOfDay(new Date(order.pickupDatetime));
+    if (pickup >= canvasStart && pickup < rangeEndExclusive) {
+      scrollToDate(addDays(pickup, -2), "auto");
+    }
+  }
 
   // Notes for the whole canvas, fetched once. There are a handful per
   // account, not one per day, so windowing them would cost more in
@@ -2067,6 +2151,105 @@ export function CalendarView({
             )}
           >
             {turoSyncNotice.message}
+          </div>
+        ) : null}
+
+        {/* What the search found everywhere, as opposed to what it
+            filtered on screen. The two are different answers and the
+            panel keeps them apart. */}
+        {!readOnly && calendarSearchQuery.trim().length >= 2 ? (
+          <div className="mt-2 rounded-md border border-[rgba(17,19,24,0.08)] bg-[rgba(255,255,255,0.8)] px-3 py-2 text-[12px]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[color:var(--ink-soft)]">
+                {searchBusy
+                  ? calendarMessages.searchAllLoading
+                  : searchFailed
+                    ? calendarMessages.searchAllFailed
+                    : searchHits.length === 0
+                      ? calendarMessages.searchAllNone
+                      : calendarMessages.searchAllResults(searchHits.length)}
+              </span>
+              {searchHits.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchListOpen((open) => !open)}
+                  className="text-[11px] font-semibold text-[var(--accent)] underline underline-offset-2"
+                >
+                  {searchListOpen
+                    ? calendarMessages.searchHideResults
+                    : calendarMessages.searchShowResults(searchHits.length)}
+                </button>
+              ) : null}
+            </div>
+
+            {/* The vehicles behind the hits, first and always visible.
+                On a phone this is the answer people actually want --
+                "which car was that" -- and each one opens its month. */}
+            {searchHits.length > 0 ? (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                <span className="text-[10px] uppercase tracking-wide text-[color:var(--ink-soft)]/80">
+                  {calendarMessages.searchVehicles}
+                </span>
+                {Array.from(
+                  new Map(
+                    searchHits.map((order) => [
+                      order.vehicleId,
+                      order.vehiclePlateNumber || order.vehicleName,
+                    ]),
+                  ),
+                ).map(([vehicleId, label]) => (
+                  <button
+                    key={vehicleId}
+                    type="button"
+                    onClick={() => setMonthCalendarFor(vehicleId)}
+                    className="rounded-full border border-[var(--line)] bg-white px-2 py-0.5 text-[11px] font-medium text-[color:var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  >
+                    {highlightText(String(label ?? ""), calendarSearchQuery)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {searchListOpen && searchHits.length > 0 ? (
+              // Capped and scrolled inside itself: twelve cards are
+              // taller than a phone screen, and growing without limit
+              // would push the calendar off the page.
+              <div className="mt-2 grid max-h-[40vh] gap-1 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+                {searchHits.slice(0, 12).map((order) => {
+                  const pickup = new Date(order.pickupDatetime);
+                  const outsideView = !orderIntersectsRange(
+                    order,
+                    visibleRangeStart,
+                    addDays(visibleRangeEndInclusive, 1),
+                  );
+                  return (
+                    <button
+                      key={order.id}
+                      type="button"
+                      onClick={() => openSearchHit(order)}
+                      className="rounded-md border border-[var(--line)] bg-white px-2 py-1.5 text-left transition hover:border-[var(--accent)]"
+                    >
+                      <span className="block truncate text-[12px] font-semibold text-[color:var(--ink)]">
+                        {highlightText(order.renterName, calendarSearchQuery)}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[10.5px] text-[color:var(--ink-soft)]">
+                        {order.vehiclePlateNumber || order.vehicleName} ·{" "}
+                        {formatDate(pickup, locale)}
+                        {outsideView ? ` · ${calendarMessages.searchOutsideWindow}` : ""}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {searchListOpen && searchHits.length > 12 ? (
+              <p className="mt-1 text-[10.5px] text-[color:var(--ink-soft)]">
+                {calendarMessages.searchMoreResults(
+                  searchHits.length - 12 + (searchTruncated ? 1 : 0),
+                )}
+              </p>
+            ) : null}
           </div>
         ) : null}
 

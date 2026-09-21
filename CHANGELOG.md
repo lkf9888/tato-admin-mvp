@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.86.0 - 2026-09-21
+
+### Search finds trips the calendar has never loaded
+
+The calendar's search box filtered what the grid had in hand, which is the dates you have scrolled near. That is the right behaviour for narrowing the view and the wrong one for finding something: a renter from last winter matched nothing, and "no results" was indistinguishable from "no such renter".
+
+Typing two characters now also asks the server about **every** trip in the workspace — renter name, phone, notes, contract number, external order id, pickup and return location, and the vehicle's plate, nickname, brand, model and owner. A panel under the search box reports what it found:
+
+- **Matching vehicles** as chips, first and always visible. On a phone that is usually the answer people actually want — "which car was that" — and tapping one opens that car's month view.
+- **The trips themselves**, collapsed behind "Show N results", each with the renter, the car, the date, and **"not in view"** when it falls outside what is on screen. Capped at twelve with an honest "N more hidden — type something more specific", and scrolled inside itself so expanding it never pushes the calendar off the page.
+
+Clicking a result opens the trip. If its dates are somewhere the grid can go, the grid goes there too. If they are not — the canvas covers 180 days back and 400 forward, and a trip from two years ago is off it entirely — the panel still opens and the grid stays put, rather than scrolling to the clamped edge and claiming to have found it a place on screen.
+
+Results carry the whole order record, so the panel opens immediately with no second round-trip and no empty dialog while one is in flight.
+
+### Fixes
+
+- **The order panel closed itself on any trip outside the loaded window.** A self-healing effect closed the panel when the open order was missing from the grid's data, which is correct for a deleted trip and wrong for one that simply has not been fetched — so every out-of-window search result looked like a dead link. It now only closes when the trip's dates fall inside a chunk that *is* loaded.
+
+
 ## v0.85.0 - 2026-09-21
 
 ### A month view for one car

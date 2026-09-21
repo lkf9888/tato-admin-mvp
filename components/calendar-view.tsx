@@ -22,6 +22,15 @@ import { cn, foldLatinLookalikes, formatCurrencyInputText, formatCurrencyInputVa
 
 type CalendarOrder = EditableOrder;
 
+/** A note pinned to one vehicle over an inclusive run of days. */
+type CalendarNote = {
+  id: string;
+  vehicleId: string;
+  startDate: string;
+  endDate: string;
+  text: string;
+};
+
 type VehicleTimelineOption = {
   id: string;
   label: string;
@@ -150,6 +159,9 @@ const CANVAS_TOTAL_DAYS = CANVAS_PAST_DAYS + CANVAS_FUTURE_DAYS;
  *  outrun the render. */
 const COLUMN_OVERSCAN = 10;
 
+/** The note band's own height, and the room a row reserves for it. */
+const NOTE_BAND_HEIGHT = 16;
+
 function startOfDay(value: Date | string) {
   const date = new Date(value);
   date.setHours(0, 0, 0, 0);
@@ -207,9 +219,17 @@ function getTimelineBarClasses(
   clippedStart: boolean,
   clippedEnd: boolean,
   compact = false,
+  dimmed = false,
+  picked = false,
 ) {
   return cn(
     "absolute flex items-center overflow-hidden border-[1.5px] text-left font-semibold leading-tight text-white shadow-[0_18px_36px_-18px_rgba(17,19,24,0.7)] transition hover:-translate-y-0.5 hover:brightness-110 cursor-pointer",
+    // Search dims rather than hides, so the matches stand out without
+    // the rest of the week disappearing.
+    dimmed ? "opacity-15 hover:opacity-40" : "",
+    // Picked in bulk mode: a ring rather than a colour, so the bar
+    // keeps saying what it said about the money.
+    picked ? "ring-2 ring-offset-1 ring-[var(--accent)] z-30" : "",
     // 14px of padding either side is most of a 34px column, so a
     // single-day booking would be all padding and no name.
     //
@@ -331,11 +351,14 @@ function formatTime(value: Date | string) {
   return formatTime24(value);
 }
 
-function buildCreateDraft(baseDate: Date, vehicleId?: string) {
+function buildCreateDraft(baseDate: Date, vehicleId?: string, lastDay?: Date) {
   const pickup = new Date(baseDate);
   pickup.setHours(10, 0, 0, 0);
 
-  const returnDatetime = addDays(pickup, 1);
+  // The return is the morning after the last day picked, which is what
+  // "I want the car on these days" means -- picking the 3rd to the 5th
+  // and getting it back on the 5th would be two days, not three.
+  const returnDatetime = addDays(lastDay ? new Date(lastDay) : pickup, 1);
   returnDatetime.setHours(10, 0, 0, 0);
 
   return {
@@ -636,6 +659,32 @@ export function CalendarView({
   const [isLoadingChunks, setIsLoadingChunks] = useState(false);
   const [chunkError, setChunkError] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // --- Picking days, and picking trips -------------------------------
+  //
+  // Two selections, and they are mutually exclusive on purpose. Days
+  // are picked on the empty grid to say "do something to this stretch
+  // of this car's calendar"; trips are picked on the bars to say "do
+  // something to these bookings". A click cannot mean both, so turning
+  // one on clears the other.
+  //
+  // The day selection is a *set*, not a range: click a day to pick it
+  // and make it the anchor, click a second to fill everything between,
+  // click a picked day to drop it again. That allows holes, which
+  // matters for a note ("servicing, Mondays") and is exactly why
+  // creating an order from it insists on an unbroken run instead.
+  const [daySelection, setDaySelection] = useState<{
+    vehicleId: string;
+    days: string[];
+    anchor: string | null;
+  } | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSelection, setBulkSelection] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [notes, setNotes] = useState<CalendarNote[]>([]);
+
   // Horizontal scroll position, sampled once per frame. Three things
   // read it: which header cells to render, which bars to render, and
   // which chunks to fetch next.
@@ -931,6 +980,29 @@ export function CalendarView({
     }
   }, [selectedOrder]);
 
+  // Escape drops whichever selection is active. It already closes the
+  // order panel; a selection is the same kind of "I am in the middle
+  // of something" state and should come off the same way.
+  useEffect(() => {
+    if (!daySelection && !bulkMode) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      // The order panel is in front; let it have the key first.
+      if (orderPopover) return;
+      if (daySelection) {
+        clearDaySelection();
+        return;
+      }
+      setBulkMode(false);
+      setBulkSelection(new Set());
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [daySelection, bulkMode, orderPopover]);
+
   useEffect(() => {
     if (!orderPopover) return;
 
@@ -997,7 +1069,14 @@ export function CalendarView({
     [canvasStart, visibleDayCount],
   );
   const rangeStart = canvasStart;
-  const rangeEndExclusive = addDays(rangeStart, visibleDayCount);
+  // Memoised, and it has to be: `addDays` returns a new Date, so an
+  // effect listing this in its deps re-runs on every single render.
+  // The notes fetch did, and its setState fed the next render -- an
+  // endless request loop that also starved the click handlers.
+  const rangeEndExclusive = useMemo(
+    () => addDays(rangeStart, visibleDayCount),
+    [rangeStart, visibleDayCount],
+  );
 
   const normalizedVehicleFilterQuery = normalizeFilterText(vehicleFilterQuery);
   const normalizedOwnerFilterQuery = normalizeFilterText(ownerFilterQuery);
@@ -1076,14 +1155,17 @@ export function CalendarView({
     ) {
       return false;
     }
-    if (
-      normalizedCalendarSearchQuery &&
-      !buildOrderTimelineSearchText(order, locale).includes(normalizedCalendarSearchQuery)
-    ) {
-      return false;
-    }
+    // Deliberately not filtered by the free-text search. A row that
+    // survives the search keeps all of its trips, and the ones that do
+    // not match are dimmed instead -- dropping them leaves gaps that
+    // read as "this car is free then", which is the one thing the
+    // calendar must never say wrongly.
     return true;
   });
+
+  const orderMatchesSearch = (order: CalendarOrder) =>
+    !normalizedCalendarSearchQuery ||
+    buildOrderTimelineSearchText(order, locale).includes(normalizedCalendarSearchQuery);
 
 
   const compact =
@@ -1258,6 +1340,161 @@ export function CalendarView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [neededChunkKey, storeVersion, serverChunks]);
 
+  // Notes for the whole canvas, fetched once. There are a handful per
+  // account, not one per day, so windowing them would cost more in
+  // requests than it saves in rows.
+  useEffect(() => {
+    if (readOnly) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch(
+          `/api/calendar/notes?from=${toDayParam(rangeStart)}&to=${toDayParam(rangeEndExclusive)}`,
+          { headers: { Accept: "application/json" } },
+        );
+        if (!response.ok) return;
+        const data = (await response.json()) as { notes?: CalendarNote[] };
+        if (!cancelled) setNotes(data.notes ?? []);
+      } catch {
+        // A missing note band is not worth a banner: the grid is still
+        // correct about every booking on it.
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+    // Keyed on the strings the request is built from rather than on the
+    // Date objects, so an identity change alone can never re-fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly, toDayParam(rangeStart), toDayParam(rangeEndExclusive), storeVersion]);
+
+  async function saveNote() {
+    if (!daySelection || !noteDraft.trim() || isSavingNote) return;
+    setIsSavingNote(true);
+    try {
+      const sorted = [...daySelection.days].sort();
+      const response = await fetch("/api/calendar/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vehicleId: daySelection.vehicleId,
+          // A gappy selection becomes one band from the first day to
+          // the last. A note is about a stretch of calendar, not three
+          // separate remarks that happen to share wording.
+          startDate: sorted[0],
+          endDate: sorted[sorted.length - 1],
+          text: noteDraft.trim(),
+        }),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      const data = (await response.json()) as { note: CalendarNote };
+      setNotes((current) => [...current, data.note]);
+      setNoteDraft("");
+      clearDaySelection();
+    } catch {
+      setBulkNotice(calendarMessages.noteSaveFailed);
+    } finally {
+      setIsSavingNote(false);
+    }
+  }
+
+  async function deleteNote(note: CalendarNote) {
+    if (!window.confirm(calendarMessages.noteDeleteConfirm)) return;
+    const previous = notes;
+    setNotes((current) => current.filter((item) => item.id !== note.id));
+    try {
+      const response = await fetch(`/api/calendar/notes/${note.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(String(response.status));
+    } catch {
+      setNotes(previous);
+      setBulkNotice(calendarMessages.noteSaveFailed);
+    }
+  }
+
+  async function bulkSyncToOwners() {
+    if (bulkSelection.size === 0 || bulkBusy) return;
+    setBulkBusy(true);
+    setBulkNotice(null);
+    try {
+      const response = await fetch("/api/orders/bulk-owner-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(bulkSelection) }),
+      });
+      const data = (await response.json()) as {
+        synced?: number;
+        skipped?: Array<{ id: string; reason: string }>;
+      };
+      if (!response.ok) throw new Error(String(response.status));
+      setBulkNotice(
+        calendarMessages.bulkSyncResult(data.synced ?? 0, data.skipped?.length ?? 0),
+      );
+      setBulkSelection(new Set());
+      router.refresh();
+    } catch {
+      setBulkNotice(calendarMessages.bulkSyncFailed);
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  // --- Day picking ----------------------------------------------------
+
+  /** `YYYY-MM-DD` in local time, which is how a day column is named. */
+  const dayKey = (date: Date) => {
+    const local = startOfDay(date);
+    return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(
+      local.getDate(),
+    ).padStart(2, "0")}`;
+  };
+
+  const sortedSelectedDays = daySelection ? [...daySelection.days].sort() : [];
+  const selectionIsRun =
+    sortedSelectedDays.length > 0 &&
+    sortedSelectedDays.every((key, index) => {
+      if (index === 0) return true;
+      const previous = new Date(`${sortedSelectedDays[index - 1]}T00:00:00`);
+      return dayKey(addDays(previous, 1)) === key;
+    });
+
+  function toggleDay(vehicleId: string, date: Date) {
+    const key = dayKey(date);
+    setBulkNotice(null);
+    setDaySelection((current) => {
+      // A different car starts over. A selection spanning two rows
+      // would have no single answer to "which car is this note about".
+      if (!current || current.vehicleId !== vehicleId) {
+        return { vehicleId, days: [key], anchor: key };
+      }
+      if (current.days.includes(key)) {
+        const days = current.days.filter((day) => day !== key);
+        if (days.length === 0) return null;
+        return { ...current, days, anchor: current.anchor === key ? null : current.anchor };
+      }
+      // With an anchor set, the second click fills the span between --
+      // that is the whole gesture: click the first day, click the last.
+      if (current.anchor) {
+        const [from, to] = [current.anchor, key].sort();
+        const filled = new Set(current.days);
+        for (
+          let cursor = new Date(`${from}T00:00:00`);
+          dayKey(cursor) <= to;
+          cursor = addDays(cursor, 1)
+        ) {
+          filled.add(dayKey(cursor));
+        }
+        return { vehicleId, days: Array.from(filled), anchor: null };
+      }
+      return { vehicleId, days: [...current.days, key], anchor: key };
+    });
+  }
+
+  function clearDaySelection() {
+    setDaySelection(null);
+    setNoteDraft("");
+  }
+
   /** Scroll the canvas so `date` sits a little in from the left edge. */
   const scrollToDate = (date: Date, behavior: ScrollBehavior = "smooth") => {
     const node = timelineViewportRef.current;
@@ -1429,6 +1666,21 @@ export function CalendarView({
     setIsOrderDialogOpen(true);
   };
 
+  /** Open the create dialog seeded from the picked days. */
+  const openCreateOrderFromSelection = () => {
+    if (!daySelection || !selectionIsRun) return;
+    const sorted = [...daySelection.days].sort();
+    setOrderFormError(null);
+    setOrderDraft(
+      buildCreateDraft(
+        new Date(`${sorted[0]}T00:00:00`),
+        daySelection.vehicleId,
+        new Date(`${sorted[sorted.length - 1]}T00:00:00`),
+      ),
+    );
+    setIsOrderDialogOpen(true);
+  };
+
   const closeOrderDialog = () => {
     if (isSavingOrder) return;
     setIsOrderDialogOpen(false);
@@ -1590,6 +1842,27 @@ export function CalendarView({
                 ? calendarMessages.refreshingAction
                 : calendarMessages.refreshAction}
             </button>
+            {!readOnly ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkMode((on) => !on);
+                  setBulkSelection(new Set());
+                  setBulkNotice(null);
+                  // The two selections are mutually exclusive: a click
+                  // cannot mean both "pick this day" and "pick this
+                  // trip".
+                  clearDaySelection();
+                }}
+                className={cn(
+                  secondaryActionClass,
+                  bulkMode ? "border-[var(--accent)] text-[var(--accent)]" : "",
+                )}
+                aria-pressed={bulkMode}
+              >
+                {bulkMode ? calendarMessages.bulkModeExit : calendarMessages.bulkModeEnter}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setMobileControlsOpen((open) => !open)}
@@ -1790,6 +2063,124 @@ export function CalendarView({
         </div>
       </section>
 
+      {/* The hint is always here while it is relevant, never toggled by
+          whether something is selected.
+          
+          It used to disappear on the first click, which took its line
+          of height with it and pulled the whole grid up -- so the
+          second click of "click the first day, click the last" landed
+          on the row above the one you were aiming at. A hint that
+          breaks the gesture it is explaining is worse than no hint. */}
+      {!readOnly ? (
+        <p
+          className={cn(
+            "mt-2 text-[11px] lg:block",
+            bulkMode
+              ? "rounded-md border border-[rgba(89,60,251,0.25)] bg-[rgba(89,60,251,0.06)] px-3 py-1.5 text-[12px] text-[color:var(--ink-soft)]"
+              : "hidden text-[color:var(--ink-soft)]/80",
+          )}
+        >
+          {bulkMode ? calendarMessages.bulkModeHint : calendarMessages.selectionHint}
+        </p>
+      ) : null}
+
+      {/* One bar, two selections. It is fixed rather than in flow so it
+          cannot shove the grid down under the cursor mid-gesture. */}
+      {!readOnly && (daySelection || (bulkMode && bulkSelection.size > 0) || bulkNotice) ? (
+        <div className="fixed inset-x-0 bottom-0 z-[60] border-t border-[color:var(--line)] bg-[rgba(255,255,255,0.97)] px-3 py-2 shadow-[0_-18px_40px_-28px_rgba(17,19,24,0.5)] backdrop-blur pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 text-[12px]">
+            {daySelection ? (
+              <>
+                <span className="font-semibold text-[color:var(--ink)]">
+                  {calendarMessages.selectionCount(daySelection.days.length)}
+                </span>
+                <span className="text-[color:var(--ink-soft)]">
+                  {vehicleOptions.find((vehicle) => vehicle.id === daySelection.vehicleId)
+                    ?.plateNumber ?? ""}
+                  {" \u00b7 "}
+                  {sortedSelectedDays.length <= 3
+                    ? sortedSelectedDays.join(", ")
+                    : `${sortedSelectedDays[0]} \u2026 ${sortedSelectedDays[sortedSelectedDays.length - 1]}`}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={openCreateOrderFromSelection}
+                  disabled={!selectionIsRun}
+                  title={selectionIsRun ? undefined : calendarMessages.selectionNeedsRun}
+                  className={cn(primaryActionClass, "h-8")}
+                >
+                  {calendarMessages.selectionCreateOrder}
+                </button>
+
+                <label className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span className="whitespace-nowrap text-[color:var(--ink-soft)]">
+                    {calendarMessages.noteLabel}
+                  </span>
+                  <input
+                    value={noteDraft}
+                    onChange={(event) => setNoteDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void saveNote();
+                      }
+                    }}
+                    maxLength={500}
+                    placeholder={calendarMessages.notePlaceholder}
+                    className="h-8 min-w-0 flex-1 rounded-md border border-[var(--line)] bg-white px-2 text-[12px] text-[color:var(--ink)] outline-none focus:border-[var(--accent)]"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void saveNote()}
+                  disabled={!noteDraft.trim() || isSavingNote}
+                  className={cn(secondaryActionClass, "h-8")}
+                >
+                  {isSavingNote
+                    ? calendarMessages.noteSavingAction
+                    : calendarMessages.noteSaveAction}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearDaySelection}
+                  className={cn(secondaryActionClass, "h-8")}
+                >
+                  {calendarMessages.selectionClear}
+                </button>
+              </>
+            ) : null}
+
+            {bulkMode && bulkSelection.size > 0 ? (
+              <>
+                <span className="font-semibold text-[color:var(--ink)]">
+                  {calendarMessages.bulkSelectedCount(bulkSelection.size)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void bulkSyncToOwners()}
+                  disabled={bulkBusy}
+                  className={cn(primaryActionClass, "h-8")}
+                >
+                  {bulkBusy ? calendarMessages.bulkSyncing : calendarMessages.bulkSyncAction}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkSelection(new Set())}
+                  className={cn(secondaryActionClass, "h-8")}
+                >
+                  {calendarMessages.selectionClear}
+                </button>
+              </>
+            ) : null}
+
+            {bulkNotice ? (
+              <span className="text-[color:var(--ink-soft)]">{bulkNotice}</span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <section className="calendar-dense overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
         {filteredVehicles.length === 0 ? (
           <div className="rounded-lg bg-[rgba(255,255,255,0.72)] px-4 py-10 text-sm text-[color:var(--ink-soft)]">
@@ -1882,8 +2273,13 @@ export function CalendarView({
                   barWindowStart,
                   barWindowEndExclusive,
                 );
-                const rowHeight = Math.max(minRowHeight, laneCount * laneHeight + 8);
+                const rowNotes = notes.filter((note) => note.vehicleId === vehicle.id);
+                const rowHeight =
+                  Math.max(minRowHeight, laneCount * laneHeight + 8) +
+                  (rowNotes.length > 0 ? NOTE_BAND_HEIGHT + 2 : 0);
                 const alternateRow = index % 2 === 1;
+                const rowSelection =
+                  daySelection?.vehicleId === vehicle.id ? daySelection.days : null;
 
                 return (
                   <div
@@ -1945,8 +2341,24 @@ export function CalendarView({
                       className={cn(
                         "relative",
                         alternateRow ? "bg-[#fcf7f1]" : "bg-[rgba(255,255,255,0.72)]",
+                        !readOnly && !bulkMode ? "cursor-pointer" : "",
                       )}
                       style={{ height: rowHeight }}
+                      onClick={(event) => {
+                        if (readOnly || bulkMode) return;
+                        // Bars and note bands are their own targets.
+                        const target = event.target as HTMLElement;
+                        if (target.closest("[data-calendar-order-bar],[data-calendar-note]")) return;
+                        // Fires on click, not pointer-down, so a pan
+                        // that merely starts on a day does not pick it
+                        // -- and a pan that ends on one is swallowed by
+                        // the same guard the drag handler already uses.
+                        const bounds = event.currentTarget.getBoundingClientRect();
+                        const offsetX = event.clientX - bounds.left;
+                        const dayIndex = Math.floor(offsetX / Math.max(dayColumnWidth, 1));
+                        const date = days[dayIndex];
+                        if (date) toggleDay(vehicle.id, date);
+                      }}
                     >
                       {/* Day columns and weekend shading are painted,
                           not built. One div per day per car is 71,000
@@ -1959,6 +2371,24 @@ export function CalendarView({
                         className="pointer-events-none absolute inset-0"
                         style={{ backgroundImage: dayGridBackground, backgroundRepeat: "repeat" }}
                       />
+                      {/* Picked days. Only this row can have any, so
+                          there is no per-row check to do here. */}
+                      {rowSelection?.map((key) => {
+                        const offset = Math.round(
+                          (new Date(`${key}T00:00:00`).getTime() - canvasStart.getTime()) /
+                            DAY_IN_MS,
+                        );
+                        if (offset < 0 || offset >= days.length) return null;
+                        return (
+                          <div
+                            key={key}
+                            aria-hidden
+                            className="pointer-events-none absolute inset-y-0 bg-[rgba(245,158,11,0.22)] ring-1 ring-inset ring-[rgba(217,119,6,0.55)]"
+                            style={{ left: offset * dayColumnWidth, width: dayColumnWidth }}
+                          />
+                        );
+                      })}
+
                       {/* Today is one column, so it stays an element. */}
                       {todayColumnOffset !== null ? (
                         <div
@@ -1967,6 +2397,39 @@ export function CalendarView({
                           style={{ left: todayColumnOffset, width: dayColumnWidth }}
                         />
                       ) : null}
+
+                      {rowNotes.map((note) => {
+                        const from = Math.round(
+                          (new Date(`${note.startDate}T00:00:00`).getTime() -
+                            canvasStart.getTime()) /
+                            DAY_IN_MS,
+                        );
+                        const to = Math.round(
+                          (new Date(`${note.endDate}T00:00:00`).getTime() - canvasStart.getTime()) /
+                            DAY_IN_MS,
+                        );
+                        const clampedFrom = Math.max(from, 0);
+                        const clampedTo = Math.min(to, days.length - 1);
+                        if (clampedTo < clampedFrom) return null;
+                        return (
+                          <button
+                            key={note.id}
+                            type="button"
+                            data-calendar-note="true"
+                            title={`${note.text} \u00b7 ${calendarMessages.noteDeleteHint}`}
+                            onClick={() => deleteNote(note)}
+                            className="absolute z-20 flex items-center overflow-hidden rounded-sm border border-[rgba(17,19,24,0.12)] bg-[rgba(17,19,24,0.07)] px-1.5 text-left text-[10px] font-medium leading-none text-[color:var(--ink)] transition hover:bg-[rgba(17,19,24,0.14)]"
+                            style={{
+                              left: clampedFrom * dayColumnWidth + 1,
+                              width: Math.max((clampedTo - clampedFrom + 1) * dayColumnWidth - 2, 16),
+                              bottom: 1,
+                              height: NOTE_BAND_HEIGHT,
+                            }}
+                          >
+                            <span className="truncate">{note.text}</span>
+                          </button>
+                        );
+                      })}
 
                       {bars.length === 0 ? (
                         <div className="absolute inset-y-0 left-3 flex items-center text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/70">
@@ -1989,6 +2452,18 @@ export function CalendarView({
                             data-calendar-order-bar="true"
                             title={`${bar.order.vehicleName} · ${bar.order.renterName}`}
                             onClick={() => {
+                              if (bulkMode) {
+                                // In bulk mode a bar is a checkbox, not
+                                // a door. Opening one here would lose
+                                // the selection behind a modal.
+                                setBulkSelection((current) => {
+                                  const next = new Set(current);
+                                  if (next.has(bar.order.id)) next.delete(bar.order.id);
+                                  else next.add(bar.order.id);
+                                  return next;
+                                });
+                                return;
+                              }
                               setSelectedOrder(bar.order);
                               setOrderPopover({ isOpen: true });
                             }}
@@ -1997,6 +2472,8 @@ export function CalendarView({
                               bar.clippedStart,
                               bar.clippedEnd,
                               compact,
+                              !orderMatchesSearch(bar.order),
+                              bulkSelection.has(bar.order.id),
                             )}
                             style={{
                               left: bar.left,

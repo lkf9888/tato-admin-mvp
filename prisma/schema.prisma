@@ -138,11 +138,11 @@ enum LedgerShareTarget {
 }
 
 model Workspace {
-  id                            String                         @id @default(cuid())
-  name                          String
-  slug                          String                         @unique
-  createdAt                     DateTime                       @default(now())
-  updatedAt                     DateTime                       @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Owner revenue-split policy. Turo's `Total earnings` bundles several
   // kinds of income together, and who they belong to depends on the
@@ -194,6 +194,7 @@ model Workspace {
   assistantThreads              AssistantThread[]
   assistantAlerts               AssistantAlert[]
   messageTemplates              MessageTemplate[]
+  calendarNotes                 CalendarNote[]
   inspectionSessions            InspectionSession[]
   inspectionShots               InspectionShot[]
 }
@@ -213,13 +214,13 @@ model User {
 }
 
 model Owner {
-  workspaceId String?
-  id          String            @id @default(cuid())
-  name        String
-  phone       String?
-  email       String?
-  companyName String?
-  accessType  OwnerAccessType   @default(share_link)
+  workspaceId       String?
+  id                String                @id @default(cuid())
+  name              String
+  phone             String?
+  email             String?
+  companyName       String?
+  accessType        OwnerAccessType       @default(share_link)
   /// Per-fee exceptions to the workspace share policy, as JSON:
   /// `{"Late fee":"MANAGER","Cleaning":"OWNER"}`.
   ///
@@ -229,29 +230,29 @@ model Owner {
   /// and a fee added to the catalogue later inherits the workspace
   /// default instead of silently defaulting to withheld.
   feeShareOverrides String?
-  notes       String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  workspace   Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  vehicles    Vehicle[]
-  shareLinks  ShareLink[]
-  ledgerItems OwnerLedgerItem[]
-  commissionRules OwnerCommissionRule[]
+  notes             String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  workspace         Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  vehicles          Vehicle[]
+  shareLinks        ShareLink[]
+  ledgerItems       OwnerLedgerItem[]
+  commissionRules   OwnerCommissionRule[]
 
   @@index([workspaceId])
 }
 
 model Vehicle {
   workspaceId            String?
-  id                     String                  @id @default(cuid())
+  id                     String                   @id @default(cuid())
   ownerId                String?
-  plateNumber            String                  @unique
+  plateNumber            String                   @unique
   nickname               String
   brand                  String
   model                  String
   year                   Int
   vin                    String?
-  status                 VehicleStatus           @default(available)
+  status                 VehicleStatus            @default(available)
   /// Retired from sync, not merely out of service.
   ///
   /// `status: inactive` means a car is off the road for a while, and
@@ -260,7 +261,7 @@ model Vehicle {
   /// import skips its rows and booking mail will not file new trips
   /// against it, so a car sold or handed back stops absorbing updates
   /// without its history being deleted.
-  isArchived             Boolean                 @default(false)
+  isArchived             Boolean                  @default(false)
   turoListingName        String?
   // Which Turo account this car is listed on. Null is the main
   // account. A co-hosted listing lives on someone else's account, so
@@ -272,7 +273,7 @@ model Vehicle {
   ownerCommissionRate    Float?
   cleaningFee            Float?
   pickupPassword         String?
-  directBookingEnabled   Boolean                 @default(false)
+  directBookingEnabled   Boolean                  @default(false)
   bookingDailyRate       Float?
   bookingInsuranceFee    Float?
   bookingDepositAmount   Float?
@@ -280,10 +281,10 @@ model Vehicle {
   bookingTaxRate         Float?
   bookingIntro           String?
   notes                  String?
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  workspace              Workspace?              @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  owner                  Owner?                  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  workspace              Workspace?               @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  owner                  Owner?                   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   orders                 Order[]
   ownerLedgerItems       OwnerLedgerItem[]
   attachments            OrderAttachment[]
@@ -292,9 +293,10 @@ model Vehicle {
   directBookingDocuments DirectBookingDocument[]
   cleaningFeeRules       VehicleCleaningFeeRule[]
   messageTemplates       MessageTemplate[]
+  calendarNotes          CalendarNote[]
+  inboundEmails          InboundEmail[]
 
   @@index([workspaceId])
-  inboundEmails          InboundEmail[]
 }
 
 model Order {
@@ -332,7 +334,7 @@ model Order {
   directBookingDocuments DirectBookingDocument[]
   contractEnvelopes      ContractEnvelope[]
   inboundEmails          InboundEmail[]
-  inspectionSessions InspectionSession[]
+  inspectionSessions     InspectionSession[]
 
   @@index([workspaceId])
   @@index([workspaceId, isArchived])
@@ -407,8 +409,8 @@ model OwnerCommissionRule {
   createdAt     DateTime                 @default(now())
   updatedAt     DateTime                 @updatedAt
 
-  workspace     Workspace?               @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  owner         Owner                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  owner     Owner      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   /// One set of terms per owner per start date; re-saving the same date
   /// edits that rule instead of stacking a second one behind it.
@@ -435,8 +437,8 @@ model VehicleCleaningFeeRule {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  workspace     Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  vehicle       Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@unique([vehicleId, effectiveFrom])
   @@index([workspaceId])
@@ -484,7 +486,7 @@ model PendingOrder {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  workspace       Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, externalOrderId])
   @@index([workspaceId, pickupDatetime])
@@ -591,25 +593,25 @@ model DirectBookingDocument {
 
 model StaffMember {
   workspaceId               String?
-  id                        String      @id @default(cuid())
+  id                        String              @id @default(cuid())
   name                      String
   phone                     String?
   email                     String?
   role                      String?
-  color                     String      @default("#3456df")
+  color                     String              @default("#3456df")
   notes                     String?
   pinnedMessage             String?
-  isActive                  Boolean     @default(true)
-  sortOrder                 Int         @default(0)
+  isActive                  Boolean             @default(true)
+  sortOrder                 Int                 @default(0)
   shareToken                String?
-  miniProgramCode           String?     @unique
-  wechatOpenId              String?     @unique
-  wechatNotificationEnabled Boolean     @default(false)
+  miniProgramCode           String?             @unique
+  wechatOpenId              String?             @unique
+  wechatNotificationEnabled Boolean             @default(false)
   wechatSubscribedAt        DateTime?
   wechatBoundAt             DateTime?
-  createdAt                 DateTime    @default(now())
-  updatedAt                 DateTime    @updatedAt
-  workspace                 Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  workspace                 Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks                     StaffTask[]
   inspectionSessions        InspectionSession[]
 
@@ -996,7 +998,7 @@ enum InboundEmailKind {
 }
 
 model InboundEmail {
-  id          String           @id @default(cuid())
+  id          String @id @default(cuid())
   workspaceId String
 
   // RFC 5322 Message-ID. The dedupe key — an IMAP poll that overlaps a
@@ -1016,11 +1018,11 @@ model InboundEmail {
   // Populated by the Kimi extraction pass. `kind` stays OTHER and
   // `parsedAt` stays null when extraction fails, so a failed parse is
   // visible and retryable rather than silently mislabelled.
-  kind        InboundEmailKind @default(OTHER)
-  parsedAt    DateTime?
+  kind           InboundEmailKind @default(OTHER)
+  parsedAt       DateTime?
   // Extracted fields as JSON: guest name, reservation id, vehicle,
   // dates, amount — whichever the email actually carried.
-  parsed      String?
+  parsed         String?
   // Set once the assistant has surfaced this to the operator.
   acknowledgedAt DateTime?
 
@@ -1038,13 +1040,13 @@ model InboundEmail {
   // ingested storing the plain-text alternative alone, and the photo
   // never appears there. A thread without one falls back to initials
   // rather than a blank circle.
-  avatarUrl   String?
+  avatarUrl String?
 
   // What the guest actually wrote, lifted out of the notification
   // template. The page used to show a model's summary in its place,
   // which is a paraphrase of the one thing on screen that has to be
   // read exactly.
-  guestText   String?
+  guestText String?
 
   // The guest's own words in Chinese. Separate from summaryZh rather
   // than replacing it: the two are translations of different source
@@ -1060,17 +1062,17 @@ model InboundEmail {
   // call. Null means "not translated yet", not "translation failed" --
   // the two look identical from the page and only one is worth
   // retrying.
-  summaryZh   String?
+  summaryZh String?
   // The vehicle the subject named, when exactly one in the fleet
   // matched. Null when the listing text matched several -- several
   // cars of one model is normal here, and guessing between them would
   // put the message against the wrong car.
-  vehicleId   String?
+  vehicleId String?
 
   // The link Turo put in the notification body. Kept as sent rather
   // than constructed from an id, so a routing change on their side
   // does not silently produce dead links on ours.
-  turoLink    String?
+  turoLink String?
 
   // Best-effort link back to the order this email is about: an exact
   // join on the reservation id for booking mail, and a name + vehicle
@@ -1078,13 +1080,13 @@ model InboundEmail {
   // when the email predates the order's import or when the match was
   // ambiguous -- showing a message against the wrong trip is worse
   // than showing it against none.
-  orderId     String?
+  orderId String?
 
-  createdAt   DateTime         @default(now())
+  createdAt DateTime @default(now())
 
-  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  order       Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  vehicle     Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  order     Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  vehicle   Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, messageId])
   @@index([workspaceId, receivedAt])
@@ -1096,15 +1098,15 @@ model InboundEmail {
 }
 
 model AssistantThread {
-  id          String             @id @default(cuid())
+  id          String   @id @default(cuid())
   workspaceId String
   userId      String
   title       String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  messages    AssistantMessage[]
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages  AssistantMessage[]
 
   @@index([workspaceId, userId, updatedAt])
 }
@@ -1125,7 +1127,7 @@ model AssistantMessage {
   context   String?
   createdAt DateTime             @default(now())
 
-  thread    AssistantThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  thread AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@index([threadId, createdAt])
 }
@@ -1141,27 +1143,27 @@ enum AssistantAlertSeverity {
 // plain code means an alert never fires because of a hallucination, and
 // never fails to fire because the model was having an off day.
 model AssistantAlert {
-  id          String                 @id @default(cuid())
+  id          String @id @default(cuid())
   workspaceId String
 
   // Stable identity for a given real-world condition, e.g.
   // "conflict:<orderId>" or "gmail_sync_failed". Lets a repeated scan
   // update the existing alert instead of stacking duplicates.
-  dedupeKey   String
-  severity    AssistantAlertSeverity @default(INFO)
-  title       String
-  body        String
+  dedupeKey String
+  severity  AssistantAlertSeverity @default(INFO)
+  title     String
+  body      String
   // Deep link into the app, e.g. /orders?q=<reservation>.
-  href        String?
+  href      String?
 
-  resolvedAt      DateTime?
-  acknowledgedAt  DateTime?
-  notifiedAt      DateTime?
+  resolvedAt     DateTime?
+  acknowledgedAt DateTime?
+  notifiedAt     DateTime?
 
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  workspace   Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, dedupeKey])
   @@index([workspaceId, resolvedAt, severity])
@@ -1195,7 +1197,7 @@ model AgentToken {
   createdAt   DateTime  @default(now())
   createdBy   String
 
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
 }
@@ -1235,7 +1237,7 @@ model TuroConversationMessage {
   source        String?
   createdAt     DateTime             @default(now())
 
-  workspace     Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, reservationId, externalId])
   @@index([workspaceId, reservationId, sentAt])
@@ -1275,25 +1277,25 @@ model MessageTemplate {
 /// server's own reading of those fields, taken from the bytes rather than
 /// from what the phone claimed.
 model InspectionSession {
-  workspaceId String?
-  id          String  @id @default(cuid())
+  workspaceId      String?
+  id               String         @id @default(cuid())
   /// The id the phone generated for its local archive. Uploads are idempotent
   /// on this: a retry after a dropped connection resumes the same session
   /// instead of starting a second one halfway through a walk-around.
-  clientSessionId String @unique
-  vehicleId    String?
-  orderId      String?
+  clientSessionId  String         @unique
+  vehicleId        String?
+  orderId          String?
   /// What the photographer typed. Kept even when `vehicleId` resolves, because
   /// it is what they saw on the plate at the time.
-  vehicleLabel String
-  staffId      String?
-  staffLabel   String
-  kind         InspectionKind
-  deviceModel  String
-  appVersion   String
-  startedAt    DateTime
+  vehicleLabel     String
+  staffId          String?
+  staffLabel       String
+  kind             InspectionKind
+  deviceModel      String
+  appVersion       String
+  startedAt        DateTime
   /// IANA zone the phone was in, so a local capture time can be placed.
-  timeZone     String
+  timeZone         String
   /// How much of the car's surface the phone reckons was photographed.
   ///
   /// ⚠️ Stored as a claim, not a finding. Coverage is computed from camera
@@ -1304,9 +1306,9 @@ model InspectionSession {
   coverageFraction Float?
   /// Set only once the shot list is complete. An incomplete session is not
   /// evidence of anything and must not read as one.
-  completedAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  completedAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   workspace Workspace?       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   vehicle   Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
@@ -1367,7 +1369,7 @@ model InspectionShot {
   /// is user-settable, so EXIF times are only as good as the device that wrote
   /// them; this is the one cross-check the server can make alone.
   clockSkewSeconds Int?
-  receivedAt       DateTime @default(now())
+  receivedAt       DateTime  @default(now())
 
   // --- What the phone reported ----------------------------------------------
   //
@@ -1655,4 +1657,34 @@ model NotifyDelivery {
   @@index([openId, createdAt])
   @@index([channelId, createdAt])
   @@index([expiresAt])
+}
+
+/// A note pinned to one vehicle over a run of days on the calendar.
+///
+/// Not a price, not a booking and not a block: it writes nothing
+/// anywhere else and takes no dates out of sale. It puts words on the
+/// grid where the operator reads them -- "winter tyres on the 3rd",
+/// "insurance lapses" -- which previously could only be done by
+/// creating a fake order, and a fake order pollutes every revenue
+/// figure it touches.
+model CalendarNote {
+  workspaceId String?
+  id          String     @id @default(cuid())
+  vehicleId   String
+  /// Inclusive at both ends. A note covers whole days, not instants:
+  /// it is read against the day columns, and storing a timestamp
+  /// would make the band's edges depend on the reader's timezone.
+  startDate   DateTime
+  endDate     DateTime
+  text        String
+  isArchived  Boolean    @default(false)
+  createdBy   String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  vehicle     Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([vehicleId, startDate, endDate])
+  @@index([workspaceId, isArchived])
 }

@@ -70,6 +70,31 @@ export const calendarMessages = {
       sixWeeks: "6 Weeks",
       day: "Day",
       scrubberLabel: "Scroll to a date",
+      selectionCount: (days: number) => `${days} day${days === 1 ? "" : "s"} selected`,
+      selectionClear: "Cancel",
+      selectionHint:
+        "Click a day to pick it, click another to fill the span, click a picked day to drop it.",
+      selectionCreateOrder: "Create order",
+      selectionNeedsRun:
+        "Pick an unbroken run of days \u2014 a selection with gaps has no single return date.",
+      noteLabel: "Note",
+      notePlaceholder: "e.g. winter tyres fitted",
+      noteSaveAction: "Add note",
+      noteSavingAction: "Saving...",
+      noteSaveFailed: "That note could not be saved. Please try again.",
+      noteDeleteConfirm: "Delete this calendar note?",
+      noteDeleteHint: "Click to delete this note",
+      bulkModeEnter: "Select",
+      bulkModeExit: "Done",
+      bulkModeHint: "Click bookings to add them to the selection",
+      bulkSelectedCount: (count: number) => `${count} selected`,
+      bulkSyncAction: "Sync to owner shares",
+      bulkSyncing: "Syncing...",
+      bulkSyncResult: (synced: number, skipped: number) =>
+        skipped > 0
+          ? `Synced ${synced}; ${skipped} skipped (no owner assigned, or failed).`
+          : `Synced ${synced} order${synced === 1 ? "" : "s"} to owner shares.`,
+      bulkSyncFailed: "The bulk sync failed. Please try again.",
       panEarlier: (days: number) => `\u2190 Back ${days} day${days === 1 ? "" : "s"}`,
       panLater: (days: number) => `${days} day${days === 1 ? "" : "s"} forward \u2192`,
       panByDrag: (days: number) =>
@@ -179,6 +204,29 @@ export const calendarMessages = {
       sixWeeks: "六周",
       day: "日",
       scrubberLabel: "滑动跳转日期",
+      selectionCount: (days: number) => `已选 ${days} 天`,
+      selectionClear: "取消",
+      selectionHint: "点一天选中它，再点另一天填满中间，点已选中的那天可取消。",
+      selectionCreateOrder: "新建订单",
+      selectionNeedsRun: "请选连续的日期——中间有空缺就没有唯一的还车日。",
+      noteLabel: "备注",
+      notePlaceholder: "例如：换了冬季胎",
+      noteSaveAction: "添加备注",
+      noteSavingAction: "保存中…",
+      noteSaveFailed: "备注没能保存，请重试。",
+      noteDeleteConfirm: "删除这条日历备注？",
+      noteDeleteHint: "点击删除这条备注",
+      bulkModeEnter: "选择",
+      bulkModeExit: "完成",
+      bulkModeHint: "点击订单将其加入选择",
+      bulkSelectedCount: (count: number) => `已选 ${count} 单`,
+      bulkSyncAction: "同步给车主",
+      bulkSyncing: "同步中…",
+      bulkSyncResult: (synced: number, skipped: number) =>
+        skipped > 0
+          ? `已同步 ${synced} 单，跳过 ${skipped} 单（没有分配车主，或同步失败）。`
+          : `已同步 ${synced} 单给车主共享。`,
+      bulkSyncFailed: "批量同步失败，请重试。",
       panEarlier: (days: number) => `\u2190 回退 ${days} 天`,
       panLater: (days: number) => `前进 ${days} 天 \u2192`,
       panByDrag: (days: number) =>

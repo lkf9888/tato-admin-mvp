@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.84.0 - 2026-09-21
+
+### Pick days on the grid, and do something with them
+
+Click a day on a car's row to pick it, click another to fill the span between, click a picked day to drop it again. The selection is a set rather than a range, so it can have holes, and it belongs to exactly one car — a selection spanning two rows has no single answer to "which car is this about".
+
+It fires on click, not pointer-down, so a pan that merely starts on a day does not pick it, and the drag handler already swallows the click after a real drag.
+
+Three things live on the selection:
+
+- **Create order** seeds the manual-order dialog with the car and the picked dates — return on the morning after the last day picked, because picking the 3rd to the 5th means three days, not two. It insists on an unbroken run: a selection with gaps has no single return date, and filling the gaps would book days you deliberately skipped.
+- **A note.** Free text over that stretch of that car's calendar — "winter tyres fitted", "insurance lapses" — drawn as a grey band along the bottom of the row, click to delete. It is not a price, not a booking and not a block: it writes nothing anywhere else. Previously the only way to put words on the calendar was to create a fake order, and a fake order pollutes every revenue figure it touches. New `CalendarNote` model and `/api/calendar/notes`.
+- **Cancel**, and Escape does the same.
+
+### Select several bookings and act on all of them
+
+A **Select** toggle turns booking bars into checkboxes instead of doors, and the selected ones can be pushed to their owners' ledgers in one go. After a CSV import every trip on an owned car needs the same button pressed, and there can be dozens of them.
+
+Partial success is reported rather than treated as failure: a selection will usually contain a car with no owner assigned, and failing the whole batch for it would mean hunting for that car and deselecting it before anything happened at all.
+
+### Search dims the other bookings instead of removing them
+
+Searching used to delete non-matching bars from the rows that survived the filter. That leaves gaps that read as "this car is free then", which is the one thing a calendar must never say wrongly. Matching bars now stay lit and the rest drop to 15% — the row still shows its whole week.
+
+### Fixes
+
+- **The calendar was fetching notes in an endless loop.** `rangeEndExclusive` was a fresh `Date` on every render, so any effect listing it re-ran forever and its own `setState` fed the next render. Memoised, and the fetch is now keyed on the date strings it actually sends.
+- **The first click of a selection broke the second one.** The gesture hint disappeared once something was picked, taking its line of height with it and pulling the grid up — so "click the first day, click the last" landed the second click on the row above. The hint no longer toggles.
+
+
 ## v0.83.0 - 2026-09-21
 
 ### The calendar is one long strip you scroll, not a page you turn

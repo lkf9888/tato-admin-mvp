@@ -7,6 +7,7 @@ import { type EditableOrder, OrderDetailModal } from "@/components/order-detail-
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { VehicleEditDialog, type VehicleEditDialogVehicle } from "@/components/vehicle-edit-dialog";
+import { RecurringOrderDialog } from "@/components/recurring-order-dialog";
 import { VehicleMonthCalendar } from "@/components/vehicle-month-calendar";
 import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-button";
 import {
@@ -602,6 +603,7 @@ export function CalendarView({
   const [rowSort, setRowSort] = useState<RowSort>("plate");
   const [isAddVehicleOpen, setIsAddVehicleOpen] = useState(false);
   const [monthCalendarFor, setMonthCalendarFor] = useState<string | null>(null);
+  const [isRecurringOpen, setIsRecurringOpen] = useState(false);
   // --- Searching every trip, not just the loaded ones -----------------
   const [searchHits, setSearchHits] = useState<CalendarOrder[]>([]);
   const [searchTruncated, setSearchTruncated] = useState(false);
@@ -2043,6 +2045,16 @@ export function CalendarView({
               </button>
             ) : null}
             {!readOnly ? (
+              <button
+                type="button"
+                onClick={() => setIsRecurringOpen(true)}
+                disabled={vehicleOptions.length === 0}
+                className={cn(secondaryActionClass, mobileControlsOpen ? "" : "max-lg:hidden")}
+              >
+                {calendarMessages.recurringAction}
+              </button>
+            ) : null}
+            {!readOnly ? (
               <VehicleEditDialog
                 locale={locale}
                 owners={ownerOptions}
@@ -2357,6 +2369,18 @@ export function CalendarView({
         >
           {bulkMode ? calendarMessages.bulkModeHint : calendarMessages.selectionHint}
         </p>
+      ) : null}
+
+      {isRecurringOpen ? (
+        <RecurringOrderDialog
+          locale={locale}
+          labels={calendarMessages.recurring}
+          vehicleOptions={vehicleOptions}
+          defaultVehicleId={
+            selectedVehicleId !== "all" ? selectedVehicleId : sortedVehicles[0]?.id
+          }
+          onClose={() => setIsRecurringOpen(false)}
+        />
       ) : null}
 
       {monthCalendarFor ? (

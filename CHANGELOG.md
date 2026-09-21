@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.87.0 - 2026-09-21
+
+### Recurring orders
+
+**Recurring order** in the calendar toolbar books a monthly renter in one go. Each cycle is one calendar month starting where the previous one ended — not thirty days, and not the same numbered day when the month is too short for it. A rental beginning on the 31st runs 31 Jan → 28 Feb → **31 Mar** → 30 Apr → 31 May: clamped where the month demands it, and back on the anchor day everywhere else, rather than drifting permanently onto the 28th.
+
+The preview is the feature. This is the one button in the app that writes twelve orders, so the server works out every date and every collision and reports them without writing anything; the list shows each cycle, with the colliding renter named in red where there is one. Nothing is created until the operator has seen it, and when it is, all the cycles go in one transaction — half a series is worse than none.
+
+### A conflict now says what it is a conflict with
+
+Saving a trip that overlaps another on the same car has always been allowed (a fleet really does double-book and sort it out afterwards, and the grid paints both red). What it never did was say *which* trip, which sent the operator back to the calendar to hunt for something the server had already found. Creating, editing or duplicating an order now reports the trips it overlaps, by renter and dates, in the panel.
+
+### Duplicate
+
+The same trip again, starting when this one ends and running the same length — for the renter who extends and the regular who comes back. Who and how much carry over; deposit, cleaning fee, payment method and contract number do not, because copying those would claim money had changed hands for a trip that has not happened. A copy of a Turo trip is filed as offline, since it has no counterpart on Turo for the next CSV import to reconcile against.
+
+### Payment schedule
+
+A long rental is not one payment, and a single total cannot answer the only question anyone asks halfway through it. Orders now carry instalments — amount, date paid, payer, method — with a live badge reading **Outstanding $X · Paid $Y**, or **Paid off**. Outstanding is measured against the trip's own price, not the sum of the rows, so an empty schedule reads as everything owed rather than nothing.
+
+### Trash
+
+Deleting an order here was always a soft delete — `isArchived` set, the row and its files kept. Nothing ever showed that, so from the outside a mis-click was indistinguishable from a permanent loss. **Trash** lists what has been deleted, with dates, price and when it went, and puts any of it back. A restored trip returns as *completed* if its return date has passed and *booked* if it has not, rather than coming back as the cancelled thing it was turned into on the way out.
+
+### Share one file with someone who has no account
+
+Damage photos have to reach renters, adjusters and owners. The alternative people actually use is downloading the file and sending it by WeChat, which severs it from the trip it belongs to. Any attachment can now mint a link that opens without signing in. The token is 256 bits and per file: sharing one photo shares one photo, not the order, not the car, not the other files on it. Minting twice returns the same link rather than quietly breaking one already sent, **Stop sharing** revokes it immediately, and the served file carries `noindex` and no caching.
+
+### The order panel is a bottom sheet on phones
+
+It is a tall panel — fourteen editable fields, a fee breakdown, attachments, and now a payment schedule — and as a centred box on a 375px screen it was a small window onto a long document with dead space above and below. It now fills the width, anchors to the bottom, and takes 92% of the height, with its controls where a thumb reaches. Unchanged on desktop.
+
+### Fixes
+
+- **The Trash page 500'd on first load.** Its labels were handed from a Server Component to a Client one with a function among them, which React cannot serialise across that boundary. The label is a template string now.
+
+
 ## v0.86.0 - 2026-09-21
 
 ### Search finds trips the calendar has never loaded

@@ -195,6 +195,7 @@ model Workspace {
   assistantAlerts               AssistantAlert[]
   messageTemplates              MessageTemplate[]
   calendarNotes                 CalendarNote[]
+  orderPayments                 OrderPayment[]
   inspectionSessions            InspectionSession[]
   inspectionShots               InspectionShot[]
 }
@@ -323,6 +324,10 @@ model Order {
   isArchived             Boolean                 @default(false)
   hasConflict            Boolean                 @default(false)
   ownerLedgerSyncedAt    DateTime?
+  /// Set on every order created together as a repeating booking, so a
+  /// monthly renter's twelve trips can be found and cancelled as one
+  /// thing rather than twelve unrelated rows.
+  recurringSeriesId      String?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   workspace              Workspace?              @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
@@ -335,6 +340,7 @@ model Order {
   contractEnvelopes      ContractEnvelope[]
   inboundEmails          InboundEmail[]
   inspectionSessions     InspectionSession[]
+  orderPayments          OrderPayment[]
 
   @@index([workspaceId])
   @@index([workspaceId, isArchived])
@@ -552,6 +558,11 @@ model OrderAttachment {
   contentType String?
   size        Int?
   isArchived  Boolean             @default(false)
+  /// Minted on demand so one photo can be sent to a renter or an
+  /// adjuster without handing over an account. Null means the file has
+  /// never been shared; clearing it revokes every link already sent.
+  shareToken  String?             @unique
+  sharedAt    DateTime?
   uploadedAt  DateTime            @default(now())
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
@@ -1687,4 +1698,30 @@ model CalendarNote {
   @@index([workspaceId])
   @@index([vehicleId, startDate, endDate])
   @@index([workspaceId, isArchived])
+}
+
+/// One instalment against an order.
+///
+/// A long rental is not one payment, and recording it as a single
+/// `totalPrice` loses the only question anybody asks about it midway
+/// through: how much is still owed. Rows here are the answer.
+model OrderPayment {
+  workspaceId String?
+  id          String     @id @default(cuid())
+  orderId     String
+  amount      Float
+  /// Null while the instalment is still expected. Setting it is what
+  /// "this one has been paid" means.
+  paidAt      DateTime?
+  payer       String?
+  method      String?
+  note        String?
+  createdBy   String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  order       Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([orderId])
 }

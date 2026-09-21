@@ -138,7 +138,28 @@ function labels(locale: Locale) {
         cancel: "取消",
         delete: "删除订单",
         deleting: "删除中...",
-        deleteConfirm: "确认要从日历中删除这条订单吗？照片和文件会保留。",
+        deleteConfirm: "确认要从日历中删除这条订单吗？照片和文件会保留，可以在回收站里恢复。",
+        duplicate: "复制订单",
+        duplicating: "复制中…",
+        duplicateHint: "在这一单结束之后新建一张同样长度的订单",
+        duplicateFailed: "复制失败，请重试。",
+        duplicated: "已复制：新订单从本单结束时开始。",
+        conflictHeading: "这段时间该车已有订单：",
+        conflictRow: (renter: string, range: string) => `${renter} · ${range}`,
+        payments: "分期付款",
+        paymentsAdd: "+ 添加一笔",
+        paymentsAmount: "金额",
+        paymentsPaidAt: "付款日",
+        paymentsPayer: "付款人",
+        paymentsMethod: "方式",
+        paymentsRemove: "删除",
+        paymentsSave: "保存付款计划",
+        paymentsSaving: "保存中…",
+        paymentsSaved: "付款计划已保存。",
+        paymentsFailed: "付款计划没能保存，请重试。",
+        paymentsTotalPaid: "已付",
+        paymentsRemaining: "未付",
+        paymentsSettled: "已付清",
         saveError: "订单暂时无法保存，请检查必填项后重试。",
         deleteError: "订单暂时无法删除，请稍后再试。",
         validationError: "请填写租客、车辆与正确的取还车时间。",
@@ -192,7 +213,29 @@ function labels(locale: Locale) {
         cancel: "Cancel",
         delete: "Delete order",
         deleting: "Deleting...",
-        deleteConfirm: "Delete this order from the calendar? Photos and files will be preserved.",
+        deleteConfirm:
+          "Delete this order from the calendar? Photos and files are preserved, and you can restore it from Trash.",
+        duplicate: "Duplicate",
+        duplicating: "Duplicating...",
+        duplicateHint: "Create the same trip again, starting when this one ends",
+        duplicateFailed: "That order could not be duplicated. Please try again.",
+        duplicated: "Duplicated: the new trip starts when this one ends.",
+        conflictHeading: "This car already has trips over those dates:",
+        conflictRow: (renter: string, range: string) => `${renter} · ${range}`,
+        payments: "Payment schedule",
+        paymentsAdd: "+ Add instalment",
+        paymentsAmount: "Amount",
+        paymentsPaidAt: "Paid on",
+        paymentsPayer: "Payer",
+        paymentsMethod: "Method",
+        paymentsRemove: "Remove",
+        paymentsSave: "Save schedule",
+        paymentsSaving: "Saving...",
+        paymentsSaved: "Payment schedule saved.",
+        paymentsFailed: "The schedule could not be saved. Please try again.",
+        paymentsTotalPaid: "Paid",
+        paymentsRemaining: "Outstanding",
+        paymentsSettled: "Paid off",
         saveError: "We could not save this order. Check the required fields and try again.",
         deleteError: "We could not delete this order right now. Please try again.",
         validationError: "Complete renter, vehicle, and a valid pickup/return window.",
@@ -380,6 +423,19 @@ export function OrderDetailModal({
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncingOwner, setIsSyncingOwner] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  /** Trips already on this car over the dates just saved. Reported,
+   *  never refused -- see the API note; the point is to name what the
+   *  red bar is about instead of leaving the operator to hunt. */
+  const [conflicts, setConflicts] = useState<
+    Array<{ id: string; renterName: string; pickupDatetime: string; returnDatetime: string }>
+  >([]);
+  const [payments, setPayments] = useState<
+    Array<{ amount: string; paidAt: string; payer: string; method: string }>
+  >([]);
+  const [paymentsLoaded, setPaymentsLoaded] = useState(false);
+  const [isSavingPayments, setIsSavingPayments] = useState(false);
 
   // Which single field is unlocked right now, if any -- only one at a
   // time, so `draft` never holds more than one field's worth of
@@ -479,7 +535,16 @@ export function OrderDetailModal({
         }),
       });
       const payload = (await response.json().catch(() => null)) as
-        | { order?: EditableOrder; error?: string }
+        | {
+            order?: EditableOrder;
+            error?: string;
+            conflicts?: Array<{
+              id: string;
+              renterName: string;
+              pickupDatetime: string;
+              returnDatetime: string;
+            }>;
+          }
         | null;
 
       if (!response.ok || !payload?.order) {
@@ -493,6 +558,10 @@ export function OrderDetailModal({
 
       setCurrentOrder(payload.order);
       setDraft(buildDraft(payload.order));
+      // What the saved dates now collide with. The save succeeded --
+      // overlaps are allowed and the grid paints both red -- so this
+      // is a statement, not an error.
+      setConflicts(payload.conflicts ?? []);
       onSaved?.(payload.order);
       router.refresh();
       return payload.order;
@@ -606,6 +675,116 @@ export function OrderDetailModal({
     }
   };
 
+  // Instalments load once, when the panel opens on an order. Not with
+  // the order itself: most trips are a single payment and would pay
+  // for a join they never use.
+  useEffect(() => {
+    if (readOnly || !currentOrder.id) return;
+    let cancelled = false;
+    setPaymentsLoaded(false);
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/orders/${currentOrder.id}/payments`);
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          payments?: Array<{
+            amount: number;
+            paidAt: string | null;
+            payer: string;
+            method: string;
+          }>;
+        };
+        if (cancelled) return;
+        setPayments(
+          (data.payments ?? []).map((payment) => ({
+            amount: String(payment.amount),
+            paidAt: payment.paidAt ?? "",
+            payer: payment.payer,
+            method: payment.method,
+          })),
+        );
+      } finally {
+        if (!cancelled) setPaymentsLoaded(true);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentOrder.id, readOnly]);
+
+  const paidTotal = payments.reduce(
+    (sum, payment) => (payment.paidAt ? sum + (Number(payment.amount) || 0) : sum),
+    0,
+  );
+  const scheduledTotal = payments.reduce(
+    (sum, payment) => sum + (Number(payment.amount) || 0),
+    0,
+  );
+  // Against the trip's own price when it has one, because that is the
+  // number the operator is trying to collect -- not the sum of the
+  // rows, which would always show zero outstanding.
+  const owedAgainst = currentOrder.totalPrice ?? scheduledTotal;
+  const outstanding = Math.max(owedAgainst - paidTotal, 0);
+
+  const savePayments = async () => {
+    if (isSavingPayments) return;
+    setIsSavingPayments(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/orders/${currentOrder.id}/payments`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payments: payments
+            // A blank row is somebody who clicked Add and changed
+            // their mind; dropping it is kinder than an error.
+            .filter((payment) => payment.amount.trim() !== "")
+            .map((payment) => ({
+              amount: Number(payment.amount),
+              paidAt: payment.paidAt || null,
+              payer: payment.payer,
+              method: payment.method,
+            })),
+        }),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      setNotice(t.paymentsSaved);
+    } catch {
+      setError(t.paymentsFailed);
+    } finally {
+      setIsSavingPayments(false);
+    }
+  };
+
+  const duplicateOrder = async () => {
+    if (isDuplicating) return;
+    setIsDuplicating(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/orders/${currentOrder.id}/duplicate`, {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      const data = (await response.json()) as {
+        conflicts?: Array<{
+          id: string;
+          renterName: string;
+          pickupDatetime: string;
+          returnDatetime: string;
+        }>;
+      };
+      setConflicts(data.conflicts ?? []);
+      setNotice(t.duplicated);
+      router.refresh();
+    } catch {
+      setError(t.duplicateFailed);
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
+
   const deleteOrder = async () => {
     if (readOnly || isDeleting) return;
     if (!window.confirm(t.deleteConfirm)) return;
@@ -637,13 +816,28 @@ export function OrderDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--ink)]/35 p-3 backdrop-blur-sm sm:p-4"
+      /* A bottom sheet on a phone, a centred dialog on a desktop.
+         
+         This panel is tall -- fourteen editable fields, a fee
+         breakdown, attachments and now a payment schedule -- and as a
+         centred box on a 375px screen it was a small window into a
+         long document, floating with dead space above and below it.
+         Anchoring it to the bottom gives it the full height and puts
+         its top edge where a thumb can reach. */
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-[var(--ink)]/35 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="max-h-[calc(100vh-1.5rem)] w-[min(58rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]"
+        className={cn(
+          "overflow-y-auto border border-[rgba(17,19,24,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]",
+          // Phone: full width, rounded top only, up to 92vh, with room
+          // under it for the home indicator.
+          "max-h-[92vh] w-full rounded-t-2xl pb-[env(safe-area-inset-bottom)]",
+          // Desktop: unchanged.
+          "sm:max-h-[calc(100vh-1.5rem)] sm:w-[min(58rem,calc(100vw-1.5rem))] sm:rounded-lg sm:pb-0",
+        )}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="sticky top-0 z-10 border-b border-[var(--line)] bg-[rgba(255,255,255,0.94)] px-4 py-3 backdrop-blur">
@@ -1094,11 +1288,171 @@ export function OrderDetailModal({
             </p>
           ) : null}
 
+          {notice ? (
+            <p className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800">
+              {notice}
+            </p>
+          ) : null}
+
+          {/* Names what the red bar is about. Without it, "Conflict"
+              sends the operator back to the calendar to find a trip
+              the server had already identified. */}
+          {conflicts.length > 0 ? (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+              <p className="font-semibold">{t.conflictHeading}</p>
+              <ul className="mt-1 space-y-0.5">
+                {conflicts.map((conflict) => (
+                  <li key={conflict.id}>
+                    {t.conflictRow(
+                      conflict.renterName,
+                      `${formatDateTime(conflict.pickupDatetime, locale)} → ${formatDateTime(
+                        conflict.returnDatetime,
+                        locale,
+                      )}`,
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* A long rental is not one payment, and a single totalPrice
+              cannot answer the only question anybody asks midway
+              through it: how much is still owed. */}
+          {!readOnly && paymentsLoaded ? (
+            <section className="mt-4 rounded-md border border-[var(--line)] bg-white/70 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-[12px] font-semibold text-[var(--ink)]">{t.payments}</h3>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                    outstanding <= 0.005
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-900",
+                  )}
+                >
+                  {outstanding <= 0.005
+                    ? t.paymentsSettled
+                    : `${t.paymentsRemaining} ${formatCurrency(outstanding, locale)}`}
+                  {" · "}
+                  {t.paymentsTotalPaid} {formatCurrency(paidTotal, locale)}
+                </span>
+              </div>
+
+              {payments.length > 0 ? (
+                <div className="mt-2 grid gap-1.5">
+                  {payments.map((payment, index) => (
+                    <div
+                      key={index}
+                      className="grid grid-cols-2 gap-1.5 sm:grid-cols-[7rem_9rem_1fr_1fr_auto]"
+                    >
+                      <input
+                        value={payment.amount}
+                        inputMode="decimal"
+                        placeholder={t.paymentsAmount}
+                        aria-label={t.paymentsAmount}
+                        onChange={(event) =>
+                          setPayments((rows) =>
+                            rows.map((row, position) =>
+                              position === index ? { ...row, amount: event.target.value } : row,
+                            ),
+                          )
+                        }
+                        className="h-8 rounded-md border border-[var(--line)] bg-white px-2 text-[12px] tabular-nums outline-none focus:border-[var(--accent)]"
+                      />
+                      <input
+                        type="date"
+                        value={payment.paidAt}
+                        aria-label={t.paymentsPaidAt}
+                        onChange={(event) =>
+                          setPayments((rows) =>
+                            rows.map((row, position) =>
+                              position === index ? { ...row, paidAt: event.target.value } : row,
+                            ),
+                          )
+                        }
+                        className="h-8 rounded-md border border-[var(--line)] bg-white px-2 text-[12px] outline-none focus:border-[var(--accent)]"
+                      />
+                      <input
+                        value={payment.payer}
+                        placeholder={t.paymentsPayer}
+                        aria-label={t.paymentsPayer}
+                        onChange={(event) =>
+                          setPayments((rows) =>
+                            rows.map((row, position) =>
+                              position === index ? { ...row, payer: event.target.value } : row,
+                            ),
+                          )
+                        }
+                        className="h-8 rounded-md border border-[var(--line)] bg-white px-2 text-[12px] outline-none focus:border-[var(--accent)]"
+                      />
+                      <input
+                        value={payment.method}
+                        placeholder={t.paymentsMethod}
+                        aria-label={t.paymentsMethod}
+                        onChange={(event) =>
+                          setPayments((rows) =>
+                            rows.map((row, position) =>
+                              position === index ? { ...row, method: event.target.value } : row,
+                            ),
+                          )
+                        }
+                        className="h-8 rounded-md border border-[var(--line)] bg-white px-2 text-[12px] outline-none focus:border-[var(--accent)]"
+                      />
+                      <button
+                        type="button"
+                        aria-label={t.paymentsRemove}
+                        onClick={() =>
+                          setPayments((rows) => rows.filter((_, position) => position !== index))
+                        }
+                        className="h-8 rounded-md border border-[var(--line)] bg-white px-2 text-[12px] text-[color:var(--ink-soft)] transition hover:border-rose-300 hover:text-rose-600"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPayments((rows) => [
+                      ...rows,
+                      { amount: "", paidAt: "", payer: "", method: "" },
+                    ])
+                  }
+                  className="inline-flex h-8 items-center rounded-md border border-[var(--line)] bg-white px-2.5 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                >
+                  {t.paymentsAdd}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void savePayments()}
+                  disabled={isSavingPayments}
+                  className="inline-flex h-8 items-center rounded-md border border-[var(--line)] bg-white px-2.5 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+                >
+                  {isSavingPayments ? t.paymentsSaving : t.paymentsSave}
+                </button>
+              </div>
+            </section>
+          ) : null}
+
           {/* Delete is guarded by its own confirm dialog, which is the
               speed bump -- it no longer needs a second one borrowed
               from a global edit mode that does not exist anymore. */}
           {!readOnly ? (
-            <div className="mt-4 flex justify-start border-t border-[var(--line)] pt-4">
+            <div className="mt-4 flex flex-wrap justify-start gap-2 border-t border-[var(--line)] pt-4">
+              <button
+                type="button"
+                onClick={() => void duplicateOrder()}
+                disabled={isDuplicating || isSaving}
+                title={t.duplicateHint}
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDuplicating ? t.duplicating : t.duplicate}
+              </button>
               <button
                 type="button"
                 onClick={deleteOrder}

@@ -7,7 +7,7 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { resolveOrderCleaningFees } from "@/lib/owner-commission";
 import { getOrderFeeLines } from "@/lib/ledger-policy";
-import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
+import { findConflictingOrders, logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { roundCurrencyAmount } from "@/lib/utils";
 
@@ -239,7 +239,23 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
 
     revalidateOrderSurfaces();
     const refreshed = await fetchOrderForResponse(order.id, workspace.id);
-    return NextResponse.json({ order: buildResponseOrder(refreshed) });
+    const conflicts = await findConflictingOrders({
+      vehicleId: order.vehicleId,
+      pickupDatetime: order.pickupDatetime,
+      returnDatetime: order.returnDatetime,
+      excludeOrderId: order.id,
+    });
+    return NextResponse.json({
+      order: buildResponseOrder(refreshed),
+      // See the offline route: reported, not refused.
+      conflicts: conflicts.map((conflict) => ({
+        id: conflict.id,
+        renterName: conflict.renterName,
+        pickupDatetime: conflict.pickupDatetime.toISOString(),
+        returnDatetime: conflict.returnDatetime.toISOString(),
+        source: conflict.source,
+      })),
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });

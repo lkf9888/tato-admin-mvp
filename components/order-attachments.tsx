@@ -16,6 +16,8 @@ type OrderAttachment = {
   contentType: string | null;
   size: number | null;
   uploadedAt: string;
+  /** Set once somebody has minted a public link for this file. */
+  shareToken?: string | null;
 };
 
 function labels(locale: Locale) {
@@ -33,9 +35,22 @@ function labels(locale: Locale) {
         delete: "删除",
         deleteConfirm: "确定隐藏这个附件吗？记录会保留在后台。",
         error: "附件暂时无法处理，请稍后再试。",
+        share: "生成分享链接",
+        shareCopy: "复制链接",
+        shareCopied: "链接已复制",
+        shareRevoke: "取消分享",
+        shareRevokeConfirm: "取消分享后，已经发出去的链接会立即失效。确定吗？",
+        shareHint: "任何拿到链接的人都能打开这个文件，不需要登录。",
       }
     : {
         title: "Photos, videos, and contract files",
+        share: "Create share link",
+        shareCopy: "Copy link",
+        shareCopied: "Link copied",
+        shareRevoke: "Stop sharing",
+        shareRevokeConfirm:
+          "Stop sharing this file? Any link already sent stops working immediately.",
+        shareHint: "Anyone with the link can open this file, without signing in.",
         photos: "Photos / videos",
         documents: "Contract files",
         uploadPhotos: "Upload photos or videos",
@@ -82,6 +97,60 @@ export function OrderAttachments({
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const docInputRef = useRef<HTMLInputElement | null>(null);
   const [attachments, setAttachments] = useState<OrderAttachment[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  /** Mint a link, or hand back the one this file already has. */
+  async function shareAttachment(attachment: OrderAttachment) {
+    try {
+      const response = await fetch(
+        `/api/orders/${orderId}/attachments/${attachment.id}/share`,
+        { method: "POST" },
+      );
+      if (!response.ok) return;
+      const data = (await response.json()) as { token?: string };
+      if (!data.token) return;
+      setAttachments((current) =>
+        current.map((item) =>
+          item.id === attachment.id ? { ...item, shareToken: data.token } : item,
+        ),
+      );
+      await copyShareLink(data.token, attachment.id);
+    } catch {
+      // The file is still there and still openable from here; a failed
+      // link is not worth tearing the panel down over.
+    }
+  }
+
+  async function copyShareLink(token: string, attachmentId: string) {
+    const url = `${window.location.origin}/api/shared-file/${token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(attachmentId);
+      window.setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // Clipboard is blocked in plenty of contexts. Showing the URL
+      // beats silently doing nothing.
+      window.prompt(copy.shareCopy, url);
+    }
+  }
+
+  async function revokeShare(attachment: OrderAttachment) {
+    if (!window.confirm(copy.shareRevokeConfirm)) return;
+    try {
+      const response = await fetch(
+        `/api/orders/${orderId}/attachments/${attachment.id}/share`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) return;
+      setAttachments((current) =>
+        current.map((item) =>
+          item.id === attachment.id ? { ...item, shareToken: null } : item,
+        ),
+      );
+    } catch {
+      // Same reasoning as above.
+    }
+  }
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<AttachmentKind | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +279,11 @@ export function OrderAttachments({
           locale={locale}
           deleteLabel={copy.delete}
           onDelete={deleteAttachment}
+          shareLabels={copy}
+          copiedId={copiedId}
+          onShare={shareAttachment}
+          onCopy={copyShareLink}
+          onRevoke={revokeShare}
         />
         <AttachmentGroup
           title={copy.documents}
@@ -218,6 +292,11 @@ export function OrderAttachments({
           locale={locale}
           deleteLabel={copy.delete}
           onDelete={deleteAttachment}
+          shareLabels={copy}
+          copiedId={copiedId}
+          onShare={shareAttachment}
+          onCopy={copyShareLink}
+          onRevoke={revokeShare}
         />
       </div>
     </section>
@@ -231,6 +310,11 @@ function AttachmentGroup({
   locale,
   deleteLabel,
   onDelete,
+  shareLabels,
+  copiedId,
+  onShare,
+  onCopy,
+  onRevoke,
 }: {
   title: string;
   empty: string;
@@ -238,6 +322,17 @@ function AttachmentGroup({
   locale: Locale;
   deleteLabel: string;
   onDelete: (attachment: OrderAttachment) => void;
+  shareLabels: {
+    share: string;
+    shareCopy: string;
+    shareCopied: string;
+    shareRevoke: string;
+    shareHint: string;
+  };
+  copiedId: string | null;
+  onShare: (attachment: OrderAttachment) => void;
+  onCopy: (token: string, attachmentId: string) => void;
+  onRevoke: (attachment: OrderAttachment) => void;
 }) {
   return (
     <div className="rounded-lg bg-[var(--surface-muted)] p-3">
@@ -276,13 +371,48 @@ function AttachmentGroup({
                   {formatDateTime(attachment.uploadedAt, locale)}
                   {attachment.size != null ? ` · ${formatSize(attachment.size)}` : ""}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => onDelete(attachment)}
-                  className="text-[11px] font-semibold text-rose-600"
-                >
-                  {deleteLabel}
-                </button>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  {/* One file, one link. Sharing a damage photo should
+                      not hand over the order, the car, or the other
+                      files attached to it. */}
+                  {attachment.shareToken ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onCopy(attachment.shareToken as string, attachment.id)}
+                        title={shareLabels.shareHint}
+                        className="text-[11px] font-semibold text-[var(--accent)]"
+                      >
+                        {copiedId === attachment.id
+                          ? shareLabels.shareCopied
+                          : shareLabels.shareCopy}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRevoke(attachment)}
+                        className="text-[11px] font-semibold text-[color:var(--ink-soft)]"
+                      >
+                        {shareLabels.shareRevoke}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onShare(attachment)}
+                      title={shareLabels.shareHint}
+                      className="text-[11px] font-semibold text-[var(--accent)]"
+                    >
+                      {shareLabels.share}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onDelete(attachment)}
+                    className="text-[11px] font-semibold text-rose-600"
+                  >
+                    {deleteLabel}
+                  </button>
+                </div>
               </div>
             </article>
           ))}

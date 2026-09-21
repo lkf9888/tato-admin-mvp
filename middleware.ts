@@ -15,6 +15,7 @@ const protectedPrefixes = [
   "/share-links",
   "/billing",
   "/direct-booking",
+  "/trash",
 ];
 
 export function middleware(request: NextRequest) {

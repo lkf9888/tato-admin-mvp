@@ -97,6 +97,7 @@ export function AppShell({
         { href: "/photos", label: messages.shell.nav.photos, icon: "photos" },
         { href: "/documents", label: messages.shell.nav.documents, icon: "documents" },
         { href: "/activity", label: messages.shell.nav.activity, icon: "activity" },
+        { href: "/trash", label: messages.shell.nav.trash, icon: "activity" },
       ],
     },
     {

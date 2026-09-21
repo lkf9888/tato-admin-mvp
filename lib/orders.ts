@@ -64,6 +64,60 @@ export function orderRangesOverlap(
   return startA < endB && endA > startB;
 }
 
+/**
+ * The trips already on this car that a proposed booking would collide
+ * with.
+ *
+ * Used to *say* what is in the way, not to stop anything: overlapping
+ * bookings are allowed here (a fleet really does double-book and sort
+ * it out afterwards, and the grid paints both red). What was missing
+ * was the name. "Conflict" on its own sends the operator hunting
+ * through the calendar for a trip the server had already found.
+ */
+export async function findConflictingOrders({
+  vehicleId,
+  pickupDatetime,
+  returnDatetime,
+  excludeOrderId,
+}: {
+  vehicleId: string;
+  pickupDatetime: Date;
+  returnDatetime: Date;
+  excludeOrderId?: string;
+}) {
+  const candidates = await prisma.order.findMany({
+    where: {
+      vehicleId,
+      isArchived: false,
+      status: { not: OrderStatus.cancelled },
+      ...(excludeOrderId ? { id: { not: excludeOrderId } } : {}),
+      // Cheap pre-filter; the exact test is below, on the same rule
+      // `reconcileVehicleConflicts` uses, so the two can never disagree
+      // about what counts as an overlap.
+      pickupDatetime: { lt: returnDatetime },
+      returnDatetime: { gt: pickupDatetime },
+    },
+    select: {
+      id: true,
+      renterName: true,
+      pickupDatetime: true,
+      returnDatetime: true,
+      source: true,
+    },
+    orderBy: { pickupDatetime: "asc" },
+    take: 5,
+  });
+
+  return candidates.filter((candidate) =>
+    orderRangesOverlap(
+      pickupDatetime,
+      returnDatetime,
+      candidate.pickupDatetime,
+      candidate.returnDatetime,
+    ),
+  );
+}
+
 export async function reconcileVehicleConflicts(vehicleId: string) {
   const orders = await prisma.order.findMany({
     where: {

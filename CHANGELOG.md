@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.91.0 - 2026-09-22
+
+### The Turo half of a private-site booking
+
+A booking taken on your own website blocks the car here immediately.
+It does not block it on Turo, and nothing can make it: Turo closed
+third-party API access in April 2023, publishes no iCal in either
+direction, and blocks automated traffic at the edge. Until somebody
+goes to Turo and marks the dates unavailable by hand, the same car can
+be booked twice.
+
+So the fleet assistant now says so. Every direct-website booking on a
+car that is also on Turo raises a warning naming the plate and the
+dates, linked to the order. It rides the existing alert digest, so it
+reaches email on the next scheduled scan rather than needing a channel
+of its own.
+
+**It is a detector, not something the checkout webhook fires.** A
+webhook fires once: if it fails, nobody is ever told, and if the trip
+is later moved or cancelled, whatever it created still names the old
+dates. A query cannot miss a booking and cannot go stale — and this
+one also covers every booking taken before today.
+
+**One alert per booking, never one for all of them.** An aggregate
+would be acknowledged once and then silently absorb the next booking,
+which is the failure this file is written to avoid.
+
+Acknowledging is what "I have blocked it on Turo" means here, because
+that fact lives only on Turo and cannot be read back. Acknowledgement
+survives later scans, so the reminder stops. Move the dates and the
+text changes, which clears the acknowledgement and surfaces it again —
+correctly, because the dates blocked on Turo are now the wrong ones.
+
+Cars that were never on Turo are skipped, by two tests: trips that
+arrived from Turo for that car, or a Turo listing name or code on it.
+The first is the stronger one — a listing name can be left blank, but
+trips do not arrive from a marketplace a car is not on. Without this a
+fleet listed nowhere else would collect a permanent, unresolvable
+warning for every sale its own website made. Hand-typed offline orders
+are skipped too: they never touched a public site, so there was no
+race.
+
+Verified against seven cases: fires for a future direct booking on a
+Turo-listed car; stays silent for a car never on Turo, for a hand-typed
+offline order, for a finished trip and for a cancelled one; the
+acknowledgement survives a rescan; and moving the dates brings it back.
+
+This is deliberately the whole of the Turo-side work for now. Driving
+Turo's own unavailability UI from the operator's logged-in browser is
+possible — the message bookmarklet already proves the shape — but it
+breaks on any Turo redesign and a write sits closer to their terms
+than the reads do. That cost is not worth paying until a private site
+takes more bookings than a person can block by hand.
+
 ## v0.90.0 - 2026-09-22
 
 ### A rental website of your own

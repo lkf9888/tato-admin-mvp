@@ -1,6 +1,6 @@
 import "server-only";
 
-import { AssistantAlertSeverity, OrderStatus } from "@prisma/client";
+import { AssistantAlertSeverity, OrderSource, OrderStatus } from "@prisma/client";
 
 import { formatBytes, getDiskUsage } from "@/lib/disk";
 import { prisma } from "@/lib/prisma";
@@ -42,6 +42,16 @@ const SYNC_STALE_HOURS = 24;
 /** Contracts left unsigned this long are usually forgotten, not pending. */
 const CONTRACT_STALE_DAYS = 3;
 
+/** How many unblocked bookings to name before the list stops helping. */
+const TURO_BLOCK_SAMPLE = 20;
+
+/** The stamp `lib/direct-booking-server.ts` writes into
+ *  `Order.sourceMetadata`. Matching the raw JSON is crude, and it is
+ *  what SQLite gives us -- there is no JSON path operator to filter
+ *  on, and pulling every offline order into memory to parse it would
+ *  scale with the whole history rather than with what is upcoming. */
+const DIRECT_BOOKING_CHANNEL_MARKER = '"channel":"direct-booking"';
+
 export type AlertDraft = {
   dedupeKey: string;
   severity: AssistantAlertSeverity;
@@ -72,6 +82,22 @@ function formatDateTime(value: Date) {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+  });
+}
+
+/**
+ * A date with no time on it.
+ *
+ * Direct bookings are date-only and stored at UTC midday precisely so
+ * that no timezone can shift the day. Rendering a clock beside one
+ * invents a precision the booking never had -- and in Vancouver it
+ * would read 05:00, which looks like a bug.
+ */
+function formatDateOnly(value: Date) {
+  return value.toLocaleDateString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   });
 }
 
@@ -402,6 +428,107 @@ async function detectStaleContracts(workspaceId: string): Promise<AlertDraft[]> 
 }
 
 /**
+ * Direct-site bookings whose dates may still be open on Turo.
+ *
+ * Turo has no public API, publishes no iCal, and blocks automated
+ * traffic, so nothing here can close a car's Turo calendar and nothing
+ * can read whether somebody already did. A booking taken on the
+ * operator's own site therefore leaves a window in which the same car
+ * can be booked again on Turo, and the only thing that closes it is a
+ * person going to Turo and blocking the dates by hand.
+ *
+ * So this is a reminder, and it is a *detector* rather than something
+ * the checkout webhook fires, on purpose. A webhook fires once: if it
+ * fails, nobody is ever told, and if the trip is later cancelled or
+ * moved, whatever it created still names the old dates. A query cannot
+ * miss a booking and cannot go stale -- and it covers the bookings
+ * taken before this existed.
+ *
+ * One alert per booking, never one for all of them. An aggregate would
+ * be acknowledged once and then silently absorb the next booking,
+ * which is the failure this whole file exists to avoid.
+ *
+ * Acknowledging is what "I have blocked it on Turo" means here,
+ * because that fact lives only on Turo and cannot be read back. Change
+ * the dates and the text changes, which clears the acknowledgement and
+ * surfaces it again -- correctly, since the dates blocked on Turo are
+ * now the wrong ones.
+ *
+ * Cars that are not on Turo are skipped. A fleet listed nowhere else
+ * would otherwise collect a permanent, unresolvable warning for every
+ * sale its own website made.
+ */
+async function detectUnblockedTuroDates(workspaceId: string): Promise<AlertDraft[]> {
+  const bookings = await prisma.order.findMany({
+    where: {
+      workspaceId,
+      source: OrderSource.offline,
+      isArchived: false,
+      status: { not: OrderStatus.cancelled },
+      // A trip that has ended cannot be double-booked any more.
+      returnDatetime: { gte: new Date() },
+      // Written by the checkout webhook. An offline order typed in by
+      // hand is not this -- it never touched a public site, so there
+      // was no race with Turo to warn about.
+      sourceMetadata: { contains: DIRECT_BOOKING_CHANNEL_MARKER },
+    },
+    select: {
+      id: true,
+      renterName: true,
+      pickupDatetime: true,
+      returnDatetime: true,
+      vehicleId: true,
+      vehicle: {
+        select: {
+          plateNumber: true,
+          nickname: true,
+          turoListingName: true,
+          turoVehicleCode: true,
+        },
+      },
+    },
+    orderBy: { pickupDatetime: "asc" },
+    take: TURO_BLOCK_SAMPLE,
+  });
+
+  if (bookings.length === 0) return [];
+
+  // Two ways to know a car is on Turo, and the second is the stronger
+  // one: a listing name can be left blank, but trips do not arrive
+  // from a marketplace the car is not on.
+  const candidateIds = Array.from(new Set(bookings.map((booking) => booking.vehicleId)));
+  const withTuroTrips = await prisma.order.findMany({
+    where: {
+      workspaceId,
+      vehicleId: { in: candidateIds },
+      source: OrderSource.turo,
+    },
+    select: { vehicleId: true },
+    distinct: ["vehicleId"],
+  });
+  const onTuro = new Set(withTuroTrips.map((order) => order.vehicleId));
+
+  return bookings
+    .filter(
+      (booking) =>
+        onTuro.has(booking.vehicleId) ||
+        Boolean(booking.vehicle.turoListingName) ||
+        Boolean(booking.vehicle.turoVehicleCode),
+    )
+    .map((booking) => ({
+      dedupeKey: `turo_block:${booking.id}`,
+      severity: AssistantAlertSeverity.WARNING,
+      title: `请在 Turo 上封锁 ${booking.vehicle.plateNumber} 的 ${formatDateOnly(booking.pickupDatetime)}–${formatDateOnly(booking.returnDatetime)}`,
+      body: [
+        `${booking.vehicle.nickname} 已被 ${booking.renterName} 通过自建网站预订。`,
+        "这辆车同时在 Turo 上架，而 Turo 没有可写入的接口 —— 需要有人手动把这几天设为不可预订，否则同一台车可能被二次预订。",
+        "封锁完成后点「知道了」，这条提醒就会停止；改期会让它重新出现。",
+      ].join("\n"),
+      href: `/orders/${booking.id}`,
+    }));
+}
+
+/**
  * Run every detector and reconcile the alert table against reality.
  *
  * Idempotent by construction: existing alerts for a still-true
@@ -417,6 +544,7 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
       detectStaleInbox(workspaceId),
       detectFailedImports(workspaceId),
       detectStaleContracts(workspaceId),
+      detectUnblockedTuroDates(workspaceId),
       detectDiskPressure(),
     ])
   ).flat();

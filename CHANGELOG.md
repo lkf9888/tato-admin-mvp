@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.89.2 - 2026-09-22
+
+- **CI now proves a deploy can boot, not just that it compiles.** The v0.89.1 outage got through a green build because nothing in CI ever applied the schema to a database that already existed — type-checking and `next build` say the code is valid, and say nothing about whether `prisma db push` will accept it at boot. The new step does to a throwaway database exactly what the container does to the real one: build it with the schema from the commit the running deploy was made from (`github.event.before` on a push, the base SHA on a pull request), run the same additive DDL the entrypoint runs, then `prisma db push` with its guard armed. A refusal fails the build, with the two ways forward spelled out and `--accept-data-loss` explicitly ruled out.
+
+  Verified both directions before shipping: against the v0.82.0 baseline it passes, and with the additive DDL removed it fails with exit 1 — a check that cannot fail is not a check.
+
+  No rows are inserted, which surprised me and is worth recording: Prisma decides from the schema diff, not from what is in the tables, so an empty database of the old shape reproduces the v0.88.0 failure exactly. Seeding would be slower, would couple this step to every required column in the repo, and would catch nothing more.
+
+  The additive DDL moved out of `scripts/docker-entrypoint.sh` into `scripts/schema-predeploy.sh` so that the entrypoint and CI run the same file. A guard that tests something other than what the container does is a guard that passes while production is down.
+
 ## v0.89.1 - 2026-09-22
 
 - **Hotfix — production crash loop on every deploy: `prisma db push` refused the v0.88.0 schema.** `tatocar.co` returned a 502 on every route from roughly 06:40, and every scheduled job against it failed the same way. v0.88.0 added `OrderAttachment.shareToken String? @unique`; on SQLite a unique constraint is a separate index, and `prisma db push` will not add one to a table that already has rows without `--accept-data-loss`, because it cannot know the existing values are not duplicates. It exits non-zero, `scripts/docker-entrypoint.sh` runs under `set -eu`, so the script ended before `next start`, Railway restarted the container, and the next boot failed identically — the same shape of crash loop as the v0.22.x ENOSPC one, from a different cause. Reproduced locally by building a database from the v0.82.0 schema, putting rows in it, and running the entrypoint's own command against it.

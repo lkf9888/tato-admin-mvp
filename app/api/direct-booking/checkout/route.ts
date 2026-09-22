@@ -10,7 +10,8 @@ import {
   isDateOnlyRangeValid,
 } from "@/lib/direct-booking";
 import { prisma } from "@/lib/prisma";
-import { getAppUrl, getStripeClient, getStripeSecretKey } from "@/lib/stripe";
+import { getBookingReturnUrls } from "@/lib/rental-site";
+import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
 import {
   PLATFORM_APPLICATION_FEE_PERCENT,
   getWorkspaceConnectSnapshot,
@@ -207,9 +208,10 @@ export async function POST(request: Request) {
     }
 
     const stripe = getStripeClient();
-    const appUrl = getAppUrl(new URL(request.url).origin);
-    const successUrl = `${appUrl}/reserve/${vehicle.id}?checkout=success`;
-    const cancelUrl = `${appUrl}/reserve/${vehicle.id}?checkout=cancelled`;
+    const { successUrl, cancelUrl } = await getBookingReturnUrls(
+      vehicle,
+      new URL(request.url).origin,
+    );
 
     // Platform fee = 5% of rental + insurance (NOT the refundable deposit).
     // Deposit is a hold the host needs to release, not earned revenue.

@@ -31,6 +31,7 @@ import { inspectionsMessages } from "@/lib/i18n/messages/inspections";
 import { investmentRankingMessages } from "@/lib/i18n/messages/investment-ranking";
 import { ordersMessages } from "@/lib/i18n/messages/orders";
 import { rentalEstimateMessages } from "@/lib/i18n/messages/rental-estimate";
+import { rentalSiteMessages } from "@/lib/i18n/messages/rental-site";
 import { shareMessages } from "@/lib/i18n/messages/share";
 import { shellMessages } from "@/lib/i18n/messages/shell";
 
@@ -333,6 +334,7 @@ const messages = {
     ...directBookingMessages.en,
     ...ordersMessages.en,
     ...rentalEstimateMessages.en,
+    ...rentalSiteMessages.en,
     ...importsMessages.en,
     ...investmentRankingMessages.en,
     ...billingMessages.en,
@@ -354,6 +356,7 @@ const messages = {
     ...directBookingMessages.zh,
     ...ordersMessages.zh,
     ...rentalEstimateMessages.zh,
+    ...rentalSiteMessages.zh,
     ...importsMessages.zh,
     ...investmentRankingMessages.zh,
     ...billingMessages.zh,

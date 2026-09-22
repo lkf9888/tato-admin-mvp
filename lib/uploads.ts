@@ -132,6 +132,20 @@ export function makeStaffTaskAttachmentPath(taskId: string, filename: string) {
 }
 
 /**
+ * Where a rental site's logo lives.
+ *
+ * Stamped like every other upload rather than overwritten in place: a
+ * logo is served with a year-long cache header, and replacing the
+ * bytes behind a stable name leaves the old mark in front of every
+ * visitor who has been to the site before.
+ */
+export function makeRentalSiteLogoPath(siteId: string, filename: string) {
+  const ext = extensionFromFilename(filename);
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return path.posix.join("rental-sites", siteId, `logo-${stamp}${ext}`);
+}
+
+/**
  * Where one vehicle-condition photograph lives.
  *
  * Built from the sequence number and the region rather than from the uploaded

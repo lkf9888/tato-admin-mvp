@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { OrderAttachmentKind } from "@prisma/client";
 
 import { CompactLanguageSwitcher } from "@/components/language-switcher";
@@ -5,6 +6,12 @@ import { PublicBookingPanel } from "@/components/public-booking-panel";
 import { VehiclePhotoCarousel } from "@/components/vehicle-photo-carousel";
 import { getBlockedBookingWindows, getDateOnlyBookingWindows } from "@/lib/direct-booking";
 import { getI18n } from "@/lib/i18n-server";
+import {
+  buildVehicleSlug,
+  findPublishedSiteByHost,
+  getRequestHost,
+  getSiteUrl,
+} from "@/lib/rental-site";
 import { prisma } from "@/lib/prisma";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
@@ -19,6 +26,43 @@ function addDays(value: Date, amount: number) {
 
 function toDateInputValue(value: Date) {
   return value.toISOString().slice(0, 10);
+}
+
+/**
+ * Point search engines at the operator's own domain.
+ *
+ * The same car is reachable here and at `<their-domain>/cars/<slug>`.
+ * Two URLs for one listing split whatever authority either earns, and
+ * the wrong one can win -- a renter arriving on this page sees a
+ * booking form with no shop around it. A canonical consolidates both
+ * onto the address being advertised. Absent when the workspace has no
+ * published site, because then this page is the only one there is.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ vehicleId: string }>;
+}): Promise<Metadata> {
+  const [{ vehicleId }, host] = await Promise.all([params, getRequestHost()]);
+  const site = await findPublishedSiteByHost(host);
+  if (!site) return {};
+
+  const vehicle = await prisma.vehicle.findFirst({
+    where: {
+      id: vehicleId,
+      workspaceId: site.workspaceId,
+      isArchived: false,
+      directBookingEnabled: true,
+    },
+    select: { id: true, brand: true, model: true, year: true },
+  });
+  if (!vehicle) return {};
+
+  return {
+    alternates: {
+      canonical: getSiteUrl(site, `/cars/${buildVehicleSlug(vehicle)}`, host),
+    },
+  };
 }
 
 export default async function ReserveVehiclePage({

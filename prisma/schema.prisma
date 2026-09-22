@@ -199,6 +199,7 @@ model Workspace {
   orderPayments                 OrderPayment[]
   inspectionSessions            InspectionSession[]
   inspectionShots               InspectionShot[]
+  rentalSite                    RentalSite?
 }
 
 model User {
@@ -1755,4 +1756,55 @@ model CalendarFeed {
 
   @@index([workspaceId])
   @@index([vehicleId])
+}
+
+/// A public, brandable rental website for one workspace.
+///
+/// Direct booking started as one shareable link per vehicle -- a link
+/// you send to somebody who already knows you. A site is the other
+/// thing: a front door a stranger can find. Same cars, same
+/// availability, same checkout. What this adds is a domain that is not
+/// ours, a brand that is not TATO's, and pages a crawler can read.
+///
+/// A site keeps its `slug` after a domain is bound, so it is reachable
+/// before the operator has bought a domain and stays reachable when
+/// their DNS breaks.
+model RentalSite {
+  id          String  @id @default(cuid())
+  workspaceId String  @unique
+  /// Reachable at `/s/<slug>` on the platform host, always.
+  slug        String  @unique
+  /// A custom domain the operator points at us, stored without
+  /// protocol, port or a leading `www.`. Null until one is bound.
+  domain      String? @unique
+  /// Off by default, and enforced on every public read. A site whose
+  /// cars have no daily rate is worse than no site at all, so
+  /// publishing is a deliberate act rather than a side effect of
+  /// filling in a brand name.
+  isPublished Boolean @default(false)
+
+  brandName      String
+  tagline        String?
+  /// Hero copy. Also the fallback `<meta name="description">`, which is
+  /// why it is prose rather than a list of features.
+  description    String?
+  logoPathname   String?
+  /// Hex, `#rrggbb`. Drives the one accent the public pages use; the
+  /// rest of the palette is shared so a bad value cannot make a site
+  /// unreadable.
+  accentColor    String?
+  contactEmail   String?
+  contactPhone   String?
+  contactAddress String?
+  /// Footer prose: cancellation terms, insurance notes, licence
+  /// numbers -- whatever the operator is required to say and we cannot
+  /// know.
+  footerNote     String?
+  /// GA4 / Google Ads measurement id. Empty emits no tag at all rather
+  /// than an empty one that still loads gtag and still sets cookies.
+  analyticsId    String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }

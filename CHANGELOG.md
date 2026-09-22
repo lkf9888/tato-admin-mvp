@@ -1,5 +1,88 @@
 # Changelog
 
+## v0.90.0 - 2026-09-22
+
+### A rental website of your own
+
+Direct booking has been one shareable link per car: a link you send to
+somebody who already knows you. A **Rental website** is the other
+thing — a front door a stranger can find. Same fleet, same
+availability, same checkout; what is new is a domain that is not ours,
+a brand that is not TATO's, and pages a crawler can read.
+
+`Rental website` in the sidebar sets it up. A site has a name, a
+tagline, homepage copy, a logo, one accent colour, contact details, a
+footer notice, and an optional Google tag. It is a draft until you
+publish it, and **publishing is refused while no vehicle is bookable**
+— a site advertising an empty fleet is worse than no site, and being
+told it is live while it shows nothing is the worst of both.
+
+Every site keeps a `/s/<slug>` address on this host forever, so it
+works before a domain is bought and still works when DNS breaks. Point
+a CNAME here and enter the domain, and the same pages answer on it:
+the home page with the fleet, and `/cars/<make-model-year-id>` for each
+car. The readable words are cosmetic — the trailing id is what is
+looked up, so renaming a car never breaks a link somebody already has.
+
+**The fleet page answers the only question a renter has.** Pick two
+dates and each car says Available or Booked for those dates, free ones
+first, against the same `Order` table the calendar and the conflict
+checks read. Turo trips are in there too, so a car busy on Turo is
+already shown as busy here. The filter is a plain GET form: no
+JavaScript, every state is a URL you can send to a passenger, and a
+crawler following the bare page still reaches the whole fleet.
+
+**What search engines get.** Per-page titles, descriptions, canonical
+URLs and OpenGraph tags on the operator's domain; `schema.org/Car` with
+a `UnitPriceSpecification` in `DAY` units, which is what stops Google
+reading a daily rate as the price of the car; a `sitemap.xml` listing
+the home page and every bookable car; and a `robots.txt` that differs
+by host. On a site's domain everything a renter sees is open. On this
+host the rule is inverted to an allow-list — it is an admin
+application whose only intentionally public page is `/reserve/`, and a
+deny-list there would silently expose the next admin page somebody
+adds. `/s/` is closed on both: a site reachable at two addresses is two
+copies of the same listings competing in the same results, and the
+domain is the one being advertised.
+
+`/reserve/<id>` keeps working and now carries a canonical pointing at
+the site's own URL when one exists, so shared links keep their
+destination without splitting its ranking.
+
+**Resolution happens in server components, not `middleware.ts`.** The
+obvious design is a host allow-list in middleware, and it would have
+shipped broken: middleware runs on the Edge runtime, where Prisma is
+unavailable and `process.env` is inlined at *build* time — and this
+image is built in Docker with none of Railway's environment present,
+so `NEXT_PUBLIC_APP_URL` would have compiled to `undefined` and matched
+no host at all.
+
+Three boundaries are enforced on every public read rather than checked
+once: the site must be published, the car must belong to that site's
+workspace, and the car must be listed and priced. A car the operator
+has not put on the site 404s even to somebody holding its id.
+
+### Fixed
+
+- **Stripe sent renters back to the wrong brand.** `getAppUrl` prefers
+  `NEXT_PUBLIC_APP_URL` over the request's own origin, which is right
+  for the admin app and wrong for a checkout that started on a
+  customer's domain: the renter would have landed on `tatocar.co`
+  after paying, looking at a page branded for somebody else. Return
+  URLs now come from the site that owns the car.
+
+- **Every photo-less car page scrolled sideways on a phone.** Predates
+  this release and affected `/reserve/<id>` the same way.
+  `aspect-[16/10]` with an unconditional `min-h-[20rem]` makes the
+  browser derive the *width* from the height — 320px tall at 16/10 is
+  512px wide, 137px past a 375px screen. Measured at 375: 528px before,
+  375px after.
+
+- **The address slug's `pattern` attribute was never enforced.**
+  `[a-z0-9-]+` compiles under the RegExp `v` flag that browsers use for
+  `pattern`, where a bare `-` in a character class is a syntax error;
+  the browser threw on every render and validated nothing.
+
 ## v0.89.2 - 2026-09-22
 
 - **CI now proves a deploy can boot, not just that it compiles.** The v0.89.1 outage got through a green build because nothing in CI ever applied the schema to a database that already existed — type-checking and `next build` say the code is valid, and say nothing about whether `prisma db push` will accept it at boot. The new step does to a throwaway database exactly what the container does to the real one: build it with the schema from the commit the running deploy was made from (`github.event.before` on a push, the base SHA on a pull request), run the same additive DDL the entrypoint runs, then `prisma db push` with its guard armed. A refusal fails the build, with the two ways forward spelled out and `--accept-data-loss` explicitly ruled out.

@@ -2,6 +2,8 @@
 
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
+import { mkdir, writeFile } from "fs/promises";
+import path from "path";
 import {
   LedgerShareTarget,
   OrderStatus,
@@ -42,6 +44,17 @@ import {
   defaultOwnerFeeShares,
 } from "@/lib/ledger-policy";
 import { prisma } from "@/lib/prisma";
+import {
+  isPlatformHost,
+  isReservedSiteSlug,
+  normalizeSiteHost,
+  normalizeSiteSlug,
+} from "@/lib/rental-site";
+import {
+  makeRentalSiteLogoPath,
+  resolveUploadPath,
+  sanitizeFilename,
+} from "@/lib/uploads";
 import { foldLatinLookalikes } from "@/lib/utils";
 import {
   checkRateLimit,
@@ -185,6 +198,7 @@ function revalidateAdminPages() {
     "/photos",
     "/documents",
     "/direct-booking",
+    "/rental-site",
     "/owners",
     "/orders",
     "/calendar",
@@ -1926,4 +1940,152 @@ export async function deleteMessageTemplateAction(formData: FormData) {
   });
 
   revalidatePath("/messages");
+}
+
+/** Empty means "clear this field", which `cleanOptional` cannot say. */
+function siteFieldOrNull(value: FormDataEntryValue | null) {
+  const text = value?.toString().trim() ?? "";
+  return text ? text : null;
+}
+
+const MAX_SITE_LOGO_BYTES = 2 * 1024 * 1024;
+
+async function saveRentalSiteLogo(siteId: string, file: File) {
+  if (file.size > MAX_SITE_LOGO_BYTES) {
+    return { error: "logo_too_large" as const };
+  }
+
+  const contentType = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+  const isImage =
+    contentType.startsWith("image/") || /\.(png|jpe?g|webp|svg)$/.test(name);
+  if (!isImage) {
+    return { error: "logo_not_an_image" as const };
+  }
+
+  const pathname = makeRentalSiteLogoPath(siteId, sanitizeFilename(file.name || "logo.png"));
+  const absolutePath = resolveUploadPath(pathname);
+  await mkdir(path.dirname(absolutePath), { recursive: true });
+  await writeFile(absolutePath, Buffer.from(await file.arrayBuffer()));
+
+  return { pathname };
+}
+
+/**
+ * Create or update this workspace's public rental website.
+ *
+ * Errors come back through the URL rather than an action result: it is
+ * the pattern the rest of the admin pages already use, and it keeps
+ * the settings form a plain server-rendered `<form>` with no client
+ * state to get out of step with the database.
+ */
+export async function saveRentalSiteAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  const existing = await prisma.rentalSite.findUnique({
+    where: { workspaceId: workspace.id },
+  });
+
+  const brandName =
+    siteFieldOrNull(formData.get("brandName")) ?? existing?.brandName ?? workspace.name;
+
+  const requestedSlug = normalizeSiteSlug(
+    formData.get("slug")?.toString() ?? existing?.slug ?? brandName,
+  );
+  const slug = requestedSlug || normalizeSiteSlug(workspace.slug) || `site-${workspace.id.slice(-8)}`;
+
+  if (isReservedSiteSlug(slug)) {
+    redirect("/rental-site?error=slug_reserved");
+  }
+
+  const slugOwner = await prisma.rentalSite.findUnique({ where: { slug } });
+  if (slugOwner && slugOwner.workspaceId !== workspace.id) {
+    redirect("/rental-site?error=slug_taken");
+  }
+
+  const domain = normalizeSiteHost(formData.get("domain")?.toString() ?? "") || null;
+  if (domain) {
+    // Binding the platform's own host would route the admin app's
+    // front door to a customer site and lock everyone out of it.
+    if (isPlatformHost(domain)) {
+      redirect("/rental-site?error=domain_reserved");
+    }
+
+    const domainOwner = await prisma.rentalSite.findUnique({ where: { domain } });
+    if (domainOwner && domainOwner.workspaceId !== workspace.id) {
+      redirect("/rental-site?error=domain_taken");
+    }
+  }
+
+  const rawAccent = siteFieldOrNull(formData.get("accentColor"));
+  const accentColor =
+    rawAccent && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(rawAccent) ? rawAccent : null;
+
+  const rawAnalytics = siteFieldOrNull(formData.get("analyticsId"));
+  const analyticsId =
+    rawAnalytics && /^(?:G|AW|GT)-[A-Z0-9-]{4,20}$/i.test(rawAnalytics) ? rawAnalytics : null;
+
+  // Publishing is gated on the site having something to sell. A page
+  // of "no vehicles listed" that an operator has been told is live is
+  // the worst of both states.
+  const bookableCount = await prisma.vehicle.count({
+    where: {
+      workspaceId: workspace.id,
+      isArchived: false,
+      directBookingEnabled: true,
+      status: VehicleStatus.available,
+      bookingDailyRate: { gt: 0 },
+    },
+  });
+  const wantsPublished = formData.get("isPublished")?.toString() === "on";
+  if (wantsPublished && bookableCount === 0) {
+    redirect("/rental-site?error=no_bookable_vehicles");
+  }
+
+  const data = {
+    slug,
+    domain,
+    isPublished: wantsPublished,
+    brandName,
+    tagline: siteFieldOrNull(formData.get("tagline")),
+    description: siteFieldOrNull(formData.get("description")),
+    accentColor,
+    contactEmail: siteFieldOrNull(formData.get("contactEmail")),
+    contactPhone: siteFieldOrNull(formData.get("contactPhone")),
+    contactAddress: siteFieldOrNull(formData.get("contactAddress")),
+    footerNote: siteFieldOrNull(formData.get("footerNote")),
+    analyticsId,
+  };
+
+  const site = existing
+    ? await prisma.rentalSite.update({ where: { id: existing.id }, data })
+    : await prisma.rentalSite.create({ data: { ...data, workspaceId: workspace.id } });
+
+  const logoFile = formData.get("logo");
+  if (formData.get("removeLogo")?.toString() === "on") {
+    await prisma.rentalSite.update({ where: { id: site.id }, data: { logoPathname: null } });
+  } else if (logoFile instanceof File && logoFile.size > 0) {
+    const saved = await saveRentalSiteLogo(site.id, logoFile);
+    if ("error" in saved) {
+      redirect(`/rental-site?error=${saved.error}`);
+    }
+    await prisma.rentalSite.update({
+      where: { id: site.id },
+      data: { logoPathname: saved.pathname },
+    });
+  }
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: existing ? "rental_site_updated" : "rental_site_created",
+    entityType: "RentalSite",
+    entityId: site.id,
+    metadata: { slug, domain, isPublished: data.isPublished },
+  });
+
+  revalidatePath("/rental-site");
+  revalidatePath("/");
+  revalidatePath(`/s/${slug}`);
+  redirect("/rental-site?saved=1");
 }

@@ -14,10 +14,16 @@ type VehicleCarouselPhoto = {
 export function VehiclePhotoCarousel({
   photos,
   fallbackLabel,
+  /** The kicker over the no-photo placeholder. Defaults to TATO for
+   *  the platform's own pages; a rental site passes its own name,
+   *  because somebody else's brand on a customer's site is the one
+   *  thing a white-labelled page must never show. */
+  brandLabel = "TATO",
   className,
 }: {
   photos: VehicleCarouselPhoto[];
   fallbackLabel: string;
+  brandLabel?: string;
   className?: string;
 }) {
   const safePhotos = useMemo(() => photos.filter((photo) => photo.src), [photos]);
@@ -43,12 +49,20 @@ export function VehiclePhotoCarousel({
     return (
       <div
         className={cn(
-          "flex aspect-[16/10] min-h-[20rem] items-center justify-center rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] text-center",
+          // `aspect-[16/10]` with an unconditional `min-h-[20rem]` makes
+          // the browser derive the WIDTH from the height: 320px tall at
+          // 16/10 is 512px wide, which is 137px past a 375px phone and
+          // put a horizontal scrollbar on every photo-less car page.
+          // `w-full` bounds the width; the floor only applies once
+          // there is room for it.
+          "flex w-full aspect-[16/10] items-center justify-center rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-4 text-center sm:min-h-[20rem]",
           className,
         )}
       >
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.34em] text-[var(--ink-soft)]">TATO</p>
+        <div className="min-w-0 break-words">
+          <p className="text-[11px] uppercase tracking-[0.34em] text-[var(--ink-soft)]">
+            {brandLabel}
+          </p>
           <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">{fallbackLabel}</p>
         </div>
       </div>
@@ -58,7 +72,7 @@ export function VehiclePhotoCarousel({
   return (
     <div
       className={cn(
-        "relative aspect-[16/10] min-h-[20rem] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-muted)]",
+        "relative w-full aspect-[16/10] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] sm:min-h-[20rem]",
         className,
       )}
     >

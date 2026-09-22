@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.88.0 - 2026-09-21
+
+### Calendar subscriptions
+
+**Subscribe** in the calendar toolbar mints a read-only `.ics` URL that an owner or a driver can add to whatever calendar app they already use — no account here, nothing to install. One for the whole fleet, or one per vehicle.
+
+The token is the entire authorisation, so a feed is scoped when it is created: a per-vehicle link publishes that car and nothing else. Handing an owner a fleet-wide URL to show them their own car would show them everybody's, and the dialog says so in as many words. Minting twice for the same scope returns the same link rather than leaving an unlabelled live one behind; **Revoke** kills it immediately, and the feed keeps its last-read time afterwards so "why did my calendar stop updating" has an answer.
+
+Events carry the renter, the car, the phone and the notes, and publish 60 days of history and 400 forward — a subscriber wants what is coming and enough of the past to recognise, not a year of finished rentals cluttering their phone. A cancelled trip is published as `STATUS:CANCELLED` rather than dropped, so a client that already has it removes it instead of keeping a booking that is not happening.
+
+**Export only.** Turo publishes no iCal feed, so there is no inbound half to build; a one-directional feature is the honest shape here rather than a settings page with a permanently empty half.
+
+The iCalendar writer is hand-rolled — the format we need is `VEVENT` with six properties, and the parts that actually break clients are the parts a library would hide while still being ours to answer for. Verified against the rules that matter: CRLF throughout and a trailing one, no line over 75 **octets** (folding counts bytes, and a Chinese renter name is three per character), continuations led by a space, and `;` `,` `\` and newlines escaped in that order — backslashes first, or the ones added while escaping commas get escaped again and the value arrives doubled.
+
+
 ## v0.87.0 - 2026-09-21
 
 ### Recurring orders

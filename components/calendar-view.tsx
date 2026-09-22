@@ -7,6 +7,7 @@ import { type EditableOrder, OrderDetailModal } from "@/components/order-detail-
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { VehicleEditDialog, type VehicleEditDialogVehicle } from "@/components/vehicle-edit-dialog";
+import { CalendarFeedDialog } from "@/components/calendar-feed-dialog";
 import { RecurringOrderDialog } from "@/components/recurring-order-dialog";
 import { VehicleMonthCalendar } from "@/components/vehicle-month-calendar";
 import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-button";
@@ -604,6 +605,7 @@ export function CalendarView({
   const [isAddVehicleOpen, setIsAddVehicleOpen] = useState(false);
   const [monthCalendarFor, setMonthCalendarFor] = useState<string | null>(null);
   const [isRecurringOpen, setIsRecurringOpen] = useState(false);
+  const [isFeedOpen, setIsFeedOpen] = useState(false);
   // --- Searching every trip, not just the loaded ones -----------------
   const [searchHits, setSearchHits] = useState<CalendarOrder[]>([]);
   const [searchTruncated, setSearchTruncated] = useState(false);
@@ -2047,6 +2049,15 @@ export function CalendarView({
             {!readOnly ? (
               <button
                 type="button"
+                onClick={() => setIsFeedOpen(true)}
+                className={cn(secondaryActionClass, mobileControlsOpen ? "" : "max-lg:hidden")}
+              >
+                {calendarMessages.feedAction}
+              </button>
+            ) : null}
+            {!readOnly ? (
+              <button
+                type="button"
                 onClick={() => setIsRecurringOpen(true)}
                 disabled={vehicleOptions.length === 0}
                 className={cn(secondaryActionClass, mobileControlsOpen ? "" : "max-lg:hidden")}
@@ -2369,6 +2380,14 @@ export function CalendarView({
         >
           {bulkMode ? calendarMessages.bulkModeHint : calendarMessages.selectionHint}
         </p>
+      ) : null}
+
+      {isFeedOpen ? (
+        <CalendarFeedDialog
+          labels={calendarMessages.feed}
+          vehicleOptions={vehicleOptions}
+          onClose={() => setIsFeedOpen(false)}
+        />
       ) : null}
 
       {isRecurringOpen ? (

@@ -195,6 +195,7 @@ model Workspace {
   assistantAlerts               AssistantAlert[]
   messageTemplates              MessageTemplate[]
   calendarNotes                 CalendarNote[]
+  calendarFeeds                 CalendarFeed[]
   orderPayments                 OrderPayment[]
   inspectionSessions            InspectionSession[]
   inspectionShots               InspectionShot[]
@@ -295,6 +296,7 @@ model Vehicle {
   cleaningFeeRules       VehicleCleaningFeeRule[]
   messageTemplates       MessageTemplate[]
   calendarNotes          CalendarNote[]
+  calendarFeeds          CalendarFeed[]
   inboundEmails          InboundEmail[]
 
   @@index([workspaceId])
@@ -1724,4 +1726,33 @@ model OrderPayment {
 
   @@index([workspaceId])
   @@index([orderId])
+}
+
+/// A subscribable calendar URL.
+///
+/// Read-only and outbound only. Turo publishes no iCal feed to import
+/// from, so there is nothing to bring in; what this solves is the
+/// other direction -- an owner or a driver seeing a car's schedule in
+/// the calendar app they already look at, without an account here.
+///
+/// The token is the whole authorisation, which is why a feed is
+/// scoped to one vehicle when `vehicleId` is set. Handing an owner a
+/// fleet-wide URL to show them their own car would show them
+/// everybody's.
+model CalendarFeed {
+  workspaceId String?
+  id          String     @id @default(cuid())
+  token       String     @unique
+  /// Null means the whole fleet.
+  vehicleId   String?
+  label       String?
+  isActive    Boolean    @default(true)
+  lastReadAt  DateTime?
+  createdBy   String?
+  createdAt   DateTime   @default(now())
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  vehicle     Vehicle?   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([vehicleId])
 }

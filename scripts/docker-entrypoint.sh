@@ -85,6 +85,41 @@ if [ "$DB_PATH" != "$DATABASE_URL" ] && [ -f "$DB_PATH" ]; then
   fi
 fi
 
+# ⚠️ One-off, additive, and safe to delete once every environment has run a
+# deploy at v0.89.1 or later.
+#
+# v0.88.0 added `OrderAttachment.shareToken String? @unique`. On SQLite a
+# unique constraint is a separate index, and `prisma db push` will not add one
+# to a table that already has rows without `--accept-data-loss` -- it cannot
+# know the existing values are not duplicates. It exits non-zero, `set -eu`
+# ends the script before `next start`, Railway restarts the container, and the
+# next boot fails identically: a crash loop that took tatocar.co down with a
+# 502 on every route from 2026-09-22 ~06:40.
+#
+# The warning was vacuous here. The column is new, so every existing row gets
+# NULL, and SQLite permits unlimited NULLs in a unique index -- a duplicate was
+# not possible. But `--accept-data-loss` in the entrypoint would wave through
+# every *future* destructive change as well, which is the opposite of what the
+# guard below is for. So the column and its index are created here, by hand and
+# by Prisma's own naming, and `db push` then finds nothing destructive left to
+# do and runs with its guard fully armed.
+#
+# Both statements fail on every deploy after the first -- "duplicate column
+# name", "index already exists" -- and that is the intended steady state, which
+# is why the failures are logged and swallowed. Nothing is masked by doing so:
+# if the statements did not take, the `db push` immediately below fails exactly
+# as it does today.
+for statement in \
+  'ALTER TABLE "OrderAttachment" ADD COLUMN "shareToken" TEXT;' \
+  'CREATE UNIQUE INDEX "OrderAttachment_shareToken_key" ON "OrderAttachment"("shareToken");'
+do
+  if echo "$statement" | npx prisma db execute --stdin --schema=prisma/schema.prisma >/dev/null 2>&1; then
+    echo "[entrypoint] applied: $statement"
+  else
+    echo "[entrypoint] already present, skipping: $statement"
+  fi
+done
+
 if ! npx prisma db push; then
   echo "Prisma schema sync failed without applying destructive changes."
   echo "Existing data was left untouched. Review the schema diff and ship a safe migration before redeploying."

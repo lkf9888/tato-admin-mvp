@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.89.1 - 2026-09-22
+
+- **Hotfix — production crash loop on every deploy: `prisma db push` refused the v0.88.0 schema.** `tatocar.co` returned a 502 on every route from roughly 06:40, and every scheduled job against it failed the same way. v0.88.0 added `OrderAttachment.shareToken String? @unique`; on SQLite a unique constraint is a separate index, and `prisma db push` will not add one to a table that already has rows without `--accept-data-loss`, because it cannot know the existing values are not duplicates. It exits non-zero, `scripts/docker-entrypoint.sh` runs under `set -eu`, so the script ended before `next start`, Railway restarted the container, and the next boot failed identically — the same shape of crash loop as the v0.22.x ENOSPC one, from a different cause. Reproduced locally by building a database from the v0.82.0 schema, putting rows in it, and running the entrypoint's own command against it.
+
+  The warning was vacuous in this case: the column is new, so every existing row takes NULL, and SQLite permits unlimited NULLs in a unique index — a duplicate was not possible. The fix is **not** `--accept-data-loss` in the entrypoint, which would wave through every future destructive change as well and disarm the one guard standing between a schema edit and the production database. Instead the column and its index are created before the push, by hand and under Prisma's own naming (`OrderAttachment_shareToken_key`), so `db push` finds nothing destructive left to do and runs with its guard intact. Both statements are expected to fail on every later deploy — "duplicate column name", "index already exists" — so they log and continue; nothing is masked, because the `db push` immediately after is still the arbiter. Additive and safe to delete once every environment has booted once on v0.89.1 or later.
+
+  **The gap that let it through:** nothing in CI ever ran the schema against a database with data in it. A green build here means the app compiles, not that it can start.
+
 ## v0.88.0 - 2026-09-21
 
 ### Calendar subscriptions

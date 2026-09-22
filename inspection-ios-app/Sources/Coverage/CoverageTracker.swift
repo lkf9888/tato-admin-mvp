@@ -105,6 +105,15 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     /// Poses of photographs taken before the car was found, so the first
     /// successful fit can credit them rather than throwing them away.
     private var pendingPoses: [(position: SIMD3<Float>, forward: SIMD3<Float>)] = []
+    /// A thinned sample of the car's own scanned surface, kept so every
+    /// photograph can be asked whether the car is actually in it. Points
+    /// rather than the fitted box: a box can be the wrong size, the points
+    /// are where the sensor found something.
+    private var carPoints: [SIMD3<Float>] = []
+
+    /// What the last photograph saw of the car. Nil before there is a car
+    /// to see.
+    private(set) var lastFraming: CarInFrame.Reading?
 
     /// How wide an arc of the car one photograph documents, measured across
     /// the screen rather than across the sensor. Overwritten with the real
@@ -257,9 +266,21 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
     /// Returns the region it turned out to document, which is what the
     /// archive files it under — worked out after the shutter, never chosen
     /// before it.
+    /// Whether the car is in the viewfinder right now, as far as the scan
+    /// can tell. Nil when there is nothing to compare against yet.
+    func framingNow() -> CarInFrame.Reading? {
+        guard !carPoints.isEmpty, let position = cameraPosition, let forward = cameraForward
+        else { return nil }
+        return CarInFrame.read(
+            points: carPoints, from: position, looking: forward,
+            horizontalFieldOfViewDegrees: fieldOfViewDegrees
+        )
+    }
+
     @discardableResult
     func recordShot() -> CarRegion {
         guard let position = cameraPosition, let forward = cameraForward else { return .front }
+        lastFraming = framingNow()
 
         guard let frame = vehicleFrame else {
             // Not fitted yet. Keep the pose; the first good fit will use it.
@@ -280,9 +301,18 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
         return Self.dominantRegion(of: patches) ?? .front
     }
 
+    /// Signed degrees from where the photographer is looking to the part of
+    /// the car that still needs work. Positive is to their right.
+    ///
+    /// A direction, deliberately, and never a name: see
+    /// `ShootingProgress.walkThisWay`.
+    func bearingToThinnest() -> Double? {
+        bearingToThinnestRegion()?.degrees
+    }
+
     /// Where to send the photographer next, in their own frame of reference:
     /// signed degrees from where they are looking, positive to their right.
-    func bearingToThinnestRegion() -> (region: CarRegion, degrees: Double)? {
+    private func bearingToThinnestRegion() -> (region: CarRegion, degrees: Double)? {
         guard let frame = vehicleFrame,
               let position = cameraPosition,
               let forward = cameraForward,
@@ -291,6 +321,14 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
             return nil
         }
         return (region, degrees)
+    }
+
+    /// Evenly spaced sample, so a dense corner of the mesh does not decide
+    /// the answer on its own.
+    private static func thin(_ points: [SIMD3<Float>], to limit: Int) -> [SIMD3<Float>] {
+        guard points.count > limit else { return points }
+        let stride = Double(points.count) / Double(limit)
+        return (0..<limit).map { points[Int(Double($0) * stride)] }
     }
 
     private static func dominantRegion(of patches: Set<CoveragePatch>) -> CarRegion? {
@@ -316,11 +354,21 @@ final class CoverageTracker: NSObject, ARSessionDelegate {
         let nearby = meshAnchors.values
             .flatMap { Self.worldVertices(of: $0) }
             .filter { simd_distance(SIMD3($0.x, 0, $0.z), SIMD3(observer.x, 0, observer.z)) < 8 }
+        // ⚠️ `looking` is not optional in practice and must not become so.
+        // Without it the fitter has no way to tell a car from the shelving
+        // beside it, and a garage returns a box built out of both — which is
+        // how a thirty-one photograph walk-around scored 42%.
         guard nearby.count >= 256,
-              let frame = VehicleFrameFitter.fit(points: nearby, groundY: ground, observedFrom: observer)
+              let frame = VehicleFrameFitter.fit(
+                  points: nearby,
+                  groundY: ground,
+                  observedFrom: observer,
+                  looking: cameraForward
+              )
         else { return }
 
         vehicleFrame = frame
+        carPoints = Self.thin(nearby.filter { frame.roughlyContains($0) }, to: 400)
         // Credit the photographs taken while the car was still being found.
         for pose in pendingPoses {
             guard !frame.contains(pose.position) else { continue }

@@ -1,92 +1,187 @@
 import EvidenceCore
 import SwiftUI
 
-/// The car seen from above, with the parts nobody has photographed still red.
+/// The car from above, painted as it gets photographed.
 ///
-/// This is the whole instruction set. A checklist has to be read and
-/// understood before it helps; a picture of your car with a red patch on the
-/// back left needs no explanation and no translation, and it is the same
-/// picture whether the photographer has used the app a hundred times or never.
+/// Small on purpose — it lives in the corner of a viewfinder and has to be
+/// readable in the half second between two photographs. It answers one
+/// question, "which way do I still have to go", and hands the detail to
+/// `CoverageSheet` when somebody taps it.
 ///
-/// Drawn small — it sits in the corner of a live camera view, and the moment
-/// it demands attention it is competing with the thing it is there to help
-/// with.
+/// Drawn as a car rather than as a ring of wedges because a ring has no
+/// front: a photographer has to map an abstract dial onto the vehicle in
+/// front of them before it means anything, and they are holding a phone in
+/// one hand in a car park.
 struct CoverageDiagram: View {
     let coverage: SurfaceCoverage
-    /// Nil when the phone cannot measure the car, in which case there is
-    /// nothing honest to draw.
-    var isLive: Bool = true
-
-    private let ringWidth: CGFloat = 9
+    /// False before the car has been located. Everything reads as empty
+    /// then, and painting it all red would be a lie about the photographs
+    /// already taken.
+    let isLive: Bool
 
     var body: some View {
         GeometryReader { geometry in
-            let size = min(geometry.size.width, geometry.size.height)
-            let centre = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            // A car is about two and a half times longer than it is wide.
-            let halfLength = size / 2 - ringWidth
-            let halfWidth = halfLength * 0.42
-
+            let size = geometry.size
             ZStack {
-                // The roof, as the body of the car.
-                Ellipse()
-                    .fill(roofColour)
-                    .frame(width: halfWidth * 2, height: halfLength * 2)
-
-                // The nose, so the diagram has an orientation at a glance.
-                Path { path in
-                    path.move(to: CGPoint(x: centre.x, y: centre.y - halfLength + 3))
-                    path.addLine(to: CGPoint(x: centre.x - 5, y: centre.y - halfLength + 12))
-                    path.addLine(to: CGPoint(x: centre.x + 5, y: centre.y - halfLength + 12))
-                    path.closeSubpath()
-                }
-                .fill(.white.opacity(0.85))
-
-                // The flanks, one wedge per sector.
-                ForEach(0..<SurfaceCoverage.sectorCount, id: \.self) { sector in
-                    let span = 360.0 / Double(SurfaceCoverage.sectorCount)
-                    // Sector 0 is the nose, which is up in this drawing.
-                    let start = Double(sector) * span - 90 - span / 2
-                    Path { path in
-                        path.addArc(
-                            center: centre,
-                            radius: halfLength + ringWidth / 2,
-                            startAngle: .degrees(start),
-                            endAngle: .degrees(start + span * 0.88),
-                            clockwise: false
-                        )
-                    }
-                    .stroke(sideColour(sector), style: StrokeStyle(lineWidth: ringWidth, lineCap: .butt))
-                    // Squash the ring into the car's proportions.
-                    .scaleEffect(x: halfWidth / halfLength, y: 1, anchor: .center)
-                }
+                CarSilhouette()
+                    .fill(Color.black.opacity(0.45))
+                sectorRing(in: size)
+                    .opacity(isLive ? 1 : 0.25)
+                CarSilhouette()
+                    .fill(roofTint)
+                    .padding(size.width * 0.26)
+                CarSilhouette()
+                    .stroke(Color.white.opacity(0.85), lineWidth: 1.4)
             }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .opacity(isLive ? 1 : 0.35)
+        }
+        .accessibilityLabel("车辆覆盖")
+        .accessibilityValue("\(Int(coverage.fraction * 100))%")
+    }
+
+    /// The roof gets the middle of the car, which is where a roof is.
+    private var roofTint: Color {
+        isLive
+            ? CoverageColour.swiftUI(coverage.roofFraction).opacity(0.85)
+            : Color.white.opacity(0.10)
+    }
+
+    /// One wedge per sector, hugging the body.
+    ///
+    /// Each is drawn with a gradient into its neighbours' colours so the
+    /// paint runs around the car instead of stepping, which is what makes a
+    /// half-covered flank look half-covered.
+    private func sectorRing(in size: CGSize) -> some View {
+        Canvas { context, canvas in
+            let centre = CGPoint(x: canvas.width / 2, y: canvas.height / 2)
+            let outer = CGSize(width: canvas.width * 0.5, height: canvas.height * 0.5)
+            let inner = CGSize(width: canvas.width * 0.30, height: canvas.height * 0.34)
+            let count = SurfaceCoverage.sectorCount
+            let step = 2 * Double.pi / Double(count)
+
+            for sector in 0..<count {
+                // ⚠️ Sector 0 points along the car's own +X, which on a
+                // bird's-eye view with the nose up is straight up the screen.
+                // Screen y grows downwards, hence the negated sine.
+                let start = Double(sector) * step - .pi / 2
+                let end = start + step
+                var path = Path()
+                path.move(to: point(centre, outer, start))
+                path.addLine(to: point(centre, outer, end))
+                path.addLine(to: point(centre, inner, end))
+                path.addLine(to: point(centre, inner, start))
+                path.closeSubpath()
+
+                let here = coverage.confidence(ofSector: sector)
+                let next = coverage.confidence(ofSector: (sector + 1) % count)
+                context.fill(
+                    path,
+                    with: .linearGradient(
+                        Gradient(colors: [
+                            CoverageColour.swiftUI(here),
+                            CoverageColour.swiftUI((here + next) / 2),
+                        ]),
+                        startPoint: point(centre, outer, start),
+                        endPoint: point(centre, outer, end)
+                    )
+                )
+            }
         }
     }
 
-    /// Averaged over the three side bands, so a sector only goes fully green
-    /// once the sill, the panel and the glass have all been photographed —
-    /// which is what stops a row of waist-height shots reading as a finished
-    /// car.
-    private func sideColour(_ sector: Int) -> Color {
-        let bands: [SurfaceBand] = [.sill, .body, .glass]
-        let hit = bands.filter { coverage.covered.contains(CoveragePatch(sector: sector, band: $0)) }.count
-        return paint(Double(hit) / Double(bands.count))
+    private func point(_ centre: CGPoint, _ radii: CGSize, _ angle: Double) -> CGPoint {
+        CGPoint(
+            x: centre.x + radii.width * cos(angle),
+            y: centre.y + radii.height * sin(angle)
+        )
+    }
+}
+
+/// A car seen from above, nose up. The same figure as the app's icon, for
+/// the same reason: it is the one shape that says "this is your car and this
+/// is its front" without a caption.
+struct CarSilhouette: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        let nose = rect.minY, tail = rect.maxY
+        let left = rect.minX, right = rect.maxX
+        var path = Path()
+        path.move(to: CGPoint(x: left + w * 0.18, y: nose))
+        path.addLine(to: CGPoint(x: right - w * 0.18, y: nose))
+        path.addQuadCurve(
+            to: CGPoint(x: right, y: nose + h * 0.21),
+            control: CGPoint(x: right, y: nose + h * 0.02)
+        )
+        path.addLine(to: CGPoint(x: right, y: tail - h * 0.26))
+        path.addQuadCurve(
+            to: CGPoint(x: right - w * 0.11, y: tail),
+            control: CGPoint(x: right, y: tail - h * 0.02)
+        )
+        path.addLine(to: CGPoint(x: left + w * 0.11, y: tail))
+        path.addQuadCurve(
+            to: CGPoint(x: left, y: tail - h * 0.26),
+            control: CGPoint(x: left, y: tail - h * 0.02)
+        )
+        path.addLine(to: CGPoint(x: left, y: nose + h * 0.21))
+        path.addQuadCurve(
+            to: CGPoint(x: left + w * 0.18, y: nose),
+            control: CGPoint(x: left, y: nose + h * 0.02)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// The big version, for when the corner is not enough.
+struct CoverageSheet: View {
+    let coverage: SurfaceCoverage
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                CarModelView(coverage: coverage)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                legend
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+            }
+            .navigationTitle("还差哪里")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("继续拍") { dismiss() } }
+            }
+        }
     }
 
-    private var roofColour: Color {
-        paint(coverage.fraction(of: .roof)).opacity(0.55)
+    private var legend: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 16) {
+                key(0, "还没拍到")
+                key(0.5, "只拍到一个角度")
+                key(1, "拍够了")
+            }
+            HStack(spacing: 14) {
+                Text("车身 \(Int(coverage.fraction * 100))%")
+                Text("车顶 \(Int(coverage.roofFraction * 100))%")
+            }
+            .font(.footnote.monospacedDigit())
+            .foregroundStyle(.secondary)
+
+            Text("拖动转车身，捏合放大。灰的是引擎盖和后备箱盖 —— 那两块目前不计分，"
+                 + "不是你漏拍了。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
     }
 
-    /// Red through amber to green. No intermediate grey: the point of the
-    /// drawing is that unshot areas are alarming.
-    private func paint(_ fraction: Double) -> Color {
-        switch fraction {
-        case ..<0.01: return Color(red: 0.82, green: 0.22, blue: 0.18)
-        case ..<0.67: return Color(red: 0.92, green: 0.63, blue: 0.18)
-        default: return Color(red: 0.24, green: 0.68, blue: 0.40)
+    private func key(_ confidence: Double, _ label: String) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(CoverageColour.swiftUI(confidence))
+                .frame(width: 11, height: 11)
+            Text(label).font(.caption)
         }
     }
 }

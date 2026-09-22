@@ -17,12 +17,48 @@ public struct VehicleFrame: Sendable, Equatable {
     public var forward: SIMD3<Float>
     public var length: Float
     public var width: Float
+    /// Roof height above the ground.
+    ///
+    /// ⚠️ Measured, not assumed. Every band used to sit at a fixed height —
+    /// the roof at 1.45m — whatever vehicle was in front of the phone. On a
+    /// RAV4, whose roof is at 1.68m, that put the roof patches 23cm inside
+    /// the car and scored a surface that was not there. Anything that needs
+    /// to know how tall the car is now asks.
+    public var height: Float
 
-    public init(centre: SIMD3<Float>, forward: SIMD3<Float>, length: Float, width: Float) {
+    public init(
+        centre: SIMD3<Float>,
+        forward: SIMD3<Float>,
+        length: Float,
+        width: Float,
+        height: Float = 1.5
+    ) {
         self.centre = centre
         self.forward = simd_normalize(SIMD3(forward.x, 0, forward.z))
         self.length = length
         self.width = width
+        self.height = height
+    }
+
+    /// Whether somebody standing on the ground can photograph the roof at
+    /// all.
+    ///
+    /// Held up at arm's length a phone reaches about 1.95m. A roof needs
+    /// roughly a third of a metre of clearance below that before the frame
+    /// takes in anything but a sliver — measured: a 1.45m roof scores 75%
+    /// from 1.8m, a 1.68m roof scores 25%. Above that the requirement is not
+    /// difficult, it is impossible, and an app that asks for it anyway is
+    /// one people learn to ignore.
+    public var roofIsReachable: Bool { height <= 1.58 }
+
+    /// Generously inside the fitted box — used to pick the car's own points
+    /// out of the scan, where a little slack costs nothing and a tight test
+    /// would drop the wing mirrors and the bumpers.
+    public func roughlyContains(_ point: SIMD3<Float>) -> Bool {
+        let offset = point - centre
+        return abs(Double(simd_dot(offset, forward))) < Double(length) / 2 * 1.15
+            && abs(Double(simd_dot(offset, right))) < Double(width) / 2 * 1.2
+            && (-0.1...Double(height) + 0.2).contains(Double(point.y - centre.y))
     }
 
     /// The car's right-hand side — the passenger side in North America.
@@ -42,7 +78,24 @@ public struct VehicleFrame: Sendable, Equatable {
     /// reject is one more second of scanning and the cost of a false accept is
     /// a whole walk-around measured against a wall.
     public var isPlausible: Bool {
-        (3.0...6.5).contains(length) && (1.4...2.4).contains(width) && length > width
+        (3.0...6.5).contains(length)
+            && (1.4...2.4).contains(width)
+            && (1.1...2.3).contains(height)
+            && length > width
+    }
+
+    /// Where the camera sits on the ring around the car, as the same
+    /// parameter the sectors are numbered by.
+    ///
+    /// ⚠️ Not a compass bearing. The sectors walk an ellipse, so the angle
+    /// that indexes them is the ellipse's parameter — on a car half as wide
+    /// as it is long the two differ by up to 20°, which is more than a
+    /// sector.
+    public func sectorParameter(of position: SIMD3<Float>) -> Double {
+        let offset = position - centre
+        let along = Double(simd_dot(offset, forward)) / max(Double(length) / 2, 0.01)
+        let across = Double(simd_dot(offset, right)) / max(Double(width) / 2, 0.01)
+        return atan2(across, along)
     }
 
     /// A point out in front of the named part of the car, at eye height.

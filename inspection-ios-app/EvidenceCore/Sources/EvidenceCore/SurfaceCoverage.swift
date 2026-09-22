@@ -29,12 +29,47 @@ public enum SurfaceBand: String, Sendable, Codable, CaseIterable {
     case roof
 
     /// Height above the ground of this band's surface, in metres.
-    var height: Double {
+    public var height: Double {
         switch self {
         case .sill: return 0.35
         case .body: return 0.95
-        case .glass: return 1.40
+        case .glass: return 1.35
         case .roof: return 1.45
+        }
+    }
+
+    /// How much of the car's full footprint this band spans, as a fraction.
+    ///
+    /// A car is not a drum. It is widest at the waist, tucks in at the sills
+    /// and narrows sharply into the glasshouse — and that shape is not
+    /// decoration, it decides where the surface points sit and therefore
+    /// which photographs are credited. One profile serves both the scoring
+    /// and the model on screen, so what a photographer sees painted is
+    /// literally what was measured.
+    public var widthProfile: Double {
+        switch self {
+        case .sill: return 0.94
+        case .body: return 1.00
+        case .glass: return 0.82
+        case .roof: return 0.64
+        }
+    }
+
+    /// And how much of its length, which is a different number.
+    ///
+    /// ⚠️ This is what makes the shape a car rather than a loaf, and it is
+    /// not only cosmetic. With one profile for both, the glass band ran the
+    /// full length of the vehicle — so the patch for "glass, straight off the
+    /// nose" sat 1.35m up in the air above the bonnet, where there is no
+    /// glass and nothing to photograph. A cabin that stops short of both ends
+    /// puts those patches on the windscreen and the backlight, where they
+    /// belong.
+    public var lengthProfile: Double {
+        switch self {
+        case .sill: return 0.98
+        case .body: return 1.00
+        case .glass: return 0.72
+        case .roof: return 0.52
         }
     }
 }
@@ -81,18 +116,58 @@ public struct SurfaceCoverage: Sendable, Codable, Equatable {
     /// photograph makes visible progress.
     public static let sectorCount = 24
 
-    public private(set) var covered: Set<CoveragePatch>
+    /// How many photographs documented each patch.
+    ///
+    /// ⚠️ A count rather than a flag, and not for the arithmetic — `fraction`
+    /// only asks whether it is above zero. It is for the person: a panel seen
+    /// from one angle is weaker evidence than the same panel seen from two,
+    /// and the model on screen shows that as amber rather than green. Without
+    /// it there is no honest middle colour to draw.
+    public private(set) var counts: [CoveragePatch: Int]
 
-    public init(covered: Set<CoveragePatch> = []) {
-        self.covered = covered
+    /// Two sightings is where a panel stops being a glimpse.
+    public static let confidentHits = 2
+
+    public init(counts: [CoveragePatch: Int] = [:]) {
+        self.counts = counts
     }
 
-    public static var total: Int { sectorCount * SurfaceBand.allCases.count }
+    public init(covered: Set<CoveragePatch>) {
+        counts = Dictionary(uniqueKeysWithValues: covered.map { ($0, 1) })
+    }
 
-    public var fraction: Double { Double(covered.count) / Double(Self.total) }
+    public var covered: Set<CoveragePatch> {
+        Set(counts.filter { $0.value > 0 }.keys)
+    }
+
+    /// ⚠️ The roof is **not** in here.
+    ///
+    /// It used to be, as 24 of 96 patches — a quarter of the score that can
+    /// only be reached by holding the phone about 2.2m up, directly over the
+    /// middle of the car. Measured: a perfect walk-around at ground level
+    /// scored exactly 75% and could never score more, against a finish line
+    /// of 90%. A percentage nobody can complete is not a target, it is a
+    /// trap. The roof is its own requirement now — see `ShootingProgress`.
+    public static var total: Int { sectorCount * (SurfaceBand.allCases.count - 1) }
+
+    public var fraction: Double {
+        let sides = counts.filter { $0.key.band != .roof && $0.value > 0 }.count
+        return Double(sides) / Double(Self.total)
+    }
+
+    /// How well the roof is done, on its own scale.
+    public var roofFraction: Double {
+        let hit = counts.filter { $0.key.band == .roof && $0.value > 0 }.count
+        return Double(hit) / Double(Self.sectorCount)
+    }
+
+    /// 0 for never seen, 1 for seen enough. What the colours are drawn from.
+    public func confidence(of patch: CoveragePatch) -> Double {
+        min(Double(counts[patch] ?? 0), Double(Self.confidentHits)) / Double(Self.confidentHits)
+    }
 
     public mutating func add(_ patches: Set<CoveragePatch>) {
-        covered.formUnion(patches)
+        for patch in patches { counts[patch, default: 0] += 1 }
     }
 
     /// Patches still unphotographed, for drawing the red areas.
@@ -116,10 +191,18 @@ public struct SurfaceCoverage: Sendable, Codable, Equatable {
         return Double(hit) / Double(wanted)
     }
 
+    /// How thoroughly one sector is done, across its three side bands.
+    /// What the diagram colours each wedge by.
+    public func confidence(ofSector sector: Int) -> Double {
+        let bands: [SurfaceBand] = [.sill, .body, .glass]
+        let total = bands.reduce(0.0) { $0 + confidence(of: CoveragePatch(sector: sector, band: $1)) }
+        return total / Double(bands.count)
+    }
+
     /// The region with the least coverage — where to send somebody next.
     public func thinnestRegion() -> CarRegion? {
         CarRegion.allCases
-            .filter { $0 != .interior }
+            .filter { $0 != .interior && $0 != .roof }
             .map { ($0, fraction(of: $0)) }
             .filter { $0.1 < 1 }
             .min { $0.1 < $1.1 }?
@@ -177,21 +260,52 @@ public enum CoverageProjection {
         return atan(halfTangent) * 2 * 180 / .pi
     }
 
-    /// A patch seen at a grazing angle shows no damage, so it does not count.
+    /// A portrait 4:3 frame is taller than it is wide.
+    public static func verticalFieldOfView(fromHorizontal degrees: Double) -> Double {
+        atan(tan(degrees / 2 * .pi / 180) * 4 / 3) * 2 * 180 / .pi
+    }
+
+    /// How far either side of where somebody stands counts as photographed.
     ///
-    /// 65° off the surface normal, which compresses a panel to about 40% of
-    /// its width — a dent is still plainly visible. Tighter sounds safer and
-    /// is not: the bands are modelled with horizontal normals, so a
-    /// photographer standing at eye level in front of a car is already 55-60°
-    /// off the normal of its front bumper. At 55° the bumper never counted as
-    /// photographed no matter how carefully it was shot.
-    static let maximumObliquityDegrees = 65.0
+    /// Stand off the left rear corner with the car filling the frame and you
+    /// have documented that corner and a good part of the flank and the tail
+    /// with it. Thirty degrees each way is about what one photograph of a
+    /// whole car covers, and it is the only inference left in here.
+    public static let spreadDegrees = 30.0
 
-    /// Outside this range a panel is either too close to be in focus or too
-    /// far to show a scratch.
-    static let usableDistance: ClosedRange<Double> = 0.25...7.0
+    /// The car has to be roughly in front of the camera, not off to one side.
+    /// Generous, because a photographer framing a corner does not centre the
+    /// whole vehicle.
+    public static let aimToleranceDegrees = 55.0
 
-    /// The patches documented by one photograph.
+    /// Useful range from the car's centre. Closer and a panel fills the frame
+    /// with no context; further and the car is a smudge.
+    public static let usableRange: ClosedRange<Double> = 0.8...8.0
+
+    /// Which parts of the car one photograph documents.
+    ///
+    /// ## Why this no longer projects a surface
+    ///
+    /// It used to place 96 patches on a fitted ellipse — three bands of
+    /// twenty-four plus a roof — and ask of each whether it was inside the
+    /// frustum and facing the lens within 65°. Every term in that chain had
+    /// to be right at once: the box's length and width from a point cloud,
+    /// band heights that were **fixed constants** regardless of the vehicle,
+    /// an obliquity limit, a frustum. In the field the chain broke
+    /// repeatedly and invisibly — shelving fitted as part of the car and a
+    /// thirty-one photograph walk-around scored 42%; an SUV's real roof sat
+    /// 23cm above the height the maths scored; and a photographer could not
+    /// see which term had gone wrong, only that the app said no.
+    ///
+    /// What the phone actually knows well is **where it was standing**.
+    /// So that is all this asks now: the bearing around the car, whether the
+    /// car was in front of the lens, and whether the range was sensible. No
+    /// box dimensions, no band heights, no obliquity. A wrong-sized box
+    /// barely moves the answer, because the answer only depends on the
+    /// centre.
+    ///
+    /// What is given up is the claim "you missed the left rear sill". What is
+    /// bought is an answer that is right.
     public static func patches(
         seenFrom position: SIMD3<Float>,
         looking direction: SIMD3<Float>,
@@ -200,26 +314,29 @@ public enum CoverageProjection {
         sectorCount: Int = SurfaceCoverage.sectorCount
     ) -> Set<CoveragePatch> {
         let view = simd_normalize(direction)
-        let halfField = cos(horizontalFieldOfViewDegrees / 2 * .pi / 180)
-        let minimumFacing = cos(maximumObliquityDegrees * .pi / 180)
+        let toCentre = frame.centre + SIMD3<Float>(0, frame.height / 2, 0) - position
+        let range = Double(simd_length(toCentre))
+        guard usableRange.contains(range) else { return [] }
+        // Pointed at the car, rather than past it.
+        guard Double(simd_dot(view, toCentre / Float(range))) >= cos(aimToleranceDegrees * .pi / 180)
+        else { return [] }
+
+        let middle = frame.sectorParameter(of: position) / (2 * .pi) * Double(sectorCount)
+        let reach = spreadDegrees / 360 * Double(sectorCount)
+
+        // Above the roof and looking down is the only way to document it.
+        let overhead = Double(position.y) > Double(frame.height) + 0.18 && Double(view.y) < -0.25
 
         var seen = Set<CoveragePatch>()
-        for sector in 0..<sectorCount {
-            let angle = Double(sector) / Double(sectorCount) * 2 * .pi
-            for band in SurfaceBand.allCases {
-                let (point, normal) = surfacePoint(sector: angle, band: band, of: frame)
-                let toCamera = position - point
-                let distance = Double(simd_length(toCamera))
-                guard usableDistance.contains(distance) else { continue }
-
-                let towards = toCamera / Float(distance)
-                // Facing the camera, not the back of the car.
-                guard Double(simd_dot(normal, towards)) >= minimumFacing else { continue }
-                // Inside the frame.
-                guard Double(simd_dot(view, -towards)) >= halfField else { continue }
-
+        var offset = -reach
+        while offset <= reach {
+            let index = Int((middle + offset).rounded())
+            let sector = ((index % sectorCount) + sectorCount) % sectorCount
+            for band in [SurfaceBand.sill, .body, .glass] {
                 seen.insert(CoveragePatch(sector: sector, band: band))
             }
+            if overhead { seen.insert(CoveragePatch(sector: sector, band: .roof)) }
+            offset += 1
         }
         return seen
     }
@@ -235,8 +352,8 @@ public enum CoverageProjection {
         band: SurfaceBand,
         of frame: VehicleFrame
     ) -> (point: SIMD3<Float>, normal: SIMD3<Float>) {
-        let semiLength = Double(frame.length) / 2
-        let semiWidth = Double(frame.width) / 2
+        let semiLength = Double(frame.length) / 2 * band.lengthProfile
+        let semiWidth = Double(frame.width) / 2 * band.widthProfile
         let along = cos(angle)
         let across = sin(angle)
 
@@ -245,8 +362,8 @@ public enum CoverageProjection {
             // rather than out at the sills. Its normal points up, which is
             // why no amount of walking around at eye level covers it.
             let point = frame.centre
-                + frame.forward * Float(along * semiLength * 0.6)
-                + frame.right * Float(across * semiWidth * 0.6)
+                + frame.forward * Float(along * semiLength)
+                + frame.right * Float(across * semiWidth)
                 + SIMD3<Float>(0, Float(band.height), 0)
             return (point, SIMD3<Float>(0, 1, 0))
         }

@@ -22,13 +22,23 @@ public enum ArchiveError: Error, Equatable {
 /// photographer shoots wherever they like and as much as they like, and the
 /// region in the filename is worked out from the camera's pose afterwards.
 ///
-/// **Nothing here ever goes near the photo library.** An iOS photo library
-/// round trip can hand back a re-encoded copy — different bytes, different
-/// digest, sometimes different metadata — and that is precisely the failure
-/// this whole app exists to avoid. Photos live in the app's own container and
-/// leave it as a ZIP of untouched files.
+/// **Nothing is ever read back from the photo library as evidence.** An iOS
+/// photo library round trip can hand back a re-encoded copy — different
+/// bytes, different digest, sometimes different metadata — and that is
+/// precisely the failure this whole app exists to avoid. The originals live
+/// here, in the app's own container, and leave as a ZIP of untouched files.
+///
+/// ⚠️ A *copy* does go to the camera roll, as each photograph is taken, and
+/// that is not a contradiction: it goes one way. `LibraryMirror` pushes the
+/// same bytes out so Turo's uploader can see them, reads them back, and
+/// re-hashes them against this manifest. The camera roll is a delivery
+/// channel that has to prove itself every session; this directory is the
+/// record.
 public actor SessionArchive {
     public nonisolated let root: URL
+    /// Fixed at creation, so callers that only need to name things can ask
+    /// without hopping onto the actor.
+    public nonisolated let startedAt: Date
     public private(set) var manifest: SessionManifest
 
     // Derived from `root`, which never changes, so they are safe to read
@@ -38,6 +48,7 @@ public actor SessionArchive {
 
     public init(parent: URL, manifest: SessionManifest) throws {
         self.root = parent.appendingPathComponent(manifest.sessionID, isDirectory: true)
+        self.startedAt = manifest.startedAt
         self.manifest = manifest
         try FileManager.default.createDirectory(at: photosDirectory, withIntermediateDirectories: true)
         try SessionArchive.write(manifest, to: manifestURL)
@@ -49,6 +60,7 @@ public actor SessionArchive {
         guard let decoded = try? JSONDecoder.evidence.decode(SessionManifest.self, from: data) else {
             throw ArchiveError.manifestUnreadable
         }
+        self.startedAt = decoded.startedAt
         self.manifest = decoded
     }
 
@@ -66,7 +78,8 @@ public actor SessionArchive {
         quality: ImageQualityReport,
         metadataPath: MetadataPath,
         accepted: Bool = true,
-        acceptedDespite: [ImageQualityIssue] = []
+        acceptedDespite: [ImageQualityIssue] = [],
+        step: ShotStep? = nil
     ) throws -> CaptureRecord {
         let sequence = (manifest.records.map(\.sequence).max() ?? 0) + 1
         let filename = String(format: "%03d-%@.jpg", sequence, region.rawValue)
@@ -94,7 +107,8 @@ public actor SessionArchive {
             evidence: EvidenceRequirements.check(jpeg: jpeg),
             metadataPath: metadataPath,
             accepted: accepted,
-            acceptedDespite: acceptedDespite
+            acceptedDespite: acceptedDespite,
+            step: step
         )
         manifest.records.append(record)
         try persist()
@@ -121,6 +135,17 @@ public actor SessionArchive {
     /// once tracking restarts, so losing it would mean starting the car over.
     public func updateCoverage(_ coverage: SurfaceCoverage) throws {
         manifest.coverage = coverage
+        try persist()
+    }
+
+    /// Records that this photograph now exists in the camera roll as well.
+    ///
+    /// Persisted with everything else so an interrupted session knows what
+    /// it already saved, and so the manifest can say where the delivery copy
+    /// went — which is a question a claim can be lost on.
+    public func noteLibraryAsset(_ identifier: String, forFilename filename: String) throws {
+        guard let index = manifest.records.firstIndex(where: { $0.filename == filename }) else { return }
+        manifest.records[index].libraryAssetID = identifier
         try persist()
     }
 

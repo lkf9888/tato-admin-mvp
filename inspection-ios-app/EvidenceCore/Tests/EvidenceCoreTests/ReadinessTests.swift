@@ -34,13 +34,20 @@ private func makeRecord(
     )
 }
 
-/// A session that has cleared every floor: covered, and past both counts.
+/// A session that has filled every step of the plan.
+///
+/// ⚠️ Built from `ShotStep` rather than from a hand-written count, so a step
+/// added to the plan shows up here as a session that no longer finishes,
+/// which is the truth. The coverage is filled in separately: only the
+/// walk-around is graded against it, and only the three side bands count
+/// towards the percentage — see `SurfaceCoverage.total`.
 private func finishedSession(coverageFraction: Double = 1.0) -> SessionManifest {
     var coverage = SurfaceCoverage()
     var patches = Set<CoveragePatch>()
+    let sideBands: [SurfaceBand] = [.sill, .body, .glass]
     let wanted = Int(Double(SurfaceCoverage.total) * coverageFraction)
     outer: for sector in 0..<SurfaceCoverage.sectorCount {
-        for band in SurfaceBand.allCases {
+        for band in sideBands {
             if patches.count >= wanted { break outer }
             patches.insert(CoveragePatch(sector: sector, band: band))
         }
@@ -48,8 +55,13 @@ private func finishedSession(coverageFraction: Double = 1.0) -> SessionManifest 
     coverage.add(patches)
 
     var records: [CaptureRecord] = []
-    for index in 1...15 { records.append(makeRecord(index, region: .front)) }
-    for index in 16...24 { records.append(makeRecord(index, region: .interior)) }
+    for step in ShotStep.allCases {
+        for _ in 0..<step.required {
+            var record = makeRecord(records.count + 1, region: step.region ?? .front)
+            record.step = step
+            records.append(record)
+        }
+    }
     return makeManifest(records, coverage: coverage)
 }
 
@@ -71,8 +83,11 @@ final class SessionReadinessTests: XCTestCase {
     /// somebody walking off without knowing.
     func testTheThingsThatWarnRatherThanBlock() {
         var manifest = finishedSession()
-        manifest.records[0] = makeRecord(1, gaps: [.noLocation])
-        manifest.records[1] = makeRecord(2, despite: [.blurry])
+        // ⚠️ Mutated in place rather than replaced. A fresh record carries no
+        // step, and a session missing two walk-around photographs is a
+        // session that cannot finish — which is not what this test is about.
+        manifest.records[0].evidence = EvidenceCheck(gaps: [.noLocation])
+        manifest.records[1].acceptedDespite = [.blurry]
 
         let readiness = manifest.readiness()
         XCTAssertTrue(readiness.canFinish)
@@ -104,6 +119,43 @@ final class SessionReadinessTests: XCTestCase {
     }
 }
 
+final class LibraryMirrorBookkeepingTests: XCTestCase {
+
+    /// ⚠️ Every photograph, not only the accepted ones. A photograph the
+    /// quality gate turned down is still a photograph of this car at this
+    /// moment, and the person who took it decides whether it is worth
+    /// attaching to a claim — not the gate, and not us.
+    func testARejectedPhotographStillHasToReachTheCameraRoll() {
+        var manifest = finishedSession()
+        manifest.records[0].accepted = false
+        XCTAssertTrue(manifest.recordsNotInLibrary.contains { $0.filename == manifest.records[0].filename })
+    }
+
+    func testAPhotographWithAnAssetIsNoLongerOutstanding() {
+        var manifest = finishedSession()
+        XCTAssertEqual(manifest.recordsNotInLibrary.count, manifest.records.count)
+        XCTAssertTrue(manifest.recordsInLibrary.isEmpty)
+
+        for index in manifest.records.indices { manifest.records[index].libraryAssetID = "asset-\(index)" }
+        XCTAssertTrue(manifest.recordsNotInLibrary.isEmpty)
+        XCTAssertEqual(manifest.recordsInLibrary.count, manifest.records.count)
+    }
+
+    /// A manifest written before the camera roll copy existed has to keep
+    /// opening. An archive that will not open is worse than one that has
+    /// forgotten something — and the same goes for `closeUp`, the key this
+    /// field's neighbour used to be called.
+    func testAManifestFromAnOlderBuildStillDecodes() throws {
+        let json = "{\"sessionID\":\"S1\",\"kind\":\"checkin\",\"vehicleLabel\":\"ABC 123\","
+            + "\"staffLabel\":\"Wei\",\"deviceModel\":\"iPhone 16 Pro\",\"appVersion\":\"0.1.0\","
+            + "\"startedAt\":\"2026-09-21T00:00:00Z\",\"timeZoneIdentifier\":\"America/Vancouver\","
+            + "\"records\":[],\"coverage\":{\"counts\":[]}}"
+        let manifest = try JSONDecoder.evidence.decode(SessionManifest.self, from: Data(json.utf8))
+        XCTAssertEqual(manifest.sessionID, "S1")
+        XCTAssertTrue(manifest.recordsNotInLibrary.isEmpty)
+    }
+}
+
 final class ExportManifestTests: XCTestCase {
 
     func testListsEveryDigestAndTheFileItCovers() {
@@ -114,7 +166,7 @@ final class ExportManifestTests: XCTestCase {
         }
         XCTAssertTrue(text.contains("ABC 123"))
         XCTAssertTrue(text.contains("Return from guest"))
-        XCTAssertTrue(text.contains("15 exterior, 9 interior"))
+        XCTAssertTrue(text.contains("33 exterior, 8 interior"), text)
     }
 
     /// A record that quietly omits its own weak points is worth less than one
@@ -122,7 +174,9 @@ final class ExportManifestTests: XCTestCase {
     /// left out.
     func testStatesTheWeakPointsInsteadOfBuryingThem() {
         var manifest = finishedSession(coverageFraction: 0.93)
-        manifest.records[0] = makeRecord(1, gaps: [.noLocation], despite: [.blurry])
+        manifest.records[0].evidence = EvidenceCheck(gaps: [.noLocation])
+        manifest.records[0].acceptedDespite = [.blurry]
+        manifest.records[0].quality.issues = [.blurry]
         let text = ExportManifest.plainText(for: manifest)
 
         XCTAssertTrue(text.contains("no geolocation recorded"))

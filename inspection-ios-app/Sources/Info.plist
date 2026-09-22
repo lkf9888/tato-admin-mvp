@@ -34,7 +34,7 @@
 	<key>NSMotionUsageDescription</key>
 	<string>Motion sensors detect camera shake, so you are asked to retake a photo before it is too blurred to prove anything.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Finished vehicle photos are copied into an album so you can attach them to a claim from the Turo app.</string>
+	<string>Each photo is copied into an album as it is taken, so you can attach them to a Turo claim even if you stop part-way.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Photos are read back after saving to confirm the system did not re-encode them, which would invalidate them as evidence.</string>
 	<key>UILaunchScreen</key>

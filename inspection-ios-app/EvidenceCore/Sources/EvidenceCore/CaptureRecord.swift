@@ -58,6 +58,35 @@ public struct CaptureRecord: Sendable, Codable, Equatable, Identifiable {
     /// pass. Non-empty means somebody made a judgement call that is now on
     /// the record with their name against it.
     public var acceptedDespite: [ImageQualityIssue]
+    /// Which step of the plan this photograph was taken for.
+    ///
+    /// ⚠️ The step the app was *showing* at the moment of the shutter, not a
+    /// guess made afterwards. A wheel cannot be recognised from a camera
+    /// pose, and a rim photographed as part of a flank is eight pixels wide,
+    /// so there is nothing to infer it from later. Nil on a photograph taken
+    /// after the plan was met, which is allowed and encouraged.
+    ///
+    /// ⚠️ Renamed from `closeUp`, and the key in the JSON changed with it. A
+    /// manifest written by an older build decodes with this nil rather than
+    /// failing — unknown keys are ignored, and an optional that is absent is
+    /// simply absent. An archive that will not open is worse than one whose
+    /// oldest sessions have forgotten which step a photo belonged to.
+    public var step: ShotStep?
+    /// The Photos identifier of the copy in the camera roll, once it is
+    /// there.
+    ///
+    /// ⚠️ Written as each photograph is taken, not when a session is handed
+    /// in. Turo's own uploader reads the photo library and nothing else, and
+    /// a walk-around that gets interrupted — a phone that dies, a guest who
+    /// turns up early, somebody who just puts the phone in their pocket —
+    /// used to leave every photograph stranded inside this app's container.
+    /// The archive is still the evidence; this is the delivery copy, and it
+    /// exists from the moment the shutter closes.
+    ///
+    /// Nil means it is not in the library: never saved, refused permission,
+    /// or the save failed. `SessionManifest.recordsNotInLibrary` is what the
+    /// finish page tops up.
+    public var libraryAssetID: String?
 
     public init(
         region: CarRegion,
@@ -70,7 +99,9 @@ public struct CaptureRecord: Sendable, Codable, Equatable, Identifiable {
         evidence: EvidenceCheck,
         metadataPath: MetadataPath,
         accepted: Bool,
-        acceptedDespite: [ImageQualityIssue] = []
+        acceptedDespite: [ImageQualityIssue] = [],
+        step: ShotStep? = nil,
+        libraryAssetID: String? = nil
     ) {
         self.region = region
         self.sequence = sequence
@@ -83,6 +114,8 @@ public struct CaptureRecord: Sendable, Codable, Equatable, Identifiable {
         self.metadataPath = metadataPath
         self.accepted = accepted
         self.acceptedDespite = acceptedDespite
+        self.step = step
+        self.libraryAssetID = libraryAssetID
     }
 }
 
@@ -134,13 +167,47 @@ public struct SessionManifest: Sendable, Codable, Equatable {
     public var exteriorShots: Int { acceptedRecords.filter { $0.region != .interior }.count }
     public var interiorShots: Int { acceptedRecords.filter { $0.region == .interior }.count }
 
-    public func progress() -> ShootingProgress {
+    /// ⚠️ `thinnestBearing` comes from outside, because it cannot come from
+    /// here. Which way to walk depends on where the photographer is standing
+    /// and which way they are facing, and a manifest is a record of what was
+    /// shot, not a live pose. Passing nil is honest and simply produces
+    /// "绕着车继续拍".
+    /// How many accepted photographs each step of the plan has.
+    public var shotsByStep: [ShotStep: Int] {
+        acceptedRecords.reduce(into: [:]) { counts, record in
+            guard let step = record.step else { return }
+            counts[step, default: 0] += 1
+        }
+    }
+
+    public func progress(
+        thinnestBearing: Double? = nil,
+        coverageIsMeasurable: Bool = true
+    ) -> ShootingProgress {
         ShootingProgress(
             coverage: coverage.fraction,
             exteriorShots: exteriorShots,
             interiorShots: interiorShots,
-            thinnestRegion: coverage.thinnestRegion()
+            roofCoverage: coverage.roofFraction,
+            shotsByStep: shotsByStep,
+            coverageIsMeasurable: coverageIsMeasurable,
+            thinnestBearing: thinnestBearing
         )
+    }
+
+    /// Photographs that are not in the camera roll yet.
+    ///
+    /// ⚠️ Every photograph, not only the accepted ones. A photograph the
+    /// quality gate turned down is still a photograph of this car at this
+    /// moment, and the person who took it is the one who decides whether it
+    /// is worth attaching to a claim. Dropping it silently is this app's
+    /// least forgivable failure mode.
+    public var recordsNotInLibrary: [CaptureRecord] {
+        records.filter { $0.libraryAssetID == nil }
+    }
+
+    public var recordsInLibrary: [CaptureRecord] {
+        records.filter { $0.libraryAssetID != nil }
     }
 
     /// Accepted photographs that would still be rejected unread — almost

@@ -46,6 +46,11 @@ final class CaptureSessionModel {
     let location = LocationProvider()
     let steadiness = SteadinessMonitor()
     let coverage = CoverageTracker()
+    /// ⚠️ Every photograph goes to the camera roll as it is taken, not when
+    /// the session is handed in. A walk-around that never reaches the finish
+    /// page used to leave the whole thing stranded in this app's container,
+    /// where Turo's uploader cannot see it.
+    let library = LibraryMirror()
     /// ⚠️ Built on the tracker's session rather than owning one. There is
     /// exactly one thing holding the camera in this app now, and it is ARKit.
     let camera: ARCamera
@@ -71,6 +76,23 @@ final class CaptureSessionModel {
     /// available depends on the device.
     private(set) var lastStillSize: String?
 
+    /// Set when the last photograph did not show the car.
+    ///
+    /// Not a rejection: the file is archived like any other, because an
+    /// archive that quietly drops frames is worse than one with a stray in
+    /// it. It just does not count towards anything, and it says so.
+    private(set) var missedTheCar = false
+
+    /// A step the photographer picked out of order, which sticks until it is
+    /// full and then hands control back to the plan.
+    ///
+    /// ⚠️ The plan prompts in order; it does not enforce one. Somebody
+    /// standing at the back of the car should be able to do the rear wheels
+    /// now rather than walking round twice, and a roof in the rain is a step
+    /// to come back to. Refusing that is how a guided app gets abandoned for
+    /// the camera app.
+    var manualStep: ShotStep?
+
     /// Whether the lamp is lit, as the hardware last reported it rather
     /// than as the button last requested it.
     private(set) var isTorchOn = false
@@ -87,7 +109,25 @@ final class CaptureSessionModel {
     }
 
     var progress: ShootingProgress {
-        manifest?.progress() ?? ShootingProgress(coverage: 0, exteriorShots: 0, interiorShots: 0)
+        manifest?.progress(
+            thinnestBearing: coverage.bearingToThinnest(),
+            // Nothing to grade the walk-around against until a car has been
+            // located. The count stands on its own until then.
+            coverageIsMeasurable: coverage.canMeasure && coverage.hasFrame
+        ) ?? ShootingProgress(coverage: 0, exteriorShots: 0, interiorShots: 0)
+    }
+
+    /// What the overlay is drawing, and what the next photograph counts
+    /// towards.
+    var currentStep: ShotStep? { manualStep ?? progress.currentStep }
+
+    /// Moves along the plan by hand. Skips nothing — every step still has to
+    /// be filled before the session can be handed in.
+    func stepAside(by delta: Int) {
+        let steps = ShotStep.allCases
+        guard let here = currentStep, let index = steps.firstIndex(of: here) else { return }
+        let wanted = min(max(index + delta, 0), steps.count - 1)
+        manualStep = steps[wanted]
     }
 
     /// Whether the photographer may overrule a rejection, having given the
@@ -143,6 +183,10 @@ final class CaptureSessionModel {
 
         location.start()
         steadiness.start()
+        // Asked here rather than at the shutter: a permission sheet that
+        // appears between somebody and the photograph they are taking is a
+        // photograph that does not get taken.
+        Task { await library.authorise() }
         // A fresh budget of recovery attempts every time the screen comes
         // back. Closing an app and opening it again is what anybody does
         // when something looks stuck, and it should mean something.
@@ -255,11 +299,45 @@ final class CaptureSessionModel {
             let finished = MetadataFinisher.finish(encoded: shot.data)
             let quality = try ImageQualityGate.evaluate(jpeg: finished.data)
 
-            // Where the photograph turned out to be pointing, worked out from
-            // the camera's pose after the fact. Only credited to the car's
-            // surface when the gate passed: a blurred picture of a door
-            // documents nothing.
-            let region = quality.passes ? coverage.recordShot() : .front
+            // What this photograph was taken for, taken from the screen at
+            // the moment of the shutter rather than guessed afterwards.
+            let step = currentStep
+            // Whether this step still owed photographs *before* this one.
+            // ⚠️ Somebody who walked back to a step that is already full
+            // wants to add to it, so that case must not hand control back
+            // after a single frame — see below.
+            let wasShort = step.map { !progress.isComplete($0) } ?? false
+
+            // ⚠️ Asked before anything is credited. A photograph of a garage
+            // floor used to count towards the exterior floor exactly like a
+            // photograph of a door.
+            //
+            // ⚠️ And asked only of the walk-around. The check reads what
+            // share of the frame the scanned car fills, which means nothing
+            // when the subject is one wheel arch, the view from the driver's
+            // seat, or a roof shot from underneath it. Applied to those, it
+            // turned down the photographs somebody had just been told to
+            // take. See `ShotStep.needsTheCarInFrame`.
+            let checkFraming = step?.needsTheCarInFrame ?? true
+            let framing = checkFraming ? coverage.framingNow() : nil
+            let showsCar = framing?.showsTheCar ?? true
+            missedTheCar = !showsCar
+            let counts = quality.passes && showsCar
+
+            let region: CarRegion
+            if !counts {
+                region = .front
+            } else if step?.isInterior == true {
+                region = .interior
+            } else {
+                // The pose credits the coverage whatever the subject was —
+                // somebody photographing a wheel is still standing on that
+                // side of the car. The step gets the last word on the label,
+                // because a roof is shot from beside the car and the pose
+                // would file it as a flank.
+                let fromPose = coverage.recordShot()
+                region = step?.region ?? fromPose
+            }
 
             let record = try await archive.store(
                 jpeg: finished.data,
@@ -267,8 +345,17 @@ final class CaptureSessionModel {
                 capturedAt: now,
                 quality: quality,
                 metadataPath: finished.path,
-                accepted: quality.passes
+                accepted: counts,
+                // Recorded even when it did not count: what somebody was
+                // aiming at is part of the record, and a shot waved through
+                // afterwards has to land on the right step.
+                step: step
             )
+            // ⚠️ Before any verdict is applied. Whether the gate liked the
+            // photograph has nothing to do with whether the person who took
+            // it should be able to find it afterwards.
+            library.mirror(finished.data, as: record, into: archive, sessionStart: archive.startedAt)
+
             if quality.passes {
                 try await archive.updateCoverage(coverage.coverage)
                 consecutiveRejections = 0
@@ -276,6 +363,10 @@ final class CaptureSessionModel {
                 consecutiveRejections += 1
             }
             manifest = await archive.manifest
+            // Hand control back to the plan once a hand-picked step that
+            // owed photographs has been filled. A step somebody went back to
+            // top up stays put until they move off it themselves.
+            if let picked = manualStep, wasShort, progress.isComplete(picked) { manualStep = nil }
             // Shown whether or not the gate liked it: seeing the blurred
             // frame is how somebody works out that they moved.
             lastThumbnail = Self.thumbnail(of: finished.data)
@@ -295,7 +386,7 @@ final class CaptureSessionModel {
     func acceptAnyway() async {
         guard let archive, case .rejected(let record) = outcome else { return }
         try? await archive.accept(record, despite: record.quality.issues)
-        coverage.recordShot()
+        if record.step?.isInterior != true { coverage.recordShot() }
         try? await archive.updateCoverage(coverage.coverage)
         manifest = await archive.manifest
         consecutiveRejections = 0
@@ -303,6 +394,11 @@ final class CaptureSessionModel {
     }
 
     func dismissOutcome() { outcome = nil }
+
+    /// Takes an updated manifest back from a page that changed the archive —
+    /// the finish page, which notes where each photograph landed in the
+    /// camera roll.
+    func refreshManifest(_ manifest: SessionManifest) { self.manifest = manifest }
 
     func clearStartupError() { startupError = nil }
 

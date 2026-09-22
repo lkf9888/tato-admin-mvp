@@ -16,7 +16,6 @@ struct FinishView: View {
     @State private var plate = ""
     @State private var photographer = ""
     @State private var kind: SessionKind = .checkin
-    @State private var exporter = PhotoLibraryExporter()
     @State private var exportResult: PhotoLibraryExportResult?
     @State private var uploader: SessionUploader?
     @State private var busy = false
@@ -61,6 +60,11 @@ struct FinishView: View {
                     if model.coverage.canMeasure {
                         LabelledRow("覆盖", "\(Int(model.progress.coverage * 100))%")
                     }
+                    // ⚠️ The mirror's own counter, not the manifest's. The
+                    // manifest lags by however many saves are still in
+                    // flight, and a number that reads low is a number
+                    // somebody acts on.
+                    LabelledRow("已存进相册", "\(model.library.saved) 张")
                 }
 
                 if let warnings = readiness?.warnings, !warnings.isEmpty {
@@ -73,7 +77,7 @@ struct FinishView: View {
                     Button {
                         Task { await saveToLibrary() }
                     } label: {
-                        row("存进相册，交给 Turo App", systemImage: "square.and.arrow.down")
+                        row("按车牌命名相簿，核对每一张", systemImage: "checkmark.seal")
                     }
                     .disabled(busy || plate.isEmpty)
 
@@ -84,8 +88,10 @@ struct FinishView: View {
                     }
                     .disabled(busy || plate.isEmpty)
                 } footer: {
-                    Text("相册那份是交给 Turo 用的，后台那份是留底的。"
-                         + "存进相册后会把每张读回来核对，确认系统没有在中间重新编码。")
+                    Text("照片是**边拍边存**进相册的，这里不用再存一次。"
+                         + "这颗按钮做三件事：把漏掉的补上、把相簿改成车牌的名字、"
+                         + "把每一张从相册读回来和原件逐字节核对。"
+                         + "相册那份是交给 Turo 用的，后台那份是留底的。")
                 }
 
                 if let exportResult { Section("存进相册的结果") { ExportVerdict(result: exportResult) } }
@@ -134,7 +140,8 @@ struct FinishView: View {
         await commitDescription()
         guard let manifest = model.manifest else { return }
         do {
-            exportResult = try await exporter.export(from: archive, manifest: manifest)
+            exportResult = try await model.library.finish(archive: archive, manifest: manifest)
+            self.model.refreshManifest(await archive.manifest)
         } catch {
             problem = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -206,7 +213,7 @@ private struct ExportVerdict: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(result.isLossless ? "相簿「\(result.albumTitle)」已建好" : "相册改动了照片",
+            Label(result.isLossless ? "相簿「\(result.albumTitle)」核对通过" : "相册改动了照片",
                   systemImage: result.isLossless ? "checkmark.seal.fill" : "xmark.seal.fill")
                 .foregroundStyle(result.isLossless ? .green : .red)
                 .font(.callout.weight(.medium))

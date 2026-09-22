@@ -95,8 +95,14 @@ final class SurfaceCoverageTests: XCTestCase {
         // The roof faces the sky. No amount of circling at eye level covers
         // it — which is how the overhead shot becomes necessary without
         // anybody naming it in a list.
-        XCTAssertLessThan(coverage.fraction(of: .roof), 0.1)
-        XCTAssertEqual(coverage.thinnestRegion(), .roof)
+        XCTAssertLessThan(coverage.roofFraction, 0.1)
+        // ⚠️ And it is not what `thinnestRegion` answers, because that
+        // question is "which way should this person walk" and no amount of
+        // walking reaches a roof. Measured: a flawless ground-level
+        // walk-around used to score exactly 75% and stop, against a finish
+        // line of 90%.
+        XCTAssertNotEqual(coverage.thinnestRegion(), .roof)
+        XCTAssertEqual(coverage.fraction, 1.0, accuracy: 0.001, "the sides are done")
     }
 
     func testHoldingThePhoneOverheadCoversTheRoof() {
@@ -134,11 +140,35 @@ final class SurfaceCoverageTests: XCTestCase {
         XCTAssertNotEqual(coverage.thinnestRegion(), .front)
     }
 
+    /// `missing()` draws the model, so it spans every band including the
+    /// roof — unlike `total`, which scores only what a walk can reach.
     func testMissingPatchesAreWhatIsLeftToPaint() {
         var coverage = SurfaceCoverage()
-        XCTAssertEqual(coverage.missing().count, SurfaceCoverage.total)
+        let everything = SurfaceCoverage.sectorCount * SurfaceBand.allCases.count
+        XCTAssertEqual(coverage.missing().count, everything)
         coverage.add(shot(azimuth: 0))
-        XCTAssertEqual(coverage.missing().count, SurfaceCoverage.total - coverage.covered.count)
+        XCTAssertEqual(coverage.missing().count, everything - coverage.covered.count)
+        XCTAssertGreaterThan(everything, SurfaceCoverage.total, "the roof is drawn but not scored")
+    }
+
+    // MARK: - Confidence
+
+    /// One photograph of a panel is a glimpse; two from different places is
+    /// evidence. The middle colour on the model has to mean something.
+    func testASecondSightingRaisesConfidence() {
+        var coverage = SurfaceCoverage()
+        let patch = CoveragePatch(sector: 0, band: .body)
+        XCTAssertEqual(coverage.confidence(of: patch), 0)
+
+        coverage.add([patch])
+        XCTAssertEqual(coverage.confidence(of: patch), 0.5, accuracy: 0.001)
+        XCTAssertTrue(coverage.covered.contains(patch), "one sighting already counts as covered")
+
+        coverage.add([patch])
+        XCTAssertEqual(coverage.confidence(of: patch), 1.0, accuracy: 0.001)
+
+        coverage.add([patch])
+        XCTAssertEqual(coverage.confidence(of: patch), 1.0, accuracy: 0.001, "it does not keep climbing")
     }
 
     // MARK: - Inside the car
@@ -155,64 +185,149 @@ final class SurfaceCoverageTests: XCTestCase {
     }
 }
 
+/// A session with every step of the plan filled, which is what the finish
+/// button waits for.
+private func wholePlan(except skipped: ShotStep? = nil) -> [ShotStep: Int] {
+    var counts: [ShotStep: Int] = [:]
+    for step in ShotStep.allCases where step != skipped { counts[step] = step.required }
+    return counts
+}
+
+private func progress(
+    coverage: Double = 1.0,
+    steps: [ShotStep: Int],
+    measurable: Bool = true,
+    bearing: Double? = nil
+) -> ShootingProgress {
+    let exterior = steps.filter { !$0.key.isInterior }.values.reduce(0, +)
+    let interior = steps.filter { $0.key.isInterior }.values.reduce(0, +)
+    return ShootingProgress(
+        coverage: coverage, exteriorShots: exterior, interiorShots: interior,
+        shotsByStep: steps, coverageIsMeasurable: measurable, thinnestBearing: bearing
+    )
+}
+
 final class ShootingProgressTests: XCTestCase {
 
-    /// Before the first photograph the app must not name a region: nothing
-    /// has been painted, so every region reads as empty and "go to the front"
-    /// would be arbitrary. It says the thing that makes the app usable
-    /// without instruction instead.
-    func testTheFirstInstructionSaysThereIsNoWrongPlaceToStart() {
-        let fresh = ShootingProgress(coverage: 0, exteriorShots: 0, interiorShots: 0, thinnestRegion: .front)
-        XCTAssertEqual(fresh.instruction, "对着车拍第一张，从哪个角度开始都行")
-
-        // Shooting, but the car has not been found yet.
-        let searching = ShootingProgress(coverage: 0, exteriorShots: 3, interiorShots: 0, thinnestRegion: .front)
-        XCTAssertEqual(searching.instruction, "绕着车继续拍")
+    /// The plan is the order it is asked in, and the first thing anybody sees
+    /// is the walk-around. No photograph has to be declared, tapped or
+    /// chosen first.
+    func testItOpensOnTheWalkAround() {
+        let fresh = progress(coverage: 0, steps: [:], bearing: -90)
+        XCTAssertEqual(fresh.currentStep, .walkAround)
+        XCTAssertEqual(fresh.instruction, ShotStep.walkAround.hintZH)
+        XCTAssertFalse(fresh.canFinish)
     }
 
-    func testAFreshSessionAsksForCoverageFirst() {
-        let progress = ShootingProgress(coverage: 0.1, exteriorShots: 2, interiorShots: 0, thinnestRegion: .rear)
-        XCTAssertFalse(progress.canFinish)
-        XCTAssertEqual(progress.instruction, "还差车尾，走过去拍")
+    /// ⚠️ Twenty photographs is not a walk around a car. It is twenty
+    /// photographs, and twenty of the same door satisfies a counter.
+    func testTheWalkAroundIsNotDoneOnCountAlone() {
+        let stoodStill = progress(coverage: 0.4, steps: [.walkAround: 20], bearing: 40)
+        XCTAssertEqual(stoodStill.currentStep, .walkAround)
+        XCTAssertEqual(stoodStill.instruction, "往你右边走，那边还没拍")
+
+        let wentRound = progress(coverage: 0.93, steps: [.walkAround: 20])
+        XCTAssertEqual(wentRound.currentStep, .bumperCorners)
+    }
+
+    /// ⚠️ And the reverse: when there is no car fitted there is nothing to
+    /// grade against, and the count has to stand on its own. A requirement
+    /// nobody can clear teaches people to ignore the others.
+    func testAnUngradableWalkAroundPassesOnItsCount() {
+        let blind = progress(coverage: 0, steps: [.walkAround: 20], measurable: false)
+        XCTAssertEqual(blind.currentStep, .bumperCorners)
+        XCTAssertEqual(progress(coverage: 0, steps: [.walkAround: 19], measurable: false).currentStep,
+                       .walkAround)
+    }
+
+    func testTheStepsAreAskedForInOrder() {
+        var counts: [ShotStep: Int] = [:]
+        for step in ShotStep.allCases {
+            XCTAssertEqual(progress(steps: counts).currentStep, step)
+            counts[step] = step.required
+        }
+        XCTAssertTrue(progress(steps: counts).canFinish)
+    }
+
+    /// ⚠️ The app cannot tell a bonnet from a boot — PCA finds an axis, not a
+    /// heading — so it must never claim to. This is the assertion that stops
+    /// somebody reintroducing "还差车尾" because it reads better.
+    func testItNeverNamesAnEndOfTheCar() {
+        for bearing in stride(from: -180.0, through: 180.0, by: 7.5) {
+            let said = progress(
+                coverage: 0.3, steps: [.walkAround: 5], bearing: bearing
+            ).instruction
+            XCTAssertFalse(said.contains("车头"), said)
+            XCTAssertFalse(said.contains("车尾"), said)
+        }
+        for step in ShotStep.allCases {
+            XCTAssertFalse(step.hintZH.contains("车头"), step.hintZH)
+            XCTAssertFalse(step.hintZH.contains("车尾"), step.hintZH)
+        }
     }
 
     /// Ninety per cent, not a hundred. A tow bar, a roof box or a car parked
     /// against a wall leaves patches nobody can reach, and a photographer who
     /// cannot finish goes back to the camera app.
     func testTheFinishButtonUnlocksBelowFullCoverage() {
-        let short = ShootingProgress(coverage: 0.88, exteriorShots: 20, interiorShots: 10)
-        let enough = ShootingProgress(coverage: 0.91, exteriorShots: 20, interiorShots: 10)
-        XCTAssertFalse(short.canFinish)
-        XCTAssertTrue(enough.canFinish)
+        XCTAssertFalse(progress(coverage: 0.88, steps: wholePlan()).canFinish)
+        XCTAssertTrue(progress(coverage: 0.91, steps: wholePlan()).canFinish)
     }
 
-    func testTuroFloorsStillApplyEvenWhenTheCarIsCovered() {
-        // Four wide shots from the corners can paint a lot of car.
-        let wideOnly = ShootingProgress(coverage: 0.95, exteriorShots: 6, interiorShots: 10)
-        XCTAssertFalse(wideOnly.canFinish)
-        XCTAssertEqual(wideOnly.instruction, "再拍 9 张外观，站近一点")
+    /// ⚠️ The roof is asked for as four photographs, not as geometry.
+    ///
+    /// It used to be a coverage band, and the arithmetic wanted the phone
+    /// above the real roofline pointing down — reachable on a 1.45m saloon,
+    /// impossible on a 1.68m RAV4, which is what the fleet drives. Somebody
+    /// photographing the roof watched the number not move. Declared
+    /// subjects do not have this problem.
+    func testTheRoofIsFourPhotographsRatherThanAnUnreachableAngle() {
+        XCTAssertEqual(ShotStep.roof.required, 4)
+        XCTAssertFalse(ShotStep.roof.isGradedByCoverage)
+        XCTAssertEqual(ShotStep.roof.region, .roof)
+        XCTAssertFalse(progress(steps: wholePlan(except: .roof)).canFinish)
+    }
 
-        let noInterior = ShootingProgress(coverage: 0.95, exteriorShots: 20, interiorShots: 3)
-        XCTAssertFalse(noInterior.canFinish)
-        XCTAssertEqual(noInterior.instruction, "拍车内，还差 5 张")
+    /// ⚠️ Only the walk-around asks whether the car is in the frame. The
+    /// check reads what share of the screen the scanned car fills, which is
+    /// meaningless for one wheel arch, for the view from the driver's seat,
+    /// and for a roof shot from underneath.
+    func testOnlyTheWalkAroundIsCheckedForHavingTheCarInFrame() {
+        XCTAssertTrue(ShotStep.walkAround.needsTheCarInFrame)
+        for step in ShotStep.allCases where step != .walkAround {
+            XCTAssertFalse(step.needsTheCarInFrame, step.rawValue)
+        }
+    }
+
+    /// The plan is the gate now, so the plan has to clear the promise the
+    /// fleet made: thirty exterior, eight interior, dashboard among them.
+    func testThePlanClearsTheFleetFloors() {
+        XCTAssertGreaterThanOrEqual(ShotStep.exteriorRequired, ShootingProgress.exteriorFloor)
+        XCTAssertGreaterThanOrEqual(ShotStep.interiorRequired, ShootingProgress.interiorFloor)
+        XCTAssertTrue(ShotStep.dashboard.isInterior)
+        XCTAssertEqual(ShotStep.walkAround.required, 20)
+        XCTAssertEqual(ShotStep.wheels.required, 4)
+        XCTAssertEqual(ShotStep.bumperCorners.required, 4)
     }
 
     /// More photographs make a claim more likely to succeed, so nothing may
     /// tell the photographer they are done — only that they *may* stop.
-    func testPastTheFloorItAsksForMoreRatherThanDeclaringVictory() {
-        let done = ShootingProgress(coverage: 0.97, exteriorShots: 30, interiorShots: 12)
+    func testPastThePlanItAsksForMoreRatherThanDeclaringVictory() {
+        let done = progress(coverage: 0.97, steps: wholePlan())
         XCTAssertTrue(done.canFinish)
         XCTAssertTrue(done.instruction.contains("多拍"), done.instruction)
         XCTAssertFalse(done.instruction.contains("完成"))
     }
 
     /// There is no ceiling anywhere: a hundred photographs is a better
-    /// session than twenty-four, and the model must not disagree.
+    /// session than forty-one, and the model must not disagree.
     func testThereIsNoUpperBound() {
-        let many = ShootingProgress(coverage: 1.0, exteriorShots: 120, interiorShots: 40)
+        var over = wholePlan()
+        for step in ShotStep.allCases { over[step] = step.required * 3 }
+        let many = progress(coverage: 1.0, steps: over)
         XCTAssertTrue(many.canFinish)
         XCTAssertTrue(many.outstanding.isEmpty)
-        XCTAssertEqual(many.totalShots, 160)
+        XCTAssertEqual(many.totalShots, ShotStep.totalRequired * 3)
     }
 
     // MARK: - How wide a photograph actually is
@@ -260,5 +375,110 @@ final class ShootingProgressTests: XCTestCase {
         let sectorWidth = 360.0 / Double(SurfaceCoverage.sectorCount)
         let ultraError = 120 - CoverageProjection.portraitFieldOfView(alongLongEdge: 120, edges: 4032, 3024)
         XCTAssertGreaterThan(ultraError, sectorWidth)
+    }
+}
+
+/// The coverage basis, after it stopped projecting a guessed surface.
+///
+/// These are the properties the change was made for. The old projection
+/// passed its tests too — and then fitted a shelving unit as part of a car
+/// and scored a thorough walk-around at 42%, because every term in it had to
+/// be right at once. What is asserted here is mostly the opposite: that
+/// getting things wrong stops mattering.
+final class BearingCoverageTests: XCTestCase {
+
+    private func car(length: Float = 4.6, width: Float = 1.86, height: Float = 1.68) -> VehicleFrame {
+        VehicleFrame(centre: .zero, forward: SIMD3(1, 0, 0), length: length, width: width, height: height)
+    }
+
+    /// Stand at a bearing, aim at the car, take a photograph.
+    private func shot(
+        at degrees: Double, distance: Float = 2.6, height: Float = 1.5, of frame: VehicleFrame
+    ) -> Set<CoveragePatch> {
+        let angle = degrees * .pi / 180
+        let position = frame.centre + SIMD3(
+            Float(cos(angle)) * distance, height, Float(sin(angle)) * distance
+        )
+        let aim = frame.centre + SIMD3(0, frame.height / 2, 0) - position
+        return CoverageProjection.patches(
+            seenFrom: position, looking: aim, horizontalFieldOfViewDegrees: 54, of: frame
+        )
+    }
+
+    func testOnePhotographDocumentsTheArcYouAreStandingIn() {
+        let frame = car()
+        let patches = shot(at: 0, of: frame)
+        XCTAssertFalse(patches.isEmpty)
+
+        let sectors = Set(patches.map(\.sector))
+        // Straight off the nose: sector 0 and its neighbours, not the tail.
+        XCTAssertTrue(sectors.contains(0))
+        XCTAssertFalse(sectors.contains(SurfaceCoverage.sectorCount / 2), "credited the far side")
+    }
+
+    func testPointingAwayFromTheCarDocumentsNothing() {
+        let frame = car()
+        let position = SIMD3<Float>(4, 1.5, 0)
+        let away = SIMD3<Float>(1, 0, 0)
+        XCTAssertTrue(CoverageProjection.patches(
+            seenFrom: position, looking: away, horizontalFieldOfViewDegrees: 54, of: frame
+        ).isEmpty, "a photograph of the wall behind the car counted")
+    }
+
+    func testStandingTooFarAwayDocumentsNothing() {
+        XCTAssertTrue(shot(at: 0, distance: 12, of: car()).isEmpty)
+    }
+
+    /// ⚠️ The whole reason for the change. The old projection put patches on
+    /// a fitted box, so a box 30% too long and 30% too wide moved every one
+    /// of them and the score collapsed — measured at 41% against a correct
+    /// walk-around's 75%. This basis only uses the centre, so the same bad
+    /// box barely registers.
+    func testABadlyFittedBoxNoLongerRuinsTheAnswer() {
+        func walk(_ frame: VehicleFrame) -> Set<Int> {
+            var seen = Set<Int>()
+            for step in 0..<24 {
+                seen.formUnion(shot(at: Double(step) * 15, of: frame).map(\.sector))
+            }
+            return seen
+        }
+        let right = walk(car())
+        let swollen = walk(car(length: 6.0, width: 2.4, height: 2.0))
+        XCTAssertEqual(right.count, SurfaceCoverage.sectorCount)
+        XCTAssertEqual(swollen.count, SurfaceCoverage.sectorCount, "a wrong box still breaks the score")
+    }
+
+    func testAWalkAroundCoversEverySideSectorAndNoRoof() {
+        var coverage = SurfaceCoverage()
+        let frame = car()
+        for step in 0..<16 { coverage.add(shot(at: Double(step) * 22.5, of: frame)) }
+        XCTAssertEqual(coverage.fraction, 1.0, accuracy: 0.001)
+        XCTAssertEqual(coverage.roofFraction, 0, "the roof cannot be had from eye level")
+    }
+
+    // MARK: - The roof
+
+    func testTheRoofNeedsThePhoneAboveTheRealRoof() {
+        let suv = car(height: 1.68)
+        // Reaching up, but not over it.
+        let short = CoverageProjection.patches(
+            seenFrom: SIMD3(0, 1.60, 1.2), looking: SIMD3(0, -1, -1),
+            horizontalFieldOfViewDegrees: 54, of: suv
+        )
+        XCTAssertFalse(short.contains { $0.band == .roof })
+
+        let over = CoverageProjection.patches(
+            seenFrom: SIMD3(0, 2.0, 1.2), looking: SIMD3(0, -1, -1),
+            horizontalFieldOfViewDegrees: 54, of: suv
+        )
+        XCTAssertTrue(over.contains { $0.band == .roof })
+    }
+
+    /// ⚠️ Measured height, not a constant. A 1.45m saloon roof is reachable
+    /// from the ground and a 1.68m SUV roof is not, and an app that demands
+    /// the impossible is one people learn to ignore.
+    func testWhetherTheRoofIsAskedForDependsOnHowTallTheCarIs() {
+        XCTAssertTrue(car(height: 1.45).roofIsReachable)
+        XCTAssertFalse(car(height: 1.68).roofIsReachable)
     }
 }

@@ -19,6 +19,7 @@ struct CaptureView: View {
     @State private var model = CaptureSessionModel()
     @State private var showingFinish = false
     @State private var showingSettings = false
+    @State private var showingCoverage = false
     @State private var noticeGeneration = 0
     @State private var shutterBlink = false
 
@@ -35,6 +36,7 @@ struct CaptureView: View {
             VStack(spacing: 0) {
                 topBar
                 viewfinder
+                stepStrip
                 Spacer(minLength: 0)
                 shutterRow
             }
@@ -57,6 +59,9 @@ struct CaptureView: View {
         .onChange(of: model.outcome) { _, outcome in respond(to: outcome) }
         .sheet(isPresented: $showingFinish) {
             FinishView(model: model)
+        }
+        .sheet(isPresented: $showingCoverage) {
+            CoverageSheet(coverage: model.coverage.coverage)
         }
         .sheet(isPresented: $showingSettings) {
             NavigationStack {
@@ -123,17 +128,51 @@ struct CaptureView: View {
             .aspectRatio(frameAspect, contentMode: .fit)
             .frame(maxWidth: .infinity)
             .clipped()
+            .overlay { stepGuide }
             .overlay(alignment: .topLeading) { diagram }
             .overlay(alignment: .bottom) { hud }
             .overlay { Color.black.opacity(shutterBlink ? 1 : 0).allowsHitTesting(false) }
     }
 
+    /// What to photograph, drawn hollow over the live image.
+    ///
+    /// ⚠️ This replaced a row of chips somebody had to tap before each named
+    /// subject. Tapping first is a thing to remember, and anything you have
+    /// to remember gets skipped on the fortieth car — after which the photo
+    /// exists but is filed as nothing in particular. The plan now advances
+    /// itself and the drawing says where it has got to, so the only action
+    /// left is the shutter.
+    ///
+    /// Sits above the middle of the frame rather than dead centre: below it
+    /// is where the instruction and the warnings live, and a guide that
+    /// covers its own caption teaches nobody anything.
+    @ViewBuilder private var stepGuide: some View {
+        if let step = model.currentStep {
+            GeometryReader { geometry in
+                StepGuide(
+                    step: step,
+                    taken: model.progress.taken(step),
+                    outlineWidth: geometry.size.width * 0.52
+                )
+                .frame(width: geometry.size.width - 36)
+                .position(x: geometry.size.width / 2, y: geometry.size.height * 0.42)
+            }
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        }
+    }
+
+    /// Tappable, because at this size it can only point a direction. The
+    /// question "which panel exactly" needs a model you can turn over.
     @ViewBuilder private var diagram: some View {
         if model.coverage.canMeasure {
-            CoverageDiagram(coverage: model.coverage.coverage, isLive: model.coverage.hasFrame)
-                .frame(width: 52, height: 82)
-                .padding(12)
-                .allowsHitTesting(false)
+            Button { showingCoverage = true } label: {
+                CoverageDiagram(coverage: model.coverage.coverage, isLive: model.coverage.hasFrame)
+                    .frame(width: 54, height: 86)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(12)
         }
     }
 
@@ -154,6 +193,15 @@ struct CaptureView: View {
             // the only one that announced itself. A capture that never
             // finishes would otherwise leave a dead button and no
             // explanation anywhere on the screen.
+            // ⚠️ Said out loud, always. A photograph that quietly does not
+            // reach the camera roll is a photograph nobody can hand to Turo,
+            // and it looks exactly like one that did.
+            if let trouble = model.library.trouble {
+                Chip(icon: "photo.badge.exclamationmark", text: trouble)
+            }
+            if model.missedTheCar {
+                Chip(icon: "questionmark.circle.fill", text: "这张里看不到车 —— 不计数，退开一点重拍")
+            }
             if model.isCapturing {
                 Chip(icon: "hourglass", text: "正在保存这一张…")
             }
@@ -163,8 +211,8 @@ struct CaptureView: View {
 
             if hasNotice {
                 notice
-            } else {
-                Text(model.progress.instruction)
+            } else if let directive = model.progress.directive {
+                Text(directive)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
@@ -176,6 +224,58 @@ struct CaptureView: View {
         .padding(.horizontal, 14)
         .padding(.bottom, 14)
         .animation(.easeOut(duration: 0.2), value: model.outcome)
+        .animation(.easeOut(duration: 0.25), value: model.currentStep)
+    }
+
+    /// Where the plan has got to, and the way to move along it by hand.
+    ///
+    /// ⚠️ The arrows are not a way to skip. Every step still has to be filled
+    /// before the finish button appears — they exist because the order in
+    /// `ShotStep` is a good default and not a law: somebody already standing
+    /// at the back of the car should do the rear wheels now rather than walk
+    /// round twice, and a roof in the rain is a step to come back to. A
+    /// guided app that refuses that gets closed in favour of the camera app,
+    /// and then there is no evidence at all.
+    @ViewBuilder private var stepStrip: some View {
+        if let step = model.currentStep, let index = ShotStep.allCases.firstIndex(of: step) {
+            HStack(spacing: 16) {
+                arrow("chevron.left", by: -1, enabled: index > 0)
+                HStack(spacing: 7) {
+                    ForEach(ShotStep.allCases) { candidate in
+                        dot(candidate, current: candidate == step)
+                    }
+                }
+                arrow("chevron.right", by: 1, enabled: index < ShotStep.allCases.count - 1)
+            }
+            .frame(height: 40)
+            .animation(.easeOut(duration: 0.2), value: step)
+        }
+    }
+
+    private func dot(_ step: ShotStep, current: Bool) -> some View {
+        Circle()
+            .fill(model.progress.isComplete(step) ? Color.white.opacity(0.92) : Color.white.opacity(0.24))
+            .frame(width: 6, height: 6)
+            .overlay {
+                if current {
+                    Circle().stroke(Color.yellow, lineWidth: 1.6).frame(width: 12, height: 12)
+                }
+            }
+    }
+
+    private func arrow(_ symbol: String, by delta: Int, enabled: Bool) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            model.stepAside(by: delta)
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white.opacity(enabled ? 0.85 : 0.2))
+                .frame(width: 34, height: 34)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 
     // MARK: - Bottom: last shot, shutter, and the way out

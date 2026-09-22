@@ -151,7 +151,7 @@ final class VehicleFrameFitterTests: XCTestCase {
             ))
         }
         XCTAssertGreaterThan(coverage.fraction, 0.6, "a walk around a fitted car should paint most of it")
-        XCTAssertEqual(coverage.thinnestRegion(), .roof, "except the roof")
+        XCTAssertLessThan(coverage.roofFraction, 0.1, "except the roof")
     }
 }
 
@@ -189,4 +189,105 @@ final class BearingTests: XCTestCase {
         XCTAssertNil(Bearing.relative(to: SIMD3(0.01, 0, 0.01), from: standing, facing: facing))
     }
 
+}
+
+// MARK: - The garage
+
+/// Builds a filled box of points, the way a depth mesh sees a solid object.
+private func slab(
+    centre: SIMD3<Float>, length: Float, width: Float, height: Float, step: Float = 0.12
+) -> [SIMD3<Float>] {
+    var points: [SIMD3<Float>] = []
+    var x = -length / 2
+    while x <= length / 2 {
+        var z = -width / 2
+        while z <= width / 2 {
+            var y: Float = 0
+            while y <= height {
+                // Surfaces only: a mesh has no interior.
+                let onShell = abs(x) > length / 2 - step || abs(z) > width / 2 - step || y > height - step
+                if onShell { points.append(centre + SIMD3(x, y, z)) }
+                y += step
+            }
+            z += step
+        }
+        x += step
+    }
+    return points
+}
+
+/// The session that started this: a car in a garage with a metal shelving
+/// unit alongside it. Everything sits in the same 0.25–2.2m height band, so
+/// the old filter handed all of it to PCA, which duly found the axis of the
+/// room. The box came back 6.0 by 2.4 metres, passed `isPlausible`, and the
+/// photographer circled the real car for thirty-one photographs while the
+/// score sat at 42%.
+final class GarageFitTests: XCTestCase {
+
+    private let car = slab(centre: SIMD3(0, 0, 0), length: 4.5, width: 1.8, height: 1.5)
+    private let shelving = slab(centre: SIMD3(0, 0, 1.7), length: 3.4, width: 0.5, height: 2.0)
+    private let wall = slab(centre: SIMD3(0, 0, 4.0), length: 9.0, width: 0.2, height: 2.4)
+
+    /// Standing beside the car, pointing at it.
+    private let observer = SIMD3<Float>(0, 1.5, -2.4)
+    private let looking = SIMD3<Float>(0, -0.2, 1)
+
+    func testItFindsTheCarAndNotTheGarage() throws {
+        let frame = try XCTUnwrap(
+            VehicleFrameFitter.fit(
+                points: car + shelving + wall,
+                groundY: 0,
+                observedFrom: observer,
+                looking: looking
+            )
+        )
+        XCTAssertEqual(frame.length, 4.5, accuracy: 0.4, "fitted something other than the car")
+        XCTAssertEqual(frame.width, 1.8, accuracy: 0.4)
+        XCTAssertLessThan(simd_length(frame.centre - SIMD3<Float>(0, 0, 0)), 0.5)
+    }
+
+    /// The exact failure, asserted directly: a box wide enough to have
+    /// swallowed the shelving must never come back.
+    func testItNeverReturnsTheCarPlusTheShelving() throws {
+        let frame = try XCTUnwrap(
+            VehicleFrameFitter.fit(
+                points: car + shelving, groundY: 0, observedFrom: observer, looking: looking
+            )
+        )
+        XCTAssertLessThan(frame.width, 2.2, "the shelving is inside the box again")
+    }
+
+    /// Pointing away from the car at the wall must not produce a car-shaped
+    /// answer built out of wall.
+    func testLookingAtTheWallFindsNoCar() {
+        let away = SIMD3<Float>(0, -0.1, 1)
+        let fromFarSide = SIMD3<Float>(0, 1.5, 2.0)
+        let frame = VehicleFrameFitter.fit(
+            points: wall, groundY: 0, observedFrom: fromFarSide, looking: away
+        )
+        XCTAssertNil(frame)
+    }
+
+    /// How close something has to be before it becomes part of the car.
+    ///
+    /// Measured, so the limit is a known quantity rather than a hope: from a
+    /// 0.2m gap outwards the fit is the car's own 1.8m. At 0.1m it merges —
+    /// and that is the honest answer, not a bug to chase. A car's mesh is
+    /// full of holes where the paint and the glass returned no infrared, so
+    /// anything ten centimetres off the flank is inside the noise of the car
+    /// itself. Nobody parks a shelf that close to a car they are inspecting.
+    func testHowCloseSomethingHasToBeBeforeItCounts() throws {
+        for gap in [Float(0.2), 0.3, 0.5, 0.9] {
+            let shelf = slab(
+                centre: SIMD3(0, 0, 0.9 + gap + 0.25), length: 3.4, width: 0.5, height: 2.0
+            )
+            let frame = try XCTUnwrap(
+                VehicleFrameFitter.fit(
+                    points: car + shelf, groundY: 0, observedFrom: observer, looking: looking
+                ),
+                "no fit at \(gap)m"
+            )
+            XCTAssertEqual(frame.width, 1.8, accuracy: 0.3, "merged with shelving \(gap)m away")
+        }
+    }
 }

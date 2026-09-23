@@ -12,6 +12,7 @@ import {
 
 import {
   expandBlockedBookingDates,
+  getDirectBookingInstalmentPlan,
   getDirectBookingQuote,
   hasDateOnlyBookingConflict,
   type DateOnlyBookingWindow,
@@ -365,6 +366,30 @@ export function PublicBookingPanel({
     storageKey,
   ]);
 
+  // The same inputs the server will bill from, so what the renter is
+  // shown here and what their card is charged cannot disagree.
+  const plan = useMemo(
+    () =>
+      getDirectBookingInstalmentPlan({
+        pickupDate,
+        returnDate,
+        bookingDailyRate,
+        bookingInsuranceFee,
+        bookingDepositAmount,
+        bookingTaxRate,
+        includeInsurance,
+      }),
+    [
+      bookingDailyRate,
+      bookingDepositAmount,
+      bookingInsuranceFee,
+      bookingTaxRate,
+      includeInsurance,
+      pickupDate,
+      returnDate,
+    ],
+  );
+
   const quote = useMemo(
     () =>
       getDirectBookingQuote({
@@ -629,10 +654,49 @@ export function PublicBookingPanel({
         </div>
         <div className="mt-4 flex items-center justify-between border-t border-[var(--line)] pt-4">
           <span className="text-sm font-medium text-[var(--ink)]">{reserveMessages.quoteTotal}</span>
-          <span className="text-[1.6rem] font-semibold text-[var(--ink)]">
-            {formatCurrency(quote.totalAmount, locale)}
+          <span
+            className={
+              plan.isInstalmentPlan
+                ? "text-lg font-semibold text-[var(--ink-mid)]"
+                : "text-[1.6rem] font-semibold text-[var(--ink)]"
+            }
+          >
+            {formatCurrency(plan.totalAmount, locale)}
           </span>
         </div>
+
+        {plan.isInstalmentPlan ? (
+          <div className="mt-4 border-t border-[var(--line)] pt-4">
+            <p className="text-sm font-medium text-[var(--ink)]">
+              {reserveMessages.instalmentTitle(plan.instalments.length)}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">
+              {reserveMessages.instalmentIntro}
+            </p>
+            <ul className="mt-3 space-y-2 text-xs text-[var(--ink-mid)]">
+              {plan.instalments.map((instalment) => (
+                <li key={instalment.index} className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 truncate">
+                    {instalment.index === 1
+                      ? reserveMessages.instalmentFirst(instalment.startDate, instalment.days)
+                      : reserveMessages.instalmentLater(instalment.startDate, instalment.days)}
+                  </span>
+                  <span className="shrink-0 tabular-nums">
+                    {formatCurrency(instalment.total, locale)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 flex items-center justify-between border-t border-[var(--line)] pt-3">
+              <span className="text-sm font-medium text-[var(--ink)]">
+                {reserveMessages.instalmentDueNow}
+              </span>
+              <span className="text-[1.6rem] font-semibold text-[var(--ink)]">
+                {formatCurrency(plan.dueNow, locale)}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-5 rounded-lg border border-[var(--line)] bg-white p-4">

@@ -3,7 +3,11 @@ import "server-only";
 import { OrderAttachmentKind } from "@prisma/client";
 import type Stripe from "stripe";
 
-import { dateOnlyToUtcMidday, hasVehicleBookingConflict } from "@/lib/direct-booking";
+import {
+  dateOnlyToUtcMidday,
+  getDirectBookingInstalmentPlan,
+  hasVehicleBookingConflict,
+} from "@/lib/direct-booking";
 import { sendDirectBookingConfirmationEmail } from "@/lib/direct-booking-email";
 import {
   buildRentalAgreementValues,
@@ -17,6 +21,8 @@ import { roundCurrencyAmount } from "@/lib/utils";
 
 type DirectBookingMetadata = {
   vehicleId?: string;
+  isInstalmentPlan?: string;
+  contractTotal?: string;
   vehiclePlateNumber?: string;
   vehicleName?: string;
   pickupDate?: string;
@@ -90,6 +96,89 @@ function describeStripePaymentMethod(session: Stripe.Checkout.Session) {
     return `${card.brand.toUpperCase()} ending ${card.last4} (held by Stripe)`;
   }
   return "Card on file with Stripe";
+}
+
+/**
+ * Write the instalments a long booking owes.
+ *
+ * The first row is what Stripe actually took, not what the plan said
+ * it would: those agree, but if a rate changed in the seconds between
+ * checkout and this webhook, the paid row should say what was paid.
+ * The later rows carry the schedule and no `paidAt`, which is what
+ * makes them show up as outstanding.
+ */
+async function writeInstalmentSchedule(input: {
+  order: { id: string; workspaceId: string | null };
+  vehicle: {
+    bookingDailyRate: number | null;
+    bookingInsuranceFee: number | null;
+    bookingDepositAmount: number | null;
+    bookingTaxRate: number | null;
+  };
+  pickupDate: string;
+  returnDate: string;
+  includeInsurance: boolean;
+  chargedAmount: number | null;
+}) {
+  const existing = await prisma.orderPayment.count({ where: { orderId: input.order.id } });
+  if (existing > 0) return;
+
+  const plan = getDirectBookingInstalmentPlan({
+    pickupDate: input.pickupDate,
+    returnDate: input.returnDate,
+    bookingDailyRate: input.vehicle.bookingDailyRate ?? 0,
+    bookingInsuranceFee: input.vehicle.bookingInsuranceFee ?? 0,
+    bookingDepositAmount: input.vehicle.bookingDepositAmount ?? 0,
+    bookingTaxRate: input.vehicle.bookingTaxRate ?? 0,
+    includeInsurance: input.includeInsurance,
+  });
+  if (!plan.isInstalmentPlan) return;
+
+  const now = new Date();
+  await prisma.orderPayment.createMany({
+    data: plan.instalments.map((instalment) => {
+      const isFirst = instalment.index === 1;
+      return {
+        workspaceId: input.order.workspaceId,
+        orderId: input.order.id,
+        amount:
+          isFirst && input.chargedAmount != null ? input.chargedAmount : instalment.total,
+        paidAt: isFirst ? now : null,
+        dueAt: dateOnlyToUtcMidday(instalment.dueDate),
+        method: isFirst ? "Stripe" : null,
+        note: `Period ${instalment.index} of ${plan.instalments.length} · ${instalment.days} day(s) from ${instalment.startDate}`,
+        createdBy: "direct-booking",
+      };
+    }),
+  });
+
+  // The schedule is recomputed here from the vehicle's current rates,
+  // while the card was charged from the rates at checkout. Those agree
+  // in every ordinary case; if a rate was edited in the seconds
+  // between, the paid row says what was actually taken and the rows
+  // then no longer sum to the order's value. That is the honest
+  // recording, but it must not be a silent one.
+  const chargedDrift =
+    input.chargedAmount != null &&
+    Math.abs(input.chargedAmount - plan.instalments[0].total) > 0.01;
+
+  await logActivity({
+    workspaceId: input.order.workspaceId ?? undefined,
+    actor: "stripe-webhook",
+    action: chargedDrift
+      ? "direct_booking_instalments_mismatch"
+      : "direct_booking_instalments_created",
+    entityType: "Order",
+    entityId: input.order.id,
+    metadata: {
+      periods: plan.instalments.length,
+      dueNow: plan.dueNow,
+      dueLater: plan.dueLater,
+      ...(chargedDrift
+        ? { chargedAmount: input.chargedAmount, expectedFirstPeriod: plan.instalments[0].total }
+        : {}),
+    },
+  });
 }
 
 export async function persistDirectBookingFromCheckoutSession(session: Stripe.Checkout.Session) {
@@ -177,8 +266,20 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
     return;
   }
 
-  const totalPrice =
+  const chargedAmount =
     typeof session.amount_total === "number" ? roundCurrencyAmount(session.amount_total / 100) : null;
+  const isInstalmentPlan = metadata.isInstalmentPlan === "true";
+  const contractTotal = metadata.contractTotal ? Number(metadata.contractTotal) : null;
+
+  // On an instalment plan the card was only charged for the first
+  // period, but the order is worth the whole booking. Recording the
+  // charge as `totalPrice` would understate every revenue figure in
+  // the app and hide the fact that money is still owed -- which is
+  // exactly what OrderPayment rows exist to answer.
+  const totalPrice =
+    isInstalmentPlan && contractTotal != null && Number.isFinite(contractTotal)
+      ? roundCurrencyAmount(contractTotal)
+      : chargedAmount;
   const depositAmount = metadata.depositAmount ? Number(metadata.depositAmount) : null;
 
   const order = await prisma.order.create({
@@ -241,6 +342,17 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
     await prisma.directBookingDocument.updateMany({
       where: { checkoutSessionId: session.id },
       data: { orderId: order.id },
+    });
+  }
+
+  if (isInstalmentPlan) {
+    await writeInstalmentSchedule({
+      order,
+      vehicle,
+      pickupDate,
+      returnDate,
+      includeInsurance: metadata.includeInsurance === "true",
+      chargedAmount,
     });
   }
 

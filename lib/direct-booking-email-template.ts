@@ -35,7 +35,17 @@ export type DirectBookingEmailValues = {
   pickupDate: string;
   returnDate: string;
   days: string;
+  /**
+   * What the card was actually charged. On a long booking billed in
+   * periods that is the first period only -- which is why this keeps
+   * the name the default template already uses next to "Total paid".
+   * A saved template that predates instalments stays truthful.
+   */
   totalAmount: string;
+  /** The whole booking, when it differs from what was paid today. */
+  bookingTotal: string;
+  /** What is still to be collected. Empty on a single payment. */
+  balanceDue: string;
   depositAmount: string;
   contactPhone: string;
   contactEmail: string;
@@ -53,7 +63,9 @@ export const DIRECT_BOOKING_EMAIL_DEFAULT_TEMPLATE: DirectBookingEmailTemplate =
     "Pick-up: {pickupDate}",
     "Return: {returnDate}",
     "Days: {days}",
-    "Total paid: {totalAmount}",
+    "Paid today: {totalAmount}",
+    "Booking total: {bookingTotal}",
+    "Still to pay: {balanceDue}",
     "Security deposit: {depositAmount}",
     "Reference: {bookingRef}",
     "",
@@ -78,6 +90,8 @@ export const DIRECT_BOOKING_EMAIL_VARIABLES = [
   "returnDate",
   "days",
   "totalAmount",
+  "bookingTotal",
+  "balanceDue",
   "depositAmount",
   "contactPhone",
   "contactEmail",
@@ -95,6 +109,8 @@ export const DIRECT_BOOKING_EMAIL_SAMPLE_VALUES: DirectBookingEmailValues = {
   returnDate: "2026/10/06",
   days: "4",
   totalAmount: "$463.52",
+  bookingTotal: "",
+  balanceDue: "",
   depositAmount: "$300.00",
   contactPhone: "+1 604 555 0147",
   contactEmail: "hello@example.com",

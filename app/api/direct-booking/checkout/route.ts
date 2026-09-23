@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
+  getDirectBookingInstalmentPlan,
   getDirectBookingQuote,
   hasVehicleBookingConflict,
   isDateOnlyRangeValid,
@@ -207,6 +208,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Quote could not be calculated." }, { status: 400 });
     }
 
+    // A booking longer than one period is charged for its first period
+    // only; the rest become instalments the operator collects. What
+    // Stripe sees is therefore `plan.dueNow`, while the order records
+    // the full contract value.
+    const plan = getDirectBookingInstalmentPlan({
+      pickupDate: parsed.pickupDate,
+      returnDate: parsed.returnDate,
+      bookingDailyRate: vehicle.bookingDailyRate ?? 0,
+      bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
+      bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
+      bookingTaxRate: vehicle.bookingTaxRate ?? 0,
+      includeInsurance: parsed.includeInsurance,
+    });
+    const firstPeriod = plan.instalments[0] ?? null;
+    const chargedDays = firstPeriod?.days ?? quote.days;
+    const chargedRent = firstPeriod ? firstPeriod.rentAmount : quote.baseAmount;
+    const chargedInsurance = firstPeriod ? firstPeriod.insuranceAmount : quote.insuranceAmount;
+    const chargedTax = firstPeriod ? firstPeriod.taxAmount : quote.taxAmount;
+
     const stripe = getStripeClient();
     const { successUrl, cancelUrl } = await getBookingReturnUrls(
       vehicle,
@@ -215,7 +235,7 @@ export async function POST(request: Request) {
 
     // Platform fee = 5% of rental + insurance (NOT the refundable deposit).
     // Deposit is a hold the host needs to release, not earned revenue.
-    const feeBaseCents = Math.round((quote.baseAmount + quote.insuranceAmount) * 100);
+    const feeBaseCents = Math.round((chargedRent + chargedInsurance) * 100);
     const applicationFeeAmount = Math.round(
       feeBaseCents * (PLATFORM_APPLICATION_FEE_PERCENT / 100),
     );
@@ -274,6 +294,11 @@ export async function POST(request: Request) {
         renterPhone: parsed.renterPhone ?? "",
         includeInsurance: parsed.includeInsurance ? "true" : "false",
         bookedDays: String(quote.days),
+        isInstalmentPlan: plan.isInstalmentPlan ? "true" : "false",
+        instalmentCount: String(plan.instalments.length),
+        contractTotal: String(plan.totalAmount),
+        dueNow: String(plan.dueNow),
+        dueLater: String(plan.dueLater),
         depositAmount: String(quote.depositAmount),
         taxName: vehicle.bookingTaxName?.trim() || "",
         taxRate: String(vehicle.bookingTaxRate ?? 0),
@@ -285,7 +310,7 @@ export async function POST(request: Request) {
       },
       line_items: [
         {
-          quantity: quote.days,
+          quantity: chargedDays,
           price_data: {
             currency: "cad",
             unit_amount: Math.round((vehicle.bookingDailyRate ?? 0) * 100),
@@ -298,7 +323,7 @@ export async function POST(request: Request) {
         ...(parsed.includeInsurance && (vehicle.bookingInsuranceFee ?? 0) > 0
           ? [
               {
-                quantity: quote.days,
+                quantity: chargedDays,
                 price_data: {
                   currency: "cad",
                   unit_amount: Math.round((vehicle.bookingInsuranceFee ?? 0) * 100),
@@ -310,13 +335,13 @@ export async function POST(request: Request) {
               },
             ]
           : []),
-        ...(quote.taxAmount > 0
+        ...(chargedTax > 0
           ? [
               {
                 quantity: 1,
                 price_data: {
                   currency: "cad",
-                  unit_amount: Math.round(quote.taxAmount * 100),
+                  unit_amount: Math.round(chargedTax * 100),
                   product_data: {
                     name: `${vehicle.bookingTaxName?.trim() || "Tax"} (${(vehicle.bookingTaxRate ?? 0).toFixed(3)}%)`,
                     description: "Tax on rental and insurance",

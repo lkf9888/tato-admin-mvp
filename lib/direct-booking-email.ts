@@ -54,6 +54,9 @@ export function buildDirectBookingEmailValues(input: {
   brandName: string;
   contactPhone?: string | null;
   contactEmail?: string | null;
+  /** Instalments, when the booking has any. */
+  paidAmount?: number | null;
+  balanceDue?: number | null;
 }): DirectBookingEmailValues {
   const days = getDirectBookingDays(
     toDateOnly(input.order.pickupDatetime),
@@ -69,7 +72,22 @@ export function buildDirectBookingEmailValues(input: {
     pickupDate: formatDisplayDate(input.order.pickupDatetime),
     returnDate: formatDisplayDate(input.order.returnDatetime),
     days: days > 0 ? String(days) : "",
-    totalAmount: input.order.totalPrice != null ? formatCurrency(input.order.totalPrice) : "",
+    // Paid today, not the contract value: the default wording puts
+    // this next to "Paid today", and a renter on an instalment plan
+    // has handed over the first period only.
+    totalAmount:
+      input.paidAmount != null
+        ? formatCurrency(input.paidAmount)
+        : input.order.totalPrice != null
+          ? formatCurrency(input.order.totalPrice)
+          : "",
+    // Both blank on a single payment, so their lines drop out.
+    bookingTotal:
+      input.balanceDue != null && input.balanceDue > 0 && input.order.totalPrice != null
+        ? formatCurrency(input.order.totalPrice)
+        : "",
+    balanceDue:
+      input.balanceDue != null && input.balanceDue > 0 ? formatCurrency(input.balanceDue) : "",
     depositAmount:
       input.order.depositAmount != null && input.order.depositAmount > 0
         ? formatCurrency(input.order.depositAmount)
@@ -113,8 +131,24 @@ export async function sendDirectBookingConfirmationEmail(input: {
       return { ok: false, reason: "DISABLED" };
     }
 
+    // Read the schedule the webhook has already written, so the email
+    // can tell a long-rental renter what left their card today and
+    // what has not.
+    const instalments = await prisma.orderPayment.findMany({
+      where: { orderId: input.order.id },
+      select: { amount: true, paidAt: true },
+    });
+    const paidAmount = instalments.length
+      ? instalments.filter((row) => row.paidAt).reduce((sum, row) => sum + row.amount, 0)
+      : null;
+    const balanceDue = instalments.length
+      ? instalments.filter((row) => !row.paidAt).reduce((sum, row) => sum + row.amount, 0)
+      : null;
+
     const template = normalizeDirectBookingEmailTemplate(saved);
     const values = buildDirectBookingEmailValues({
+      paidAmount,
+      balanceDue,
       order: input.order,
       vehicle: input.vehicle,
       // The renter booked on the operator's brand, not ours. Falling

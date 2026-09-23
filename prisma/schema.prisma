@@ -1717,6 +1717,11 @@ model OrderPayment {
   /// Null while the instalment is still expected. Setting it is what
   /// "this one has been paid" means.
   paidAt      DateTime?
+  /// When this instalment falls due. Null for rows an operator typed
+  /// in by hand, which are usually a record of money already taken;
+  /// set on the ones a long booking generates, where the schedule is
+  /// the entire point of writing them down.
+  dueAt       DateTime?
   payer       String?
   method      String?
   note        String?

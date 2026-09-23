@@ -160,3 +160,126 @@ export function getBlockedBookingWindows(
       returnDatetime: order.returnDatetime,
     }));
 }
+
+/**
+ * Long rentals, billed in periods.
+ *
+ * A three-month booking at a daily rate is several thousand dollars,
+ * and asking a renter to put all of it on one card is how a long
+ * rental stops happening. The booking is split into 30-day periods:
+ * the first is taken at checkout together with the deposit, and the
+ * rest become expected instalments the operator collects.
+ *
+ * Only the first period goes through Stripe, which is worth saying out
+ * loud: the rest are settled off-platform, so no card fee and no
+ * platform fee are charged on them either.
+ */
+export const INSTALMENT_PERIOD_DAYS = 30;
+
+export type BookingInstalment = {
+  /** 1-based. Period 1 is the one taken at checkout. */
+  index: number;
+  days: number;
+  /** `YYYY-MM-DD`, inclusive. */
+  startDate: string;
+  /** `YYYY-MM-DD` the period is payable on, which is the day it starts. */
+  dueDate: string;
+  rentAmount: number;
+  insuranceAmount: number;
+  taxAmount: number;
+  /** Deposit rides on the first period only. */
+  depositAmount: number;
+  total: number;
+};
+
+export type BookingInstalmentPlan = {
+  /** False for ordinary short bookings, which stay a single payment. */
+  isInstalmentPlan: boolean;
+  instalments: BookingInstalment[];
+  /** What the card is charged at checkout. */
+  dueNow: number;
+  /** What the operator collects afterwards. */
+  dueLater: number;
+  /** Rent + insurance + tax + deposit across the whole booking. */
+  totalAmount: number;
+};
+
+function addDaysToDateOnly(value: string, amount: number) {
+  return dateToDateOnly(new Date(dateOnlyToUtcMidday(value).getTime() + amount * 86_400_000));
+}
+
+export function getDirectBookingInstalmentPlan(input: {
+  pickupDate: string;
+  returnDate: string;
+  bookingDailyRate: number;
+  bookingInsuranceFee?: number | null;
+  bookingDepositAmount?: number | null;
+  bookingTaxRate?: number | null;
+  includeInsurance?: boolean;
+}): BookingInstalmentPlan {
+  const quote = getDirectBookingQuote(input);
+  const days = quote.days;
+
+  const single: BookingInstalmentPlan = {
+    isInstalmentPlan: false,
+    instalments: [],
+    dueNow: quote.totalAmount,
+    dueLater: 0,
+    totalAmount: quote.totalAmount,
+  };
+
+  // One period or less is one payment. There is no threshold beyond
+  // this: a 30-day booking split into a single "instalment" would be
+  // the same charge wearing a schedule.
+  if (days <= INSTALMENT_PERIOD_DAYS) return single;
+
+  const insurancePerDay = input.includeInsurance ? input.bookingInsuranceFee ?? 0 : 0;
+  const taxRate = Math.max(0, input.bookingTaxRate ?? 0);
+  const depositAmount = input.bookingDepositAmount ?? 0;
+
+  const instalments: BookingInstalment[] = [];
+  let remaining = days;
+  let cursor = input.pickupDate;
+  let index = 1;
+
+  while (remaining > 0) {
+    const periodDays = Math.min(INSTALMENT_PERIOD_DAYS, remaining);
+    const rentAmount = roundMoney(periodDays * input.bookingDailyRate);
+    const insuranceAmount = roundMoney(periodDays * insurancePerDay);
+    const taxAmount = roundMoney((rentAmount + insuranceAmount) * (taxRate / 100));
+    const deposit = index === 1 ? depositAmount : 0;
+
+    instalments.push({
+      index,
+      days: periodDays,
+      startDate: cursor,
+      dueDate: cursor,
+      rentAmount,
+      insuranceAmount,
+      taxAmount,
+      depositAmount: deposit,
+      total: roundMoney(rentAmount + insuranceAmount + taxAmount + deposit),
+    });
+
+    remaining -= periodDays;
+    cursor = addDaysToDateOnly(cursor, periodDays);
+    index += 1;
+  }
+
+  const dueNow = instalments[0].total;
+  const dueLater = roundMoney(
+    instalments.slice(1).reduce((sum, instalment) => sum + instalment.total, 0),
+  );
+
+  return {
+    isInstalmentPlan: true,
+    instalments,
+    dueNow,
+    dueLater,
+    totalAmount: roundMoney(dueNow + dueLater),
+  };
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}

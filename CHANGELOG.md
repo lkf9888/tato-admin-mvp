@@ -1,5 +1,56 @@
 # Changelog
 
+## v0.94.0 - 2026-09-23
+
+### Long rentals are billed by period
+
+A three-month booking is several thousand dollars, and asking a renter
+to put all of it on one card is how a long rental stops happening. A
+booking longer than 30 days is now split into 30-day periods: the
+first is taken at checkout with the deposit, the rest become
+instalments the operator collects as each period begins.
+
+There is no threshold beyond one period, because a 30-day booking
+split into a single "instalment" would be the same charge wearing a
+schedule.
+
+**The order is worth the whole booking, not what the card was
+charged.** `totalPrice` records the contract value and the instalment
+rows record the schedule -- which is what `OrderPayment` was built for:
+"a long rental is not one payment, and recording it as a single
+totalPrice loses the only question anybody asks about it midway
+through: how much is still owed." `dueAt` is new, because a generated
+schedule without due dates is not a schedule.
+
+The renter sees the whole arithmetic before paying: every period with
+its dates and amount, the booking total de-emphasised, and **Due
+today** as the large number. Both figures matter and neither may be
+the only one on screen.
+
+Only the first period goes through Stripe, and that is worth saying
+plainly: the platform fee is charged on it alone. The rest are settled
+off-platform.
+
+The confirmation email now says `Paid today`, with `Booking total` and
+`Still to pay` alongside it on an instalment plan and absent on a
+single payment. `{totalAmount}` deliberately keeps its name and now
+means what was actually charged -- a template an operator saved before
+today sits it next to "Total paid", and that line has to stay true.
+
+Verified that splitting invents and loses nothing: for 4, 30, 31 and
+95 days the plan's total equals the single-payment quote to the cent,
+period days sum to the booking, the deposit rides on the first period
+only, and dueNow + dueLater = total. Through the webhook: the rows sum
+to the contract value, the paid row carries what Stripe actually took,
+outstanding equals dueLater, and a retry does not double the schedule.
+
+One deliberate asymmetry: the schedule is recomputed at webhook time
+from the vehicle's current rates while the card was charged from the
+rates at checkout. If a rate is edited in the seconds between, the
+paid row says what was really taken and the rows no longer sum to the
+order's value. That is the honest record, so it is kept -- and logged
+as `direct_booking_instalments_mismatch` rather than left silent.
+
 ## v0.93.0 - 2026-09-23
 
 ### The paper agreement, signed online

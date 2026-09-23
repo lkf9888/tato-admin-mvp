@@ -200,6 +200,7 @@ model Workspace {
   inspectionSessions            InspectionSession[]
   inspectionShots               InspectionShot[]
   rentalSite                    RentalSite?
+  directBookingEmailTemplate    DirectBookingEmailTemplate?
 }
 
 model User {
@@ -1807,4 +1808,23 @@ model RentalSite {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+/// The confirmation a renter receives after paying on a booking page.
+///
+/// One row per workspace, and absent until the operator edits it --
+/// `lib/direct-booking-email-template.ts` holds the default, so a
+/// workspace that has never opened the editor still sends a sensible
+/// confirmation rather than nothing.
+model DirectBookingEmailTemplate {
+  id              String    @id @default(cuid())
+  workspaceId     String    @unique
+  /// Off is a real choice: an operator who confirms by text message
+  /// does not want a second, colder confirmation going out unsigned.
+  isEnabled       Boolean   @default(true)
+  subjectTemplate String?
+  bodyTemplate    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }

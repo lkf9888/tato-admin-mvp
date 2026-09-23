@@ -2,6 +2,9 @@ import Link from "next/link";
 import { headers } from "next/headers";
 
 import { saveVehicleDirectBookingAction } from "@/app/actions";
+import { DirectBookingEmailEditor } from "@/components/direct-booking-email-editor";
+import { normalizeDirectBookingEmailTemplate } from "@/lib/direct-booking-email-template";
+import { isEmailConfigured } from "@/lib/email";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getBlockedBookingWindows } from "@/lib/direct-booking";
 import { getI18n } from "@/lib/i18n-server";
@@ -9,13 +12,19 @@ import { prisma } from "@/lib/prisma";
 import { getAppUrl, getStripeSecretKey } from "@/lib/stripe";
 import { formatDate } from "@/lib/utils";
 
-export default async function DirectBookingPage() {
+export default async function DirectBookingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ emailSaved?: string }>;
+}) {
   const workspace = await requireCurrentWorkspace();
   const bookableFrom = new Date();
   bookableFrom.setDate(bookableFrom.getDate() - 1);
-  const [headerStore, { locale, messages }, vehicles] = await Promise.all([
+  const [query, headerStore, { locale, messages }, emailTemplate, vehicles] = await Promise.all([
+    searchParams,
     headers(),
     getI18n(),
+    prisma.directBookingEmailTemplate.findUnique({ where: { workspaceId: workspace.id } }),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
       include: {
@@ -103,6 +112,15 @@ export default async function DirectBookingPage() {
           </div>
         </div>
       </section>
+
+      <DirectBookingEmailEditor
+        locale={locale}
+        initialEnabled={emailTemplate?.isEnabled ?? true}
+        initialSubject={normalizeDirectBookingEmailTemplate(emailTemplate).subjectTemplate}
+        initialBody={normalizeDirectBookingEmailTemplate(emailTemplate).bodyTemplate}
+        emailConfigured={isEmailConfigured()}
+        saved={Boolean(query.emailSaved)}
+      />
 
       {vehicles.length === 0 ? (
         <section className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-5 text-[12px] text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">

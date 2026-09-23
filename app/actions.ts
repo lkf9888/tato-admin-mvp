@@ -2089,3 +2089,37 @@ export async function saveRentalSiteAction(formData: FormData) {
   revalidatePath(`/s/${slug}`);
   redirect("/rental-site?saved=1");
 }
+
+/**
+ * Save the renter-facing booking confirmation.
+ *
+ * Blank fields fall back to the shipped default rather than being
+ * stored as empty strings: an operator who clears the body wants the
+ * default wording back, not an email with no body.
+ */
+export async function saveDirectBookingEmailTemplateAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  const isEnabled = formData.get("isEnabled")?.toString() === "on";
+  const subjectTemplate = formData.get("subjectTemplate")?.toString().trim() || null;
+  const bodyTemplate = formData.get("bodyTemplate")?.toString().trim() || null;
+
+  const data = { isEnabled, subjectTemplate, bodyTemplate };
+  const saved = await prisma.directBookingEmailTemplate.upsert({
+    where: { workspaceId: workspace.id },
+    update: data,
+    create: { workspaceId: workspace.id, ...data },
+  });
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "direct_booking_email_template_updated",
+    entityType: "DirectBookingEmailTemplate",
+    entityId: saved.id,
+    metadata: { isEnabled },
+  });
+
+  revalidatePath("/direct-booking");
+  redirect("/direct-booking?emailSaved=1");
+}

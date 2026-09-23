@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.92.0 - 2026-09-23
+
+### The renter hears back
+
+A direct booking took the money and then said nothing. The renter got
+a Stripe receipt and no word from the person whose car they had just
+rented. Now a confirmation goes out when the payment clears, with the
+vehicle, the dates, what was paid, the deposit and a booking
+reference.
+
+**The wording is the operator's, not ours.** Direct booking -> the
+Confirmation email panel is a real editor: subject, body, an
+enable switch for operators who confirm by phone instead, and thirteen
+variables you insert by clicking them, at the caret, in whichever
+field you were last typing in.
+
+The preview beside it is rendered **by the same functions that send**,
+not a mock-up. That matters for one behaviour in particular: a line
+that reduces to a bare label is dropped rather than sent as "Security
+deposit:" with nothing after it. Delete `{depositAmount}` from a line
+and you watch the line disappear, which is the only way that rule is
+discoverable.
+
+The brand, reply-to address and phone number come from the rental
+site's settings, falling back to the workspace name. A renter who
+booked on the operator's own domain should not find TATO in their
+inbox.
+
+Sending never fails the webhook. It is called after the order exists
+and the host has been paid; a mail outage there would otherwise fail
+the webhook, and Stripe would retry an order we had already created.
+
+Verified end to end against the sender, not just the editor: the
+deposit line vanishes on a booking without one, the switch suppresses
+the send, a booking with no renter address is skipped, and the
+subject and body come back rendered with the operator's own text.
+
 ## v0.91.0 - 2026-09-22
 
 ### The Turo half of a private-site booking

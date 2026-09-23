@@ -4,6 +4,7 @@ import { OrderAttachmentKind } from "@prisma/client";
 import type Stripe from "stripe";
 
 import { dateOnlyToUtcMidday, hasVehicleBookingConflict } from "@/lib/direct-booking";
+import { sendDirectBookingConfirmationEmail } from "@/lib/direct-booking-email";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { getStripeClient } from "@/lib/stripe";
@@ -217,6 +218,17 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
   }
 
   await reconcileVehicleConflicts(vehicleId);
+
+  // After the order exists and the host has been paid. The sender
+  // swallows its own failures: a mail outage here must not fail the
+  // webhook, because Stripe would retry it and we would be deciding
+  // all over again whether an order we already created is a duplicate.
+  await sendDirectBookingConfirmationEmail({
+    workspaceId: vehicle.workspaceId,
+    order,
+    vehicle,
+    renterEmail: renterEmail ?? session.customer_details?.email ?? null,
+  });
 
   await logActivity({
     actor: "stripe-webhook",

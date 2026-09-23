@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.95.1 - 2026-09-23
+
+- **The renter's booking page had TATO in the browser tab.** Every
+  other pixel of it was branded for the operator -- header, accent,
+  footer, contact details -- but the page exported a static
+  `metadata` carrying only `robots`, so the title fell through to the
+  root layout's. A renter on the operator's own domain, looking at
+  their own booking, saw somebody else's name above it. It now takes
+  the rental site's brand, falling back to the workspace name, and
+  stays `noindex` either way.
+
 ## v0.95.0 - 2026-09-23
 
 ### A renter can ask, and a host can answer

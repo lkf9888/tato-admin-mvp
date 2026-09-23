@@ -15,10 +15,36 @@ import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
-/** A renter's link to their own booking is never a search result. */
-export const metadata: Metadata = { robots: { index: false, follow: false } };
-
 type Params = Promise<{ token: string }>;
+
+/**
+ * Never a search result, and never our name.
+ *
+ * A static `metadata` export left the title falling back to the root
+ * layout's, so a renter looking at their own booking on the
+ * operator's domain had TATO in their browser tab. The page had every
+ * other pixel branded correctly.
+ */
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const robots = { index: false, follow: false };
+  const { token } = await params;
+  const order = await loadBookingByToken(token);
+  if (!order?.workspaceId) return { robots };
+
+  const site = await prisma.rentalSite.findUnique({
+    where: { workspaceId: order.workspaceId },
+    select: { brandName: true },
+  });
+  const workspace = site
+    ? null
+    : await prisma.workspace.findUnique({
+        where: { id: order.workspaceId },
+        select: { name: true },
+      });
+  const brand = site?.brandName?.trim() || workspace?.name?.trim();
+
+  return brand ? { title: brand, robots } : { robots };
+}
 
 export default async function RenterBookingPage({ params }: { params: Params }) {
   const [{ token }, { locale, messages }] = await Promise.all([params, getI18n()]);

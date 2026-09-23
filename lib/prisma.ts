@@ -44,6 +44,30 @@ if (process.env.NODE_ENV !== "production") {
  * Failures are logged and swallowed: a Postgres URL, or a read-only
  * file, must not stop the app from booting when the query layer itself
  * is fine.
+ *
+ * ⚠️ `$queryRawUnsafe`, not `$executeRawUnsafe`, and each statement in
+ * its own try.
+ *
+ * `PRAGMA journal_mode = WAL` returns a row -- the resulting mode --
+ * and `$executeRawUnsafe` refuses any statement that returns results.
+ * It was written with it, so it threw on every boot, one shared `try`
+ * swallowed the throw, and the two statements after it never ran. The
+ * log line said "SQLite pragmas not applied", which read like the
+ * Postgres path described above rather than a bug.
+ *
+ * Measured, because the obvious reading of that is wrong twice over:
+ *
+ *   - WAL was applied anyway. SQLite runs the pragma and Prisma throws
+ *     afterwards on the row it got back, so the side effect lands. On
+ *     a fresh database `journal_mode` still went `delete` -> `wal`.
+ *   - `busy_timeout` was already 5000 without us. Prisma sets its own
+ *     on SQLite connections, so the statement we never reached was
+ *     asking for what was already true.
+ *
+ * What the bug actually cost was `synchronous`, which stayed at FULL
+ * instead of dropping to NORMAL -- an fsync on every write we did not
+ * need, not a correctness or availability problem. Worth fixing, worth
+ * not overstating.
  */
 async function applySqlitePragmas() {
   if (global.prismaPragmasApplied) return;
@@ -52,15 +76,24 @@ async function applySqlitePragmas() {
   const url = process.env.DATABASE_URL ?? "";
   if (!url.startsWith("file:")) return;
 
-  try {
-    await prisma.$executeRawUnsafe("PRAGMA journal_mode = WAL;");
-    await prisma.$executeRawUnsafe("PRAGMA busy_timeout = 5000;");
-    await prisma.$executeRawUnsafe("PRAGMA synchronous = NORMAL;");
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(
-      `[prisma] SQLite pragmas not applied :: ${error instanceof Error ? error.message : "unknown"}`,
-    );
+  for (const statement of [
+    "PRAGMA journal_mode = WAL;",
+    "PRAGMA busy_timeout = 5000;",
+    "PRAGMA synchronous = NORMAL;",
+  ]) {
+    try {
+      await prisma.$queryRawUnsafe(statement);
+    } catch (error) {
+      // One failure must not skip the rest. They are independent
+      // settings, and the one that fails is rarely the one that
+      // matters most.
+      // eslint-disable-next-line no-console
+      console.error(
+        `[prisma] SQLite pragma not applied (${statement}) :: ${
+          error instanceof Error ? error.message : "unknown"
+        }`,
+      );
+    }
   }
 }
 

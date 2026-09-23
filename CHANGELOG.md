@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.0.1 - 2026-09-23
+
+- **`applySqlitePragmas` silently skipped two of its three statements.**
+  `PRAGMA journal_mode = WAL` returns a row, and `$executeRawUnsafe`
+  refuses any statement that returns results, so it threw on every
+  boot; one shared `try` swallowed the throw and `busy_timeout` and
+  `synchronous` were never reached. The log line read
+  `[prisma] SQLite pragmas not applied`, which looked like the
+  Postgres path the comment above it describes rather than a bug, and
+  it appeared dozens of times in every production build.
+
+  Each statement now runs through `$queryRawUnsafe` — which accepts all
+  three — inside its own `try`, so one failure cannot skip the rest.
+
+  **The impact was smaller than it looked, and measuring it mattered.**
+  Two things about the obvious reading are wrong: WAL was applied
+  anyway, because SQLite runs the pragma and Prisma throws afterwards
+  on the row it gets back (on a fresh database `journal_mode` still
+  went `delete` → `wal`); and `busy_timeout` was already 5000 because
+  Prisma sets its own on SQLite connections, so the statement that
+  never ran was asking for what was already true. What the bug
+  actually cost was `synchronous`, which stayed at FULL instead of
+  NORMAL — an fsync on every write that was not needed, not the
+  concurrency failure it first appeared to be.
+
+  Verified by reading the values back on a fresh connection rather than
+  by the statements not throwing, which the broken version also
+  managed: `busy_timeout=5000`, `journal_mode=wal`, `synchronous=1`.
+
 ## v1.0.0 - 2026-09-23
 
 ### Season and weekend, fitted from your own trips

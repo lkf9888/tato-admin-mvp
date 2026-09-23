@@ -45,6 +45,18 @@ function vehicleTokens(text: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * The model year the text states, if it states one.
+ *
+ * Turo writes it last ("Toyota Sienna 2018"), so the last year-shaped
+ * token wins -- that keeps a number inside a model name, the 1500 in
+ * "Ram 1500 Classic 2021", from being read as the year.
+ */
+function statedModelYear(text: string): number | null {
+  const years = vehicleTokens(text).filter((token) => /^(19|20)\d{2}$/.test(token));
+  return years.length > 0 ? Number(years[years.length - 1]) : null;
+}
+
 export type VehicleForMatch = {
   id: string;
   brand: string;
@@ -84,7 +96,28 @@ export function matchVehicles(
       ? vehicles
       : vehicles.filter((vehicle) => (vehicle.turoAccount ?? null) === coHostAccount);
 
+  const emailYear = statedModelYear(vehicleText);
+
   return scoped.filter((vehicle) => {
+    // A year the email states and the car contradicts rules the car
+    // out, before any of the looser rules below get a say.
+    //
+    // They were letting it back in. The year-less `brand model`
+    // candidate exists for mail that omits the year, but it also fired
+    // when the mail *had* one: "toyotasienna2018" starts with
+    // "toyotasienna", so a Sienna 2018 booking matched every Sienna in
+    // the fleet -- seven of them, across six model years -- and was
+    // parked as ambiguous when exactly one car could have taken it.
+    // The year is the least ambiguous thing Turo tells us; a
+    // contradiction on it is decisive.
+    //
+    // Unless the number is part of the car's own model name. A Peugeot
+    // 2008 is not a car from 2008.
+    if (emailYear !== null && vehicle.year && vehicle.year !== emailYear) {
+      const modelTokens = vehicleTokens(`${vehicle.brand} ${vehicle.model}`);
+      if (!modelTokens.includes(String(emailYear))) return false;
+    }
+
     const candidateTexts = [
       `${vehicle.brand} ${vehicle.model}`,
       `${vehicle.brand} ${vehicle.model} ${vehicle.year}`,

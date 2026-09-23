@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.0.2 - 2026-09-23
+
+### Booking mail no longer matches cars of the wrong year
+
+A Turo booking email names the car as "Toyota Sienna 2018" and never the plate, so TATO finds the car by its make, model and year. When more than one car answers, the booking is parked under **Unassigned** rather than guessed.
+
+The year was not being enforced. Vehicle text is compared with spaces stripped, and one of the fleet's candidate names is `brand model` with no year — kept for mail that omits it. But it fired when the mail *did* state a year, too: `toyotasienna2018` starts with `toyotasienna`, so a Sienna 2018 booking matched all seven Siennas across six model years and was parked as ambiguous when exactly one car could have taken it. The same thing let a Range Rover Sport 2024 booking match a plain Range Rover 2020.
+
+A year the email states and the car contradicts now rules the car out. A number that is part of the model's own name — the 1500 in "Ram 1500", a Peugeot 2008 — is not read as a year.
+
+Checked against the live fleet of 129 cars before shipping: of the 193 distinct vehicle texts Turo could send for it, **62 now narrow further** (most to exactly one car), **none got worse**, and every car still matches its own listing name. Of the 16 bookings currently unassigned, four resolve on the next mail sync with no action needed (Sequoia 2015, Range Rover Sport 2024, RAV4 2021, Sienna 2018). The other twelve are not a matching problem: seven name cars that are not in the fleet at all (Hyundai Elantra 2023, Lexus ES 2019), and five are Sequoia 2016s, of which the fleet genuinely has two with different Turo listings.
+
+Guest-message attribution uses the same matcher, so messages about those models now land on the right car as well.
+
+
 ## v1.0.1 - 2026-09-23
 
 - **`applySqlitePragmas` silently skipped two of its three statements.**

@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.99.0 - 2026-09-23
+
+### Collection and return, priced
+
+**Pickup & return** on the Direct booking page is a short list of
+places a car can be handed over, each with a fee per leg. Renters
+choose from it; they cannot type an address. Turo works the same way
+and for the same reason — a typed address is a promise somebody has to
+keep, and an operator cannot price a delivery to a street they have
+never seen.
+
+Fleet-wide, not per-vehicle: the cost of meeting a renter at the
+airport is the cost of the drive, which does not change with which car
+is being driven there.
+
+Collection and return are chosen separately, so a car picked up at the
+airport and dropped at the shop is charged one leg, not two. The
+default location is preselected and is normally free.
+
+**The fee is taxed with the rest.** Delivery is a service the operator
+performs, so it joins rent and insurance in the tax base rather than
+sitting outside it. On an instalment plan it is charged in full with
+the first period — splitting a one-off across instalments would mean
+still owing part of the airport drive in month three.
+
+The chosen places are written onto the order as label and address
+together, so a handover has somewhere to go rather than a nickname
+somebody has to look up. Fees are resolved from the list on the
+server; a fee sent by the browser would be a fee the browser could
+choose.
+
+Removing a location deactivates it rather than deleting the row, so a
+place named on a past order stays resolvable.
+
+Verified against the running app: two locations saved (a free shop and
+a $65 airport), both selects rendered with their fees, and switching
+pickup to the airport moved a 3-day booking from $602.40 to $675.20 —
+$65 of fee and $7.80 of tax on it, matching 12% of (216 + 54 + 65) to
+the cent.
+
 ## v0.98.0 - 2026-09-23
 
 ### A price for one particular day

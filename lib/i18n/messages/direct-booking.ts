@@ -53,6 +53,20 @@ export const directBookingMessages = {
       policyMultiplierHint:
         "The income model measures what Turo paid out per rented day, net of their cut. This scales it into a list price.",
       aiPricedBadge: "AI priced",
+      locationsKicker: "Pickup & return",
+      locationsTitle: "Where a car can be collected and left",
+      locationsCopy:
+        "Renters choose from this list — they cannot type an address. Applies to every vehicle. The first row is the default; give it a fee of 0 if collecting there is included.",
+      locationsLabelHeader: "Name",
+      locationsAddressHeader: "Address",
+      locationsFeeHeader: "Fee per leg",
+      locationsDefaultHeader: "Default",
+      locationsAddRow: "Add a location",
+      locationsSaveAction: "Save locations",
+      locationsSavedNotice: "Locations saved.",
+      locationsEmptyHint:
+        "With no locations set, renters are not asked and no fee is charged.",
+      locationsRemoveHint: "Clear the name to remove a row.",
       rateHintAuto: (rate: string, net: string) =>
         `Blank means AI pricing: ${rate}/day, from ${net}/day earned.`,
       rateHintNoModel: "This model is not in the catalogue, so a price must be typed.",
@@ -130,6 +144,19 @@ export const directBookingMessages = {
       policyMultiplierHint:
         "收入模型算的是 Turo 抽成后每个出租日的净额，这个系数把它折算成挂牌价。",
       aiPricedBadge: "AI 定价",
+      locationsKicker: "取还车地点",
+      locationsTitle: "车可以在哪里交接",
+      locationsCopy:
+        "租客只能从这个列表里选，不能自己填地址。对所有车辆生效。第一行是默认地点；如果在那里取车不额外收费，费用填 0。",
+      locationsLabelHeader: "名称",
+      locationsAddressHeader: "地址",
+      locationsFeeHeader: "单程费用",
+      locationsDefaultHeader: "默认",
+      locationsAddRow: "添加地点",
+      locationsSaveAction: "保存地点",
+      locationsSavedNotice: "地点已保存。",
+      locationsEmptyHint: "没有设置地点时，不会询问租客，也不收取任何费用。",
+      locationsRemoveHint: "清空名称即可删除该行。",
       rateHintAuto: (rate: string, net: string) =>
         `留空即 AI 定价：${rate}/天，基于实测净额 ${net}/天。`,
       rateHintNoModel: "目录里没有这个车型，必须手动填价。",

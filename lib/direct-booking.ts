@@ -94,6 +94,10 @@ export function getDirectBookingQuote(input: {
   weeklyDiscountPercent?: number | null;
   /** `YYYY-MM-DD` → price, for days priced by hand. */
   dailyRateOverrides?: Record<string, number> | null;
+  /** Collection, if it is not the home base. */
+  pickupLocationFee?: number | null;
+  /** Return, which may be a different place and a different fee. */
+  returnLocationFee?: number | null;
 }) {
   const days = getDirectBookingDays(input.pickupDate, input.returnDate);
   const weeklyDiscountPercent = input.weeklyDiscountPercent ?? 0;
@@ -117,7 +121,12 @@ export function getDirectBookingQuote(input: {
   const discountAmount = roundMoney(listBaseAmount - baseAmount);
   const insuranceFeePerDay = input.includeInsurance ? input.bookingInsuranceFee ?? 0 : 0;
   const insuranceAmount = days * insuranceFeePerDay;
-  const taxableAmount = baseAmount + insuranceAmount;
+  // Delivery is a service the operator performs, so it is taxed with
+  // the rest of what they charge rather than sitting outside the base.
+  const locationFeeAmount = roundMoney(
+    Math.max(0, input.pickupLocationFee ?? 0) + Math.max(0, input.returnLocationFee ?? 0),
+  );
+  const taxableAmount = baseAmount + insuranceAmount + locationFeeAmount;
   const taxRate = Math.max(0, input.bookingTaxRate ?? 0);
   const taxAmount = Math.round(taxableAmount * (taxRate / 100) * 100) / 100;
   const depositAmount = input.bookingDepositAmount ?? 0;
@@ -132,9 +141,12 @@ export function getDirectBookingQuote(input: {
     hasOverriddenDays: schedule.some((day) => day.isOverridden),
     isWeeklyRateApplied: isWeeklyRateApplied(days, weeklyDiscountPercent),
     insuranceAmount,
+    locationFeeAmount,
     taxAmount,
     depositAmount,
-    totalAmount: roundMoney(baseAmount + insuranceAmount + taxAmount + depositAmount),
+    totalAmount: roundMoney(
+      baseAmount + insuranceAmount + locationFeeAmount + taxAmount + depositAmount,
+    ),
   };
 }
 
@@ -260,6 +272,8 @@ export type BookingInstalment = {
   taxAmount: number;
   /** Deposit rides on the first period only. */
   depositAmount: number;
+  /** As does the collection and return fee. */
+  locationFeeAmount: number;
   total: number;
 };
 
@@ -289,6 +303,8 @@ export function getDirectBookingInstalmentPlan(input: {
   includeInsurance?: boolean;
   weeklyDiscountPercent?: number | null;
   dailyRateOverrides?: Record<string, number> | null;
+  pickupLocationFee?: number | null;
+  returnLocationFee?: number | null;
 }): BookingInstalmentPlan {
   const quote = getDirectBookingQuote(input);
   const days = quote.days;
@@ -333,7 +349,12 @@ export function getDirectBookingInstalmentPlan(input: {
     // weekly rate the renter was quoted.
     const rentAmount = roundMoney(periodList * discountFactor);
     const insuranceAmount = roundMoney(periodDays * insurancePerDay);
-    const taxAmount = roundMoney((rentAmount + insuranceAmount) * (taxRate / 100));
+    // Collection and return happen once, at the start and the end, so
+    // the fee is charged with the first period rather than spread --
+    // splitting a one-off across instalments would mean still owing
+    // part of the airport drive in month three.
+    const locationFee = index === 1 ? quote.locationFeeAmount : 0;
+    const taxAmount = roundMoney((rentAmount + insuranceAmount + locationFee) * (taxRate / 100));
     const deposit = index === 1 ? depositAmount : 0;
 
     instalments.push({
@@ -345,7 +366,8 @@ export function getDirectBookingInstalmentPlan(input: {
       insuranceAmount,
       taxAmount,
       depositAmount: deposit,
-      total: roundMoney(rentAmount + insuranceAmount + taxAmount + deposit),
+      locationFeeAmount: locationFee,
+      total: roundMoney(rentAmount + insuranceAmount + locationFee + taxAmount + deposit),
     });
 
     remaining -= periodDays;

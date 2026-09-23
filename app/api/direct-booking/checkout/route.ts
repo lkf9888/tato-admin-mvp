@@ -13,6 +13,11 @@ import {
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
+import {
+  describeBookingLocation,
+  listBookingLocations,
+  resolveBookingLocation,
+} from "@/lib/booking-locations";
 import { prisma } from "@/lib/prisma";
 import { getBookingReturnUrls } from "@/lib/rental-site";
 import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
@@ -42,6 +47,8 @@ const checkoutSchema = z.object({
   renterEmail: z.string().trim().email(),
   renterPhone: z.string().trim().max(50).optional().or(z.literal("")),
   includeInsurance: z.boolean().optional().default(true),
+  pickupLocationId: z.string().trim().max(60).optional(),
+  returnLocationId: z.string().trim().max(60).optional(),
   agreementAccepted: z.boolean().refine(Boolean, "Rental agreement must be accepted."),
 });
 
@@ -133,6 +140,8 @@ async function readCheckoutRequest(request: Request) {
     renterEmail: readFormString(formData, "renterEmail"),
     renterPhone: readFormString(formData, "renterPhone"),
     includeInsurance: readFormBoolean(formData, "includeInsurance"),
+    pickupLocationId: readFormString(formData, "pickupLocationId") || undefined,
+    returnLocationId: readFormString(formData, "returnLocationId") || undefined,
     agreementAccepted: readFormBoolean(formData, "agreementAccepted"),
   });
 
@@ -208,11 +217,27 @@ export async function POST(request: Request) {
     const dailyRate = rate.dailyRate ?? 0;
     const dailyRateOverrides = await loadPriceOverridesForBooking(vehicle.id);
 
+    // Priced from the list, never from the request: a fee sent by the
+    // browser would be a fee the browser could choose.
+    const locations = await listBookingLocations(vehicle.workspaceId);
+    const pickupLocation = resolveBookingLocation(locations, parsed.pickupLocationId);
+    const returnLocation = resolveBookingLocation(locations, parsed.returnLocationId);
+    if (locations.length > 0 && (!pickupLocation || !returnLocation)) {
+      return NextResponse.json(
+        { error: "Choose where the car is collected from and returned to." },
+        { status: 400 },
+      );
+    }
+    const pickupLocationFee = pickupLocation?.fee ?? 0;
+    const returnLocationFee = returnLocation?.fee ?? 0;
+
     const quote = getDirectBookingQuote({
       pickupDate: parsed.pickupDate,
       returnDate: parsed.returnDate,
       bookingDailyRate: dailyRate,
       dailyRateOverrides,
+      pickupLocationFee,
+      returnLocationFee,
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       bookingTaxRate: vehicle.bookingTaxRate ?? 0,
@@ -242,6 +267,8 @@ export async function POST(request: Request) {
       returnDate: parsed.returnDate,
       bookingDailyRate: dailyRate,
       dailyRateOverrides,
+      pickupLocationFee,
+      returnLocationFee,
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       bookingTaxRate: vehicle.bookingTaxRate ?? 0,
@@ -253,6 +280,10 @@ export async function POST(request: Request) {
     const chargedRent = firstPeriod ? firstPeriod.rentAmount : quote.baseAmount;
     const chargedInsurance = firstPeriod ? firstPeriod.insuranceAmount : quote.insuranceAmount;
     const chargedTax = firstPeriod ? firstPeriod.taxAmount : quote.taxAmount;
+    // A one-off, so it is charged in full with the first period.
+    const chargedLocationFee = firstPeriod
+      ? firstPeriod.locationFeeAmount
+      : quote.locationFeeAmount;
 
     const stripe = getStripeClient();
     const { successUrl, cancelUrl } = await getBookingReturnUrls(
@@ -330,6 +361,9 @@ export async function POST(request: Request) {
         taxName: vehicle.bookingTaxName?.trim() || "",
         taxRate: String(vehicle.bookingTaxRate ?? 0),
         taxAmount: String(quote.taxAmount),
+        pickupLocation: describeBookingLocation(pickupLocation) ?? "",
+        returnLocation: describeBookingLocation(returnLocation) ?? "",
+        locationFeeAmount: String(quote.locationFeeAmount),
         licenseDraftId,
         agreementAccepted: "true",
         connectAccountId: connectSnapshot.accountId!,
@@ -376,6 +410,26 @@ export async function POST(request: Request) {
                   product_data: {
                     name: `${vehicle.bookingTaxName?.trim() || "Tax"} (${(vehicle.bookingTaxRate ?? 0).toFixed(3)}%)`,
                     description: "Tax on rental and insurance",
+                  },
+                },
+              },
+            ]
+          : []),
+        ...(chargedLocationFee > 0
+          ? [
+              {
+                quantity: 1,
+                price_data: {
+                  currency: "cad",
+                  unit_amount: Math.round(chargedLocationFee * 100),
+                  product_data: {
+                    name: `${vehicle.nickname} collection & return`,
+                    description: [
+                      describeBookingLocation(pickupLocation),
+                      describeBookingLocation(returnLocation),
+                    ]
+                      .filter(Boolean)
+                      .join(" → ") || "Collection and return",
                   },
                 },
               },

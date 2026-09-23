@@ -241,6 +241,7 @@ export function PublicBookingPanel({
   bookingTaxRate,
   blockedDateWindows,
   dailyRateOverrides,
+  locations,
   weeklyDiscountPercent,
   minimumRentalDays,
   dailyKmAllowance,
@@ -261,6 +262,8 @@ export function PublicBookingPanel({
   blockedDateWindows: DateOnlyBookingWindow[];
   /** `YYYY-MM-DD` → price, for days the operator priced by hand. */
   dailyRateOverrides: Record<string, number>;
+  /** Places the car may be collected from and returned to. */
+  locations: { id: string; label: string; fee: number; isDefault: boolean }[];
   weeklyDiscountPercent: number;
   minimumRentalDays: number;
   dailyKmAllowance: number;
@@ -379,6 +382,15 @@ export function PublicBookingPanel({
 
   // The same inputs the server will bill from, so what the renter is
   // shown here and what their card is charged cannot disagree.
+  const defaultLocationId =
+    locations.find((location) => location.isDefault)?.id ?? locations[0]?.id ?? "";
+  const [pickupLocationId, setPickupLocationId] = useState(defaultLocationId);
+  const [returnLocationId, setReturnLocationId] = useState(defaultLocationId);
+  const pickupLocationFee =
+    locations.find((location) => location.id === pickupLocationId)?.fee ?? 0;
+  const returnLocationFee =
+    locations.find((location) => location.id === returnLocationId)?.fee ?? 0;
+
   const plan = useMemo(
     () =>
       getDirectBookingInstalmentPlan({
@@ -386,6 +398,8 @@ export function PublicBookingPanel({
         returnDate,
         weeklyDiscountPercent,
         dailyRateOverrides,
+        pickupLocationFee,
+        returnLocationFee,
         bookingDailyRate,
         bookingInsuranceFee,
         bookingDepositAmount,
@@ -402,6 +416,8 @@ export function PublicBookingPanel({
       returnDate,
       weeklyDiscountPercent,
       dailyRateOverrides,
+      pickupLocationFee,
+      returnLocationFee,
     ],
   );
 
@@ -412,6 +428,8 @@ export function PublicBookingPanel({
         returnDate,
         weeklyDiscountPercent,
         dailyRateOverrides,
+        pickupLocationFee,
+        returnLocationFee,
         bookingDailyRate,
         bookingInsuranceFee,
         bookingDepositAmount,
@@ -428,6 +446,8 @@ export function PublicBookingPanel({
       returnDate,
       weeklyDiscountPercent,
       dailyRateOverrides,
+      pickupLocationFee,
+      returnLocationFee,
     ],
   );
 
@@ -487,6 +507,8 @@ export function PublicBookingPanel({
       formData.set("renterEmail", renterEmail);
       formData.set("renterPhone", renterPhone);
       formData.set("includeInsurance", includeInsurance ? "true" : "false");
+      formData.set("pickupLocationId", pickupLocationId);
+      formData.set("returnLocationId", returnLocationId);
       formData.set("agreementAccepted", agreementAccepted ? "true" : "false");
       formData.set("licenseFront", licenseFront);
       formData.set("licenseBack", licenseBack);
@@ -649,6 +671,49 @@ export function PublicBookingPanel({
         </span>
       </label>
 
+      {locations.length > 1 ? (
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {(
+            [
+              {
+                key: "pickup" as const,
+                label: reserveMessages.pickupLocationLabel,
+                value: pickupLocationId,
+                onChange: setPickupLocationId,
+              },
+              {
+                key: "return" as const,
+                label: reserveMessages.returnLocationLabel,
+                value: returnLocationId,
+                onChange: setReturnLocationId,
+              },
+            ]
+          ).map((field) => (
+            <label key={field.key} className="block min-w-0">
+              <span className="mb-1 block text-xs font-medium text-[var(--ink-mid)]">
+                {field.label}
+              </span>
+              <select
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                className="h-11 w-full rounded-[var(--control-radius)] border border-[var(--line-strong)] bg-white px-3 text-sm text-[var(--ink)]"
+              >
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.fee > 0
+                      ? reserveMessages.locationOption(
+                          location.label,
+                          formatCurrency(location.fee, locale),
+                        )
+                      : reserveMessages.locationOptionFree(location.label)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+      ) : null}
+
       <div className="mt-5 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
         <div className="flex items-center justify-between text-sm text-[var(--ink-mid)]">
           <span>{reserveMessages.quoteDays(quote.days)}</span>
@@ -682,6 +747,12 @@ export function PublicBookingPanel({
                 {bookingTaxName?.trim() || reserveMessages.quoteTax} ({bookingTaxRate.toFixed(3)}%)
               </span>
               <span>{formatCurrency(quote.taxAmount, locale)}</span>
+            </div>
+          ) : null}
+          {quote.locationFeeAmount > 0 ? (
+            <div className="flex items-center justify-between">
+              <span>{reserveMessages.locationFeeLabel}</span>
+              <span>{formatCurrency(quote.locationFeeAmount, locale)}</span>
             </div>
           ) : null}
           <div className="flex items-center justify-between">

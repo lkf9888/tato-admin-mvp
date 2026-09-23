@@ -5,9 +5,11 @@ import {
   saveBookingPolicyAction,
   saveVehicleDirectBookingAction,
 } from "@/app/actions";
+import { listBookingLocations } from "@/lib/booking-locations";
 import { normalizeBookingPolicy } from "@/lib/booking-policy";
 import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { formatCurrency } from "@/lib/utils";
+import { BookingLocationsEditor } from "@/components/booking-locations-editor";
 import { DirectBookingEmailEditor } from "@/components/direct-booking-email-editor";
 import { normalizeDirectBookingEmailTemplate } from "@/lib/direct-booking-email-template";
 import { isEmailConfigured } from "@/lib/email";
@@ -21,18 +23,26 @@ import { formatDate } from "@/lib/utils";
 export default async function DirectBookingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ emailSaved?: string; policySaved?: string }>;
+  searchParams: Promise<{ emailSaved?: string; policySaved?: string; locationsSaved?: string }>;
 }) {
   const workspace = await requireCurrentWorkspace();
   const bookableFrom = new Date();
   bookableFrom.setDate(bookableFrom.getDate() - 1);
-  const [query, headerStore, { locale, messages }, emailTemplate, savedPolicy, vehicles] =
-    await Promise.all([
+  const [
+    query,
+    headerStore,
+    { locale, messages },
+    emailTemplate,
+    savedPolicy,
+    bookingLocations,
+    vehicles,
+  ] = await Promise.all([
     searchParams,
     headers(),
     getI18n(),
     prisma.directBookingEmailTemplate.findUnique({ where: { workspaceId: workspace.id } }),
     prisma.bookingPricingPolicy.findUnique({ where: { workspaceId: workspace.id } }),
+    listBookingLocations(workspace.id),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
       include: {
@@ -214,6 +224,21 @@ export default async function DirectBookingPage({
           {directMessages.policySaveAction}
         </button>
       </form>
+
+      <BookingLocationsEditor
+        locale={locale}
+        initialRows={bookingLocations.map((location) => ({
+          id: location.id,
+          label: location.label,
+          address: location.address ?? "",
+          fee: String(location.fee),
+        }))}
+        defaultIndex={Math.max(
+          0,
+          bookingLocations.findIndex((location) => location.isDefault),
+        )}
+        saved={Boolean(query.locationsSaved)}
+      />
 
       <DirectBookingEmailEditor
         locale={locale}

@@ -2210,3 +2210,73 @@ export async function saveBookingPolicyAction(formData: FormData) {
   revalidateAdminPages();
   redirect("/direct-booking?policySaved=1");
 }
+
+/**
+ * Save the fleet's pickup and return locations.
+ *
+ * The whole list arrives at once and replaces what was there: the UI
+ * is a short table an operator edits and saves, and reconciling
+ * per-row creates, updates and deletes across it would be far more
+ * code for a list that is typically three lines long.
+ *
+ * Rows are not deleted outright -- a location named on a past order
+ * should stay resolvable -- they are deactivated, which takes them out
+ * of every renter-facing list while leaving the row.
+ */
+export async function saveBookingLocationsAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  const labels = formData.getAll("locationLabel").map((value) => value.toString().trim());
+  const addresses = formData.getAll("locationAddress").map((value) => value.toString().trim());
+  const fees = formData.getAll("locationFee").map((value) => value.toString().trim());
+  const ids = formData.getAll("locationId").map((value) => value.toString().trim());
+  const defaultIndex = Number(formData.get("defaultLocationIndex")?.toString() ?? "0");
+
+  const rows = labels
+    .map((label, index) => ({
+      id: ids[index] || null,
+      label,
+      address: addresses[index] || null,
+      fee: Math.max(0, Number(fees[index] || 0)) || 0,
+      isDefault: index === defaultIndex,
+      sortOrder: index,
+    }))
+    // A row with no name is an empty line in the form, not a place.
+    .filter((row) => row.label.length > 0);
+
+  const existing = await prisma.bookingLocation.findMany({
+    where: { workspaceId: workspace.id },
+    select: { id: true },
+  });
+  const keptIds = new Set(rows.map((row) => row.id).filter(Boolean) as string[]);
+
+  await prisma.$transaction([
+    ...existing
+      .filter((row) => !keptIds.has(row.id))
+      .map((row) =>
+        prisma.bookingLocation.update({ where: { id: row.id }, data: { isActive: false } }),
+      ),
+    ...rows.map((row) =>
+      row.id
+        ? prisma.bookingLocation.update({
+            where: { id: row.id },
+            data: { ...row, id: undefined, isActive: true },
+          })
+        : prisma.bookingLocation.create({
+            data: { ...row, id: undefined, workspaceId: workspace.id, isActive: true },
+          }),
+    ),
+  ]);
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "booking_locations_updated",
+    entityType: "Workspace",
+    entityId: workspace.id,
+    metadata: { count: rows.length },
+  });
+
+  revalidateAdminPages();
+  redirect("/direct-booking?locationsSaved=1");
+}

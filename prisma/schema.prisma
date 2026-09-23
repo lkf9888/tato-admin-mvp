@@ -203,6 +203,7 @@ model Workspace {
   bookingChangeRequests         BookingChangeRequest[]
   bookingPricingPolicy          BookingPricingPolicy?
   vehiclePriceOverrides         VehiclePriceOverride[]
+  bookingLocations              BookingLocation[]
   directBookingEmailTemplate    DirectBookingEmailTemplate?
 }
 
@@ -1974,4 +1975,36 @@ model VehiclePriceOverride {
   @@unique([vehicleId, date])
   @@index([vehicleId, date])
   @@index([workspaceId])
+}
+
+/// A place a renter may collect or leave a car, and what that costs.
+///
+/// A fixed list, not free text. Turo works the same way and for the
+/// same reason: a typed address is a promise somebody has to keep, and
+/// an operator cannot price a delivery to a street they have never
+/// seen. Renters choose from what is offered here or nothing.
+///
+/// Fleet-wide rather than per-vehicle. The cost of meeting a renter at
+/// the airport is the cost of the drive, which does not change with
+/// which car is being driven there.
+model BookingLocation {
+  id          String  @id @default(cuid())
+  workspaceId String
+  label       String
+  /// Shown to the renter once they pick it, and written onto the
+  /// order so the handover has an address rather than a nickname.
+  address     String?
+  /// Charged per leg. The home base is normally 0.
+  fee         Float   @default(0)
+  /// Preselected, and the one a booking falls back to. Exactly one per
+  /// workspace should carry it; the loader takes the first if more do.
+  isDefault   Boolean @default(false)
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, isActive, sortOrder])
 }

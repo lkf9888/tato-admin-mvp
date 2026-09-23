@@ -40,6 +40,9 @@ type DirectBookingMetadata = {
   taxName?: string;
   taxRate?: string;
   taxAmount?: string;
+  pickupLocation?: string;
+  returnLocation?: string;
+  locationFeeAmount?: string;
   licenseDraftId?: string;
   agreementAccepted?: string;
 };
@@ -131,6 +134,8 @@ async function writeInstalmentSchedule(input: {
   pickupDate: string;
   returnDate: string;
   includeInsurance: boolean;
+  /** Charged once, with the first period. */
+  locationFeeAmount: number;
   chargedAmount: number | null;
 }) {
   const existing = await prisma.orderPayment.count({ where: { orderId: input.order.id } });
@@ -149,6 +154,10 @@ async function writeInstalmentSchedule(input: {
     bookingDepositAmount: input.vehicle.bookingDepositAmount ?? 0,
     bookingTaxRate: input.vehicle.bookingTaxRate ?? 0,
     includeInsurance: input.includeInsurance,
+    // Split across the two legs only so the quote adds them back up;
+    // the plan puts the whole thing on period one either way.
+    pickupLocationFee: input.locationFeeAmount,
+    returnLocationFee: 0,
   });
   if (!plan.isInstalmentPlan) return;
 
@@ -315,6 +324,10 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
         depositAmount && !Number.isNaN(depositAmount) ? depositAmount : null,
       ),
       status: "booked",
+      // Written onto the order so the handover has an address, not a
+      // nickname the operator has to look up.
+      pickupLocation: metadata.pickupLocation || null,
+      returnLocation: metadata.returnLocation || null,
       createdBy: "direct-booking",
       // The renter's own link. Minted here rather than on demand so
       // it can go into the confirmation that is about to be sent.
@@ -332,6 +345,9 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
         taxName: metadata.taxName || null,
         taxRate: metadata.taxRate ? Number(metadata.taxRate) : null,
         taxAmount: metadata.taxAmount ? Number(metadata.taxAmount) : null,
+        locationFeeAmount: metadata.locationFeeAmount
+          ? Number(metadata.locationFeeAmount)
+          : null,
         licenseDraftId: metadata.licenseDraftId || null,
         agreementAccepted: metadata.agreementAccepted === "true",
       }),
@@ -373,6 +389,7 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       pickupDate,
       returnDate,
       includeInsurance: metadata.includeInsurance === "true",
+      locationFeeAmount: metadata.locationFeeAmount ? Number(metadata.locationFeeAmount) : 0,
       chargedAmount,
     });
   }

@@ -30,6 +30,7 @@ export function SiteVehicleView({
   vehicle,
   policy,
   dailyRate,
+  dailyRateOverrides,
   stripeReady,
   hostPayoutsReady,
   defaultPickupDate,
@@ -43,6 +44,7 @@ export function SiteVehicleView({
   policy: BookingPolicy;
   /** Resolved: the operator's price, or the income model's. */
   dailyRate: number;
+  dailyRateOverrides: Record<string, number>;
   stripeReady: boolean;
   hostPayoutsReady: boolean;
   defaultPickupDate: string;
@@ -184,6 +186,7 @@ export function SiteVehicleView({
             bookingTaxName={vehicle.bookingTaxName}
             bookingTaxRate={vehicle.bookingTaxRate ?? 0}
             blockedDateWindows={blockedDateWindows}
+            dailyRateOverrides={dailyRateOverrides}
             weeklyDiscountPercent={policy.weeklyDiscountPercent}
             minimumRentalDays={policy.minimumRentalDays}
             dailyKmAllowance={policy.dailyKmAllowance}

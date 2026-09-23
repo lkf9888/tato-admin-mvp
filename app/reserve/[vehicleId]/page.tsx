@@ -15,6 +15,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
+import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
 import { isImageAttachment } from "@/lib/uploads";
@@ -142,6 +143,7 @@ export default async function ReserveVehiclePage({
   const stripeReady = Boolean(getStripeSecretKey());
   const policy = await getBookingPolicyForVehicle(vehicle);
   const dailyRate = rate.dailyRate ?? 0;
+  const dailyRateOverrides = await loadPriceOverridesForBooking(vehicle.id);
   const connectSnapshot = vehicle.workspaceId
     ? await getWorkspaceConnectSnapshot(vehicle.workspaceId)
     : null;
@@ -262,6 +264,7 @@ export default async function ReserveVehiclePage({
               bookingTaxName={vehicle.bookingTaxName}
               bookingTaxRate={vehicle.bookingTaxRate ?? 0}
             blockedDateWindows={blockedDateWindows}
+            dailyRateOverrides={dailyRateOverrides}
             weeklyDiscountPercent={policy.weeklyDiscountPercent}
             minimumRentalDays={policy.minimumRentalDays}
             dailyKmAllowance={policy.dailyKmAllowance}

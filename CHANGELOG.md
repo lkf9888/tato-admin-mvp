@@ -1,5 +1,50 @@
 # Changelog
 
+## v0.98.0 - 2026-09-23
+
+### A price for one particular day
+
+**Price Calendar** in the sidebar shows a month of one car's prices and
+lets you set any of them by hand. Days follow the vehicle's rate until
+somebody disagrees with a specific one; a repriced day is drawn in bold
+against the inherited ones, because the question an operator opens this
+to answer is "which of these did I set myself".
+
+Same resolution a short-let system uses, and the reason the quote had
+to change shape: rent is now **summed over the rented days** rather
+than multiplied out. With no repriced days that is arithmetically
+identical, and with one it is the only thing that can be right. Seven
+days at the base rate and three over Christmas at a holiday price now
+produce one honest number.
+
+Selecting scattered days sends **one request per contiguous run**.
+Picking the 12th, 13th, 14th and the 20th prices four days, not nine —
+a single from/to spanning the selection would have swept up everything
+between.
+
+Clearing a day **deletes its row** rather than writing the inherited
+number into it. A stored copy would freeze at whatever the rate was on
+the day somebody cleared it, and stop following the rate it was
+supposed to fall back to.
+
+The instalment plan slices the same per-day schedule, so a 95-day
+booking with a repriced fortnight inside it still has periods that sum
+to the quote. The Stripe line item became a single amount with the day
+count in its description: days can be priced individually, so there is
+no unit price that multiplies out to the right number.
+
+A range is capped at 400 days, and the writes go through one upsert per
+day inside a transaction rather than a delete-then-recreate — a failure
+half-way through leaves the untouched days priced as they were instead
+of cleared and not yet rewritten.
+
+Verified against the running app: three days repriced to $155 against a
+$72 base give a 5-day booking spanning them $609 (72 + 155x3 + 72)
+while an identical 5-day booking elsewhere in the month stays $360; the
+tax follows the real rent; the activity log shows the run-splitting
+writing 09-12..09-14 and 09-20 as two separate ranges; and a day
+outside the booked range is never charged.
+
 ## v0.97.0 - 2026-09-23
 
 ### Cars price themselves

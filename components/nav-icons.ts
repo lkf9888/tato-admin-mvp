@@ -57,6 +57,7 @@ export const NAV_ICONS = {
   directBooking: Ticket,
   rentalSite: Globe,
   bookingRequests: Inbox,
+  priceCalendar: CalendarDays,
   staffSchedule: ListChecks,
   contracts: FileSignature,
   photos: Image,

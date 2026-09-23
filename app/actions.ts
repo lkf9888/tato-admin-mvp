@@ -205,6 +205,7 @@ function revalidateAdminPages() {
     "/documents",
     "/direct-booking",
     "/rental-site",
+    "/price-calendar",
     "/booking-requests",
     "/owners",
     "/orders",

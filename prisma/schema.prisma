@@ -202,6 +202,7 @@ model Workspace {
   rentalSite                    RentalSite?
   bookingChangeRequests         BookingChangeRequest[]
   bookingPricingPolicy          BookingPricingPolicy?
+  vehiclePriceOverrides         VehiclePriceOverride[]
   directBookingEmailTemplate    DirectBookingEmailTemplate?
 }
 
@@ -310,6 +311,7 @@ model Vehicle {
   messageTemplates             MessageTemplate[]
   calendarNotes                CalendarNote[]
   calendarFeeds                CalendarFeed[]
+  priceOverrides               VehiclePriceOverride[]
   inboundEmails                InboundEmail[]
 
   @@index([workspaceId])
@@ -1942,4 +1944,34 @@ model BookingPricingPolicy {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+/// One day of one car, priced by hand.
+///
+/// The last word in the chain: a day with a row here is charged this,
+/// whatever the vehicle's own rate says and whatever the income model
+/// would have suggested. Absent means "fall through" -- which is why
+/// clearing a day deletes the row rather than writing the inherited
+/// number into it, since a stored copy would stop following the rate
+/// it was copied from.
+///
+/// Stored as the UTC midday of a calendar day, the convention every
+/// other date-only value in the booking flow uses, so no timezone can
+/// shift which day a price belongs to.
+model VehiclePriceOverride {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  vehicleId   String
+  date        DateTime
+  price       Float
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleId, date])
+  @@index([vehicleId, date])
+  @@index([workspaceId])
 }

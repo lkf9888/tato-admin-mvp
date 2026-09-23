@@ -12,6 +12,7 @@ import {
 } from "@/lib/direct-booking";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
+import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import { prisma } from "@/lib/prisma";
 import { getBookingReturnUrls } from "@/lib/rental-site";
 import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
@@ -205,11 +206,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This vehicle is not priced yet." }, { status: 400 });
     }
     const dailyRate = rate.dailyRate ?? 0;
+    const dailyRateOverrides = await loadPriceOverridesForBooking(vehicle.id);
 
     const quote = getDirectBookingQuote({
       pickupDate: parsed.pickupDate,
       returnDate: parsed.returnDate,
       bookingDailyRate: dailyRate,
+      dailyRateOverrides,
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       bookingTaxRate: vehicle.bookingTaxRate ?? 0,
@@ -238,6 +241,7 @@ export async function POST(request: Request) {
       pickupDate: parsed.pickupDate,
       returnDate: parsed.returnDate,
       bookingDailyRate: dailyRate,
+      dailyRateOverrides,
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       bookingTaxRate: vehicle.bookingTaxRate ?? 0,
@@ -333,13 +337,17 @@ export async function POST(request: Request) {
       },
       line_items: [
         {
-          quantity: chargedDays,
+          // One line, not `quantity x unit_amount`: days can be priced
+          // individually, so there is no single unit price that
+          // multiplies out to the right number. The day count moves
+          // into the description instead.
+          quantity: 1,
           price_data: {
             currency: "cad",
-            unit_amount: Math.round(quote.effectiveDailyRate * 100),
+            unit_amount: Math.round(chargedRent * 100),
             product_data: {
               name: `${vehicle.nickname} booking`,
-              description: `${vehicle.plateNumber} · ${parsed.pickupDate} to ${parsed.returnDate}`,
+              description: `${vehicle.plateNumber} · ${parsed.pickupDate} to ${parsed.returnDate} · ${chargedDays} day(s)`,
             },
           },
         },

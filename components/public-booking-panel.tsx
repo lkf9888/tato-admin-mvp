@@ -240,6 +240,7 @@ export function PublicBookingPanel({
   bookingTaxName,
   bookingTaxRate,
   blockedDateWindows,
+  dailyRateOverrides,
   weeklyDiscountPercent,
   minimumRentalDays,
   dailyKmAllowance,
@@ -258,6 +259,8 @@ export function PublicBookingPanel({
   bookingTaxName: string | null;
   bookingTaxRate: number;
   blockedDateWindows: DateOnlyBookingWindow[];
+  /** `YYYY-MM-DD` → price, for days the operator priced by hand. */
+  dailyRateOverrides: Record<string, number>;
   weeklyDiscountPercent: number;
   minimumRentalDays: number;
   dailyKmAllowance: number;
@@ -382,6 +385,7 @@ export function PublicBookingPanel({
         pickupDate,
         returnDate,
         weeklyDiscountPercent,
+        dailyRateOverrides,
         bookingDailyRate,
         bookingInsuranceFee,
         bookingDepositAmount,
@@ -397,6 +401,7 @@ export function PublicBookingPanel({
       pickupDate,
       returnDate,
       weeklyDiscountPercent,
+      dailyRateOverrides,
     ],
   );
 
@@ -406,6 +411,7 @@ export function PublicBookingPanel({
         pickupDate,
         returnDate,
         weeklyDiscountPercent,
+        dailyRateOverrides,
         bookingDailyRate,
         bookingInsuranceFee,
         bookingDepositAmount,
@@ -421,6 +427,7 @@ export function PublicBookingPanel({
       pickupDate,
       returnDate,
       weeklyDiscountPercent,
+      dailyRateOverrides,
     ],
   );
 

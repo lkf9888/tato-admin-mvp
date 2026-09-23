@@ -40,6 +40,48 @@ export function getDirectBookingDays(pickupDate: string, returnDate: string) {
   return Math.max(0, Math.round((dropoff.getTime() - pickup.getTime()) / 86_400_000));
 }
 
+/**
+ * Every calendar day the renter is charged for, in order.
+ *
+ * The pickup day counts and the return day does not, which is what
+ * `getDirectBookingDays` already counts -- this just names them, so a
+ * price can be attached to one.
+ */
+export function getRentedDayKeys(pickupDate: string, returnDate: string): string[] {
+  const days = getDirectBookingDays(pickupDate, returnDate);
+  const keys: string[] = [];
+  let cursor = dateOnlyToUtcMidday(pickupDate);
+  for (let i = 0; i < days; i += 1) {
+    keys.push(dateToDateOnly(cursor));
+    cursor = new Date(cursor.getTime() + 86_400_000);
+  }
+  return keys;
+}
+
+/**
+ * What each rented day costs before any discount.
+ *
+ * A day with a hand-set price is charged that; every other day falls
+ * through to the vehicle's rate. Same shape as the nightly resolution
+ * in a short-let system, and the reason the quote is a sum rather than
+ * a multiplication.
+ */
+export function getDailyRateSchedule(input: {
+  pickupDate: string;
+  returnDate: string;
+  bookingDailyRate: number;
+  dailyRateOverrides?: Record<string, number> | null;
+}) {
+  return getRentedDayKeys(input.pickupDate, input.returnDate).map((key) => {
+    const override = input.dailyRateOverrides?.[key];
+    return {
+      date: key,
+      rate: typeof override === "number" && override > 0 ? override : input.bookingDailyRate,
+      isOverridden: typeof override === "number" && override > 0,
+    };
+  });
+}
+
 export function getDirectBookingQuote(input: {
   pickupDate: string;
   returnDate: string;
@@ -50,6 +92,8 @@ export function getDirectBookingQuote(input: {
   includeInsurance?: boolean;
   /** Off the rent once the booking reaches a week. */
   weeklyDiscountPercent?: number | null;
+  /** `YYYY-MM-DD` → price, for days priced by hand. */
+  dailyRateOverrides?: Record<string, number> | null;
 }) {
   const days = getDirectBookingDays(input.pickupDate, input.returnDate);
   const weeklyDiscountPercent = input.weeklyDiscountPercent ?? 0;
@@ -58,11 +102,18 @@ export function getDirectBookingQuote(input: {
     days,
     weeklyDiscountPercent,
   );
+
+  // Summed per day rather than multiplied out, because days can be
+  // priced individually. With no overrides this is arithmetically the
+  // same as days x rate.
+  const schedule = getDailyRateSchedule(input);
+  const discountFactor =
+    days > 0 && input.bookingDailyRate > 0 ? effectiveDailyRate / input.bookingDailyRate : 1;
   // `baseAmount` stays the rent actually owed, so every existing caller
   // that adds it into a total keeps working. What the discount adds is
   // the two figures a renter needs to see it happened.
-  const listBaseAmount = roundMoney(days * input.bookingDailyRate);
-  const baseAmount = roundMoney(days * effectiveDailyRate);
+  const listBaseAmount = roundMoney(schedule.reduce((sum, day) => sum + day.rate, 0));
+  const baseAmount = roundMoney(listBaseAmount * discountFactor);
   const discountAmount = roundMoney(listBaseAmount - baseAmount);
   const insuranceFeePerDay = input.includeInsurance ? input.bookingInsuranceFee ?? 0 : 0;
   const insuranceAmount = days * insuranceFeePerDay;
@@ -77,6 +128,8 @@ export function getDirectBookingQuote(input: {
     listBaseAmount,
     discountAmount,
     effectiveDailyRate,
+    schedule,
+    hasOverriddenDays: schedule.some((day) => day.isOverridden),
     isWeeklyRateApplied: isWeeklyRateApplied(days, weeklyDiscountPercent),
     insuranceAmount,
     taxAmount,
@@ -235,9 +288,13 @@ export function getDirectBookingInstalmentPlan(input: {
   bookingTaxRate?: number | null;
   includeInsurance?: boolean;
   weeklyDiscountPercent?: number | null;
+  dailyRateOverrides?: Record<string, number> | null;
 }): BookingInstalmentPlan {
   const quote = getDirectBookingQuote(input);
   const days = quote.days;
+  const discountFactor =
+    quote.listBaseAmount > 0 ? quote.baseAmount / quote.listBaseAmount : 1;
+  let dayOffset = 0;
 
   const single: BookingInstalmentPlan = {
     isInstalmentPlan: false,
@@ -263,10 +320,18 @@ export function getDirectBookingInstalmentPlan(input: {
 
   while (remaining > 0) {
     const periodDays = Math.min(INSTALMENT_PERIOD_DAYS, remaining);
-    // The discount is decided by the whole booking's length, not by
-    // the period's -- otherwise a 5-day tail period would quietly lose
-    // the weekly rate the renter was quoted.
-    const rentAmount = roundMoney(periodDays * quote.effectiveDailyRate);
+    // Each period is charged for its own days, at their own prices.
+    // Multiplying a period's length by an average rate would be wrong
+    // the moment any day inside it is priced by hand, and would stop
+    // the periods summing to the quote.
+    const periodList = quote.schedule
+      .slice(dayOffset, dayOffset + periodDays)
+      .reduce((sum, day) => sum + day.rate, 0);
+    dayOffset += periodDays;
+    // The discount follows the whole booking's length, not the
+    // period's -- otherwise a 5-day tail period would quietly lose the
+    // weekly rate the renter was quoted.
+    const rentAmount = roundMoney(periodList * discountFactor);
     const insuranceAmount = roundMoney(periodDays * insurancePerDay);
     const taxAmount = roundMoney((rentAmount + insuranceAmount) * (taxRate / 100));
     const deposit = index === 1 ? depositAmount : 0;

@@ -1,5 +1,50 @@
 # Changelog
 
+## v0.93.0 - 2026-09-23
+
+### The paper agreement, signed online
+
+The car sharing agreement that was being printed and signed by hand is
+now a contract the renter signs from the confirmation. Every clause is
+transcribed verbatim from the operator's own document -- a paraphrase
+that reads better is a different contract.
+
+It is generated in three parts, and the split is the whole trick:
+a details page whose boxes are drawn at known positions, the clauses
+as flowing text, and a signature page. Only the first and last carry
+fields, because field coordinates have to be known in advance and text
+that reflows cannot tell you where it landed. Four pages, seventeen
+fields.
+
+**The renter cannot retype the price.** Fourteen of those fields carry
+the booking's own facts and are addressed to a signing order no
+recipient holds: they print onto the contract but are never handed to
+the person signing it. The renter is offered exactly three -- their
+address, their signature and the date. Beginning mileage stays blank
+for the odometer reading at handover.
+
+Sent automatically when a direct booking is paid, prefilled from the
+order, and idempotent: a webhook retry reuses the existing envelope
+rather than sending a second contract.
+
+**The credit-card box is not reproduced.** The paper form ends with
+the front of a card and its CVV. Storing a card number is
+PCI-regulated and storing a CVV is prohibited outright, with no
+exception for internal use; a form in a filing cabinet and a web
+application with database backups are not the same undertaking. The
+clause requiring a payment method for subsequent charges is kept, and
+what the contract records instead is the card already held by
+Stripe -- `VISA ending 4242 (held by Stripe)` -- which is what that
+clause actually needs.
+
+### Fixed
+
+- **The signing email introduced itself as TATO.** Fine when an
+  operator sends a contract from the admin app, wrong for a renter who
+  booked on the operator's own domain and had never heard of us. It
+  now carries the rental site's brand, with TATO as the default for
+  every existing caller.
+
 ## v0.92.0 - 2026-09-23
 
 ### The renter hears back

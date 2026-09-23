@@ -5,6 +5,11 @@ import type Stripe from "stripe";
 
 import { dateOnlyToUtcMidday, hasVehicleBookingConflict } from "@/lib/direct-booking";
 import { sendDirectBookingConfirmationEmail } from "@/lib/direct-booking-email";
+import {
+  buildRentalAgreementValues,
+  createRentalAgreementEnvelope,
+} from "@/lib/rental-agreement";
+import { getAppUrl } from "@/lib/stripe";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { getStripeClient } from "@/lib/stripe";
@@ -63,6 +68,28 @@ async function refundCheckoutSession(session: Stripe.Checkout.Session, reason: s
     });
     return null;
   }
+}
+
+/**
+ * How the contract refers to the card, without holding any of it.
+ *
+ * Stripe's checkout session carries the brand and last four digits
+ * once payment succeeds. That is enough for a clause about subsequent
+ * charges and is the most that may be written down.
+ */
+function describeStripePaymentMethod(session: Stripe.Checkout.Session) {
+  const card =
+    typeof session.payment_intent === "string"
+      ? null
+      : session.payment_intent?.payment_method &&
+          typeof session.payment_intent.payment_method !== "string"
+        ? session.payment_intent.payment_method.card
+        : null;
+
+  if (card?.brand && card.last4) {
+    return `${card.brand.toUpperCase()} ending ${card.last4} (held by Stripe)`;
+  }
+  return "Card on file with Stripe";
 }
 
 export async function persistDirectBookingFromCheckoutSession(session: Stripe.Checkout.Session) {
@@ -223,11 +250,44 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
   // swallows its own failures: a mail outage here must not fail the
   // webhook, because Stripe would retry it and we would be deciding
   // all over again whether an order we already created is a duplicate.
+  const confirmationEmail = renterEmail ?? session.customer_details?.email ?? null;
+
   await sendDirectBookingConfirmationEmail({
     workspaceId: vehicle.workspaceId,
     order,
     vehicle,
-    renterEmail: renterEmail ?? session.customer_details?.email ?? null,
+    renterEmail: confirmationEmail,
+  });
+
+  // The rental agreement, prefilled and sent for signature. Swallows
+  // its own failures for the same reason the confirmation does: the
+  // booking is already paid for, and an unsent contract is something
+  // to chase rather than a reason for Stripe to retry the webhook.
+  await createRentalAgreementEnvelope({
+    workspaceId: vehicle.workspaceId,
+    orderId: order.id,
+    renterName,
+    renterEmail: confirmationEmail,
+    values: buildRentalAgreementValues({
+      renterName,
+      renterPhone: metadata.renterPhone,
+      renterEmail: confirmationEmail,
+      vehicle,
+      pickupDatetime: order.pickupDatetime,
+      returnDatetime: order.returnDatetime,
+      totalPrice: order.totalPrice,
+      depositAmount: order.depositAmount,
+      insuranceAmount:
+        metadata.includeInsurance === "true" && metadata.bookedDays
+          ? (vehicle.bookingInsuranceFee ?? 0) * Number(metadata.bookedDays)
+          : null,
+      // The card itself stays with Stripe. What the contract records
+      // is that one is on file, which is what its payment clause
+      // actually needs -- storing the number would be a PCI matter and
+      // storing the CVV is prohibited outright.
+      paymentMethodOnFile: describeStripePaymentMethod(session),
+    }),
+    appUrl: getAppUrl(),
   });
 
   await logActivity({

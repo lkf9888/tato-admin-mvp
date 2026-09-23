@@ -9,6 +9,13 @@ type ContractSigningEmailInput = {
   senderName: string | null;
   signingUrl: string;
   message?: string | null;
+  /**
+   * Whose name this arrives under. Defaults to TATO, which is right
+   * when an operator sends a contract from the admin app. A renter who
+   * booked on the operator's own domain must not find our name on the
+   * agreement instead of theirs, so that path passes its own brand.
+   */
+  brandName?: string | null;
 };
 
 type ContractCompletedEmailInput = {
@@ -30,11 +37,12 @@ export type ContractEmailResult =
 export async function sendContractSigningEmail(
   input: ContractSigningEmailInput,
 ): Promise<ContractEmailResult> {
-  const subject = `[TATO] 请签署电子合约：${input.contractTitle}`;
+  const brand = input.brandName?.trim() || "TATO";
+  const subject = `[${brand}] 请签署电子合约：${input.contractTitle}`;
   const text = [
     `${input.recipientName}，您好：`,
     "",
-    "您收到一份需要查看并签署的 TATO 电子合约。",
+    `您收到一份需要查看并签署的${brand}电子合约。`,
     input.senderName ? `发送人：${input.senderName}` : null,
     "",
     input.message || null,
@@ -43,7 +51,7 @@ export async function sendContractSigningEmail(
     `签署链接：${input.signingUrl}`,
     "",
     "这个签署链接只属于您本人，请不要转发。",
-    "TATO",
+    brand,
   ]
     .filter((line): line is string => line !== null)
     .join("\n");
@@ -53,7 +61,7 @@ export async function sendContractSigningEmail(
   <body style="margin:0;background:#f6f6f6;padding:24px;font-family:Arial,sans-serif;color:#111827;">
     <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
       <div style="padding:28px;border-bottom:1px solid #e5e7eb;">
-        <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#111827;">TATO eSignature</div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#111827;">${brand} eSignature</div>
         <p style="margin:12px 0 0;color:#4b5563;line-height:1.6;">${escapeHtml(input.recipientName)}，您好，您收到一份需要查看并签署的电子合约。</p>
       </div>
       <div style="padding:28px;">

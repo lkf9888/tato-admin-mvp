@@ -43,6 +43,10 @@ import {
   SHAREABLE_FEE_COLUMNS,
   defaultOwnerFeeShares,
 } from "@/lib/ledger-policy";
+import {
+  BOOKING_POLICY_DEFAULTS,
+  normalizeBookingPolicy,
+} from "@/lib/booking-policy";
 import { prisma } from "@/lib/prisma";
 import {
   isPlatformHost,
@@ -1482,6 +1486,23 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
   const bookingTaxName = cleanOptional(formData.get("bookingTaxName"));
   const rawTaxRate = cleanOptional(formData.get("bookingTaxRate"));
   const bookingIntro = cleanOptional(formData.get("bookingIntro"));
+  // Null is "follow the fleet", so an empty field has to clear the
+  // override rather than be left alone -- `cleanOptional` returns
+  // undefined for blank, which Prisma reads as "do not touch".
+  const overrideNumber = (name: string, parse: (raw: string) => number) => {
+    const raw = formData.get(name)?.toString().trim();
+    if (!raw) return null;
+    const value = parse(raw);
+    return Number.isFinite(value) ? value : null;
+  };
+  const bookingWeeklyDiscountPercent = overrideNumber("bookingWeeklyDiscountPercent", Number);
+  const bookingMinimumRentalDays = overrideNumber("bookingMinimumRentalDays", (raw) =>
+    Math.round(Number(raw)),
+  );
+  const bookingDailyKmAllowance = overrideNumber("bookingDailyKmAllowance", (raw) =>
+    Math.round(Number(raw)),
+  );
+  const bookingExtraKmRate = overrideNumber("bookingExtraKmRate", Number);
 
   const bookingDailyRate =
     rawDailyRate == null ? null : z.coerce.number().nonnegative().parse(rawDailyRate);
@@ -1507,6 +1528,10 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
       bookingTaxName,
       bookingTaxRate: bookingTaxRate == null ? null : +bookingTaxRate.toFixed(3),
       bookingIntro,
+      bookingWeeklyDiscountPercent,
+      bookingMinimumRentalDays,
+      bookingDailyKmAllowance,
+      bookingExtraKmRate,
     },
   });
 
@@ -2123,4 +2148,48 @@ export async function saveDirectBookingEmailTemplateAction(formData: FormData) {
 
   revalidatePath("/direct-booking");
   redirect("/direct-booking?emailSaved=1");
+}
+
+/**
+ * Save the fleet-wide booking policy.
+ *
+ * Stored as concrete numbers rather than nullable ones: this row IS
+ * the default, so an empty field here means "use what ships", which
+ * `normalizeBookingPolicy` supplies. Vehicles are where null means
+ * inherit.
+ */
+export async function saveBookingPolicyAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+
+  const read = (name: string, fallback: number) => {
+    const raw = formData.get(name)?.toString().trim();
+    if (!raw) return fallback;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : fallback;
+  };
+
+  const data = normalizeBookingPolicy({
+    weeklyDiscountPercent: read("weeklyDiscountPercent", BOOKING_POLICY_DEFAULTS.weeklyDiscountPercent),
+    minimumRentalDays: read("minimumRentalDays", BOOKING_POLICY_DEFAULTS.minimumRentalDays),
+    dailyKmAllowance: read("dailyKmAllowance", BOOKING_POLICY_DEFAULTS.dailyKmAllowance),
+    extraKmRate: read("extraKmRate", BOOKING_POLICY_DEFAULTS.extraKmRate),
+  });
+
+  const saved = await prisma.bookingPricingPolicy.upsert({
+    where: { workspaceId: workspace.id },
+    update: data,
+    create: { workspaceId: workspace.id, ...data },
+  });
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "booking_policy_updated",
+    entityType: "BookingPricingPolicy",
+    entityId: saved.id,
+    metadata: data,
+  });
+
+  revalidateAdminPages();
+  redirect("/direct-booking?policySaved=1");
 }

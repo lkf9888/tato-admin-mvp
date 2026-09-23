@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 
-import { saveVehicleDirectBookingAction } from "@/app/actions";
+import {
+  saveBookingPolicyAction,
+  saveVehicleDirectBookingAction,
+} from "@/app/actions";
+import { normalizeBookingPolicy } from "@/lib/booking-policy";
 import { DirectBookingEmailEditor } from "@/components/direct-booking-email-editor";
 import { normalizeDirectBookingEmailTemplate } from "@/lib/direct-booking-email-template";
 import { isEmailConfigured } from "@/lib/email";
@@ -15,16 +19,18 @@ import { formatDate } from "@/lib/utils";
 export default async function DirectBookingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ emailSaved?: string }>;
+  searchParams: Promise<{ emailSaved?: string; policySaved?: string }>;
 }) {
   const workspace = await requireCurrentWorkspace();
   const bookableFrom = new Date();
   bookableFrom.setDate(bookableFrom.getDate() - 1);
-  const [query, headerStore, { locale, messages }, emailTemplate, vehicles] = await Promise.all([
+  const [query, headerStore, { locale, messages }, emailTemplate, savedPolicy, vehicles] =
+    await Promise.all([
     searchParams,
     headers(),
     getI18n(),
     prisma.directBookingEmailTemplate.findUnique({ where: { workspaceId: workspace.id } }),
+    prisma.bookingPricingPolicy.findUnique({ where: { workspaceId: workspace.id } }),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
       include: {
@@ -54,6 +60,7 @@ export default async function DirectBookingPage({
   ]);
 
   const directMessages = messages.directBookingPage;
+  const fleetPolicy = normalizeBookingPolicy(savedPolicy);
   const forwardedHost = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
   const forwardedProto = headerStore.get("x-forwarded-proto");
   const protocol =
@@ -112,6 +119,89 @@ export default async function DirectBookingPage({
           </div>
         </div>
       </section>
+
+      <form
+        action={saveBookingPolicyAction}
+        className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-3 py-3 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--ink-soft)]">
+              {directMessages.policyKicker}
+            </p>
+            <h3 className="mt-1 text-[1.05rem] font-semibold text-[color:var(--ink)]">
+              {directMessages.policyTitle}
+            </h3>
+            <p className="mt-1 max-w-3xl text-[12px] leading-5 text-[color:var(--ink-soft)]">
+              {directMessages.policyCopy}
+            </p>
+          </div>
+          {query.policySaved ? (
+            <span className="rounded-md bg-[var(--ok-bg)] px-2.5 py-1 text-[11px] text-[color:var(--ok-fg)]">
+              {directMessages.policySavedNotice}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              name: "weeklyDiscountPercent",
+              label: directMessages.policyWeeklyLabel,
+              hint: directMessages.policyWeeklyHint,
+              value: fleetPolicy.weeklyDiscountPercent,
+              step: "0.1",
+            },
+            {
+              name: "minimumRentalDays",
+              label: directMessages.policyMinDaysLabel,
+              hint: directMessages.policyMinDaysHint,
+              value: fleetPolicy.minimumRentalDays,
+              step: "1",
+            },
+            {
+              name: "dailyKmAllowance",
+              label: directMessages.policyKmLabel,
+              hint: directMessages.policyKmHint,
+              value: fleetPolicy.dailyKmAllowance,
+              step: "1",
+            },
+            {
+              name: "extraKmRate",
+              label: directMessages.policyExtraKmLabel,
+              hint: directMessages.policyExtraKmHint,
+              value: fleetPolicy.extraKmRate,
+              step: "0.01",
+            },
+          ].map((field) => (
+            <label key={field.name} className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-medium text-[color:var(--ink)]">
+                {field.label}
+              </span>
+              <input
+                name={field.name}
+                type="number"
+                min="0"
+                step={field.step}
+                inputMode="decimal"
+                defaultValue={field.value}
+                className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px] font-medium tabular-nums text-[color:var(--ink)]"
+              />
+              <span className="mt-1 block text-[11px] leading-4 text-[color:var(--ink-soft)]">
+                {field.hint}
+              </span>
+            </label>
+          ))}
+        </div>
+
+        <button
+          type="submit"
+          className="mt-3 rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white"
+          style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+        >
+          {directMessages.policySaveAction}
+        </button>
+      </form>
 
       <DirectBookingEmailEditor
         locale={locale}
@@ -203,6 +293,63 @@ export default async function DirectBookingPage({
                     className="h-4 w-4 shrink-0 rounded border-[color:var(--line)]"
                   />
                 </label>
+
+                <div className="rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2.5">
+                  <p className="text-[11px] font-medium text-[color:var(--ink)]">
+                    {directMessages.vehicleOverrideTitle}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-[color:var(--ink-soft)]">
+                    {directMessages.vehicleOverrideHint}
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                    {[
+                      {
+                        name: "bookingWeeklyDiscountPercent",
+                        label: directMessages.policyWeeklyLabel,
+                        value: vehicle.bookingWeeklyDiscountPercent,
+                        fleet: fleetPolicy.weeklyDiscountPercent,
+                        step: "0.1",
+                      },
+                      {
+                        name: "bookingMinimumRentalDays",
+                        label: directMessages.policyMinDaysLabel,
+                        value: vehicle.bookingMinimumRentalDays,
+                        fleet: fleetPolicy.minimumRentalDays,
+                        step: "1",
+                      },
+                      {
+                        name: "bookingDailyKmAllowance",
+                        label: directMessages.policyKmLabel,
+                        value: vehicle.bookingDailyKmAllowance,
+                        fleet: fleetPolicy.dailyKmAllowance,
+                        step: "1",
+                      },
+                      {
+                        name: "bookingExtraKmRate",
+                        label: directMessages.policyExtraKmLabel,
+                        value: vehicle.bookingExtraKmRate,
+                        fleet: fleetPolicy.extraKmRate,
+                        step: "0.01",
+                      },
+                    ].map((field) => (
+                      <label key={field.name} className="block min-w-0">
+                        <span className="mb-1 block text-[10px] text-[color:var(--ink-soft)]">
+                          {field.label}
+                        </span>
+                        <input
+                          name={field.name}
+                          type="number"
+                          min="0"
+                          step={field.step}
+                          inputMode="decimal"
+                          defaultValue={field.value ?? ""}
+                          placeholder={directMessages.inheritPlaceholder(String(field.fleet))}
+                          className="w-full rounded-md border border-[color:var(--line)] bg-white px-2 py-1.5 text-[12px] tabular-nums text-[color:var(--ink)]"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <label className="block min-w-0">

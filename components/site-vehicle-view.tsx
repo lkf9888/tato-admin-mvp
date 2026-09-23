@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PublicBookingPanel } from "@/components/public-booking-panel";
 import { VehiclePhotoCarousel } from "@/components/vehicle-photo-carousel";
 import { getBlockedBookingWindows, getDateOnlyBookingWindows } from "@/lib/direct-booking";
+import type { BookingPolicy } from "@/lib/booking-policy";
 import { buildVehicleSlug, getSiteBasePath, getSiteUrl } from "@/lib/rental-site";
 import { isImageAttachment } from "@/lib/uploads";
 import type { Locale, Messages } from "@/lib/i18n";
@@ -27,6 +28,7 @@ export function SiteVehicleView({
   locale,
   messages,
   vehicle,
+  policy,
   stripeReady,
   hostPayoutsReady,
   defaultPickupDate,
@@ -37,6 +39,7 @@ export function SiteVehicleView({
   locale: Locale;
   messages: Messages;
   vehicle: SiteVehicle;
+  policy: BookingPolicy;
   stripeReady: boolean;
   hostPayoutsReady: boolean;
   defaultPickupDate: string;
@@ -178,6 +181,10 @@ export function SiteVehicleView({
             bookingTaxName={vehicle.bookingTaxName}
             bookingTaxRate={vehicle.bookingTaxRate ?? 0}
             blockedDateWindows={blockedDateWindows}
+            weeklyDiscountPercent={policy.weeklyDiscountPercent}
+            minimumRentalDays={policy.minimumRentalDays}
+            dailyKmAllowance={policy.dailyKmAllowance}
+            extraKmRate={policy.extraKmRate}
             stripeReady={stripeReady}
             hostPayoutsReady={hostPayoutsReady}
             defaultPickupDate={defaultPickupDate}

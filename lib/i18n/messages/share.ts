@@ -87,6 +87,10 @@ export const shareMessages = {
       quoteTax: "Tax",
       quoteDeposit: "Deposit",
       quoteTotal: "Estimated total",
+      quoteWeeklyDiscount: (percent: number) => `Weekly rate (${percent}% off)`,
+      minimumDaysError: (days: number) => `This car is rented for a minimum of ${days} days.`,
+      mileageIncluded: (km: number, rate: string) =>
+        `${km} km included per day · ${rate}/km beyond that`,
       instalmentTitle: (count: number) => `Paid in ${count} instalments`,
       instalmentIntro:
         "Long rentals are billed by period. You pay the first one today; the rest are collected as each period begins.",
@@ -227,6 +231,10 @@ export const shareMessages = {
       quoteTax: "税费",
       quoteDeposit: "押金",
       quoteTotal: "预计总价",
+      quoteWeeklyDiscount: (percent: number) => `周租价（立减 ${percent}%）`,
+      minimumDaysError: (days: number) => `这辆车最短租期为 ${days} 天。`,
+      mileageIncluded: (km: number, rate: string) =>
+        `每天含 ${km} 公里 · 超出部分 ${rate}/公里`,
       instalmentTitle: (count: number) => `分 ${count} 期支付`,
       instalmentIntro:
         "长租按周期计费。今天只付第一期，之后每期开始时再收。",

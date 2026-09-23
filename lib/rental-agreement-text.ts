@@ -31,8 +31,13 @@ export const RENTAL_AGREEMENT_CLAUSES: RentalAgreementClause[] = [
   },
   {
     heading: "Maximum Daily Mileage",
+    // The paper form states 100 km and $0.12/km inline. Both are now
+    // per-fleet settings with a per-vehicle override, so the figures
+    // live on the details page and this clause points at them --
+    // a clause naming one number while the page prints another is
+    // worse than a clause naming none.
     body:
-      "The maximum mileage can be driven is 100 KM per Day, and an additional $0.12/km will be charged for any excess.",
+      "The maximum mileage the Renter may drive is the Daily Mileage Allowance stated on the first page of this Agreement. Kilometres driven beyond that allowance are charged at the Excess Mileage Rate stated there.",
   },
   {
     heading: "Insurance",

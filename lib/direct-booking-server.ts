@@ -9,6 +9,7 @@ import {
   hasVehicleBookingConflict,
 } from "@/lib/direct-booking";
 import { mintRenterToken } from "@/lib/booking-access";
+import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { sendDirectBookingConfirmationEmail } from "@/lib/direct-booking-email";
 import {
   buildRentalAgreementValues,
@@ -111,10 +112,15 @@ function describeStripePaymentMethod(session: Stripe.Checkout.Session) {
 async function writeInstalmentSchedule(input: {
   order: { id: string; workspaceId: string | null };
   vehicle: {
+    workspaceId: string | null;
     bookingDailyRate: number | null;
     bookingInsuranceFee: number | null;
     bookingDepositAmount: number | null;
     bookingTaxRate: number | null;
+    bookingWeeklyDiscountPercent: number | null;
+    bookingMinimumRentalDays: number | null;
+    bookingDailyKmAllowance: number | null;
+    bookingExtraKmRate: number | null;
   };
   pickupDate: string;
   returnDate: string;
@@ -124,9 +130,11 @@ async function writeInstalmentSchedule(input: {
   const existing = await prisma.orderPayment.count({ where: { orderId: input.order.id } });
   if (existing > 0) return;
 
+  const policy = await getBookingPolicyForVehicle(input.vehicle);
   const plan = getDirectBookingInstalmentPlan({
     pickupDate: input.pickupDate,
     returnDate: input.returnDate,
+    weeklyDiscountPercent: policy.weeklyDiscountPercent,
     bookingDailyRate: input.vehicle.bookingDailyRate ?? 0,
     bookingInsuranceFee: input.vehicle.bookingInsuranceFee ?? 0,
     bookingDepositAmount: input.vehicle.bookingDepositAmount ?? 0,
@@ -402,6 +410,7 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       // actually needs -- storing the number would be a PCI matter and
       // storing the CVV is prohibited outright.
       paymentMethodOnFile: describeStripePaymentMethod(session),
+      policy: await getBookingPolicyForVehicle(vehicle),
     }),
     appUrl: getAppUrl(),
   });

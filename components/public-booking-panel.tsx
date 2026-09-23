@@ -240,6 +240,10 @@ export function PublicBookingPanel({
   bookingTaxName,
   bookingTaxRate,
   blockedDateWindows,
+  weeklyDiscountPercent,
+  minimumRentalDays,
+  dailyKmAllowance,
+  extraKmRate,
   stripeReady,
   hostPayoutsReady,
   defaultPickupDate,
@@ -254,6 +258,10 @@ export function PublicBookingPanel({
   bookingTaxName: string | null;
   bookingTaxRate: number;
   blockedDateWindows: DateOnlyBookingWindow[];
+  weeklyDiscountPercent: number;
+  minimumRentalDays: number;
+  dailyKmAllowance: number;
+  extraKmRate: number;
   stripeReady: boolean;
   hostPayoutsReady: boolean;
   defaultPickupDate: string;
@@ -373,6 +381,7 @@ export function PublicBookingPanel({
       getDirectBookingInstalmentPlan({
         pickupDate,
         returnDate,
+        weeklyDiscountPercent,
         bookingDailyRate,
         bookingInsuranceFee,
         bookingDepositAmount,
@@ -387,6 +396,7 @@ export function PublicBookingPanel({
       includeInsurance,
       pickupDate,
       returnDate,
+      weeklyDiscountPercent,
     ],
   );
 
@@ -395,6 +405,7 @@ export function PublicBookingPanel({
       getDirectBookingQuote({
         pickupDate,
         returnDate,
+        weeklyDiscountPercent,
         bookingDailyRate,
         bookingInsuranceFee,
         bookingDepositAmount,
@@ -409,6 +420,7 @@ export function PublicBookingPanel({
       includeInsurance,
       pickupDate,
       returnDate,
+      weeklyDiscountPercent,
     ],
   );
 
@@ -431,6 +443,11 @@ export function PublicBookingPanel({
 
     if (!pickupDate || !returnDate || quote.days < 1) {
       setError(reserveMessages.invalidRange);
+      return;
+    }
+
+    if (quote.days < minimumRentalDays) {
+      setError(reserveMessages.minimumDaysError(minimumRentalDays));
       return;
     }
 
@@ -633,8 +650,21 @@ export function PublicBookingPanel({
         <div className="mt-4 space-y-3 text-sm text-[var(--ink-mid)]">
           <div className="flex items-center justify-between">
             <span>{reserveMessages.quoteBase}</span>
-            <span>{formatCurrency(quote.baseAmount, locale)}</span>
+            <span>
+              {quote.isWeeklyRateApplied ? (
+                <span className="mr-2 text-[var(--ink-soft)] line-through">
+                  {formatCurrency(quote.listBaseAmount, locale)}
+                </span>
+              ) : null}
+              {formatCurrency(quote.baseAmount, locale)}
+            </span>
           </div>
+          {quote.isWeeklyRateApplied ? (
+            <div className="flex items-center justify-between text-[var(--ok-fg)]">
+              <span>{reserveMessages.quoteWeeklyDiscount(weeklyDiscountPercent)}</span>
+              <span>-{formatCurrency(quote.discountAmount, locale)}</span>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between">
             <span>{reserveMessages.quoteInsurance}</span>
             <span>{includeInsurance ? formatCurrency(quote.insuranceAmount, locale) : "—"}</span>
@@ -652,6 +682,15 @@ export function PublicBookingPanel({
             <span>{formatCurrency(quote.depositAmount, locale)}</span>
           </div>
         </div>
+        {dailyKmAllowance > 0 ? (
+          <p className="mt-3 text-[11px] leading-4 text-[var(--ink-soft)]">
+            {reserveMessages.mileageIncluded(
+              dailyKmAllowance,
+              formatCurrency(extraKmRate, locale),
+            )}
+          </p>
+        ) : null}
+
         <div className="mt-4 flex items-center justify-between border-t border-[var(--line)] pt-4">
           <span className="text-sm font-medium text-[var(--ink)]">{reserveMessages.quoteTotal}</span>
           <span

@@ -10,6 +10,7 @@ import {
   hasVehicleBookingConflict,
   isDateOnlyRangeValid,
 } from "@/lib/direct-booking";
+import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { prisma } from "@/lib/prisma";
 import { getBookingReturnUrls } from "@/lib/rental-site";
 import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
@@ -194,6 +195,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // Resolved server-side and never taken from the request: the
+    // browser prices with the same numbers, but a discount the client
+    // chose for itself would be a discount anyone could choose.
+    const policy = await getBookingPolicyForVehicle(vehicle);
+
     const quote = getDirectBookingQuote({
       pickupDate: parsed.pickupDate,
       returnDate: parsed.returnDate,
@@ -202,10 +208,20 @@ export async function POST(request: Request) {
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       bookingTaxRate: vehicle.bookingTaxRate ?? 0,
       includeInsurance: parsed.includeInsurance,
+      weeklyDiscountPercent: policy.weeklyDiscountPercent,
     });
 
     if (quote.days < 1 || quote.totalAmount <= 0) {
       return NextResponse.json({ error: "Quote could not be calculated." }, { status: 400 });
+    }
+
+    if (quote.days < policy.minimumRentalDays) {
+      return NextResponse.json(
+        {
+          error: `This vehicle is rented for a minimum of ${policy.minimumRentalDays} days.`,
+        },
+        { status: 400 },
+      );
     }
 
     // A booking longer than one period is charged for its first period
@@ -220,6 +236,7 @@ export async function POST(request: Request) {
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       bookingTaxRate: vehicle.bookingTaxRate ?? 0,
       includeInsurance: parsed.includeInsurance,
+      weeklyDiscountPercent: policy.weeklyDiscountPercent,
     });
     const firstPeriod = plan.instalments[0] ?? null;
     const chargedDays = firstPeriod?.days ?? quote.days;
@@ -313,7 +330,7 @@ export async function POST(request: Request) {
           quantity: chargedDays,
           price_data: {
             currency: "cad",
-            unit_amount: Math.round((vehicle.bookingDailyRate ?? 0) * 100),
+            unit_amount: Math.round(quote.effectiveDailyRate * 100),
             product_data: {
               name: `${vehicle.nickname} booking`,
               description: `${vehicle.plateNumber} · ${parsed.pickupDate} to ${parsed.returnDate}`,

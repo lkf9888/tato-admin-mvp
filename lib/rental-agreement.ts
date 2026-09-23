@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import type { ContractFieldType } from "@prisma/client";
 
+import type { BookingPolicy } from "@/lib/booking-policy";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import {
@@ -158,6 +159,7 @@ export function buildRentalAgreementValues(input: {
   depositAmount?: number | null;
   insuranceAmount?: number | null;
   paymentMethodOnFile?: string | null;
+  policy?: BookingPolicy | null;
 }): RentalAgreementValues {
   return {
     renterName: input.renterName,
@@ -181,6 +183,8 @@ export function buildRentalAgreementValues(input: {
         ? formatCurrency(input.insuranceAmount)
         : "",
     paymentMethodOnFile: input.paymentMethodOnFile?.trim() || "",
+    dailyKmAllowance: input.policy ? `${input.policy.dailyKmAllowance} km / day` : "",
+    extraKmRate: input.policy ? `${formatCurrency(input.policy.extraKmRate)} / km` : "",
   };
 }
 
@@ -313,6 +317,8 @@ const RENTAL_AGREEMENT_FIELD_LABELS: Record<RentalAgreementFieldKey, string> = {
   rentalEndDate: "Rental End Date",
   beginningMileage: "Beginning Mileage (km)",
   fuelLevel: "Fuel Level",
+  dailyKmAllowance: "Daily Mileage Allowance",
+  extraKmRate: "Excess Mileage Rate",
   rentalPrice: "Rental Price",
   securityDeposit: "Security Deposit",
   insuranceFee: "ICBC Insurance",

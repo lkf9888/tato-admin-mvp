@@ -44,6 +44,8 @@ export type RentalAgreementFieldKey =
   | "rentalPrice"
   | "securityDeposit"
   | "insuranceFee"
+  | "dailyKmAllowance"
+  | "extraKmRate"
   | "paymentMethodOnFile"
   | "renterSignature"
   | "signedDate";
@@ -135,6 +137,8 @@ const DETAIL_ROWS: RowSpec[] = [
   { key: "rentalEndDate", label: "Rental End Date" },
   { key: "beginningMileage", label: "Beginning Mileage (km)" },
   { key: "fuelLevel", label: "Fuel Level" },
+  { key: "dailyKmAllowance", label: "Daily Mileage Allowance" },
+  { key: "extraKmRate", label: "Excess Mileage Rate" },
   { key: "rentalPrice", label: "Rental Price" },
   { key: "securityDeposit", label: "Security Deposit" },
   { key: "insuranceFee", label: "ICBC Insurance" },

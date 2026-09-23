@@ -15,6 +15,7 @@ import {
   readCheckoutState,
   readDateParam,
 } from "@/lib/rental-site";
+import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
 
@@ -70,7 +71,10 @@ export async function renderSiteVehicle(
     readDateParam(searchParams.from),
     readDateParam(searchParams.to),
   );
-  const connectSnapshot = await getWorkspaceConnectSnapshot(site.workspaceId);
+  const [connectSnapshot, policy] = await Promise.all([
+    getWorkspaceConnectSnapshot(site.workspaceId),
+    getBookingPolicyForVehicle(vehicle),
+  ]);
 
   return (
     <SiteShell site={site} locale={locale}>
@@ -79,6 +83,7 @@ export async function renderSiteVehicle(
         locale={locale}
         messages={messages}
         vehicle={vehicle}
+        policy={policy}
         stripeReady={Boolean(getStripeSecretKey())}
         hostPayoutsReady={Boolean(connectSnapshot.accountId && connectSnapshot.chargesEnabled)}
         defaultPickupDate={defaultPickupDate}

@@ -1,5 +1,55 @@
 # Changelog
 
+## v0.96.0 - 2026-09-23
+
+### Fleet booking policy, and the cars that disagree with it
+
+Three settings an operator actually changes -- the weekly discount,
+the shortest booking they will take, and how far a renter may drive
+per day -- set once for the whole fleet on the Direct booking page.
+Defaults are 30% off at a week, no minimum, 100 km a day.
+
+**A vehicle overrides by filling a field in, and inherits by leaving
+it blank.** The alternative -- seeding each car with a copy of the
+default -- would mean an operator who raises the mileage allowance has
+to visit all of them. Blank fields show the fleet value as their
+placeholder, so what a car will actually do is readable without
+opening anything else.
+
+The excess-kilometre rate is settable too, which was not asked for and
+is not optional: the rental agreement states the allowance and the
+overage rate in the same clause, and a contract reading "100 KM per
+Day and $0.12/km" while the fleet allows 200 is worse than no clause.
+That clause now points at the figures printed on the agreement's first
+page, which are filled per booking from the vehicle's own resolved
+policy.
+
+**The weekly rate applies to the whole rental once it reaches seven
+days**, not to complete weeks. "A week or more is 30% off" fits in one
+sentence; "30% off the first seven days and full price for the other
+three" takes a paragraph and still reads like a trick. On an
+instalment plan the discount is decided by the booking's length rather
+than each period's, so a five-day tail period keeps the weekly rate
+the renter was quoted.
+
+The renter sees the list price struck through, the saving on its own
+line, and the mileage allowance beside the total. A discounted price
+with nothing saying why reads as the price being wrong.
+
+Pricing is resolved server-side on every path that takes money. The
+browser prices with the same numbers, but a discount the client chose
+for itself would be a discount anyone could choose.
+
+### Fixed
+
+- **`getBookingPolicyForVehicle` could silently ignore a vehicle's
+  overrides.** Its parameter marked them optional, so a caller loading
+  a vehicle with a `select` that omitted those columns would hand over
+  `undefined` for each one and the car would quietly fall back to the
+  fleet policy -- priced wrongly with nothing to show for it. They are
+  required now, which makes that a compile error. Every existing
+  caller already passed a fully-loaded vehicle.
+
 ## v0.95.1 - 2026-09-23
 
 - **The renter's booking page had TATO in the browser tab.** Every

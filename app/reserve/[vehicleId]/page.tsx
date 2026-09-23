@@ -13,6 +13,7 @@ import {
   getSiteUrl,
 } from "@/lib/rental-site";
 import { prisma } from "@/lib/prisma";
+import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
 import { isImageAttachment } from "@/lib/uploads";
@@ -134,6 +135,7 @@ export default async function ReserveVehiclePage({
       alt: attachment.filename || vehicle.nickname,
     }));
   const stripeReady = Boolean(getStripeSecretKey());
+  const policy = await getBookingPolicyForVehicle(vehicle);
   const connectSnapshot = vehicle.workspaceId
     ? await getWorkspaceConnectSnapshot(vehicle.workspaceId)
     : null;
@@ -253,7 +255,11 @@ export default async function ReserveVehiclePage({
               bookingDepositAmount={vehicle.bookingDepositAmount ?? 0}
               bookingTaxName={vehicle.bookingTaxName}
               bookingTaxRate={vehicle.bookingTaxRate ?? 0}
-              blockedDateWindows={blockedDateWindows}
+            blockedDateWindows={blockedDateWindows}
+            weeklyDiscountPercent={policy.weeklyDiscountPercent}
+            minimumRentalDays={policy.minimumRentalDays}
+            dailyKmAllowance={policy.dailyKmAllowance}
+            extraKmRate={policy.extraKmRate}
               stripeReady={stripeReady}
               hostPayoutsReady={hostPayoutsReady}
               defaultPickupDate={defaultPickupDate}

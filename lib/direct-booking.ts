@@ -1,5 +1,6 @@
 import { OrderStatus, type Order } from "@prisma/client";
 
+import { getEffectiveDailyRate, isWeeklyRateApplied } from "@/lib/booking-policy";
 import { orderRangesOverlap } from "@/lib/orders";
 
 type BookingOrderLike = Pick<Order, "pickupDatetime" | "returnDatetime" | "status"> & {
@@ -47,9 +48,22 @@ export function getDirectBookingQuote(input: {
   bookingDepositAmount?: number | null;
   bookingTaxRate?: number | null;
   includeInsurance?: boolean;
+  /** Off the rent once the booking reaches a week. */
+  weeklyDiscountPercent?: number | null;
 }) {
   const days = getDirectBookingDays(input.pickupDate, input.returnDate);
-  const baseAmount = days * input.bookingDailyRate;
+  const weeklyDiscountPercent = input.weeklyDiscountPercent ?? 0;
+  const effectiveDailyRate = getEffectiveDailyRate(
+    input.bookingDailyRate,
+    days,
+    weeklyDiscountPercent,
+  );
+  // `baseAmount` stays the rent actually owed, so every existing caller
+  // that adds it into a total keeps working. What the discount adds is
+  // the two figures a renter needs to see it happened.
+  const listBaseAmount = roundMoney(days * input.bookingDailyRate);
+  const baseAmount = roundMoney(days * effectiveDailyRate);
+  const discountAmount = roundMoney(listBaseAmount - baseAmount);
   const insuranceFeePerDay = input.includeInsurance ? input.bookingInsuranceFee ?? 0 : 0;
   const insuranceAmount = days * insuranceFeePerDay;
   const taxableAmount = baseAmount + insuranceAmount;
@@ -60,10 +74,14 @@ export function getDirectBookingQuote(input: {
   return {
     days,
     baseAmount,
+    listBaseAmount,
+    discountAmount,
+    effectiveDailyRate,
+    isWeeklyRateApplied: isWeeklyRateApplied(days, weeklyDiscountPercent),
     insuranceAmount,
     taxAmount,
     depositAmount,
-    totalAmount: baseAmount + insuranceAmount + taxAmount + depositAmount,
+    totalAmount: roundMoney(baseAmount + insuranceAmount + taxAmount + depositAmount),
   };
 }
 
@@ -216,6 +234,7 @@ export function getDirectBookingInstalmentPlan(input: {
   bookingDepositAmount?: number | null;
   bookingTaxRate?: number | null;
   includeInsurance?: boolean;
+  weeklyDiscountPercent?: number | null;
 }): BookingInstalmentPlan {
   const quote = getDirectBookingQuote(input);
   const days = quote.days;
@@ -244,7 +263,10 @@ export function getDirectBookingInstalmentPlan(input: {
 
   while (remaining > 0) {
     const periodDays = Math.min(INSTALMENT_PERIOD_DAYS, remaining);
-    const rentAmount = roundMoney(periodDays * input.bookingDailyRate);
+    // The discount is decided by the whole booking's length, not by
+    // the period's -- otherwise a 5-day tail period would quietly lose
+    // the weekly rate the renter was quoted.
+    const rentAmount = roundMoney(periodDays * quote.effectiveDailyRate);
     const insuranceAmount = roundMoney(periodDays * insurancePerDay);
     const taxAmount = roundMoney((rentAmount + insuranceAmount) * (taxRate / 100));
     const deposit = index === 1 ? depositAmount : 0;

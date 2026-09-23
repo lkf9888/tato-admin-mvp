@@ -201,6 +201,7 @@ model Workspace {
   inspectionShots               InspectionShot[]
   rentalSite                    RentalSite?
   bookingChangeRequests         BookingChangeRequest[]
+  bookingPricingPolicy          BookingPricingPolicy?
   directBookingEmailTemplate    DirectBookingEmailTemplate?
 }
 
@@ -248,16 +249,16 @@ model Owner {
 }
 
 model Vehicle {
-  workspaceId            String?
-  id                     String                   @id @default(cuid())
-  ownerId                String?
-  plateNumber            String                   @unique
-  nickname               String
-  brand                  String
-  model                  String
-  year                   Int
-  vin                    String?
-  status                 VehicleStatus            @default(available)
+  workspaceId                  String?
+  id                           String                   @id @default(cuid())
+  ownerId                      String?
+  plateNumber                  String                   @unique
+  nickname                     String
+  brand                        String
+  model                        String
+  year                         Int
+  vin                          String?
+  status                       VehicleStatus            @default(available)
   /// Retired from sync, not merely out of service.
   ///
   /// `status: inactive` means a car is off the road for a while, and
@@ -266,41 +267,50 @@ model Vehicle {
   /// import skips its rows and booking mail will not file new trips
   /// against it, so a car sold or handed back stops absorbing updates
   /// without its history being deleted.
-  isArchived             Boolean                  @default(false)
-  turoListingName        String?
+  isArchived                   Boolean                  @default(false)
+  turoListingName              String?
   // Which Turo account this car is listed on. Null is the main
   // account. A co-hosted listing lives on someone else's account, so
   // its trips never appear in this account's CSV export -- the mailbox
   // is the only place both accounts arrive together.
-  turoAccount            String?
-  turoVehicleCode        String?
-  purchasePrice          Float?
-  ownerCommissionRate    Float?
-  cleaningFee            Float?
-  pickupPassword         String?
-  directBookingEnabled   Boolean                  @default(false)
-  bookingDailyRate       Float?
-  bookingInsuranceFee    Float?
-  bookingDepositAmount   Float?
-  bookingTaxName         String?
-  bookingTaxRate         Float?
-  bookingIntro           String?
-  notes                  String?
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
-  workspace              Workspace?               @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  owner                  Owner?                   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  orders                 Order[]
-  ownerLedgerItems       OwnerLedgerItem[]
-  attachments            OrderAttachment[]
-  staffTasks             StaffTask[]
-  inspectionSessions     InspectionSession[]
-  directBookingDocuments DirectBookingDocument[]
-  cleaningFeeRules       VehicleCleaningFeeRule[]
-  messageTemplates       MessageTemplate[]
-  calendarNotes          CalendarNote[]
-  calendarFeeds          CalendarFeed[]
-  inboundEmails          InboundEmail[]
+  turoAccount                  String?
+  turoVehicleCode              String?
+  purchasePrice                Float?
+  ownerCommissionRate          Float?
+  cleaningFee                  Float?
+  pickupPassword               String?
+  directBookingEnabled         Boolean                  @default(false)
+  bookingDailyRate             Float?
+  bookingInsuranceFee          Float?
+  bookingDepositAmount         Float?
+  bookingTaxName               String?
+  bookingTaxRate               Float?
+  /// Per-vehicle overrides of the workspace's booking policy. Null
+  /// means "whatever the fleet does" -- an operator who changes the
+  /// mileage allowance once should not have to visit every car, and
+  /// the one car that genuinely differs should not force the others
+  /// to be set explicitly.
+  bookingWeeklyDiscountPercent Float?
+  bookingMinimumRentalDays     Int?
+  bookingDailyKmAllowance      Int?
+  bookingExtraKmRate           Float?
+  bookingIntro                 String?
+  notes                        String?
+  createdAt                    DateTime                 @default(now())
+  updatedAt                    DateTime                 @updatedAt
+  workspace                    Workspace?               @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  owner                        Owner?                   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  orders                       Order[]
+  ownerLedgerItems             OwnerLedgerItem[]
+  attachments                  OrderAttachment[]
+  staffTasks                   StaffTask[]
+  inspectionSessions           InspectionSession[]
+  directBookingDocuments       DirectBookingDocument[]
+  cleaningFeeRules             VehicleCleaningFeeRule[]
+  messageTemplates             MessageTemplate[]
+  calendarNotes                CalendarNote[]
+  calendarFeeds                CalendarFeed[]
+  inboundEmails                InboundEmail[]
 
   @@index([workspaceId])
 }
@@ -1895,4 +1905,32 @@ model BookingChangeRequest {
 
   @@index([workspaceId, status])
   @@index([orderId])
+}
+
+/// Fleet-wide booking policy, and the default every vehicle inherits.
+///
+/// Absent until an operator saves it; `lib/booking-policy.ts` holds
+/// the shipped defaults, so a workspace that has never opened the
+/// settings still prices and contracts correctly.
+model BookingPricingPolicy {
+  id          String @id @default(cuid())
+  workspaceId String @unique
+
+  /// Off the rent once a booking reaches seven days. Applied to the
+  /// whole rental rather than to complete weeks: a renter can be told
+  /// "a week or more is 30% off" in one sentence, and "30% off the
+  /// first 7 days and full price for the other 3" in none.
+  weeklyDiscountPercent Float @default(30)
+  /// Bookings shorter than this are refused. 1 means no restriction.
+  minimumRentalDays     Int   @default(1)
+  /// Kilometres included per rented day.
+  dailyKmAllowance      Int   @default(100)
+  /// Charged per kilometre beyond the allowance. Settable because the
+  /// allowance is: a contract that reads "100 KM per Day and $0.12/km"
+  /// while the fleet actually allows 200 is worse than no clause.
+  extraKmRate           Float @default(0.12)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }

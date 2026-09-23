@@ -10,6 +10,7 @@ import {
 } from "@/lib/direct-booking";
 import { mintRenterToken } from "@/lib/booking-access";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
+import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { sendDirectBookingConfirmationEmail } from "@/lib/direct-booking-email";
 import {
   buildRentalAgreementValues,
@@ -113,6 +114,9 @@ async function writeInstalmentSchedule(input: {
   order: { id: string; workspaceId: string | null };
   vehicle: {
     workspaceId: string | null;
+    brand: string;
+    model: string;
+    year: number;
     bookingDailyRate: number | null;
     bookingInsuranceFee: number | null;
     bookingDepositAmount: number | null;
@@ -131,11 +135,12 @@ async function writeInstalmentSchedule(input: {
   if (existing > 0) return;
 
   const policy = await getBookingPolicyForVehicle(input.vehicle);
+  const rate = resolveVehicleDailyRate(input.vehicle, policy);
   const plan = getDirectBookingInstalmentPlan({
     pickupDate: input.pickupDate,
     returnDate: input.returnDate,
     weeklyDiscountPercent: policy.weeklyDiscountPercent,
-    bookingDailyRate: input.vehicle.bookingDailyRate ?? 0,
+    bookingDailyRate: rate.dailyRate ?? 0,
     bookingInsuranceFee: input.vehicle.bookingInsuranceFee ?? 0,
     bookingDepositAmount: input.vehicle.bookingDepositAmount ?? 0,
     bookingTaxRate: input.vehicle.bookingTaxRate ?? 0,

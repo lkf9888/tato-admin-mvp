@@ -5,7 +5,9 @@ import { BookingRequestKind, BookingRequestStatus, OrderStatus } from "@prisma/c
 
 import { getCancellationQuote, type CancellationQuote } from "@/lib/booking-changes";
 import { dateToDateOnly, hasVehicleBookingConflict } from "@/lib/direct-booking";
+import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { prisma } from "@/lib/prisma";
+import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 
 /**
  * A renter's way back into the booking they made online.
@@ -38,6 +40,10 @@ export async function loadBookingByToken(token: string) {
           year: true,
           plateNumber: true,
           bookingDailyRate: true,
+          bookingWeeklyDiscountPercent: true,
+          bookingMinimumRentalDays: true,
+          bookingDailyKmAllowance: true,
+          bookingExtraKmRate: true,
           workspaceId: true,
         },
       },
@@ -66,12 +72,27 @@ export function getAmountsPaid(order: BookingForRenter) {
   };
 }
 
-export function quoteCancellation(order: BookingForRenter, now = new Date()): CancellationQuote {
+/**
+ * The late-cancellation penalty is one day's rent, and a car may be
+ * priced by the income model rather than by hand -- so the rate is
+ * resolved, not read off the column. Reading the column would quietly
+ * make every AI-priced car free to cancel late.
+ */
+export async function quoteCancellation(
+  order: BookingForRenter,
+  now = new Date(),
+): Promise<CancellationQuote> {
   const { paidAmount, depositAmount } = getAmountsPaid(order);
+  const policy = await getBookingPolicyForVehicle(order.vehicle);
+  const rate = resolveVehicleDailyRate(
+    { ...order.vehicle, brand: order.vehicle.brand, model: order.vehicle.model },
+    policy,
+  );
+
   return getCancellationQuote({
     paidAmount,
     depositAmount,
-    dailyRate: order.vehicle.bookingDailyRate ?? 0,
+    dailyRate: rate.dailyRate ?? 0,
     pickupDatetime: order.pickupDatetime,
     now,
   });

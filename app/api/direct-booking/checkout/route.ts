@@ -11,6 +11,7 @@ import {
   isDateOnlyRangeValid,
 } from "@/lib/direct-booking";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
+import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { prisma } from "@/lib/prisma";
 import { getBookingReturnUrls } from "@/lib/rental-site";
 import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
@@ -162,7 +163,7 @@ export async function POST(request: Request) {
       },
     });
 
-    if (!vehicle || !vehicle.directBookingEnabled || (vehicle.bookingDailyRate ?? 0) <= 0) {
+    if (!vehicle || !vehicle.directBookingEnabled) {
       return NextResponse.json({ error: "This vehicle is not bookable right now." }, { status: 400 });
     }
 
@@ -199,11 +200,16 @@ export async function POST(request: Request) {
     // browser prices with the same numbers, but a discount the client
     // chose for itself would be a discount anyone could choose.
     const policy = await getBookingPolicyForVehicle(vehicle);
+    const rate = resolveVehicleDailyRate(vehicle, policy);
+    if (!isVehicleBookable(rate)) {
+      return NextResponse.json({ error: "This vehicle is not priced yet." }, { status: 400 });
+    }
+    const dailyRate = rate.dailyRate ?? 0;
 
     const quote = getDirectBookingQuote({
       pickupDate: parsed.pickupDate,
       returnDate: parsed.returnDate,
-      bookingDailyRate: vehicle.bookingDailyRate ?? 0,
+      bookingDailyRate: dailyRate,
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       bookingTaxRate: vehicle.bookingTaxRate ?? 0,
@@ -231,7 +237,7 @@ export async function POST(request: Request) {
     const plan = getDirectBookingInstalmentPlan({
       pickupDate: parsed.pickupDate,
       returnDate: parsed.returnDate,
-      bookingDailyRate: vehicle.bookingDailyRate ?? 0,
+      bookingDailyRate: dailyRate,
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       bookingTaxRate: vehicle.bookingTaxRate ?? 0,

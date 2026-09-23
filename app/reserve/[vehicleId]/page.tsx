@@ -14,6 +14,7 @@ import {
 } from "@/lib/rental-site";
 import { prisma } from "@/lib/prisma";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
+import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
 import { isImageAttachment } from "@/lib/uploads";
@@ -107,7 +108,11 @@ export default async function ReserveVehiclePage({
     },
   });
 
-  if (!vehicle || !vehicle.directBookingEnabled || (vehicle.bookingDailyRate ?? 0) <= 0) {
+  const rate = vehicle
+    ? resolveVehicleDailyRate(vehicle, await getBookingPolicyForVehicle(vehicle))
+    : null;
+
+  if (!vehicle || !vehicle.directBookingEnabled || !rate || !isVehicleBookable(rate)) {
     return (
       <main className="min-h-screen bg-[var(--page)] px-4 py-8 sm:px-6">
         <div className="mx-auto max-w-4xl rounded-lg border border-[var(--line)] bg-[rgba(255,255,255,0.92)] p-10 shadow-[0_30px_90px_rgba(17,19,24,0.08)]">
@@ -136,6 +141,7 @@ export default async function ReserveVehiclePage({
     }));
   const stripeReady = Boolean(getStripeSecretKey());
   const policy = await getBookingPolicyForVehicle(vehicle);
+  const dailyRate = rate.dailyRate ?? 0;
   const connectSnapshot = vehicle.workspaceId
     ? await getWorkspaceConnectSnapshot(vehicle.workspaceId)
     : null;
@@ -192,7 +198,7 @@ export default async function ReserveVehiclePage({
                     {reserveMessages.rateLabel}
                   </p>
                   <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
-                    {formatCurrency(vehicle.bookingDailyRate, locale)}
+                    {formatCurrency(dailyRate, locale)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
@@ -250,7 +256,7 @@ export default async function ReserveVehiclePage({
             <PublicBookingPanel
               locale={locale}
               vehicleId={vehicle.id}
-              bookingDailyRate={vehicle.bookingDailyRate ?? 0}
+              bookingDailyRate={dailyRate}
               bookingInsuranceFee={vehicle.bookingInsuranceFee ?? 0}
               bookingDepositAmount={vehicle.bookingDepositAmount ?? 0}
               bookingTaxName={vehicle.bookingTaxName}

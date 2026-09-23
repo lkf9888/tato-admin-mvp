@@ -4,7 +4,9 @@ import { OrderAttachmentKind, type RentalSite, type Vehicle } from "@prisma/clie
 import { headers } from "next/headers";
 
 import { getDateOnlyBookingWindows, hasDateOnlyBookingConflict } from "@/lib/direct-booking";
+import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
 import { prisma } from "@/lib/prisma";
+import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { getAppUrl } from "@/lib/stripe";
 import { isImageAttachment } from "@/lib/uploads";
 
@@ -200,6 +202,8 @@ export type SiteFleetVehicle = {
   model: string;
   year: number;
   dailyRate: number;
+  /** Whether a person set that rate or the income model did. */
+  rateSource: "manual" | "suggested";
   insuranceFee: number | null;
   depositAmount: number | null;
   intro: string | null;
@@ -232,7 +236,6 @@ export async function getSiteFleet(input: {
       isArchived: false,
       directBookingEnabled: true,
       status: "available",
-      bookingDailyRate: { gt: 0 },
     },
     include: {
       orders: {
@@ -255,12 +258,18 @@ export async function getSiteFleet(input: {
         take: 6,
       },
     },
-    orderBy: { bookingDailyRate: "asc" },
   });
 
   const wantsRange = Boolean(input.pickupDate && input.returnDate);
+  const policy = await getWorkspaceBookingPolicy(input.workspaceId);
 
-  return vehicles.map((vehicle) => {
+  return vehicles
+    .map((vehicle) => ({ vehicle, rate: resolveVehicleDailyRate(vehicle, policy) }))
+    // A car with no typed price and no catalogue match has no price at
+    // all. Listing it would be a card a renter can click and not book.
+    .filter(({ rate }) => isVehicleBookable(rate))
+    .sort((left, right) => (left.rate.dailyRate ?? 0) - (right.rate.dailyRate ?? 0))
+    .map(({ vehicle, rate }) => {
     const blockedWindows = getDateOnlyBookingWindows(vehicle.orders);
     const photo = vehicle.attachments.find((attachment) =>
       isImageAttachment(attachment.contentType, attachment.filename),
@@ -273,7 +282,8 @@ export async function getSiteFleet(input: {
       brand: vehicle.brand,
       model: vehicle.model,
       year: vehicle.year,
-      dailyRate: vehicle.bookingDailyRate ?? 0,
+      dailyRate: rate.dailyRate ?? 0,
+      rateSource: rate.source ?? "suggested",
       insuranceFee: vehicle.bookingInsuranceFee,
       depositAmount: vehicle.bookingDepositAmount,
       intro: vehicle.bookingIntro,
@@ -316,7 +326,6 @@ export async function loadSiteVehicle(site: RentalSite, vehicleSlug: string) {
       isArchived: false,
       directBookingEnabled: true,
       status: "available",
-      bookingDailyRate: { gt: 0 },
     },
     include: {
       orders: {

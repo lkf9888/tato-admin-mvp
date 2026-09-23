@@ -4,7 +4,9 @@ import { VehicleStatus } from "@prisma/client";
 import { saveRentalSiteAction } from "@/app/actions";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
+import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
 import { prisma } from "@/lib/prisma";
+import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import {
   getPlatformHost,
   getRequestHost,
@@ -25,22 +27,29 @@ export default async function RentalSitePage({
   searchParams: Promise<{ error?: string; saved?: string }>;
 }) {
   const workspace = await requireCurrentWorkspace();
-  const [query, { messages }, requestHost, site, bookableCount] = await Promise.all([
+  const [query, { messages }, requestHost, site, fleetPolicy, bookableVehicles] =
+    await Promise.all([
     searchParams,
     getI18n(),
     getRequestHost(),
     prisma.rentalSite.findUnique({ where: { workspaceId: workspace.id } }),
-    prisma.vehicle.count({
+    getWorkspaceBookingPolicy(workspace.id),
+    prisma.vehicle.findMany({
       where: {
         workspaceId: workspace.id,
         isArchived: false,
         directBookingEnabled: true,
         status: VehicleStatus.available,
-        bookingDailyRate: { gt: 0 },
       },
+      select: { brand: true, model: true, year: true, bookingDailyRate: true },
     }),
   ]);
 
+  // A price can now come from the income model, which no `count()`
+  // can see -- so the candidates are loaded and resolved instead.
+  const bookableCount = bookableVehicles.filter((vehicle) =>
+    isVehicleBookable(resolveVehicleDailyRate(vehicle, fleetPolicy)),
+  ).length;
   const copy = messages.rentalSitePage;
   // The address shown here has to be one the operator can paste into a
   // browser. `NEXT_PUBLIC_APP_URL` is the right answer when it is set,

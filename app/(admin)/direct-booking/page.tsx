@@ -6,6 +6,8 @@ import {
   saveVehicleDirectBookingAction,
 } from "@/app/actions";
 import { normalizeBookingPolicy } from "@/lib/booking-policy";
+import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
+import { formatCurrency } from "@/lib/utils";
 import { DirectBookingEmailEditor } from "@/components/direct-booking-email-editor";
 import { normalizeDirectBookingEmailTemplate } from "@/lib/direct-booking-email-template";
 import { isEmailConfigured } from "@/lib/email";
@@ -71,8 +73,11 @@ export default async function DirectBookingPage({
   const requestOrigin = forwardedHost ? `${protocol}://${forwardedHost}` : undefined;
   const appUrl = requestOrigin?.replace(/\/$/, "") ?? getAppUrl();
   const enabledCount = vehicles.filter((vehicle) => vehicle.directBookingEnabled).length;
+  const rates = new Map(
+    vehicles.map((vehicle) => [vehicle.id, resolveVehicleDailyRate(vehicle, fleetPolicy)]),
+  );
   const readyCount = vehicles.filter(
-    (vehicle) => vehicle.directBookingEnabled && (vehicle.bookingDailyRate ?? 0) > 0,
+    (vehicle) => vehicle.directBookingEnabled && (rates.get(vehicle.id)?.dailyRate ?? 0) > 0,
   ).length;
   const stripeReady = Boolean(getStripeSecretKey());
 
@@ -143,7 +148,7 @@ export default async function DirectBookingPage({
           ) : null}
         </div>
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {[
             {
               name: "weeklyDiscountPercent",
@@ -172,6 +177,13 @@ export default async function DirectBookingPage({
               hint: directMessages.policyExtraKmHint,
               value: fleetPolicy.extraKmRate,
               step: "0.01",
+            },
+            {
+              name: "suggestedRateMultiplier",
+              label: directMessages.policyMultiplierLabel,
+              hint: directMessages.policyMultiplierHint,
+              value: fleetPolicy.suggestedRateMultiplier,
+              step: "0.05",
             },
           ].map((field) => (
             <label key={field.name} className="block min-w-0">
@@ -222,7 +234,8 @@ export default async function DirectBookingPage({
         {vehicles.map((vehicle) => {
           const shareUrl = `${appUrl}/reserve/${vehicle.id}`;
           const blockedWindows = getBlockedBookingWindows(vehicle.orders, 4);
-          const hasDailyRate = (vehicle.bookingDailyRate ?? 0) > 0;
+          const rate = rates.get(vehicle.id);
+          const hasDailyRate = (rate?.dailyRate ?? 0) > 0;
           const isLive = vehicle.directBookingEnabled && hasDailyRate;
 
           return (
@@ -245,6 +258,11 @@ export default async function DirectBookingPage({
                     >
                       {isLive ? directMessages.liveLabel : directMessages.draftLabel}
                     </span>
+                    {rate?.source === "suggested" ? (
+                      <span className="inline-flex rounded-full border border-[rgba(89,60,251,0.18)] bg-[var(--accent-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[color:var(--ink)]">
+                        {directMessages.aiPricedBadge}
+                      </span>
+                    ) : null}
                   </div>
                   <p className="mt-0.5 text-[11px] text-[color:var(--ink-soft)]">
                     {vehicle.brand} {vehicle.model} · {vehicle.year} · {directMessages.ownerLabel}:{" "}
@@ -363,9 +381,23 @@ export default async function DirectBookingPage({
                       step="0.01"
                       inputMode="decimal"
                       defaultValue={vehicle.bookingDailyRate ?? ""}
-                      placeholder="0.00"
+                      placeholder={
+                        rate?.suggestedDailyRate ? String(rate.suggestedDailyRate) : "0.00"
+                      }
                       className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px] font-medium tabular-nums text-[color:var(--ink)]"
                     />
+                    <span className="mt-1 block text-[10px] leading-4 text-[color:var(--ink-soft)]">
+                      {!rate?.suggestedDailyRate
+                        ? directMessages.rateHintNoModel
+                        : rate.source === "manual"
+                          ? directMessages.rateHintManual(
+                              formatCurrency(rate.suggestedDailyRate, locale),
+                            )
+                          : directMessages.rateHintAuto(
+                              formatCurrency(rate.suggestedDailyRate, locale),
+                              formatCurrency(rate.suggestion?.dailyRate ?? 0, locale),
+                            )}
+                    </span>
                   </label>
 
                   <label className="block min-w-0">

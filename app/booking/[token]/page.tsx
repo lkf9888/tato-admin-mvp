@@ -64,7 +64,7 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
     ? await prisma.rentalSite.findUnique({ where: { workspaceId: order.workspaceId } })
     : null;
   const amounts = getAmountsPaid(order);
-  const quote = quoteCancellation(order);
+  const quote = await quoteCancellation(order);
   const openRequest = getOpenRequest(order);
   const lastResolved = order.changeRequests.find(
     (request) => request.status === BookingRequestStatus.DECLINED,

@@ -74,7 +74,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
     requestedPickupDate = dateOnlyToUtcMidday(body.pickupDate);
     requestedReturnDate = dateOnlyToUtcMidday(body.returnDate);
   } else {
-    const quote = quoteCancellation(order);
+    const quote = await quoteCancellation(order);
     if (!quote.isSelfServiceEligible) {
       return NextResponse.json({ error: "ALREADY_STARTED" }, { status: 409 });
     }

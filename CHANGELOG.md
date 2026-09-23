@@ -1,5 +1,58 @@
 # Changelog
 
+## v0.97.0 - 2026-09-23
+
+### Cars price themselves
+
+Turo publishes no prices we can import, so the income model already in
+this repo does the job instead. A vehicle with no rate typed on it is
+now priced from `lib/rental-estimate` -- the catalogue's value for that
+model-year, through the same fitted per-rented-day curve
+`/investment-ranking` uses -- and is bookable without anyone opening
+its card.
+
+**`bookingDailyRate` stops meaning "the price" and starts meaning "the
+price a person typed."** Null is not missing data; it is the operator
+leaving the model in charge. A typed price always wins, including one
+below the suggestion, because disagreeing is the entire point of
+letting them type.
+
+That changed what "bookable" means. It used to be a column test,
+`bookingDailyRate > 0`, which a database query could answer. It cannot
+any more, so every place that asked -- the site fleet, the vehicle
+page, the reserve page, checkout, the publish gate, two admin counts --
+loads its candidates and resolves them in code. Fleets here are
+hundreds of cars, not millions of rows.
+
+**The suggestion is not the model's raw output, and the difference
+matters.** `netRevenuePerRentedDay` is fitted on what Turo *paid out*
+per rented day, net of their cut. Taken literally it would have priced
+this operator's Ford Explorer at $38 against the $89 they charge.
+Turning a net payout into a list price needs a number nobody has
+measured, so it is a setting -- **Suggested price multiplier**,
+defaulting to 1.6, the median ratio between this fleet's own manual
+prices and the model's figure. The admin shows both numbers, so what
+the multiplier is doing is visible rather than baked in.
+
+Model matching is punctuation- and case-insensitive, so `CX-5`, `CX5`
+and `cx 5` all find the same catalogue row. A model that is not in the
+catalogue gets **no suggestion at all** rather than a conjured one --
+the operator would have no way to tell the difference -- so such a car
+stays unbookable until somebody types a price.
+
+The admin says which is which: an `AI priced` badge on cars the model
+is pricing, the suggested figure as the rate field's placeholder, and
+under it either "Blank means AI pricing: $74/day, from $46/day earned"
+or, for a manually priced car, what the model would have said.
+
+Verified across the fleet: 5 of 5 vehicles match the catalogue, a
+mixed fleet lists and sorts correctly with two cars priced each way,
+an uncatalogued unpriced car drops out of the listing entirely and
+returns the moment a price is typed, a stored 0 reads as unpriced
+rather than free, and moving the multiplier to 2.0 moved both
+AI-priced cars on the public page while leaving both manual ones
+alone.
+
 ## v0.96.0 - 2026-09-23
 
 ### Fleet booking policy, and the cars that disagree with it

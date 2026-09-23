@@ -16,6 +16,7 @@ import {
   readDateParam,
 } from "@/lib/rental-site";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
+import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
 
@@ -75,6 +76,11 @@ export async function renderSiteVehicle(
     getWorkspaceConnectSnapshot(site.workspaceId),
     getBookingPolicyForVehicle(vehicle),
   ]);
+  // A car whose price nobody typed and whose model is not in the
+  // catalogue has no price to show, so it is a 404 rather than a
+  // page quoting $0.
+  const rate = resolveVehicleDailyRate(vehicle, policy);
+  if (!isVehicleBookable(rate)) notFound();
 
   return (
     <SiteShell site={site} locale={locale}>
@@ -84,6 +90,7 @@ export async function renderSiteVehicle(
         messages={messages}
         vehicle={vehicle}
         policy={policy}
+        dailyRate={rate.dailyRate ?? 0}
         stripeReady={Boolean(getStripeSecretKey())}
         hostPayoutsReady={Boolean(connectSnapshot.accountId && connectSnapshot.chargesEnabled)}
         defaultPickupDate={defaultPickupDate}

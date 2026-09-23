@@ -47,7 +47,9 @@ import {
   BOOKING_POLICY_DEFAULTS,
   normalizeBookingPolicy,
 } from "@/lib/booking-policy";
+import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
 import { prisma } from "@/lib/prisma";
+import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import {
   isPlatformHost,
   isReservedSiteSlug,
@@ -1504,6 +1506,8 @@ export async function saveVehicleDirectBookingAction(formData: FormData) {
   );
   const bookingExtraKmRate = overrideNumber("bookingExtraKmRate", Number);
 
+  // Blank is no longer missing data: it is the operator handing
+  // pricing back to the income model.
   const bookingDailyRate =
     rawDailyRate == null ? null : z.coerce.number().nonnegative().parse(rawDailyRate);
   const bookingInsuranceFee =
@@ -2054,15 +2058,23 @@ export async function saveRentalSiteAction(formData: FormData) {
   // Publishing is gated on the site having something to sell. A page
   // of "no vehicles listed" that an operator has been told is live is
   // the worst of both states.
-  const bookableCount = await prisma.vehicle.count({
-    where: {
-      workspaceId: workspace.id,
-      isArchived: false,
-      directBookingEnabled: true,
-      status: VehicleStatus.available,
-      bookingDailyRate: { gt: 0 },
-    },
-  });
+  // Not a `count()`: a car can be priced by the income model with no
+  // rate typed on it, and no database query can see that.
+  const [fleetPolicy, candidates] = await Promise.all([
+    getWorkspaceBookingPolicy(workspace.id),
+    prisma.vehicle.findMany({
+      where: {
+        workspaceId: workspace.id,
+        isArchived: false,
+        directBookingEnabled: true,
+        status: VehicleStatus.available,
+      },
+      select: { brand: true, model: true, year: true, bookingDailyRate: true },
+    }),
+  ]);
+  const bookableCount = candidates.filter((vehicle) =>
+    isVehicleBookable(resolveVehicleDailyRate(vehicle, fleetPolicy)),
+  ).length;
   const wantsPublished = formData.get("isPublished")?.toString() === "on";
   if (wantsPublished && bookableCount === 0) {
     redirect("/rental-site?error=no_bookable_vehicles");
@@ -2170,6 +2182,10 @@ export async function saveBookingPolicyAction(formData: FormData) {
 
   const data = normalizeBookingPolicy({
     weeklyDiscountPercent: read("weeklyDiscountPercent", BOOKING_POLICY_DEFAULTS.weeklyDiscountPercent),
+    suggestedRateMultiplier: read(
+      "suggestedRateMultiplier",
+      BOOKING_POLICY_DEFAULTS.suggestedRateMultiplier,
+    ),
     minimumRentalDays: read("minimumRentalDays", BOOKING_POLICY_DEFAULTS.minimumRentalDays),
     dailyKmAllowance: read("dailyKmAllowance", BOOKING_POLICY_DEFAULTS.dailyKmAllowance),
     extraKmRate: read("extraKmRate", BOOKING_POLICY_DEFAULTS.extraKmRate),

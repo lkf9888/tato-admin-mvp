@@ -1920,15 +1920,24 @@ model BookingPricingPolicy {
   /// whole rental rather than to complete weeks: a renter can be told
   /// "a week or more is 30% off" in one sentence, and "30% off the
   /// first 7 days and full price for the other 3" in none.
-  weeklyDiscountPercent Float @default(30)
+  weeklyDiscountPercent   Float @default(30)
   /// Bookings shorter than this are refused. 1 means no restriction.
-  minimumRentalDays     Int   @default(1)
+  minimumRentalDays       Int   @default(1)
   /// Kilometres included per rented day.
-  dailyKmAllowance      Int   @default(100)
+  dailyKmAllowance        Int   @default(100)
   /// Charged per kilometre beyond the allowance. Settable because the
   /// allowance is: a contract that reads "100 KM per Day and $0.12/km"
   /// while the fleet actually allows 200 is worse than no clause.
-  extraKmRate           Float @default(0.12)
+  extraKmRate             Float @default(0.12)
+  /// What the suggested daily rate is multiplied by.
+  ///
+  /// The income model measures what Turo PAID OUT per rented day --
+  /// net of their cut -- so it is a floor, not a list price. Turning
+  /// one into the other needs a number we have never measured, so it
+  /// is a setting with a default rather than a constant in the code.
+  /// 1.6 is the median ratio between this operator's own manual
+  /// prices and the model's figure across their fleet.
+  suggestedRateMultiplier Float @default(1.6)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

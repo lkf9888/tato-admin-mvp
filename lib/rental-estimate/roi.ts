@@ -234,7 +234,7 @@ export function analyseVehicle(inputs: RoiInputs): RoiResult | null {
  *
  * Median error against those 71 cars is 12%.
  */
-function netRevenuePerRentedDay(value: number) {
+export function netRevenuePerRentedDay(value: number) {
   return Math.exp(0.6326 + 0.3286 * Math.log(value));
 }
 

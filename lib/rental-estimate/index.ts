@@ -52,7 +52,7 @@ export type Segment =
   | "lux_suv"
   | "ev";
 
-type CatalogEntry = {
+export type CatalogEntry = {
   make: string;
   model: string;
   seg: Segment;

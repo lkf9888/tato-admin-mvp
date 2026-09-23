@@ -22,6 +22,7 @@ export const WEEKLY_DISCOUNT_MIN_DAYS = 7;
 
 export type BookingPolicy = {
   weeklyDiscountPercent: number;
+  suggestedRateMultiplier: number;
   minimumRentalDays: number;
   dailyKmAllowance: number;
   extraKmRate: number;
@@ -29,6 +30,7 @@ export type BookingPolicy = {
 
 export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
   weeklyDiscountPercent: 30,
+  suggestedRateMultiplier: 1.6,
   minimumRentalDays: 1,
   dailyKmAllowance: 100,
   extraKmRate: 0.12,
@@ -36,6 +38,7 @@ export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
 
 type NullablePolicy = {
   weeklyDiscountPercent?: number | null;
+  suggestedRateMultiplier?: number | null;
   minimumRentalDays?: number | null;
   dailyKmAllowance?: number | null;
   extraKmRate?: number | null;
@@ -67,6 +70,16 @@ export function normalizeBookingPolicy(policy?: NullablePolicy | null): BookingP
       Math.round(pick(policy?.dailyKmAllowance, BOOKING_POLICY_DEFAULTS.dailyKmAllowance)),
     ),
     extraKmRate: Math.max(0, pick(policy?.extraKmRate, BOOKING_POLICY_DEFAULTS.extraKmRate)),
+    // Clamped well clear of zero: a multiplier of 0 would suggest
+    // every car be rented for nothing, and it is far likelier to be a
+    // half-typed number than an intention.
+    suggestedRateMultiplier: Math.min(
+      5,
+      Math.max(
+        0.5,
+        pick(policy?.suggestedRateMultiplier, BOOKING_POLICY_DEFAULTS.suggestedRateMultiplier),
+      ),
+    ),
   };
 }
 

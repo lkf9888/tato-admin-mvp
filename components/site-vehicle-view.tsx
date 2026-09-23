@@ -29,6 +29,7 @@ export function SiteVehicleView({
   messages,
   vehicle,
   policy,
+  dailyRate,
   stripeReady,
   hostPayoutsReady,
   defaultPickupDate,
@@ -40,6 +41,8 @@ export function SiteVehicleView({
   messages: Messages;
   vehicle: SiteVehicle;
   policy: BookingPolicy;
+  /** Resolved: the operator's price, or the income model's. */
+  dailyRate: number;
   stripeReady: boolean;
   hostPayoutsReady: boolean;
   defaultPickupDate: string;
@@ -75,11 +78,11 @@ export function SiteVehicleView({
       "@type": "Offer",
       url: canonical,
       priceCurrency: "CAD",
-      price: vehicle.bookingDailyRate ?? 0,
+      price: dailyRate,
       availability: "https://schema.org/InStock",
       priceSpecification: {
         "@type": "UnitPriceSpecification",
-        price: vehicle.bookingDailyRate ?? 0,
+        price: dailyRate,
         priceCurrency: "CAD",
         // UN/CEFACT code for "day" — what tells Google the price is a
         // daily rate and not the cost of the car.
@@ -125,7 +128,7 @@ export function SiteVehicleView({
                   {reserveMessages.rateLabel}
                 </p>
                 <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
-                  {formatCurrency(vehicle.bookingDailyRate, locale)}
+                  {formatCurrency(dailyRate, locale)}
                 </p>
               </div>
               <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
@@ -175,7 +178,7 @@ export function SiteVehicleView({
           <PublicBookingPanel
             locale={locale}
             vehicleId={vehicle.id}
-            bookingDailyRate={vehicle.bookingDailyRate ?? 0}
+            bookingDailyRate={dailyRate}
             bookingInsuranceFee={vehicle.bookingInsuranceFee ?? 0}
             bookingDepositAmount={vehicle.bookingDepositAmount ?? 0}
             bookingTaxName={vehicle.bookingTaxName}

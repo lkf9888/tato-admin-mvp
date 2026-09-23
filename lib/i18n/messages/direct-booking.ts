@@ -49,6 +49,14 @@ export const directBookingMessages = {
       policyKmHint: "Shown to renters and written into the rental agreement.",
       policyExtraKmLabel: "Excess km rate",
       policyExtraKmHint: "Charged per kilometre beyond the allowance.",
+      policyMultiplierLabel: "Suggested price multiplier",
+      policyMultiplierHint:
+        "The income model measures what Turo paid out per rented day, net of their cut. This scales it into a list price.",
+      aiPricedBadge: "AI priced",
+      rateHintAuto: (rate: string, net: string) =>
+        `Blank means AI pricing: ${rate}/day, from ${net}/day earned.`,
+      rateHintNoModel: "This model is not in the catalogue, so a price must be typed.",
+      rateHintManual: (rate: string) => `AI would suggest ${rate}/day.`,
       policySaveAction: "Save fleet policy",
       policySavedNotice: "Fleet policy saved.",
       vehicleOverrideTitle: "Overrides for this vehicle",
@@ -118,6 +126,14 @@ export const directBookingMessages = {
       policyKmHint: "会展示给租客，并写进租赁合同。",
       policyExtraKmLabel: "超里程单价",
       policyExtraKmHint: "超出部分按每公里收取。",
+      policyMultiplierLabel: "建议价系数",
+      policyMultiplierHint:
+        "收入模型算的是 Turo 抽成后每个出租日的净额，这个系数把它折算成挂牌价。",
+      aiPricedBadge: "AI 定价",
+      rateHintAuto: (rate: string, net: string) =>
+        `留空即 AI 定价：${rate}/天，基于实测净额 ${net}/天。`,
+      rateHintNoModel: "目录里没有这个车型，必须手动填价。",
+      rateHintManual: (rate: string) => `AI 建议 ${rate}/天。`,
       policySaveAction: "保存车队政策",
       policySavedNotice: "车队政策已保存。",
       vehicleOverrideTitle: "这台车的单独设置",

@@ -1,6 +1,12 @@
 import "server-only";
 
-import { AssistantAlertSeverity, OrderSource, OrderStatus } from "@prisma/client";
+import {
+  AssistantAlertSeverity,
+  BookingRequestKind,
+  BookingRequestStatus,
+  OrderSource,
+  OrderStatus,
+} from "@prisma/client";
 
 import { formatBytes, getDiskUsage } from "@/lib/disk";
 import { prisma } from "@/lib/prisma";
@@ -529,6 +535,63 @@ async function detectUnblockedTuroDates(workspaceId: string): Promise<AlertDraft
 }
 
 /**
+ * Renters waiting on an answer.
+ *
+ * A change request sits in a queue nobody has a reason to open, and a
+ * renter who asked to cancel three days before pickup and heard
+ * nothing will call, or charge back. One alert per request, so
+ * acknowledging one cannot swallow the next -- and it resolves by
+ * itself the moment the request is answered, because a resolved
+ * request no longer matches this query.
+ *
+ * WARNING rather than INFO: only WARNING and above reach email, and
+ * the whole point is that this does not wait to be noticed.
+ */
+async function detectPendingBookingRequests(workspaceId: string): Promise<AlertDraft[]> {
+  const requests = await prisma.bookingChangeRequest.findMany({
+    where: { workspaceId, status: BookingRequestStatus.PENDING },
+    orderBy: { createdAt: "asc" },
+    take: 20,
+    include: {
+      order: {
+        select: {
+          renterName: true,
+          pickupDatetime: true,
+          vehicle: { select: { plateNumber: true } },
+        },
+      },
+    },
+  });
+
+  return requests.map((request) => {
+    const isCancel = request.kind === BookingRequestKind.CANCEL;
+    const plate = request.order.vehicle.plateNumber;
+
+    return {
+      dedupeKey: `booking_request:${request.id}`,
+      severity: AssistantAlertSeverity.WARNING,
+      title: isCancel
+        ? `${request.order.renterName} 申请取消 ${plate} 的预订`
+        : `${request.order.renterName} 申请改期 ${plate} 的预订`,
+      body: [
+        `取车日期：${formatDateOnly(request.order.pickupDatetime)}`,
+        isCancel && request.quotedRefundAmount != null
+          ? `按政策应退：$${request.quotedRefundAmount.toFixed(2)}（租客提交时已看到这个数字）`
+          : null,
+        !isCancel && request.requestedPickupDate && request.requestedReturnDate
+          ? `希望改到：${formatDateOnly(request.requestedPickupDate)} – ${formatDateOnly(request.requestedReturnDate)}`
+          : null,
+        request.renterNote ? `租客留言：${request.renterNote}` : null,
+        "在「变更申请」页同意或拒绝。",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      href: "/booking-requests",
+    };
+  });
+}
+
+/**
  * Run every detector and reconcile the alert table against reality.
  *
  * Idempotent by construction: existing alerts for a still-true
@@ -545,6 +608,7 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
       detectFailedImports(workspaceId),
       detectStaleContracts(workspaceId),
       detectUnblockedTuroDates(workspaceId),
+      detectPendingBookingRequests(workspaceId),
       detectDiskPressure(),
     ])
   ).flat();

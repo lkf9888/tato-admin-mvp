@@ -50,6 +50,9 @@ export type DirectBookingEmailValues = {
   contactPhone: string;
   contactEmail: string;
   bookingRef: string;
+  /** The renter's own page: their schedule, and how they ask to
+   *  change or cancel without a phone call. */
+  bookingUrl: string;
 };
 
 export const DIRECT_BOOKING_EMAIL_DEFAULT_TEMPLATE: DirectBookingEmailTemplate = {
@@ -72,6 +75,8 @@ export const DIRECT_BOOKING_EMAIL_DEFAULT_TEMPLATE: DirectBookingEmailTemplate =
     "The security deposit is refunded after the vehicle is returned and checked over.",
     "",
     "Please bring the driver's licence you uploaded. If anything about your trip changes, tell us as early as you can.",
+    "",
+    "Manage your booking: {bookingUrl}",
     "",
     "Questions: {contactPhone}",
     "Email: {contactEmail}",
@@ -96,6 +101,7 @@ export const DIRECT_BOOKING_EMAIL_VARIABLES = [
   "contactPhone",
   "contactEmail",
   "bookingRef",
+  "bookingUrl",
 ] as const;
 
 /** What the admin editor renders its preview against. */
@@ -115,6 +121,7 @@ export const DIRECT_BOOKING_EMAIL_SAMPLE_VALUES: DirectBookingEmailValues = {
   contactPhone: "+1 604 555 0147",
   contactEmail: "hello@example.com",
   bookingRef: "A1B2C3D4",
+  bookingUrl: "https://example.com/booking/7f3c…",
 };
 
 export function normalizeDirectBookingEmailTemplate(

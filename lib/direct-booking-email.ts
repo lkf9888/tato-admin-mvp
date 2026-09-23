@@ -11,6 +11,7 @@ import {
 } from "@/lib/direct-booking-email-template";
 import { getDirectBookingDays } from "@/lib/direct-booking";
 import { sendMail } from "@/lib/email";
+import { getAppUrl } from "@/lib/stripe";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency } from "@/lib/utils";
@@ -57,6 +58,7 @@ export function buildDirectBookingEmailValues(input: {
   /** Instalments, when the booking has any. */
   paidAmount?: number | null;
   balanceDue?: number | null;
+  bookingUrl?: string | null;
 }): DirectBookingEmailValues {
   const days = getDirectBookingDays(
     toDateOnly(input.order.pickupDatetime),
@@ -95,6 +97,7 @@ export function buildDirectBookingEmailValues(input: {
     contactPhone: input.contactPhone?.trim() ?? "",
     contactEmail: input.contactEmail?.trim() ?? "",
     bookingRef: bookingReference(input.order.id),
+    bookingUrl: input.bookingUrl?.trim() ?? "",
   };
 }
 
@@ -108,7 +111,10 @@ export function buildDirectBookingEmailValues(input: {
  */
 export async function sendDirectBookingConfirmationEmail(input: {
   workspaceId: string;
-  order: Pick<Order, "id" | "renterName" | "pickupDatetime" | "returnDatetime" | "totalPrice" | "depositAmount">;
+  order: Pick<
+    Order,
+    "id" | "renterName" | "pickupDatetime" | "returnDatetime" | "totalPrice" | "depositAmount" | "renterToken"
+  >;
   vehicle: Pick<Vehicle, "nickname" | "brand" | "model" | "year" | "plateNumber">;
   renterEmail: string | null;
 }): Promise<{ ok: boolean; reason?: string }> {
@@ -146,9 +152,18 @@ export async function sendDirectBookingConfirmationEmail(input: {
       : null;
 
     const template = normalizeDirectBookingEmailTemplate(saved);
+    // The renter's own page lives at the site's address when there is
+    // one, so the link keeps them inside the brand they booked with.
+    const origin = site?.domain
+      ? `https://${site.domain}`
+      : getAppUrl().replace(/\/$/, "");
+
     const values = buildDirectBookingEmailValues({
       paidAmount,
       balanceDue,
+      bookingUrl: input.order.renterToken
+        ? `${origin}/booking/${input.order.renterToken}`
+        : null,
       order: input.order,
       vehicle: input.vehicle,
       // The renter booked on the operator's brand, not ours. Falling

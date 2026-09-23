@@ -20,6 +20,7 @@ import { guestMessagesMessages } from "@/lib/i18n/messages/guest-messages";
 import { orderDetailMessages } from "@/lib/i18n/messages/order-detail";
 import { turoUpdatesMessages } from "@/lib/i18n/messages/turo-updates";
 import { authMessages } from "@/lib/i18n/messages/auth";
+import { bookingMessages } from "@/lib/i18n/messages/booking";
 import { billingMessages } from "@/lib/i18n/messages/billing";
 import { calendarMessages } from "@/lib/i18n/messages/calendar";
 import { contactMessages } from "@/lib/i18n/messages/contact";
@@ -138,6 +139,12 @@ const activityLabelsBase = {
     direct_booking_conflict_refunded: "Direct booking conflict refunded",
     direct_booking_instalments_created: "Instalment schedule created",
     direct_booking_instalments_mismatch: "Instalment schedule did not match the charge",
+    booking_cancel_requested: "Renter asked to cancel",
+    booking_reschedule_requested: "Renter asked to change dates",
+    booking_cancel_approved: "Cancellation approved",
+    booking_reschedule_approved: "Date change approved",
+    booking_request_declined: "Change request declined",
+    booking_cancel_refund_failed: "Cancellation refund failed",
     account_profile_updated: "Account profile updated",
     account_email_updated: "Account email updated",
     account_password_updated: "Account password updated",
@@ -192,6 +199,12 @@ const activityLabelsBase = {
     direct_booking_conflict_refunded: "在线预订冲突已退款",
     direct_booking_instalments_created: "已生成分期计划",
     direct_booking_instalments_mismatch: "分期计划与实际扣款不一致",
+    booking_cancel_requested: "租客申请取消",
+    booking_reschedule_requested: "租客申请改期",
+    booking_cancel_approved: "取消已批准",
+    booking_reschedule_approved: "改期已批准",
+    booking_request_declined: "变更申请已拒绝",
+    booking_cancel_refund_failed: "取消退款失败",
     account_profile_updated: "已更新账户资料",
     account_email_updated: "已更新账户邮箱",
     account_password_updated: "已更新账户密码",
@@ -342,6 +355,7 @@ const messages = {
     ...importsMessages.en,
     ...investmentRankingMessages.en,
     ...billingMessages.en,
+    ...bookingMessages.en,
     ...calendarMessages.en,
     ...shareMessages.en,
   },
@@ -364,6 +378,7 @@ const messages = {
     ...importsMessages.zh,
     ...investmentRankingMessages.zh,
     ...billingMessages.zh,
+    ...bookingMessages.zh,
     ...calendarMessages.zh,
     ...shareMessages.zh,
   },

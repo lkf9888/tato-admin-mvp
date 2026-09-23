@@ -8,6 +8,7 @@ import {
   getDirectBookingInstalmentPlan,
   hasVehicleBookingConflict,
 } from "@/lib/direct-booking";
+import { mintRenterToken } from "@/lib/booking-access";
 import { sendDirectBookingConfirmationEmail } from "@/lib/direct-booking-email";
 import {
   buildRentalAgreementValues,
@@ -298,6 +299,9 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       ),
       status: "booked",
       createdBy: "direct-booking",
+      // The renter's own link. Minted here rather than on demand so
+      // it can go into the confirmation that is about to be sent.
+      renterToken: mintRenterToken(),
       sourceMetadata: JSON.stringify({
         channel: "direct-booking",
         stripeCheckoutSessionId: session.id,

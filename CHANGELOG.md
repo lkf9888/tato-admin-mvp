@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.95.0 - 2026-09-23
+
+### A renter can ask, and a host can answer
+
+The confirmation email now carries a link to the booking itself. There
+is no account to log into, so the token in that URL is the entire
+authorisation -- looked up on its own, never alongside an id, and
+refused before it reaches the database when it is too short to be one.
+The page is `noindex`, and it renders inside the operator's own brand.
+
+On it the renter sees what they paid, what is still owed, the
+instalment schedule, and two things they could previously only get by
+telephone: move the dates, or cancel.
+
+**Both are requests, not actions.** Approving is the operator's,
+because a date change has to clear the rest of the fleet's calendar
+and a refund is money leaving the business. Change Requests is the new
+queue; each pending one also raises a WARNING alert, so it reaches
+email rather than waiting to be noticed, and resolves itself the
+moment it is answered.
+
+**The cancellation policy**: free up to 48 hours before pick-up, one
+day's rent kept after that, and the deposit never touched -- it is the
+renter's money held against damage to a car they never collected. A
+trip that has already started is an early return, which the agreement
+charges in full, so it cannot be cancelled here at all.
+
+The refundable figure is captured **when the renter asks**, not when
+the host answers. The 48-hour window keeps closing, and a number
+recomputed at approval would quietly answer a different question than
+the one the renter was shown.
+
+Two checks that only matter when they fail. Requested dates are tested
+for clashes when the renter asks *and* again when the operator
+approves, because the fleet moves in between and only the second one
+commits. And a cancellation whose refund cannot be sent is **refused**
+rather than recorded: a booking marked cancelled while the renter's
+money sat where it was is the one state nobody can see is wrong from
+the outside.
+
+`Order.renterToken` is a unique column on a populated table -- the
+exact shape that crash-looped production in v0.88.0. The CI guard
+caught it before it shipped, and the additive DDL went into
+`scripts/schema-predeploy.sh`. Verified both ways: the check fails
+without it and passes with it.
+
+Verified end to end: the token mints on checkout and loads the
+booking, a short or wrong token finds nothing, the quote is correct at
+72h / 48h / 47.9h / 1h / 0h / -5h, the penalty never eats the deposit,
+a second request is refused while one is pending, the alert is raised
+and then resolves on an answer, and approving with no way to refund
+leaves the order booked and the request pending with the failure
+logged.
+
 ## v0.94.0 - 2026-09-23
 
 ### Long rentals are billed by period

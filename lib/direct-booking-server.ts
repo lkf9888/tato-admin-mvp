@@ -11,6 +11,11 @@ import {
 import { mintRenterToken } from "@/lib/booking-access";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
+import {
+  buildSeasonalRateMap,
+  getBookingWindowDayKeys,
+  getRateSeasonality,
+} from "@/lib/rental-estimate/rate-seasonality-server";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import { sendDirectBookingConfirmationEmail } from "@/lib/direct-booking-email";
 import {
@@ -144,12 +149,21 @@ async function writeInstalmentSchedule(input: {
   const policy = await getBookingPolicyForVehicle(input.vehicle);
   const rate = resolveVehicleDailyRate(input.vehicle, policy);
   const dailyRateOverrides = await loadPriceOverridesForBooking(input.vehicle.id);
+  const seasonalRates =
+    rate.source === "suggested"
+      ? buildSeasonalRateMap(
+          rate.dailyRate ?? 0,
+          getBookingWindowDayKeys(),
+          await getRateSeasonality(input.vehicle.workspaceId),
+        )
+      : {};
   const plan = getDirectBookingInstalmentPlan({
     pickupDate: input.pickupDate,
     returnDate: input.returnDate,
     weeklyDiscountPercent: policy.weeklyDiscountPercent,
     bookingDailyRate: rate.dailyRate ?? 0,
     dailyRateOverrides,
+    seasonalRates,
     bookingInsuranceFee: input.vehicle.bookingInsuranceFee ?? 0,
     bookingDepositAmount: input.vehicle.bookingDepositAmount ?? 0,
     bookingTaxRate: input.vehicle.bookingTaxRate ?? 0,

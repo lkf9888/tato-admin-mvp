@@ -71,14 +71,23 @@ export function getDailyRateSchedule(input: {
   returnDate: string;
   bookingDailyRate: number;
   dailyRateOverrides?: Record<string, number> | null;
+  /** Model pricing, which varies by month and weekday. */
+  seasonalRates?: Record<string, number> | null;
 }) {
   return getRentedDayKeys(input.pickupDate, input.returnDate).map((key) => {
+    // Three layers, in order of who had the last word: a price set on
+    // this day, then the model's price for this day, then the car's
+    // flat rate.
     const override = input.dailyRateOverrides?.[key];
-    return {
-      date: key,
-      rate: typeof override === "number" && override > 0 ? override : input.bookingDailyRate,
-      isOverridden: typeof override === "number" && override > 0,
-    };
+    const isOverridden = typeof override === "number" && override > 0;
+    const seasonal = input.seasonalRates?.[key];
+    const rate = isOverridden
+      ? override
+      : typeof seasonal === "number" && seasonal > 0
+        ? seasonal
+        : input.bookingDailyRate;
+
+    return { date: key, rate, isOverridden };
   });
 }
 
@@ -94,6 +103,7 @@ export function getDirectBookingQuote(input: {
   weeklyDiscountPercent?: number | null;
   /** `YYYY-MM-DD` → price, for days priced by hand. */
   dailyRateOverrides?: Record<string, number> | null;
+  seasonalRates?: Record<string, number> | null;
   /** Collection, if it is not the home base. */
   pickupLocationFee?: number | null;
   /** Return, which may be a different place and a different fee. */
@@ -303,6 +313,7 @@ export function getDirectBookingInstalmentPlan(input: {
   includeInsurance?: boolean;
   weeklyDiscountPercent?: number | null;
   dailyRateOverrides?: Record<string, number> | null;
+  seasonalRates?: Record<string, number> | null;
   pickupLocationFee?: number | null;
   returnLocationFee?: number | null;
 }): BookingInstalmentPlan {

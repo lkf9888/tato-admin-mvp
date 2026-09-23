@@ -6,6 +6,7 @@ import {
   saveVehicleDirectBookingAction,
 } from "@/app/actions";
 import { listBookingLocations } from "@/lib/booking-locations";
+import { getRateSeasonality } from "@/lib/rental-estimate/rate-seasonality-server";
 import { normalizeBookingPolicy } from "@/lib/booking-policy";
 import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { formatCurrency } from "@/lib/utils";
@@ -35,6 +36,7 @@ export default async function DirectBookingPage({
     emailTemplate,
     savedPolicy,
     bookingLocations,
+    seasonality,
     vehicles,
   ] = await Promise.all([
     searchParams,
@@ -43,6 +45,7 @@ export default async function DirectBookingPage({
     prisma.directBookingEmailTemplate.findUnique({ where: { workspaceId: workspace.id } }),
     prisma.bookingPricingPolicy.findUnique({ where: { workspaceId: workspace.id } }),
     listBookingLocations(workspace.id),
+    getRateSeasonality(workspace.id),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
       include: {
@@ -224,6 +227,48 @@ export default async function DirectBookingPage({
           {directMessages.policySaveAction}
         </button>
       </form>
+
+      <section className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-3 py-3 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+        <h3 className="text-[1.05rem] font-semibold text-[color:var(--ink)]">
+          {directMessages.seasonalityTitle}
+        </h3>
+        <p className="mt-1 max-w-3xl text-[12px] leading-5 text-[color:var(--ink-soft)]">
+          {seasonality.sampleSize > 0
+            ? directMessages.seasonalityCopy(
+                seasonality.sampleSize,
+                formatCurrency(seasonality.medianDailyRate, locale),
+              )
+            : directMessages.seasonalityEmpty}
+        </p>
+        {seasonality.sampleSize > 0 ? (
+          <div className="mt-3 grid grid-cols-6 gap-1.5 lg:grid-cols-12">
+            {directMessages.seasonalityMonths.map((label, index) => {
+              const factor = seasonality.monthIndex[index + 1];
+              return (
+                <div
+                  key={label}
+                  className="rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-1.5 py-2 text-center"
+                >
+                  <p className="text-[10px] text-[color:var(--ink-soft)]">{label}</p>
+                  <p
+                    className={`mt-1 text-[12px] font-semibold tabular-nums ${
+                      factor == null
+                        ? "text-[color:var(--ink-soft)]"
+                        : factor > 1.05
+                          ? "text-[color:var(--ok-fg)]"
+                          : factor < 0.95
+                            ? "text-[color:var(--bad-fg)]"
+                            : "text-[color:var(--ink)]"
+                    }`}
+                  >
+                    {factor == null ? "—" : `${factor.toFixed(2)}x`}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </section>
 
       <BookingLocationsEditor
         locale={locale}

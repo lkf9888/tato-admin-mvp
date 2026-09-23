@@ -15,6 +15,11 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
+import {
+  buildSeasonalRateMap,
+  getBookingWindowDayKeys,
+  getRateSeasonality,
+} from "@/lib/rental-estimate/rate-seasonality-server";
 import { listBookingLocations } from "@/lib/booking-locations";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import { getStripeSecretKey } from "@/lib/stripe";
@@ -144,10 +149,15 @@ export default async function ReserveVehiclePage({
   const stripeReady = Boolean(getStripeSecretKey());
   const policy = await getBookingPolicyForVehicle(vehicle);
   const dailyRate = rate.dailyRate ?? 0;
-  const [dailyRateOverrides, locations] = await Promise.all([
+  const [dailyRateOverrides, locations, seasonality] = await Promise.all([
     loadPriceOverridesForBooking(vehicle.id),
     listBookingLocations(vehicle.workspaceId),
+    getRateSeasonality(vehicle.workspaceId),
   ]);
+  const seasonalRates =
+    rate.source === "suggested"
+      ? buildSeasonalRateMap(dailyRate, getBookingWindowDayKeys(), seasonality)
+      : {};
   const connectSnapshot = vehicle.workspaceId
     ? await getWorkspaceConnectSnapshot(vehicle.workspaceId)
     : null;
@@ -269,6 +279,7 @@ export default async function ReserveVehiclePage({
               bookingTaxRate={vehicle.bookingTaxRate ?? 0}
             blockedDateWindows={blockedDateWindows}
             dailyRateOverrides={dailyRateOverrides}
+            seasonalRates={seasonalRates}
             locations={locations}
             weeklyDiscountPercent={policy.weeklyDiscountPercent}
             minimumRentalDays={policy.minimumRentalDays}

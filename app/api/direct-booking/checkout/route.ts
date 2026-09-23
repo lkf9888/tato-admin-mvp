@@ -12,6 +12,11 @@ import {
 } from "@/lib/direct-booking";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
+import {
+  buildSeasonalRateMap,
+  getBookingWindowDayKeys,
+  getRateSeasonality,
+} from "@/lib/rental-estimate/rate-seasonality-server";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import {
   describeBookingLocation,
@@ -217,6 +222,18 @@ export async function POST(request: Request) {
     const dailyRate = rate.dailyRate ?? 0;
     const dailyRateOverrides = await loadPriceOverridesForBooking(vehicle.id);
 
+    // Only a car the model prices follows the season. A typed rate is
+    // a flat statement, and bending it by month would overrule the
+    // person who typed it.
+    const seasonalRates =
+      rate.source === "suggested"
+        ? buildSeasonalRateMap(
+            dailyRate,
+            getBookingWindowDayKeys(),
+            await getRateSeasonality(vehicle.workspaceId),
+          )
+        : {};
+
     // Priced from the list, never from the request: a fee sent by the
     // browser would be a fee the browser could choose.
     const locations = await listBookingLocations(vehicle.workspaceId);
@@ -236,6 +253,7 @@ export async function POST(request: Request) {
       returnDate: parsed.returnDate,
       bookingDailyRate: dailyRate,
       dailyRateOverrides,
+      seasonalRates,
       pickupLocationFee,
       returnLocationFee,
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
@@ -267,6 +285,7 @@ export async function POST(request: Request) {
       returnDate: parsed.returnDate,
       bookingDailyRate: dailyRate,
       dailyRateOverrides,
+      seasonalRates,
       pickupLocationFee,
       returnLocationFee,
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,

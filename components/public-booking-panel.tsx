@@ -241,6 +241,7 @@ export function PublicBookingPanel({
   bookingTaxRate,
   blockedDateWindows,
   dailyRateOverrides,
+  seasonalRates,
   locations,
   weeklyDiscountPercent,
   minimumRentalDays,
@@ -262,6 +263,8 @@ export function PublicBookingPanel({
   blockedDateWindows: DateOnlyBookingWindow[];
   /** `YYYY-MM-DD` → price, for days the operator priced by hand. */
   dailyRateOverrides: Record<string, number>;
+  /** Model pricing per day, empty when a person set the rate. */
+  seasonalRates: Record<string, number>;
   /** Places the car may be collected from and returned to. */
   locations: { id: string; label: string; fee: number; isDefault: boolean }[];
   weeklyDiscountPercent: number;
@@ -398,6 +401,7 @@ export function PublicBookingPanel({
         returnDate,
         weeklyDiscountPercent,
         dailyRateOverrides,
+        seasonalRates,
         pickupLocationFee,
         returnLocationFee,
         bookingDailyRate,
@@ -416,6 +420,7 @@ export function PublicBookingPanel({
       returnDate,
       weeklyDiscountPercent,
       dailyRateOverrides,
+      seasonalRates,
       pickupLocationFee,
       returnLocationFee,
     ],
@@ -428,6 +433,7 @@ export function PublicBookingPanel({
         returnDate,
         weeklyDiscountPercent,
         dailyRateOverrides,
+        seasonalRates,
         pickupLocationFee,
         returnLocationFee,
         bookingDailyRate,
@@ -446,6 +452,7 @@ export function PublicBookingPanel({
       returnDate,
       weeklyDiscountPercent,
       dailyRateOverrides,
+      seasonalRates,
       pickupLocationFee,
       returnLocationFee,
     ],

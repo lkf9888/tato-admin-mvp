@@ -53,6 +53,15 @@ export const directBookingMessages = {
       policyMultiplierHint:
         "The income model measures what Turo paid out per rented day, net of their cut. This scales it into a list price.",
       aiPricedBadge: "AI priced",
+      seasonalityTitle: "What the model does to each month",
+      seasonalityCopy: (trips: number, rate: string) =>
+        `Fitted from ${trips} of your own trips, against a typical day of ${rate}. Only cars priced by the model follow it — a rate you typed stays flat. Weekends are fitted the same way, from the day a trip starts.`,
+      seasonalityEmpty:
+        "Not enough trip history yet, so every month prices the same. This fills in on its own as bookings complete.",
+      seasonalityMonths: [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+      ] as readonly string[],
       locationsKicker: "Pickup & return",
       locationsTitle: "Where a car can be collected and left",
       locationsCopy:
@@ -144,6 +153,14 @@ export const directBookingMessages = {
       policyMultiplierHint:
         "收入模型算的是 Turo 抽成后每个出租日的净额，这个系数把它折算成挂牌价。",
       aiPricedBadge: "AI 定价",
+      seasonalityTitle: "模型对每个月做了什么",
+      seasonalityCopy: (trips: number, rate: string) =>
+        `用你自己的 ${trips} 趟行程拟合，基准是一个普通日 ${rate}。只有由模型定价的车会跟随——你手动填过的价格保持不变。周末用同样的方法拟合，按行程开始的那一天。`,
+      seasonalityEmpty: "行程历史还不够，所以每个月价格一样。随着订单完成会自动补上。",
+      seasonalityMonths: [
+        "1月", "2月", "3月", "4月", "5月", "6月",
+        "7月", "8月", "9月", "10月", "11月", "12月",
+      ] as readonly string[],
       locationsKicker: "取还车地点",
       locationsTitle: "车可以在哪里交接",
       locationsCopy:

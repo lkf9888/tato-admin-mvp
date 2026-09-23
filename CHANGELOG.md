@@ -1,5 +1,58 @@
 # Changelog
 
+## v1.0.0 - 2026-09-23
+
+### Season and weekend, fitted from your own trips
+
+The income model in `lib/rental-estimate` cannot answer this, and it is
+worth saying why rather than quietly using it anyway. Its seasonal
+curve multiplies **monthly revenue**, and `estimateRentedDays` divides
+that revenue by a *constant* per-day rate — so the fit attributes all
+seasonality to how many days a car rents and none of it to what a day
+costs. Multiplying a daily rate by July's 1.87 would count the same
+effect twice. It has no weekday dimension at all, and the raw Turo
+exports it was fitted from are no longer on disk to refit.
+
+What does answer it is the order history. Every trip carries what it
+was paid and the days it covered, and their ratio is exactly the
+quantity wanted. Month and weekday indices are fitted from the
+workspace's own trips over three years, and they sharpen on their own
+as the fleet books more.
+
+**Shrunk toward neutral by sample size**, with a prior of 20 trips —
+the same device the segment and model adjustments use, for the same
+reason: three trips in February cannot speak with the authority of
+three hundred. Clamped to 0.6–1.8 so no bucket can double a price or
+halve it, and a month with no history multiplies by 1 rather than
+guessing from its neighbours.
+
+**One point per trip, not per rented day.** Weighting by days would let
+a single three-month rental set the index for three months on its own.
+
+The index is centred on a typical **month**, not a typical trip. That
+distinction looked cosmetic and was not: a fleet that books far more in
+summer has its median trip sitting inside summer, so July reads 1.00
+and every other month reads cheap. The ratios survive that; the level
+does not — and the level is what multiplies a rate calibrated to an
+average day.
+
+**Only cars the model prices follow the curve.** A rate somebody typed
+is a flat statement about what they want for the car, and bending it by
+month would be overruling them with an average. The chain is now: a
+price set on that day, then the model's price for that day, then the
+car's flat rate.
+
+Direct booking shows the fitted curve — twelve months, the trip count
+behind it, and the typical day it is measured against — because a model
+quietly changing prices is worse than no model.
+
+Verified: July reads dear and November cheap against seeded history; 3
+trips cannot move a month that 80 trips can; shrinkage lands exactly
+half-way at the prior; one long cheap rental barely moves its month; a
+Friday premium is picked up; zero, negative and unparseable rows are
+dropped; and a hand-set day still overrides the seasonal price for that
+day alone.
+
 ## v0.99.0 - 2026-09-23
 
 ### Collection and return, priced

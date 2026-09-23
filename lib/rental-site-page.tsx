@@ -17,6 +17,11 @@ import {
 } from "@/lib/rental-site";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
+import {
+  buildSeasonalRateMap,
+  getBookingWindowDayKeys,
+  getRateSeasonality,
+} from "@/lib/rental-estimate/rate-seasonality-server";
 import { listBookingLocations } from "@/lib/booking-locations";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import { getStripeSecretKey } from "@/lib/stripe";
@@ -83,10 +88,15 @@ export async function renderSiteVehicle(
   // page quoting $0.
   const rate = resolveVehicleDailyRate(vehicle, policy);
   if (!isVehicleBookable(rate)) notFound();
-  const [dailyRateOverrides, locations] = await Promise.all([
+  const [dailyRateOverrides, locations, seasonality] = await Promise.all([
     loadPriceOverridesForBooking(vehicle.id),
     listBookingLocations(site.workspaceId),
+    getRateSeasonality(site.workspaceId),
   ]);
+  const seasonalRates =
+    rate.source === "suggested"
+      ? buildSeasonalRateMap(rate.dailyRate ?? 0, getBookingWindowDayKeys(), seasonality)
+      : {};
 
   return (
     <SiteShell site={site} locale={locale}>
@@ -98,6 +108,7 @@ export async function renderSiteVehicle(
         policy={policy}
         dailyRate={rate.dailyRate ?? 0}
         dailyRateOverrides={dailyRateOverrides}
+        seasonalRates={seasonalRates}
         locations={locations}
         stripeReady={Boolean(getStripeSecretKey())}
         hostPayoutsReady={Boolean(connectSnapshot.accountId && connectSnapshot.chargesEnabled)}

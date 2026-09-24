@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.4.1 - 2026-09-24
+
+### Crawlers may fetch a site's car photos and logo
+
+A rental site's robots.txt disallowed `/api/`, which is where car photos
+and the site logo are served from — so Google could index a car page
+but not the photo on it, nor the images its structured data points at.
+Those two routes are now allowed explicitly; the longer match wins over
+the `/api/` block, and nothing else under `/api/` is opened.
+
 ## v1.4.0 - 2026-09-24
 
 ### The rental site in English, Simplified and Traditional Chinese

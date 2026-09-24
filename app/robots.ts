@@ -27,7 +27,11 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
       rules: [
         {
           userAgent: "*",
-          allow: "/",
+          // Car photos and the logo are served from under /api/. They
+          // are what the pages show and what the structured data points
+          // at, so they are carved out of the /api/ block -- the longer
+          // match wins in robots.txt.
+          allow: ["/", "/api/direct-booking/vehicles/", "/api/rental-site/logo"],
           disallow: ["/api/", "/s/", "/login", "/register", "/share/", "/sign/", "/staff-share/"],
         },
       ],

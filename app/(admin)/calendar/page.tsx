@@ -1,4 +1,8 @@
 import { CalendarView } from "@/components/calendar-view";
+import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
+import { getRateSeasonality } from "@/lib/rental-estimate/rate-seasonality-server";
+import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
+import { dateToDateOnly } from "@/lib/direct-booking";
 import { MobileCalendarSwitch } from "@/components/mobile-calendar-switch";
 import { MobileScheduleList } from "@/components/mobile-schedule-list";
 import { requireCurrentWorkspace } from "@/lib/auth";
@@ -36,12 +40,28 @@ function initialWindow() {
 export default async function CalendarPage() {
   const workspace = await requireCurrentWorkspace();
   const { from, to, indexes } = initialWindow();
-  const [{ locale, messages }, vehicles, owners, orders] = await Promise.all([
+  const [
+    { locale, messages },
+    vehicles,
+    bookingPolicy,
+    seasonality,
+    priceOverrideRows,
+    owners,
+    orders,
+  ] = await Promise.all([
     getI18n(),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
       include: { owner: true },
       orderBy: { plateNumber: "asc" },
+    }),
+    getWorkspaceBookingPolicy(workspace.id),
+    getRateSeasonality(workspace.id),
+    // Sparse by nature: only days somebody priced by hand have rows,
+    // so this is small even for a fleet that has been running years.
+    prisma.vehiclePriceOverride.findMany({
+      where: { vehicle: { workspaceId: workspace.id } },
+      select: { vehicleId: true, date: true, price: true },
     }),
     prisma.owner.findMany({
       where: { workspaceId: workspace.id },
@@ -95,9 +115,28 @@ export default async function CalendarPage() {
   // Built once, rendered in two places -- the phone's switch and the
   // desktop pane show the same component, and duplicating the props
   // would double the payload for a view only one of them displays.
+  const vehicleRates = new Map(
+    vehicles.map((vehicle) => [vehicle.id, resolveVehicleDailyRate(vehicle, bookingPolicy)]),
+  );
+  const priceOverrides: Record<string, Record<string, number>> = {};
+  for (const row of priceOverrideRows) {
+    const key = dateToDateOnly(row.date);
+    priceOverrides[row.vehicleId] = { ...(priceOverrides[row.vehicleId] ?? {}), [key]: row.price };
+  }
+
   const calendarView = (
     <CalendarView
       locale={locale}
+      pricing={{
+        seasonality,
+        overrides: priceOverrides,
+        rates: Object.fromEntries(
+          [...vehicleRates].map(([id, rate]) => [
+            id,
+            { baseRate: rate.dailyRate ?? 0, source: rate.source ?? "suggested" },
+          ]),
+        ),
+      }}
       vehicleOptions={vehicles.map((vehicle) => ({
         id: vehicle.id,
         label: vehicle.nickname,

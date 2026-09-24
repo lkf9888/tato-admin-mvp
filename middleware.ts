@@ -16,7 +16,6 @@ const protectedPrefixes = [
   "/billing",
   "/direct-booking",
   "/rental-site",
-  "/price-calendar",
   "/booking-requests",
   "/trash",
 ];

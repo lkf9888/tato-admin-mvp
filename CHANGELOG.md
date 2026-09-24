@@ -1,5 +1,44 @@
 # Changelog
 
+## v1.1.0 - 2026-09-23
+
+### Prices live on the calendar
+
+The separate Price Calendar page is gone. Prices are set on the
+operations calendar, where the fleet's days already are — one grid
+that answers "when is this car free" and "what does that day cost"
+instead of two pages that each answer half.
+
+**Prices** in the toolbar draws what every visible day costs, with
+hand-set days in bold against inherited ones. Editing reuses the
+gesture the grid already had: pick a stretch of a car's row, and the
+bar that offers Create order and a note now offers a price too.
+
+Nothing new was invented for the interaction, and nothing was
+rebuilt. The calendar's own comment explains why: "One div per day per
+car is 71,000 elements on this canvas." Price labels are rendered only
+for days near the viewport — the same window the day headers use — so
+a fleet-wide grid gains about forty spans per row, not five hundred.
+
+The browser resolves a day itself, running the same pure function the
+server bills from: a price set on that day, then the model's price for
+that day, then the car's flat rate. That costs one base rate per car,
+a sparse map of hand-set days, and the seasonal curve — nineteen
+numbers — rather than a price per car per day.
+
+Saving patches the grid in place rather than reloading. Scroll
+position and loaded chunks are the expensive part of this page and a
+price has no bearing on either.
+
+Scattered days still split into one request per unbroken run, so
+picking the 12th, 13th and the 20th prices three days and not nine.
+
+Verified against the running app: the toggle drew 160 labels across
+five rows matching each car's rate, picking two days filled the span
+to three, setting $199 wrote three rows and turned those three labels
+bold without a reload, and Reset removed them and returned the days to
+the car's rate.
+
 ## v1.0.2 - 2026-09-23
 
 ### Booking mail no longer matches cars of the wrong year

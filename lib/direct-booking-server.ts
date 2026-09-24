@@ -25,7 +25,7 @@ import {
 import { getAppUrl } from "@/lib/stripe";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
-import { getStripeClient } from "@/lib/stripe";
+import { refundDirectBookingCharge } from "@/lib/stripe-refunds";
 import { roundCurrencyAmount } from "@/lib/utils";
 
 type DirectBookingMetadata = {
@@ -65,12 +65,16 @@ async function refundCheckoutSession(session: Stripe.Checkout.Session, reason: s
 
   if (!paymentIntentId) return null;
 
-  const stripe = getStripeClient();
   try {
-    const refund = await stripe.refunds.create({
-      payment_intent: paymentIntentId,
-      reason: "requested_by_customer",
+    // A booking we could not honour: the renter gets everything back,
+    // the host gives back what was transferred, and the platform gives
+    // back its fee -- nobody earns on a trip that never existed. Keyed
+    // on the session so a redelivered webhook cannot refund twice.
+    const refund = await refundDirectBookingCharge({
+      paymentIntentId,
+      refundPlatformFee: true,
       metadata: { reason },
+      idempotencyKey: `checkout-refund:${session.id}`,
     });
     return refund.id;
   } catch (error) {

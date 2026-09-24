@@ -6,7 +6,8 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { areRequestedDatesFree } from "@/lib/booking-access";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
-import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
+import { getStripeSecretKey } from "@/lib/stripe";
+import { readDirectBookingPayment, refundDirectBookingCharge } from "@/lib/stripe-refunds";
 import { dateToDateOnly } from "@/lib/direct-booking";
 
 export const runtime = "nodejs";
@@ -17,17 +18,6 @@ const bodySchema = z.object({
   decision: z.enum(["APPROVE", "DECLINE"]),
   note: z.string().trim().max(1000).optional(),
 });
-
-/** The PaymentIntent a direct booking was paid with, if it had one. */
-function readPaymentIntentId(sourceMetadata: string | null) {
-  if (!sourceMetadata) return null;
-  try {
-    const parsed = JSON.parse(sourceMetadata) as { stripePaymentIntent?: string | null };
-    return parsed.stripePaymentIntent ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Answer a renter's change request.
@@ -126,7 +116,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
 
   // Cancellation.
   const refundAmount = changeRequest.quotedRefundAmount ?? 0;
-  const paymentIntentId = readPaymentIntentId(changeRequest.order.sourceMetadata);
+  const paymentIntentId = readDirectBookingPayment(changeRequest.order.sourceMetadata).paymentIntentId;
   let stripeRefundId: string | null = null;
 
   // Refusing beats cancelling silently. A booking marked cancelled
@@ -149,11 +139,15 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
 
   if (refundAmount > 0 && paymentIntentId) {
     try {
-      const refund = await getStripeClient().refunds.create({
-        payment_intent: paymentIntentId,
-        amount: Math.round(refundAmount * 100),
-        reason: "requested_by_customer",
+      // Out of the host's balance, not the platform's, with the
+      // platform's fee handed back pro rata: a cancelled trip is one
+      // the platform should not be earning on either.
+      const refund = await refundDirectBookingCharge({
+        paymentIntentId,
+        amount: refundAmount,
+        refundPlatformFee: true,
         metadata: { tato_request_id: changeRequest.id, tato_order_id: changeRequest.orderId },
+        idempotencyKey: `booking-request-refund:${changeRequest.id}`,
       });
       stripeRefundId = refund.id;
     } catch (error) {

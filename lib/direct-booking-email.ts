@@ -212,4 +212,91 @@ export async function sendDirectBookingConfirmationEmail(input: {
   }
 }
 
+/**
+ * Tell the renter what happened to their deposit.
+ *
+ * Fixed wording rather than an operator template: it is a statement of
+ * money, and the one line that matters -- how much came back and why
+ * the rest did not -- is written by the operator per trip already.
+ * Stripe's own refund receipt, when the account sends one, names an
+ * amount and nothing else; a renter who sees $180 of a $300 deposit
+ * return with no reason is a chargeback waiting to happen.
+ *
+ * Never throws, for the same reason the confirmation does not: the
+ * money has already moved by the time this runs.
+ */
+export async function sendDepositSettlementEmail(input: {
+  workspaceId: string;
+  order: Pick<Order, "id" | "renterName" | "depositAmount">;
+  vehicle: Pick<Vehicle, "brand" | "model" | "year">;
+  renterEmail: string | null;
+  refundedAmount: number;
+  note: string | null;
+}): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const to = input.renterEmail?.trim();
+    if (!to) return { ok: false, reason: "NO_RENTER_EMAIL" };
+
+    const [site, workspace] = await Promise.all([
+      prisma.rentalSite.findUnique({ where: { workspaceId: input.workspaceId } }),
+      prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
+    ]);
+    const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
+    const deposit = input.order.depositAmount ?? 0;
+    const kept = Math.max(0, Math.round((deposit - input.refundedAmount) * 100) / 100);
+    const money = (value: number) => formatCurrency(value, "en");
+    const car = `${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`;
+
+    const lines = [
+      `Hi ${input.order.renterName},`,
+      "",
+      kept === 0
+        ? `Thanks for returning the ${car}. Your full security deposit of ${money(deposit)} has been refunded to the card you paid with.`
+        : input.refundedAmount > 0
+          ? `Thanks for returning the ${car}. ${money(input.refundedAmount)} of your ${money(deposit)} security deposit has been refunded to the card you paid with; ${money(kept)} has been kept.`
+          : `Thanks for returning the ${car}. Your ${money(deposit)} security deposit has been kept.`,
+      kept > 0 && input.note ? `\nReason: ${input.note}` : null,
+      input.refundedAmount > 0
+        ? "\nRefunds usually appear on your statement within 5–10 business days, depending on your bank."
+        : null,
+      "",
+      `Booking reference: ${bookingReference(input.order.id)}`,
+      site?.contactPhone || site?.contactEmail
+        ? `Questions? ${[site?.contactPhone, site?.contactEmail].filter(Boolean).join(" · ")}`
+        : null,
+      "",
+      brandName,
+    ].filter((line): line is string => line !== null);
+    const text = lines.join("\n");
+
+    const result = await sendMail({
+      to,
+      subject: `${brandName} — your security deposit (${bookingReference(input.order.id)})`,
+      text,
+      html: toHtmlBody(text),
+      replyTo: site?.contactEmail?.trim() || undefined,
+    });
+
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: result.ok ? "deposit_settlement_email_sent" : "deposit_settlement_email_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { to, reason: result.reason ?? null },
+    });
+    return result;
+  } catch (error) {
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "deposit_settlement_email_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => undefined);
+    return { ok: false, reason: "SEND_FAILED" };
+  }
+}
+
 export { DIRECT_BOOKING_EMAIL_VARIABLES };

@@ -354,6 +354,17 @@ model Order {
   /// id. Null on orders typed in by an operator -- nobody outside has
   /// been given a link to those.
   renterToken            String?                 @unique
+  /// The deposit decision, made once after the car is back. Set
+  /// together, claim-first: `depositSettledAt` is written before Stripe
+  /// is called so two clicks cannot both refund, and cleared again if
+  /// Stripe refuses. `depositRefundedAmount` may be anything from 0 (the
+  /// whole deposit kept) to `depositAmount`; the difference is what was
+  /// withheld, and `depositSettlementNote` says why -- the one thing a
+  /// renter disputing a deduction will ask for.
+  depositSettledAt       DateTime?
+  depositRefundedAmount  Float?
+  depositStripeRefundId  String?
+  depositSettlementNote  String?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   workspace              Workspace?              @relation(fields: [workspaceId], references: [id], onDelete: SetNull)

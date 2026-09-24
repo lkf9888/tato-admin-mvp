@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DepositSettlementPanel } from "@/components/deposit-settlement-panel";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import { readDirectBookingPayment } from "@/lib/stripe-refunds";
 import { getNetEarningFromFinancials } from "@/lib/utils";
 
 /**
@@ -90,6 +92,15 @@ export default async function OrderDetailPage({
     ),
   );
 
+  // Only a deposit we actually charged can be refunded from here. A
+  // hand-typed offline order may carry a deposit figure, but that
+  // money was taken some other way and goes back the same way.
+  const directPayment = readDirectBookingPayment(order.sourceMetadata);
+  const showDeposit =
+    directPayment.isDirectBooking &&
+    Boolean(directPayment.paymentIntentId) &&
+    (order.depositAmount ?? 0) > 0;
+
   const turoUrl = order.externalOrderId
     ? `https://turo.com/us/en/reservation/${order.externalOrderId.trim()}`
     : null;
@@ -167,6 +178,24 @@ export default async function OrderDetailPage({
 
         {/* Right rail: who, and where to act. */}
         <aside className="space-y-3">
+          {showDeposit ? (
+            <DepositSettlementPanel
+              locale={locale}
+              orderId={order.id}
+              depositAmount={order.depositAmount ?? 0}
+              hasReturned={order.returnDatetime.getTime() <= Date.now()}
+              isCancelled={order.status === "cancelled"}
+              settlement={
+                order.depositSettledAt
+                  ? {
+                      settledAt: order.depositSettledAt.toISOString(),
+                      refundedAmount: order.depositRefundedAmount ?? 0,
+                      note: order.depositSettlementNote,
+                    }
+                  : null
+              }
+            />
+          ) : null}
           <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
             <p className="t-eyebrow text-[var(--ink-soft)]">{t.guest}</p>
             <p className="mt-1 t-title text-[var(--ink)]">{order.renterName}</p>

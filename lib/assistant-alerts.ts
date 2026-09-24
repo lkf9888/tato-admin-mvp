@@ -591,6 +591,59 @@ async function detectPendingBookingRequests(workspaceId: string): Promise<AlertD
   });
 }
 
+/** Long enough to check the car, read the odometer and price a scratch. */
+const DEPOSIT_SETTLE_GRACE_DAYS = 3;
+/** Past this a card refund starts to fail and the renter has long since
+ *  called; an alert that old is history, not a task. */
+const DEPOSIT_SETTLE_HORIZON_DAYS = 90;
+
+/**
+ * Deposits still sitting with us after the car came back.
+ *
+ * Direct-booking deposits are charged, not held, so nothing returns
+ * them automatically -- a forgotten one is the renter's money kept by
+ * default, which is how a direct channel collects chargebacks. One
+ * alert per order, WARNING so it reaches email, resolving itself the
+ * moment the deposit is settled either way.
+ */
+async function detectUnsettledDeposits(workspaceId: string): Promise<AlertDraft[]> {
+  const orders = await prisma.order.findMany({
+    where: {
+      workspaceId,
+      source: OrderSource.offline,
+      isArchived: false,
+      status: { not: OrderStatus.cancelled },
+      depositAmount: { gt: 0 },
+      depositSettledAt: null,
+      returnDatetime: {
+        lte: daysAgo(DEPOSIT_SETTLE_GRACE_DAYS),
+        gte: daysAgo(DEPOSIT_SETTLE_HORIZON_DAYS),
+      },
+      sourceMetadata: { contains: DIRECT_BOOKING_CHANNEL_MARKER },
+    },
+    select: {
+      id: true,
+      renterName: true,
+      depositAmount: true,
+      returnDatetime: true,
+      vehicle: { select: { plateNumber: true } },
+    },
+    orderBy: { returnDatetime: "asc" },
+    take: 20,
+  });
+
+  return orders.map((order) => ({
+    dedupeKey: `deposit_unsettled:${order.id}`,
+    severity: AssistantAlertSeverity.WARNING,
+    title: `${order.renterName} 的押金 $${(order.depositAmount ?? 0).toFixed(2)} 还没有结算`,
+    body: [
+      `${order.vehicle.plateNumber} 已于 ${formatDateOnly(order.returnDatetime)} 还车。`,
+      "自建站的押金是实收的，不会自动退回。在订单页决定退多少；扣留的部分需要写原因，原因会发给租客。",
+    ].join("\n"),
+    href: `/orders/${order.id}`,
+  }));
+}
+
 /**
  * Run every detector and reconcile the alert table against reality.
  *
@@ -609,6 +662,7 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
       detectStaleContracts(workspaceId),
       detectUnblockedTuroDates(workspaceId),
       detectPendingBookingRequests(workspaceId),
+      detectUnsettledDeposits(workspaceId),
       detectDiskPressure(),
     ])
   ).flat();

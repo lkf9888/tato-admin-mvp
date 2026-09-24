@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.2.0 - 2026-09-24
+
+### Deposits go back from the admin, and refunds come out of the right account
+
+**Settle a deposit from the order page.** Direct-booking deposits are
+charged with the rent, not held, so nothing ever returned them — the
+only way was the Stripe dashboard, and on a destination charge only
+the platform account can refund at all. The order page now has a
+Security deposit panel: the amount to refund defaults to all of it,
+and lowering it asks for a reason. The renter is emailed the amount
+and that reason, because a deduction they can read is a conversation
+and one they cannot is a chargeback.
+
+It happens once. The order is claimed in a conditional update before
+Stripe is called, so a double click, a second tab or a retried request
+finds nothing to claim — three simultaneous submissions produced one
+refund and two refusals. If Stripe refuses, the claim is released and
+nothing on the order has changed.
+
+A deposit still unsettled three days after the car is back raises a
+WARNING, which reaches email, and resolves itself once it is settled.
+
+**Every refund used to be paid by the platform.** Direct bookings are
+destination charges: the whole charge is transferred to the host the
+moment it is captured. A plain refund on such a charge sends the
+renter's money back out of the *platform's* balance and leaves the
+host's transfer where it was — Stripe's documented default. Approved
+cancellations and the webhook's own safety refunds (double-booking,
+missing car) all did that.
+
+All three now go through one helper that sets `reverse_transfer`, so
+the refund comes back from the host. Because the transfer is the whole
+charge, a partial reversal equals the refund exactly: a $300 deposit
+refund reverses $300. Cancellations also hand back a pro-rata share of
+the platform fee — nobody should earn on a trip that did not happen —
+while deposit refunds do not, since the deposit was never in the fee
+base. Charges with no transfer on them fall back to a plain refund.
+
 ## v1.1.0 - 2026-09-23
 
 ### Prices live on the calendar

@@ -31,6 +31,8 @@ jobs:
         run: ./scripts/check-schema-push.sh
       - name: Launch checklist stays in sync
         run: npm run check:docs
+      - name: Traditional Chinese messages are regenerated
+        run: npm run check:zh-hant
       - name: Type check
         run: npx tsc --noEmit
       - name: Production build

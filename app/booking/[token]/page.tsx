@@ -3,6 +3,7 @@ import { BookingRequestKind, BookingRequestStatus, OrderStatus } from "@prisma/c
 
 import { BookingChangeForm } from "@/components/booking-change-form";
 import { SiteShell } from "@/components/site-shell";
+import { getLocalizedSite } from "@/lib/rental-site-page";
 import {
   canRequestChange,
   getAmountsPaid,
@@ -186,7 +187,9 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
   // Wrapped in the operator's own chrome when they have a site, so the
   // renter stays inside the brand they booked with.
   return site ? (
-    <SiteShell site={site} locale={locale}>
+    // The language menu leads to the site's home: this page is reached
+    // by a private link and has no public address in other languages.
+    <SiteShell site={getLocalizedSite(site, locale)} locale={locale} path="/" messages={messages}>
       {body}
     </SiteShell>
   ) : (

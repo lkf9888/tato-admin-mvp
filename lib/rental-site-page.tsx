@@ -5,16 +5,18 @@ import type { Metadata } from "next";
 import { SiteHome } from "@/components/site-home";
 import { SiteShell } from "@/components/site-shell";
 import { SiteVehicleView } from "@/components/site-vehicle-view";
-import { getI18n } from "@/lib/i18n-server";
+import { getMessages } from "@/lib/i18n";
 import {
   buildVehicleSlug,
   getBookingDateDefaults,
   getSiteFleet,
+  getSiteOrigin,
   getSiteUrl,
   loadSiteVehicle,
   readCheckoutState,
   readDateParam,
 } from "@/lib/rental-site";
+import { localizeSite, type LocalizedSite } from "@/lib/rental-site-content";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import {
@@ -29,20 +31,50 @@ import { SiteConversionReporter } from "@/components/site-conversion";
 import { parseAdsSendTo, parseMeasurementId } from "@/lib/site-conversion";
 import { loadCheckoutConversion } from "@/lib/site-conversion-server";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
+import { SITE_LOCALES, getSiteHreflang, type SiteLocale } from "@/lib/site-locale";
+import { convertContentToTraditional } from "@/lib/zh-hant-convert";
 
 /**
  * The two public pages of a rental site, written once.
  *
  * A site is reachable at two addresses -- its own domain and
- * `/s/<slug>` on the platform host -- and both have to render the same
- * thing. Next needs a route file per address, so the routes stay thin
- * and the pages live here.
+ * `/s/<slug>` on the platform host -- in three languages each, and all
+ * of them have to render the same thing. Next needs a route file per
+ * address, so the routes stay thin and the pages live here.
+ *
+ * The language always arrives from the route, never from a cookie: a
+ * page's language is part of its address, so the crawler that indexes
+ * `/zh-TW` indexes Traditional Chinese.
  */
 
 export type SearchParams = Record<string, string | string[] | undefined>;
 
-export async function renderSiteHome(site: RentalSite, searchParams: SearchParams) {
-  const { locale, messages } = await getI18n();
+export function getLocalizedSite(site: RentalSite, locale: SiteLocale): LocalizedSite {
+  return localizeSite(site, locale, convertContentToTraditional);
+}
+
+/**
+ * `hreflang` for one page in every language, plus `x-default` pointing
+ * at English -- the scheme the operator's company site already uses.
+ */
+function buildAlternates(site: RentalSite, path: string, locale: SiteLocale): Metadata["alternates"] {
+  const languages: Record<string, string> = {};
+  for (const each of SITE_LOCALES) {
+    languages[getSiteHreflang(each)] = getSiteUrl(site, path, undefined, each);
+  }
+  languages["x-default"] = getSiteUrl(site, path, undefined, "en");
+  return { canonical: getSiteUrl(site, path, undefined, locale), languages };
+}
+
+const OG_LOCALE: Record<SiteLocale, string> = { en: "en_CA", zh: "zh_CN", "zh-Hant": "zh_TW" };
+
+export async function renderSiteHome(
+  site: RentalSite,
+  searchParams: SearchParams,
+  locale: SiteLocale,
+) {
+  const messages = getMessages(locale);
+  const localized = getLocalizedSite(site, locale);
   const pickupDate = readDateParam(searchParams.from);
   const returnDate = readDateParam(searchParams.to);
   // Half a range filters nothing, and a card marked "booked" on the
@@ -56,9 +88,9 @@ export async function renderSiteHome(site: RentalSite, searchParams: SearchParam
   });
 
   return (
-    <SiteShell site={site} locale={locale}>
+    <SiteShell site={localized} locale={locale} path="/" messages={messages}>
       <SiteHome
-        site={site}
+        site={localized}
         locale={locale}
         messages={messages}
         fleet={fleet}
@@ -73,11 +105,13 @@ export async function renderSiteVehicle(
   site: RentalSite,
   vehicleSlug: string,
   searchParams: SearchParams,
+  locale: SiteLocale,
 ) {
   const vehicle = await loadSiteVehicle(site, vehicleSlug);
   if (!vehicle) notFound();
 
-  const { locale, messages } = await getI18n();
+  const messages = getMessages(locale);
+  const localized = getLocalizedSite(site, locale);
   const { defaultPickupDate, defaultReturnDate } = getBookingDateDefaults(
     readDateParam(searchParams.from),
     readDateParam(searchParams.to),
@@ -107,9 +141,14 @@ export async function renderSiteVehicle(
       : {};
 
   return (
-    <SiteShell site={site} locale={locale}>
+    <SiteShell
+      site={localized}
+      locale={locale}
+      path={`/cars/${buildVehicleSlug(vehicle)}`}
+      messages={messages}
+    >
       <SiteVehicleView
-        site={site}
+        site={localized}
         locale={locale}
         messages={messages}
         vehicle={vehicle}
@@ -135,18 +174,27 @@ export async function renderSiteVehicle(
   );
 }
 
-export function buildSiteHomeMetadata(site: RentalSite): Metadata {
-  const title = site.tagline?.trim()
-    ? `${site.brandName} · ${site.tagline.trim()}`
-    : site.brandName;
-  const description = site.description?.trim() || site.tagline?.trim() || undefined;
-  const url = getSiteUrl(site, "/");
+export function buildSiteHomeMetadata(site: RentalSite, locale: SiteLocale): Metadata {
+  const localized = getLocalizedSite(site, locale);
+  const title = localized.tagline?.trim()
+    ? `${localized.brandName} · ${localized.tagline.trim()}`
+    : localized.brandName;
+  const description =
+    localized.description?.trim() || localized.tagline?.trim() || undefined;
+  const alternates = buildAlternates(site, "/", locale);
 
   return {
     title,
     description,
-    alternates: { canonical: url },
-    openGraph: { title, description, url, siteName: site.brandName, type: "website" },
+    alternates,
+    openGraph: {
+      title,
+      description,
+      url: alternates?.canonical as string,
+      siteName: localized.brandName,
+      locale: OG_LOCALE[locale],
+      type: "website",
+    },
     twitter: { card: "summary_large_image", title, description },
   };
 }
@@ -154,26 +202,43 @@ export function buildSiteHomeMetadata(site: RentalSite): Metadata {
 export async function buildSiteVehicleMetadata(
   site: RentalSite,
   vehicleSlug: string,
+  locale: SiteLocale,
 ): Promise<Metadata> {
+  const localized = getLocalizedSite(site, locale);
   const vehicle = await loadSiteVehicle(site, vehicleSlug);
-  if (!vehicle) return { title: site.brandName };
+  if (!vehicle) return { title: localized.brandName };
 
   const name = `${vehicle.brand} ${vehicle.model} ${vehicle.year}`;
-  const title = `${name} · ${site.brandName}`;
-  const description = vehicle.bookingIntro?.trim() || site.description?.trim() || undefined;
-  const url = getSiteUrl(site, `/cars/${buildVehicleSlug(vehicle)}`);
+  const title = `${name} · ${localized.brandName}`;
+  // The car's own intro is written in one language, so it describes the
+  // English page; the others lead with the operator's translated pitch.
+  const description =
+    (locale === "en" ? vehicle.bookingIntro?.trim() : undefined) ||
+    localized.description?.trim() ||
+    undefined;
+  const alternates = buildAlternates(site, `/cars/${buildVehicleSlug(vehicle)}`, locale);
   const photo = vehicle.attachments[0];
+  // Assets live at the origin's root, not under a site's `/s/<slug>`
+  // base -- joining them to the page URL produced links that 404.
   const images = photo
     ? [
-        `${getSiteUrl(site, "")}/api/direct-booking/vehicles/${vehicle.id}/attachments/file?attachmentId=${photo.id}`,
+        `${getSiteOrigin(site)}/api/direct-booking/vehicles/${vehicle.id}/attachments/file?attachmentId=${photo.id}`,
       ]
     : undefined;
 
   return {
     title,
     description,
-    alternates: { canonical: url },
-    openGraph: { title, description, url, siteName: site.brandName, type: "website", images },
+    alternates,
+    openGraph: {
+      title,
+      description,
+      url: alternates?.canonical as string,
+      siteName: localized.brandName,
+      locale: OG_LOCALE[locale],
+      type: "website",
+      images,
+    },
     twitter: { card: "summary_large_image", title, description, images },
   };
 }

@@ -523,6 +523,7 @@ export function PublicBookingPanel({
     startTransition(async () => {
       const formData = new FormData();
       formData.set("vehicleId", vehicleId);
+      formData.set("locale", locale);
       formData.set("pickupDate", pickupDate);
       formData.set("returnDate", returnDate);
       formData.set("renterName", renterName);

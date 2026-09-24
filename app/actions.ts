@@ -72,6 +72,7 @@ import {
 import { roundCurrencyAmount } from "@/lib/utils";
 import { createWorkspaceForRegistration } from "@/lib/workspaces";
 import { parseAdsSendTo } from "@/lib/site-conversion";
+import { readSiteContentForm } from "@/lib/rental-site-content";
 
 // Brute-force protection. Limits are deliberately permissive enough
 // for typo-and-retry while shutting down credential stuffing: one
@@ -2095,13 +2096,14 @@ export async function saveRentalSiteAction(formData: FormData) {
     domain,
     isPublished: wantsPublished,
     brandName,
-    tagline: siteFieldOrNull(formData.get("tagline")),
-    description: siteFieldOrNull(formData.get("description")),
+    // Headline, intro, hours and footer in English, plus the other two
+    // languages and the headline numbers.
+    ...readSiteContentForm((name) => formData.get(name)?.toString() ?? null),
     accentColor,
     contactEmail: siteFieldOrNull(formData.get("contactEmail")),
     contactPhone: siteFieldOrNull(formData.get("contactPhone")),
     contactAddress: siteFieldOrNull(formData.get("contactAddress")),
-    footerNote: siteFieldOrNull(formData.get("footerNote")),
+    wechatId: siteFieldOrNull(formData.get("wechatId"))?.slice(0, 60) ?? null,
     analyticsId,
     adsConversionSendTo,
   };

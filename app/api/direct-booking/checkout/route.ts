@@ -25,6 +25,7 @@ import {
 } from "@/lib/booking-locations";
 import { prisma } from "@/lib/prisma";
 import { getBookingReturnUrls } from "@/lib/rental-site";
+import { getStripeCheckoutLocale, isSiteLocale } from "@/lib/site-locale";
 import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
 import {
   PLATFORM_APPLICATION_FEE_PERCENT,
@@ -150,7 +151,12 @@ async function readCheckoutRequest(request: Request) {
     agreementAccepted: readFormBoolean(formData, "agreementAccepted"),
   });
 
-  return { parsed, licenseFront, licenseBack };
+  // The language the renter was reading in, so Stripe's page and the
+  // page they come back to both stay in it.
+  const rawLocale = formData.get("locale");
+  const siteLocale = isSiteLocale(rawLocale) ? rawLocale : "en";
+
+  return { parsed, licenseFront, licenseBack, siteLocale };
 }
 
 export async function POST(request: Request) {
@@ -159,7 +165,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Stripe is not configured." }, { status: 400 });
     }
 
-    const { parsed, licenseFront, licenseBack } = await readCheckoutRequest(request);
+    const { parsed, licenseFront, licenseBack, siteLocale } = await readCheckoutRequest(request);
     if (!isDateOnlyRangeValid(parsed.pickupDate, parsed.returnDate)) {
       return NextResponse.json({ error: "Choose a valid pickup and return date." }, { status: 400 });
     }
@@ -308,6 +314,7 @@ export async function POST(request: Request) {
     const { successUrl, cancelUrl } = await getBookingReturnUrls(
       vehicle,
       new URL(request.url).origin,
+      siteLocale,
     );
 
     // Platform fee = 5% of rental + insurance (NOT the refundable deposit).
@@ -345,6 +352,7 @@ export async function POST(request: Request) {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
+      locale: getStripeCheckoutLocale(siteLocale),
       success_url: successUrl,
       cancel_url: cancelUrl,
       customer_email: parsed.renterEmail,

@@ -1840,6 +1840,25 @@ model RentalSite {
   /// numbers -- whatever the operator is required to say and we cannot
   /// know.
   footerNote     String?
+  /// Small line above the headline ("Richmond · minutes from YVR").
+  eyebrow        String?
+  /// Opening hours as the operator writes them. Prose, not a schedule:
+  /// nothing computes with it, and "Mon–Sat 10–6:30, 24/7 airport
+  /// delivery" is not a shape a form can hold.
+  hours          String?
+  /// For Chinese-speaking renters, who reach for WeChat before email.
+  wechatId       String?
+  /// Up to four headline numbers for the hero ("5,000+" / "trips"), as
+  /// JSON `[{ value, label }]`. Labels here are English; translations
+  /// live in `translations`.
+  highlights     String?
+  /// The operator's own words in the other two languages, as JSON:
+  /// `{ "zh": {...}, "zh-Hant": {...} }` with the same keys as the
+  /// English columns (brandName, eyebrow, tagline, description, hours,
+  /// footerNote) plus `highlightLabels`. The columns above are English.
+  /// A missing Traditional value falls back to the Simplified one run
+  /// through OpenCC, then to English.
+  translations   String?
   /// GA4 / Google Ads measurement id. Empty emits no tag at all rather
   /// than an empty one that still loads gtag and still sets cookies.
   analyticsId    String?

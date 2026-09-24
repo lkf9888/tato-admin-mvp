@@ -8,11 +8,12 @@
  *
  * To add a new page's strings, create a new file in
  * `lib/i18n/messages/` exporting `{ en: {...}, zh: {...} } as const`,
- * then add it to the imports + the `messages` composition below. The
- * Traditional Chinese (`zh-Hant`) variant is computed automatically
- * from the Simplified `zh` block via the SC→TC substitution map.
+ * add it to the imports + the `messages` composition below, and run
+ * `npx tsx scripts/generate-zh-hant.ts` to produce its Traditional
+ * Chinese (`zh-Hant`) block.
  */
-import { convertMessagesScToTc, convertScToTc } from "@/lib/sc-to-tc";
+import { activityLabelsBase, statusLabelsBase } from "@/lib/i18n/messages/labels";
+import * as zhHant from "@/lib/i18n/zh-hant";
 
 import { accountSettingsMessages } from "@/lib/i18n/messages/account-settings";
 import { assistantMessages } from "@/lib/i18n/messages/assistant";
@@ -42,36 +43,6 @@ export const supportedLocales = ["en", "zh", "zh-Hant"] as const;
 
 export type Locale = (typeof supportedLocales)[number];
 
-const statusLabelsBase = {
-  en: {
-    turo: "Turo",
-    offline: "Offline",
-    cancelled: "Cancelled",
-    booked: "Booked",
-    ongoing: "Ongoing",
-    completed: "Completed",
-    available: "Available",
-    maintenance: "Maintenance",
-    inactive: "Inactive",
-    conflict: "Conflict",
-    standard: "Standard",
-    privacy: "Privacy",
-  },
-  zh: {
-    turo: "Turo",
-    offline: "线下",
-    cancelled: "已取消",
-    booked: "已预订",
-    ongoing: "进行中",
-    completed: "已完成",
-    available: "可用",
-    maintenance: "维修中",
-    inactive: "停用",
-    conflict: "冲突",
-    standard: "标准版",
-    privacy: "隐私版",
-  },
-} as const;
 
 type StatusLabelKey = keyof typeof statusLabelsBase["en"];
 type StatusLabelMap = Record<StatusLabelKey, string>;
@@ -79,138 +50,9 @@ type StatusLabelMap = Record<StatusLabelKey, string>;
 const statusLabels: Record<Locale, StatusLabelMap> = {
   en: statusLabelsBase.en,
   zh: statusLabelsBase.zh,
-  "zh-Hant": convertMessagesScToTc(statusLabelsBase.zh) as StatusLabelMap,
+  "zh-Hant": zhHant.statusLabelsBase as StatusLabelMap,
 };
 
-// Canonical list of every `action` string written by `logActivity`
-// across the codebase. Sources audited: `app/actions.ts`, the `app/api/*`
-// routes, `lib/orders.ts`, `lib/direct-booking-server.ts`. If you add
-// a new logActivity call, add the string here too — the activity log
-// page reads from this map to populate the action filter dropdown,
-// and an unlisted action falls back to a raw underscore-separated
-// string in the UI.
-const activityLabelsBase = {
-  en: {
-    user_registered: "User registered",
-    password_reset: "Password reset",
-    owner_created: "Owner created",
-    owner_updated: "Owner updated",
-    owner_deleted: "Owner deleted",
-    owner_vehicle_assignments_updated: "Owner vehicle assignments updated",
-    owner_ledger_item_created: "Owner ledger item created",
-    owner_ledger_item_updated: "Owner ledger item updated",
-    owner_ledger_item_deleted: "Owner ledger item deleted",
-    owner_ledger_resynced: "Owner ledger resynced",
-    owner_ledger_receipts_uploaded: "Owner ledger receipts uploaded",
-    vehicle_created: "Vehicle created",
-    vehicle_updated: "Vehicle updated",
-    vehicle_deleted: "Vehicle deleted",
-    vehicle_deactivated: "Vehicle deactivated",
-    vehicle_purchase_price_updated: "Vehicle purchase price updated",
-    vehicle_direct_booking_updated: "Vehicle booking settings updated",
-    vehicle_auto_created_from_csv: "Vehicle auto-created from CSV",
-    turo_sync_settings_updated: "Turo sync settings updated",
-    offline_order_created: "Offline order created",
-    offline_order_updated: "Offline order updated",
-    offline_order_deleted: "Offline order deleted",
-    order_status_updated: "Order status updated",
-    order_notes_updated: "Order notes updated",
-    order_updated: "Order updated",
-    order_deleted: "Order deleted",
-    calendar_note_created: "Calendar note added",
-    orders_owner_share_bulk_synced: "Orders synced to owner shares",
-    orders_recurring_created: "Recurring orders created",
-    order_duplicated: "Order duplicated",
-    order_restored: "Order restored",
-    calendar_note_deleted: "Calendar note removed",
-    import_csv: "CSV imported",
-    share_link_created: "Share link created",
-    share_link_revoked: "Share link revoked",
-    share_link_deleted: "Share link deleted",
-    feedback_submitted: "Feedback submitted",
-    direct_booking_order_created: "Direct booking order created",
-    pending_order_assigned: "Unassigned booking placed on a car",
-    pending_order_already_imported: "Unassigned booking cleared — CSV had already filed it",
-    pending_order_dismissed: "Unassigned booking dismissed",
-    direct_booking_refund_failed: "Direct booking refund failed",
-    direct_booking_metadata_missing: "Direct booking metadata missing",
-    direct_booking_vehicle_missing: "Direct booking vehicle missing",
-    direct_booking_workspace_missing: "Direct booking workspace missing",
-    direct_booking_conflict_refunded: "Direct booking conflict refunded",
-    direct_booking_instalments_created: "Instalment schedule created",
-    direct_booking_instalments_mismatch: "Instalment schedule did not match the charge",
-    booking_cancel_requested: "Renter asked to cancel",
-    booking_reschedule_requested: "Renter asked to change dates",
-    booking_cancel_approved: "Cancellation approved",
-    booking_reschedule_approved: "Date change approved",
-    booking_request_declined: "Change request declined",
-    booking_cancel_refund_failed: "Cancellation refund failed",
-    account_profile_updated: "Account profile updated",
-    account_email_updated: "Account email updated",
-    account_password_updated: "Account password updated",
-    stripe_connect_account_updated: "Stripe payout binding updated",
-  },
-  zh: {
-    user_registered: "已注册用户",
-    password_reset: "已重置密码",
-    owner_created: "已创建车主",
-    owner_updated: "已更新车主",
-    owner_deleted: "已删除车主",
-    owner_vehicle_assignments_updated: "已更新车主车辆绑定",
-    owner_ledger_item_created: "已创建车主账目",
-    owner_ledger_item_updated: "已更新车主账目",
-    owner_ledger_item_deleted: "已删除车主账目",
-    owner_ledger_resynced: "已重新同步车主账目",
-    owner_ledger_receipts_uploaded: "已上传车主账目凭证",
-    vehicle_created: "已创建车辆",
-    vehicle_updated: "已更新车辆",
-    vehicle_deleted: "已删除车辆",
-    vehicle_deactivated: "已停用车辆",
-    vehicle_purchase_price_updated: "已更新车辆购买价",
-    vehicle_direct_booking_updated: "已更新车辆在线预定设置",
-    vehicle_auto_created_from_csv: "CSV 自动建档车辆",
-    turo_sync_settings_updated: "已更新 Turo 同步设置",
-    offline_order_created: "已创建线下订单",
-    offline_order_updated: "已更新线下订单",
-    offline_order_deleted: "已删除线下订单",
-    order_status_updated: "已更新订单状态",
-    order_notes_updated: "已更新订单备注",
-    order_updated: "已更新订单",
-    order_deleted: "已删除订单",
-    calendar_note_created: "添加了日历备注",
-    orders_owner_share_bulk_synced: "批量同步给车主",
-    orders_recurring_created: "创建了循环订单",
-    order_duplicated: "复制了订单",
-    order_restored: "恢复了订单",
-    calendar_note_deleted: "删除了日历备注",
-    import_csv: "已导入 CSV",
-    share_link_created: "已创建共享链接",
-    share_link_revoked: "已作废共享链接",
-    share_link_deleted: "已删除共享链接",
-    feedback_submitted: "已提交反馈",
-    direct_booking_order_created: "已创建在线预订订单",
-    pending_order_assigned: "待分配订单已挂到车辆",
-    pending_order_already_imported: "待分配订单已清除 —— CSV 已经建过这一单",
-    pending_order_dismissed: "已忽略待分配订单",
-    direct_booking_refund_failed: "在线预订退款失败",
-    direct_booking_metadata_missing: "在线预订元数据缺失",
-    direct_booking_vehicle_missing: "在线预订车辆缺失",
-    direct_booking_workspace_missing: "在线预订工作台缺失",
-    direct_booking_conflict_refunded: "在线预订冲突已退款",
-    direct_booking_instalments_created: "已生成分期计划",
-    direct_booking_instalments_mismatch: "分期计划与实际扣款不一致",
-    booking_cancel_requested: "租客申请取消",
-    booking_reschedule_requested: "租客申请改期",
-    booking_cancel_approved: "取消已批准",
-    booking_reschedule_approved: "改期已批准",
-    booking_request_declined: "变更申请已拒绝",
-    booking_cancel_refund_failed: "取消退款失败",
-    account_profile_updated: "已更新账户资料",
-    account_email_updated: "已更新账户邮箱",
-    account_password_updated: "已更新账户密码",
-    stripe_connect_account_updated: "已更新 Stripe 收款绑定",
-  },
-} as const;
 
 type ActivityLabelKey = keyof typeof activityLabelsBase["en"];
 type ActivityLabelMap = Record<ActivityLabelKey, string>;
@@ -218,7 +60,7 @@ type ActivityLabelMap = Record<ActivityLabelKey, string>;
 const activityLabels: Record<Locale, ActivityLabelMap> = {
   en: activityLabelsBase.en,
   zh: activityLabelsBase.zh,
-  "zh-Hant": convertMessagesScToTc(activityLabelsBase.zh) as ActivityLabelMap,
+  "zh-Hant": zhHant.activityLabelsBase as ActivityLabelMap,
 };
 
 export function resolveLocale(value?: string | null): Locale {
@@ -386,14 +228,35 @@ const messages = {
 
 export type Messages = (typeof messages)["zh"];
 
-// Traditional Chinese is computed from the Simplified zh block at module
-// load via a per-character substitution map (see lib/sc-to-tc.ts). The
-// converter preserves functions and non-string values, so message getters
-// like `quoteDays(count)` keep working unchanged. About 95% of admin UI
-// text converts cleanly with this approach; for the remaining ~5% that
-// needs context-sensitive Traditional forms (e.g. 系統 vs 聯繫), tweak
-// the SC_TO_TC map in lib/sc-to-tc.ts or override here.
-const traditionalMessages = convertMessagesScToTc(messages.zh) as Messages;
+// Traditional Chinese is generated, not computed: scripts/generate-zh-hant.ts
+// runs OpenCC over the source of every `zh` block and writes the result
+// to lib/i18n/zh-hant/, which CI checks is up to date. That converts the
+// text inside message functions too, which a runtime pass over values
+// never could -- functions came through it untouched, so every
+// parameterised string in the Traditional UI used to render Simplified.
+const traditionalMessages = {
+  ...zhHant.shellMessages,
+  ...zhHant.inspectionsMessages,
+  ...zhHant.accountSettingsMessages,
+  ...zhHant.contactMessages,
+  ...zhHant.assistantMessages,
+  ...zhHant.guestMessagesMessages,
+  ...zhHant.orderDetailMessages,
+  ...zhHant.turoUpdatesMessages,
+  ...zhHant.authMessages,
+  ...zhHant.dashboardMessages,
+  ...zhHant.fleetMessages,
+  ...zhHant.directBookingMessages,
+  ...zhHant.ordersMessages,
+  ...zhHant.rentalEstimateMessages,
+  ...zhHant.rentalSiteMessages,
+  ...zhHant.importsMessages,
+  ...zhHant.investmentRankingMessages,
+  ...zhHant.billingMessages,
+  ...zhHant.bookingMessages,
+  ...zhHant.calendarMessages,
+  ...zhHant.shareMessages,
+} as unknown as Messages;
 
 // Cast through `unknown` because messages.en / messages.zh have different
 // literal-string types from `as const`, even though their shapes match.
@@ -406,7 +269,3 @@ const messagesByLocale: Record<Locale, Messages> = {
 export function getMessages(locale: Locale): Messages {
   return messagesByLocale[locale];
 }
-
-// Re-exported here so callers don't need to import sc-to-tc directly when
-// they want to translate ad-hoc DB strings (e.g. owner names) to TC.
-export { convertScToTc };

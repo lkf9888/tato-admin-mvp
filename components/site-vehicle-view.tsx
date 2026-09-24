@@ -1,13 +1,16 @@
-import type { Order, OrderAttachment, RentalSite, Vehicle } from "@prisma/client";
+import type { Order, OrderAttachment, Vehicle } from "@prisma/client";
 import Link from "next/link";
 
 import { PublicBookingPanel } from "@/components/public-booking-panel";
 import { VehiclePhotoCarousel } from "@/components/vehicle-photo-carousel";
 import { getBlockedBookingWindows, getDateOnlyBookingWindows } from "@/lib/direct-booking";
 import type { BookingPolicy } from "@/lib/booking-policy";
-import { buildVehicleSlug, getSiteBasePath, getSiteUrl } from "@/lib/rental-site";
+import { siteHref } from "@/components/site-shell";
+import { buildVehicleSlug, getSiteOrigin, getSiteUrl } from "@/lib/rental-site";
+import type { LocalizedSite } from "@/lib/rental-site-content";
+import type { SiteLocale } from "@/lib/site-locale";
 import { isImageAttachment } from "@/lib/uploads";
-import type { Locale, Messages } from "@/lib/i18n";
+import type { Messages } from "@/lib/i18n";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export type SiteVehicle = Vehicle & {
@@ -39,8 +42,8 @@ export function SiteVehicleView({
   defaultReturnDate,
   checkoutState,
 }: {
-  site: RentalSite;
-  locale: Locale;
+  site: LocalizedSite;
+  locale: SiteLocale;
   messages: Messages;
   vehicle: SiteVehicle;
   policy: BookingPolicy;
@@ -57,7 +60,6 @@ export function SiteVehicleView({
 }) {
   const reserveMessages = messages.reservePage;
   const copy = messages.sitePublic;
-  const base = getSiteBasePath(site);
   const blockedWindows = getBlockedBookingWindows(vehicle.orders, 6);
   const blockedDateWindows = getDateOnlyBookingWindows(vehicle.orders);
   const photos = vehicle.attachments
@@ -68,7 +70,7 @@ export function SiteVehicleView({
       alt: attachment.filename || vehicle.nickname,
     }));
 
-  const canonical = getSiteUrl(site, `/cars/${buildVehicleSlug(vehicle)}`);
+  const canonical = getSiteUrl(site, `/cars/${buildVehicleSlug(vehicle)}`, undefined, locale);
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "Car",
@@ -78,7 +80,7 @@ export function SiteVehicleView({
     vehicleModelDate: String(vehicle.year),
     url: canonical,
     ...(photos.length > 0
-      ? { image: photos.slice(0, 5).map((photo) => `${getSiteUrl(site, "")}${photo.src}`) }
+      ? { image: photos.slice(0, 5).map((photo) => `${getSiteOrigin(site)}${photo.src}`) }
       : {}),
     offers: {
       "@type": "Offer",
@@ -99,20 +101,20 @@ export function SiteVehicleView({
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
       />
 
       <Link
-        href={`${base}/`}
-        className="text-[13px] text-[var(--ink-soft)] hover:text-[var(--brand)]"
+        href={siteHref(site, locale, "/") === "/" ? "/#fleet" : `${siteHref(site, locale, "/")}#fleet`}
+        className="inline-flex items-center gap-1 rounded-full px-1 text-[14px] font-medium text-[var(--ink-soft)] hover:text-[var(--brand)]"
       >
         ← {copy.backToFleet}
       </Link>
 
-      <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1.12fr)_minmax(22rem,0.88fr)]">
+      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1.12fr)_minmax(22rem,0.88fr)] lg:items-start">
         <div className="space-y-5">
           <VehiclePhotoCarousel
             photos={photos}
@@ -120,36 +122,40 @@ export function SiteVehicleView({
             brandLabel={site.brandName}
           />
 
-          <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5">
-            <h1 className="text-2xl font-semibold leading-tight text-[var(--ink)] sm:text-3xl">
+          <section className="site-card p-6">
+            <h1 className="text-[1.9rem] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-[2.3rem]">
               {vehicle.brand} {vehicle.model} {vehicle.year}
             </h1>
-            <p className="mt-4 max-w-3xl whitespace-pre-line text-sm leading-7 text-[var(--ink-mid)]">
-              {vehicle.bookingIntro?.trim() || reserveMessages.introFallback}
+            <p className="mt-4 max-w-3xl whitespace-pre-line text-[15px] leading-7 text-[var(--ink-mid)]">
+              {/* The car's own intro is written in one language; on the
+                  other two the platform's localized line reads better
+                  than a paragraph in a language the visitor chose not
+                  to read. */}
+              {(locale === "en" ? vehicle.bookingIntro?.trim() : "") || copy.vehicleIntroFallback}
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+              <div className="rounded-[18px] bg-[var(--brand-tint)] p-4">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--brand-deep)]">
                   {reserveMessages.rateLabel}
                 </p>
-                <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
+                <p className="mt-2 text-[1.6rem] font-bold tracking-[-0.02em] text-[var(--ink)]">
                   {formatCurrency(dailyRate, locale)}
                 </p>
               </div>
-              <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+              <div className="rounded-[18px] bg-[var(--brand-tint)] p-4">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--brand-deep)]">
                   {copy.insuranceLabel}
                 </p>
-                <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
+                <p className="mt-2 text-[1.6rem] font-bold tracking-[-0.02em] text-[var(--ink)]">
                   {formatCurrency(vehicle.bookingInsuranceFee, locale)}
                 </p>
               </div>
-              <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+              <div className="rounded-[18px] bg-[var(--brand-tint)] p-4">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--brand-deep)]">
                   {copy.depositLabel}
                 </p>
-                <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
+                <p className="mt-2 text-[1.6rem] font-bold tracking-[-0.02em] text-[var(--ink)]">
                   {formatCurrency(vehicle.bookingDepositAmount, locale)}
                 </p>
               </div>
@@ -164,7 +170,7 @@ export function SiteVehicleView({
                   {blockedWindows.map((window) => (
                     <span
                       key={`${window.pickupDatetime.toISOString()}-${window.returnDatetime.toISOString()}`}
-                      className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs text-[var(--ink-mid)]"
+                      className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[13px] text-[var(--ink-mid)]"
                     >
                       {formatDate(window.pickupDatetime, locale)} -{" "}
                       {formatDate(window.returnDatetime, locale)}
@@ -180,7 +186,7 @@ export function SiteVehicleView({
           </section>
         </div>
 
-        <div>
+        <div className="lg:sticky lg:top-24">
           <PublicBookingPanel
             locale={locale}
             vehicleId={vehicle.id}

@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
+import { headers } from "next/headers";
+
 import "@/app/globals.css";
 import { getI18n } from "@/lib/i18n-server";
 
@@ -42,7 +44,19 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { locale } = await getI18n();
+  const [{ locale }, requestHeaders] = await Promise.all([getI18n(), headers()]);
+  // Public rental-site pages take their language from the URL, which
+  // middleware reads for us; everything else follows the admin's own
+  // preference.
+  const siteLang = requestHeaders.get("x-site-lang");
+  const lang =
+    siteLang && /^(?:en|zh-Hans|zh-Hant)$/.test(siteLang)
+      ? siteLang
+      : locale === "zh"
+        ? "zh-CN"
+        : locale === "zh-Hant"
+          ? "zh-Hant"
+          : "en";
 
   // The previous floating version chip pinned at `bottom-3 left-3` was
   // removed in v0.19.5 — on mobile it sat directly under the
@@ -51,7 +65,7 @@ export default async function RootLayout({
   // block. Keeping it in two places was clutter for no information
   // gain.
   return (
-    <html lang={locale === "zh" ? "zh-CN" : "en"}>
+    <html lang={lang}>
       <body>{children}</body>
     </html>
   );

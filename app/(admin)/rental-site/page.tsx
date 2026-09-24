@@ -2,6 +2,9 @@ import Link from "next/link";
 import { VehicleStatus } from "@prisma/client";
 
 import { saveRentalSiteAction } from "@/app/actions";
+import { SiteContentEditor } from "@/components/site-content-editor";
+import { parseHighlights, parseSiteTranslations } from "@/lib/rental-site-content";
+import { SITE_LOCALES, SITE_LOCALE_LABELS } from "@/lib/site-locale";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
@@ -27,7 +30,7 @@ export default async function RentalSitePage({
   searchParams: Promise<{ error?: string; saved?: string }>;
 }) {
   const workspace = await requireCurrentWorkspace();
-  const [query, { messages }, requestHost, site, fleetPolicy, bookableVehicles] =
+  const [query, { locale, messages }, requestHost, site, fleetPolicy, bookableVehicles] =
     await Promise.all([
     searchParams,
     getI18n(),
@@ -51,6 +54,7 @@ export default async function RentalSitePage({
     isVehicleBookable(resolveVehicleDailyRate(vehicle, fleetPolicy)),
   ).length;
   const copy = messages.rentalSitePage;
+  const translations = parseSiteTranslations(site?.translations);
   // The address shown here has to be one the operator can paste into a
   // browser. `NEXT_PUBLIC_APP_URL` is the right answer when it is set,
   // but it is read at runtime and may not be, so the host this very
@@ -129,9 +133,24 @@ export default async function RentalSitePage({
             <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
               {copy.liveAddress}
             </p>
-            <p className="mt-1.5 truncate text-[13px] font-medium text-[color:var(--ink)]">
-              {liveUrl ?? `https://${platformHost}/s/${previewSlug || "…"}`}
-            </p>
+            {site ? (
+              <ul className="mt-1.5 space-y-0.5">
+                {SITE_LOCALES.map((each) => (
+                  <li key={each} className="flex min-w-0 items-baseline gap-2 text-[12px]">
+                    <span className="w-16 shrink-0 text-[color:var(--ink-soft)]">
+                      {SITE_LOCALE_LABELS[each]}
+                    </span>
+                    <span className="truncate font-medium text-[color:var(--ink)]">
+                      {getSiteUrl(site, "/", requestHost, each)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1.5 truncate text-[13px] font-medium text-[color:var(--ink)]">
+                {`https://${platformHost}/s/${previewSlug || "…"}`}
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -153,18 +172,6 @@ export default async function RentalSitePage({
             {copy.sectionAddress}
           </h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block min-w-0">
-              <span className={LABEL_CLASS}>{copy.brandNameLabel}</span>
-              <input
-                name="brandName"
-                defaultValue={site?.brandName ?? workspace.name}
-                required
-                maxLength={80}
-                className={FIELD_CLASS}
-              />
-              <span className={HINT_CLASS}>{copy.brandNameHint}</span>
-            </label>
-
             <label className="block min-w-0">
               <span className={LABEL_CLASS}>{copy.slugLabel}</span>
               <div className="flex items-center gap-1">
@@ -216,20 +223,36 @@ export default async function RentalSitePage({
 
         <section className={SECTION_CLASS}>
           <h3 className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
+            {copy.sectionContent}
+          </h3>
+          <p className="mt-1 max-w-3xl text-[11px] leading-4 text-[color:var(--ink-soft)]">
+            {copy.contentHint}
+          </p>
+          <div className="mt-3">
+            <SiteContentEditor
+              locale={locale}
+              values={{
+                en: {
+                  brandName: site?.brandName ?? workspace.name,
+                  eyebrow: site?.eyebrow ?? "",
+                  tagline: site?.tagline ?? "",
+                  description: site?.description ?? "",
+                  hours: site?.hours ?? "",
+                  footerNote: site?.footerNote ?? "",
+                },
+                zh: translations.zh ?? {},
+                "zh-Hant": translations["zh-Hant"] ?? {},
+              }}
+              highlights={parseHighlights(site?.highlights)}
+            />
+          </div>
+        </section>
+
+        <section className={SECTION_CLASS}>
+          <h3 className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
             {copy.sectionBrand}
           </h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block min-w-0">
-              <span className={LABEL_CLASS}>{copy.taglineLabel}</span>
-              <input
-                name="tagline"
-                defaultValue={site?.tagline ?? ""}
-                maxLength={160}
-                className={FIELD_CLASS}
-              />
-              <span className={HINT_CLASS}>{copy.taglineHint}</span>
-            </label>
-
             <label className="block min-w-0">
               <span className={LABEL_CLASS}>{copy.accentColorLabel}</span>
               <input
@@ -241,18 +264,6 @@ export default async function RentalSitePage({
                 className={FIELD_CLASS}
               />
               <span className={HINT_CLASS}>{copy.accentColorHint}</span>
-            </label>
-
-            <label className="block min-w-0 sm:col-span-2">
-              <span className={LABEL_CLASS}>{copy.descriptionLabel}</span>
-              <textarea
-                name="description"
-                rows={4}
-                defaultValue={site?.description ?? ""}
-                maxLength={1200}
-                className={FIELD_CLASS}
-              />
-              <span className={HINT_CLASS}>{copy.descriptionHint}</span>
             </label>
 
             <label className="block min-w-0 sm:col-span-2">
@@ -286,7 +297,7 @@ export default async function RentalSitePage({
           <h3 className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
             {copy.sectionContact}
           </h3>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block min-w-0">
               <span className={LABEL_CLASS}>{copy.contactEmailLabel}</span>
               <input
@@ -314,16 +325,14 @@ export default async function RentalSitePage({
                 className={FIELD_CLASS}
               />
             </label>
-            <label className="block min-w-0 sm:col-span-3">
-              <span className={LABEL_CLASS}>{copy.footerNoteLabel}</span>
-              <textarea
-                name="footerNote"
-                rows={3}
-                defaultValue={site?.footerNote ?? ""}
-                maxLength={1200}
+            <label className="block min-w-0">
+              <span className={LABEL_CLASS}>{copy.wechatIdLabel}</span>
+              <input
+                name="wechatId"
+                defaultValue={site?.wechatId ?? ""}
+                maxLength={60}
                 className={FIELD_CLASS}
               />
-              <span className={HINT_CLASS}>{copy.footerNoteHint}</span>
             </label>
           </div>
         </section>

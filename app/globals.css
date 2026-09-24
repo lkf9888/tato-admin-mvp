@@ -606,3 +606,125 @@ a[class*="rounded-2xl"],
     font-size: 11px;
   }
 }
+
+/* ---------------------------------------------------------------
+   Public rental site
+
+   Scoped to `.site-theme`, which only SiteShell renders, so none of
+   this reaches the admin app. The look follows the operator's company
+   site: near-black ink, one saturated accent with lavender tints of it,
+   pill buttons, 24px cards, and a hero lit by two soft glows. Every
+   tint is mixed from `--brand`, so another operator's accent colour
+   re-tints the whole site rather than clashing with a fixed purple.
+   --------------------------------------------------------------- */
+.site-theme {
+  --ink: #0b0b10;
+  --ink-mid: #3f3f46;
+  --ink-soft: #6b6b76;
+  --line: #ececf0;
+  --line-strong: #dcdce3;
+  --surface: #ffffff;
+  --surface-muted: #f7f7f8;
+  --page: #ffffff;
+  --control-radius: 12px;
+  --radius-card: 24px;
+  --brand-tint: color-mix(in srgb, var(--brand) 8%, #ffffff);
+  --brand-tint-line: color-mix(in srgb, var(--brand) 32%, #ffffff);
+  --brand-deep: color-mix(in srgb, var(--brand) 62%, #000000);
+  --coral: #ff5a4a;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC",
+    "PingFang TC", "Microsoft YaHei", "Noto Sans SC", "Noto Sans TC", sans-serif;
+  color: var(--ink);
+  background: var(--page);
+  -webkit-font-smoothing: antialiased;
+}
+
+.site-theme .site-hero {
+  background:
+    radial-gradient(1200px 600px at 85% -10%, color-mix(in srgb, var(--brand) 18%, transparent) 0%, transparent 60%),
+    radial-gradient(900px 500px at 5% 20%, color-mix(in srgb, var(--coral) 12%, transparent) 0%, transparent 55%),
+    linear-gradient(#ffffff 0%, color-mix(in srgb, var(--brand) 3%, #ffffff) 100%);
+}
+
+.site-theme .site-stats {
+  background:
+    radial-gradient(700px 320px at 90% 0%, color-mix(in srgb, var(--brand) 45%, transparent) 0%, transparent 65%),
+    #0b0b10;
+  box-shadow: 0 25px 50px -12px color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+.site-theme .site-card {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.site-theme a.site-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--brand-tint-line);
+  box-shadow: 0 18px 40px -24px color-mix(in srgb, var(--brand) 45%, transparent);
+}
+
+.site-theme .site-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.7rem 1.35rem;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease;
+}
+
+.site-theme .site-pill-dark {
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.site-theme .site-pill-dark:hover {
+  opacity: 0.88;
+}
+
+.site-theme .site-pill-soft {
+  background: var(--brand-tint);
+  border: 1px solid var(--brand-tint-line);
+  color: var(--brand-deep);
+}
+
+.site-theme .site-pill-line {
+  background: #ffffff;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+}
+
+.site-theme .site-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background: var(--brand-tint);
+  color: var(--brand-deep);
+  padding: 0.35rem 0.85rem;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.site-theme .site-lang[open] > summary {
+  border-color: var(--line-strong);
+}
+
+.site-theme .site-lang > summary::-webkit-details-marker {
+  display: none;
+}

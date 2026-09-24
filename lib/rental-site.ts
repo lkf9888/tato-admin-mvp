@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { getAppUrl } from "@/lib/stripe";
 import { isImageAttachment } from "@/lib/uploads";
+import { getSiteLocalePrefix, type SiteLocale } from "@/lib/site-locale";
 
 /**
  * Resolving a public rental site from the request.
@@ -159,14 +160,28 @@ export function getSiteOrigin(site: RentalSite, requestHost?: string) {
   return `${protocol}://${platformHost}`;
 }
 
-/** Where a site's pages live relative to its origin. */
-export function getSiteBasePath(site: RentalSite) {
-  return site.domain ? "" : `/s/${site.slug}`;
+/**
+ * Where a site's pages live relative to its origin, in one language.
+ *
+ * Every internal link on a site is built from this, which is what keeps
+ * a visitor in the language they arrived in without each link having to
+ * remember to.
+ */
+export function getSiteBasePath(site: Pick<RentalSite, "domain" | "slug">, locale: SiteLocale = "en") {
+  return `${site.domain ? "" : `/s/${site.slug}`}${getSiteLocalePrefix(locale)}`;
 }
 
-export function getSiteUrl(site: RentalSite, path: string, requestHost?: string) {
+export function getSiteUrl(
+  site: RentalSite,
+  path: string,
+  requestHost?: string,
+  locale: SiteLocale = "en",
+) {
   const suffix = path === "/" ? "" : path;
-  return `${getSiteOrigin(site, requestHost)}${getSiteBasePath(site)}${suffix}`;
+  const base = getSiteBasePath(site, locale);
+  // The English home is the bare origin; a language home is `/zh-CN`,
+  // never `/zh-CN/`, so each page has exactly one address.
+  return `${getSiteOrigin(site, requestHost)}${base}${suffix}`;
 }
 
 /**
@@ -383,12 +398,14 @@ export function getBookingDateDefaults(pickupDate: string, returnDate: string) {
 export async function getBookingReturnUrls(
   vehicle: Pick<Vehicle, "id" | "workspaceId" | "brand" | "model" | "year">,
   fallbackOrigin?: string,
+  locale: SiteLocale = "en",
 ) {
   const host = await getRequestHost();
   const site = await findPublishedSiteByHost(host);
 
   if (site && vehicle.workspaceId && site.workspaceId === vehicle.workspaceId) {
-    const url = getSiteUrl(site, `/cars/${buildVehicleSlug(vehicle)}`, host);
+    // Back to the language they paid in.
+    const url = getSiteUrl(site, `/cars/${buildVehicleSlug(vehicle)}`, host, locale);
     return {
       // Stripe fills `{CHECKOUT_SESSION_ID}` in on the way back. The
       // page needs it to report the booking to Google with its real

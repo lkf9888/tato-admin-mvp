@@ -26,7 +26,7 @@ import {
 
 export async function generateMetadata(): Promise<Metadata> {
   const site = await getSiteForCurrentRequest();
-  return site ? buildSiteHomeMetadata(site) : {};
+  return site ? buildSiteHomeMetadata(site, "en") : {};
 }
 
 export default async function HomePage({
@@ -36,7 +36,7 @@ export default async function HomePage({
 }) {
   const site = await getSiteForCurrentRequest();
   if (site) {
-    return renderSiteHome(site, await searchParams);
+    return renderSiteHome(site, await searchParams, "en");
   }
 
   const authenticated = await isAdminAuthenticated();

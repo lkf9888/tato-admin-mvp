@@ -63,6 +63,12 @@ export const rentalSiteMessages = {
 
       analyticsIdLabel: "Google tag ID",
       analyticsIdHint: "G- or AW- measurement ID. Left empty, no tracking script loads at all.",
+      adsConversionLabel: "Google Ads conversion",
+      adsConversionHint:
+        "AW-XXXXXXXXX/label, from the conversion action's tag setup in Google Ads. Every paid booking is reported once, valued at its rent excluding tax and deposit.",
+      adsConversionInvalid: "Not saved: a Google Ads conversion looks like AW-123456789/AbCdEfGh.",
+      trackingPurchaseNote:
+        "With a G- ID, each paid booking is also sent to GA4 as a purchase, which Google Ads can import instead.",
 
       bookableCount: "Bookable vehicles",
       liveAddress: "Live address",
@@ -143,6 +149,11 @@ export const rentalSiteMessages = {
 
       analyticsIdLabel: "Google 跟踪 ID",
       analyticsIdHint: "G- 或 AW- 开头的衡量 ID。留空则完全不加载跟踪脚本。",
+      adsConversionLabel: "Google Ads 转化",
+      adsConversionHint:
+        "格式 AW-XXXXXXXXX/标签，在 Google Ads 转化操作的「代码设置」里能找到。每笔付款成功的预订上报一次，价值按租金计，不含税和押金。",
+      adsConversionInvalid: "未保存：Google Ads 转化的格式是 AW-123456789/AbCdEfGh。",
+      trackingPurchaseNote: "填了 G- 开头的 ID 时，每笔付款的预订也会作为 purchase 事件发到 GA4，Google Ads 也可以从那里导入。",
 
       bookableCount: "可预订车辆",
       liveAddress: "当前地址",

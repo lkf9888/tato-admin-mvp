@@ -505,6 +505,21 @@ export function PublicBookingPanel({
       return;
     }
 
+    // The funnel step between "looked at a car" and "paid", valued the
+    // way the purchase will be so the two can be compared. A no-op on
+    // pages without a Google tag.
+    const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag;
+    if (typeof gtag === "function") {
+      gtag("event", "begin_checkout", {
+        currency: "CAD",
+        value: Math.max(
+          0,
+          Math.round((plan.totalAmount - quote.depositAmount - quote.taxAmount) * 100) / 100,
+        ),
+        items: [{ item_id: vehicleId, quantity: quote.days }],
+      });
+    }
+
     startTransition(async () => {
       const formData = new FormData();
       formData.set("vehicleId", vehicleId);

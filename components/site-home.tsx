@@ -1,7 +1,7 @@
 import type { RentalSite } from "@prisma/client";
 import Link from "next/link";
 
-import { getSiteBasePath, type SiteFleetVehicle } from "@/lib/rental-site";
+import { getSiteBasePath, getSiteUrl, type SiteFleetVehicle } from "@/lib/rental-site";
 import type { Locale, Messages } from "@/lib/i18n";
 import { formatCurrency } from "@/lib/utils";
 
@@ -44,8 +44,38 @@ export function SiteHome({
     ? `?${new URLSearchParams({ from: pickupDate, to: returnDate }).toString()}`
     : "";
 
+  // The business itself, for the local results a "car rental near me"
+  // search draws from. Each car page already describes its car; this
+  // is the one place that says who rents them and where to find them.
+  const siteUrl = getSiteUrl(site, "/");
+  const rates = fleet.map((vehicle) => vehicle.dailyRate).filter((rate) => rate > 0);
+  const businessData = {
+    "@context": "https://schema.org",
+    "@type": "AutoRental",
+    name: site.brandName,
+    url: siteUrl,
+    ...(site.description?.trim() || site.tagline?.trim()
+      ? { description: site.description?.trim() || site.tagline?.trim() }
+      : {}),
+    ...(site.logoPathname
+      ? { logo: `${getSiteUrl(site, "")}/api/rental-site/logo?siteId=${site.id}` }
+      : {}),
+    ...(site.contactPhone?.trim() ? { telephone: site.contactPhone.trim() } : {}),
+    ...(site.contactEmail?.trim() ? { email: site.contactEmail.trim() } : {}),
+    ...(site.contactAddress?.trim() ? { address: site.contactAddress.trim() } : {}),
+    ...(rates.length > 0
+      ? {
+          priceRange: `CA$${Math.round(Math.min(...rates))}–CA$${Math.round(Math.max(...rates))} / day`,
+        }
+      : {}),
+  };
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(businessData).replace(/</g, "\\u003c") }}
+      />
       <section>
         <h1 className="max-w-3xl text-3xl font-semibold leading-tight text-[var(--ink)] sm:text-[2.6rem]">
           {site.tagline?.trim() || site.brandName}

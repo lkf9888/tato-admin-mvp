@@ -71,6 +71,7 @@ import {
 } from "@/lib/rate-limit";
 import { roundCurrencyAmount } from "@/lib/utils";
 import { createWorkspaceForRegistration } from "@/lib/workspaces";
+import { parseAdsSendTo } from "@/lib/site-conversion";
 
 // Brute-force protection. Limits are deliberately permissive enough
 // for typo-and-retry while shutting down credential stuffing: one
@@ -2055,6 +2056,15 @@ export async function saveRentalSiteAction(formData: FormData) {
   const analyticsId =
     rawAnalytics && /^(?:G|AW|GT)-[A-Z0-9-]{4,20}$/i.test(rawAnalytics) ? rawAnalytics : null;
 
+  // Refused loudly rather than dropped: a conversion id that silently
+  // fails to save is an ad account optimising on nothing, and nobody
+  // finds out until the spend report.
+  const rawAdsSendTo = siteFieldOrNull(formData.get("adsConversionSendTo"));
+  const adsConversionSendTo = rawAdsSendTo ? parseAdsSendTo(rawAdsSendTo)?.sendTo ?? null : null;
+  if (rawAdsSendTo && !adsConversionSendTo) {
+    redirect("/rental-site?error=ads_conversion_invalid");
+  }
+
   // Publishing is gated on the site having something to sell. A page
   // of "no vehicles listed" that an operator has been told is live is
   // the worst of both states.
@@ -2093,6 +2103,7 @@ export async function saveRentalSiteAction(formData: FormData) {
     contactAddress: siteFieldOrNull(formData.get("contactAddress")),
     footerNote: siteFieldOrNull(formData.get("footerNote")),
     analyticsId,
+    adsConversionSendTo,
   };
 
   const site = existing

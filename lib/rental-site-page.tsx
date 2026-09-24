@@ -25,6 +25,9 @@ import {
 import { listBookingLocations } from "@/lib/booking-locations";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import { getStripeSecretKey } from "@/lib/stripe";
+import { SiteConversionReporter } from "@/components/site-conversion";
+import { parseAdsSendTo, parseMeasurementId } from "@/lib/site-conversion";
+import { loadCheckoutConversion } from "@/lib/site-conversion-server";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
 
 /**
@@ -93,6 +96,11 @@ export async function renderSiteVehicle(
     listBookingLocations(site.workspaceId),
     getRateSeasonality(site.workspaceId),
   ]);
+  const checkoutState = readCheckoutState(searchParams.checkout);
+  const conversion =
+    checkoutState === "success"
+      ? await loadCheckoutConversion(site, vehicle, searchParams.session_id)
+      : null;
   const seasonalRates =
     rate.source === "suggested"
       ? buildSeasonalRateMap(rate.dailyRate ?? 0, getBookingWindowDayKeys(), seasonality)
@@ -114,8 +122,15 @@ export async function renderSiteVehicle(
         hostPayoutsReady={Boolean(connectSnapshot.accountId && connectSnapshot.chargesEnabled)}
         defaultPickupDate={defaultPickupDate}
         defaultReturnDate={defaultReturnDate}
-        checkoutState={readCheckoutState(searchParams.checkout)}
+        checkoutState={checkoutState}
       />
+      {conversion ? (
+        <SiteConversionReporter
+          conversion={conversion}
+          measurementId={parseMeasurementId(site.analyticsId)}
+          adsSendTo={parseAdsSendTo(site.adsConversionSendTo)?.sendTo ?? null}
+        />
+      ) : null}
     </SiteShell>
   );
 }

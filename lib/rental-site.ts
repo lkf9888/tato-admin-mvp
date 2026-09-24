@@ -390,7 +390,11 @@ export async function getBookingReturnUrls(
   if (site && vehicle.workspaceId && site.workspaceId === vehicle.workspaceId) {
     const url = getSiteUrl(site, `/cars/${buildVehicleSlug(vehicle)}`, host);
     return {
-      successUrl: `${url}?checkout=success`,
+      // Stripe fills `{CHECKOUT_SESSION_ID}` in on the way back. The
+      // page needs it to report the booking to Google with its real
+      // value, and it is only read after Stripe confirms it -- a
+      // pasted id reports nothing.
+      successUrl: `${url}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${url}?checkout=cancelled`,
     };
   }

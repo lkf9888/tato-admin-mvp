@@ -5,6 +5,7 @@ import Script from "next/script";
 import { CompactLanguageSwitcher } from "@/components/language-switcher";
 import { getSiteBasePath } from "@/lib/rental-site";
 import type { Locale } from "@/lib/i18n";
+import { parseAdsSendTo, parseMeasurementId } from "@/lib/site-conversion";
 
 /**
  * The chrome every public page of a rental site sits inside.
@@ -27,11 +28,6 @@ function safeAccent(value: string | null | undefined) {
 /** GA4 / Google Ads ids only, and only when one is actually set. An
  *  empty id still loads gtag and still sets cookies, which is a
  *  consent problem in exchange for no measurement. */
-function safeMeasurementId(value: string | null | undefined) {
-  if (!value) return null;
-  const clean = value.trim();
-  return /^(?:G|AW|GT)-[A-Z0-9-]{4,20}$/i.test(clean) ? clean : null;
-}
 
 export function SiteShell({
   site,
@@ -44,7 +40,17 @@ export function SiteShell({
 }) {
   const base = getSiteBasePath(site);
   const accent = safeAccent(site.accentColor);
-  const measurementId = safeMeasurementId(site.analyticsId);
+  // Every tag the page reports to, configured once here so any event
+  // fired later -- a purchase, an Ads conversion -- has a destination.
+  // The Ads tag rides along with the GA4 one rather than replacing it.
+  const tagIds = Array.from(
+    new Set(
+      [parseMeasurementId(site.analyticsId), parseAdsSendTo(site.adsConversionSendTo)?.tagId].filter(
+        (id): id is string => Boolean(id),
+      ),
+    ),
+  );
+  const measurementId = tagIds[0] ?? null;
   const year = new Date().getFullYear();
 
   return (
@@ -59,7 +65,7 @@ export function SiteShell({
             strategy="afterInteractive"
           />
           <Script id="site-analytics" strategy="afterInteractive">
-            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config',${JSON.stringify(measurementId)});`}
+            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());${tagIds.map((id) => `gtag('config',${JSON.stringify(id)});`).join("")}`}
           </Script>
         </>
       ) : null}

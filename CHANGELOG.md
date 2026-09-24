@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.3.0 - 2026-09-24
+
+### Google hears about the bookings its ads bring in
+
+The rental site loaded a Google tag and then told it nothing. A paid
+booking returned to the car page with `?checkout=success` and no way to
+know which booking, or what it was worth, so Google Ads could count
+clicks but never the bookings behind them — and a campaign that cannot
+see conversions cannot bid on them.
+
+Stripe now sends the visitor back with the Checkout session id. The
+page looks that session up before reporting anything, and reports
+only if Stripe says it was paid, for this car, on this operator's
+site. The URL is public and anyone can type an id into it, so the id is
+a key to look up, never a value to trust.
+
+A paid booking then sends a GA4 `purchase` when the site has a GA4
+property, and a Google Ads `conversion` when it has a conversion action
+— a new **Google Ads conversion** field in the site settings, in the
+`AW-…/label` form Ads gives you. Both carry the session id as
+`transaction_id`, which Google de-duplicates on, so a renter reloading
+the thank-you page is still one booking. An id that does not look like
+one is refused with a message rather than silently dropped.
+
+The value reported is the whole contract less the deposit and the tax:
+rent, insurance and the collection fee. A three-month rental paid
+monthly was still won by one click, and a bidder told that a $300
+deposit is revenue will pay for clicks that only bring deposits.
+Pressing pay also sends `begin_checkout`, valued the same way, so the
+drop-off between the two is visible.
+
+The site's home page now describes the business to search engines as
+an `AutoRental` — name, address, phone, price range across the fleet —
+for the local results a "car rental near me" search draws from. Car
+pages already described their car. Both now escape `<` inside the
+structured data, so a brand or model name can no longer close the
+script tag it sits in.
+
 ## v1.2.0 - 2026-09-24
 
 ### Deposits go back from the admin, and refunds come out of the right account

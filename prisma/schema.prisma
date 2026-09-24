@@ -1843,6 +1843,11 @@ model RentalSite {
   /// GA4 / Google Ads measurement id. Empty emits no tag at all rather
   /// than an empty one that still loads gtag and still sets cookies.
   analyticsId    String?
+  /// A Google Ads conversion action, `AW-<id>/<label>`, fired once per
+  /// paid booking. Separate from `analyticsId` because Ads will not
+  /// count a conversion without the label, and a GA4 property alone
+  /// only reaches Ads through an import the operator may not have set up.
+  adsConversionSendTo String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

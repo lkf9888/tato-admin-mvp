@@ -71,6 +71,8 @@ export default async function RentalSitePage({
         return copy.domainTakenError;
       case "no_bookable_vehicles":
         return copy.publishBlocked;
+      case "ads_conversion_invalid":
+        return copy.adsConversionInvalid;
       case "logo_too_large":
       case "logo_not_an_image":
         return copy.logoHint;
@@ -341,6 +343,20 @@ export default async function RentalSitePage({
             />
             <span className={HINT_CLASS}>{copy.analyticsIdHint}</span>
           </label>
+          <label className="mt-3 block max-w-md min-w-0">
+            <span className={LABEL_CLASS}>{copy.adsConversionLabel}</span>
+            <input
+              name="adsConversionSendTo"
+              defaultValue={site?.adsConversionSendTo ?? ""}
+              placeholder="AW-123456789/AbCdEfGh"
+              maxLength={80}
+              className={FIELD_CLASS}
+            />
+            <span className={HINT_CLASS}>{copy.adsConversionHint}</span>
+          </label>
+          <p className="mt-3 max-w-md text-[11px] leading-4 text-[color:var(--ink-soft)]">
+            {copy.trackingPurchaseNote}
+          </p>
         </section>
 
         <button

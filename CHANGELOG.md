@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.7.0 - 2026-09-25
+
+### Direct booking: the fleet list is a table, and fees have fleet defaults
+
+The per-car cards on /direct-booking are replaced by one table: a
+thumbnail (the car's first photo), plate and model, a listed switch,
+the daily rate, insurance, deposit, tax, photo count and the next
+booked dates. Search matches plate, model or Turo id (`/` focuses it);
+filters (live, not listed, manual price, AI price, no photos, differs
+from fleet, archived) show their counts; sorting covers plate, model,
+price and next booking. Filter, search and sort live in the URL, so a
+reload or a shared link keeps the view.
+
+Most edits no longer need a form. The listed switch and the daily rate
+save in the row (clearing the rate hands the car back to AI pricing).
+Selecting rows opens a bulk bar: list, unlist, back to AI pricing,
+fees follow the fleet, or set one field to one value across the
+selection. Everything else is in an edit drawer that sends only the
+fields that changed, so a bulk deposit change cannot wipe an insurance
+figure set by hand.
+
+Insurance per day, deposit, tax name and tax rate are now fleet
+defaults in the pricing rules, like the weekly discount and mileage
+already were. A car's own figure still wins; a blank one now means
+"follow the fleet" rather than "none". The table shows a car's own
+figure in bold with a dot and a fleet figure muted. Fleet defaults
+start at zero and no tax, so nothing a renter pays changes until they
+are set.
+
+Fixed: a car's resolved booking terms always used the default AI
+price multiplier (1.6) instead of the fleet's own setting.
+
 ## v1.6.3 - 2026-09-25
 
 ### The payouts page explains Stripe Connect errors instead of relaying them

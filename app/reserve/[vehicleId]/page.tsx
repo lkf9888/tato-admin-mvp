@@ -222,7 +222,7 @@ export default async function ReserveVehiclePage({
                     {reserveMessages.insuranceLabel}
                   </p>
                   <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
-                    {formatCurrency(vehicle.bookingInsuranceFee, locale)}
+                    {formatCurrency(policy.insuranceFee, locale)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
@@ -230,7 +230,7 @@ export default async function ReserveVehiclePage({
                     {reserveMessages.depositLabel}
                   </p>
                   <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
-                    {formatCurrency(vehicle.bookingDepositAmount, locale)}
+                    {formatCurrency(policy.depositAmount, locale)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
@@ -273,10 +273,10 @@ export default async function ReserveVehiclePage({
               locale={locale}
               vehicleId={vehicle.id}
               bookingDailyRate={dailyRate}
-              bookingInsuranceFee={vehicle.bookingInsuranceFee ?? 0}
-              bookingDepositAmount={vehicle.bookingDepositAmount ?? 0}
-              bookingTaxName={vehicle.bookingTaxName}
-              bookingTaxRate={vehicle.bookingTaxRate ?? 0}
+              bookingInsuranceFee={policy.insuranceFee}
+              bookingDepositAmount={policy.depositAmount}
+              bookingTaxName={policy.taxName}
+              bookingTaxRate={policy.taxRate}
             blockedDateWindows={blockedDateWindows}
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}

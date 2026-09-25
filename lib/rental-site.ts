@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 
 import { getDateOnlyBookingWindows, hasDateOnlyBookingConflict } from "@/lib/direct-booking";
 import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
+import { resolveBookingPolicy } from "@/lib/booking-policy";
 import { prisma } from "@/lib/prisma";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { getAppUrl } from "@/lib/stripe";
@@ -286,6 +287,9 @@ export async function getSiteFleet(input: {
     .sort((left, right) => (left.rate.dailyRate ?? 0) - (right.rate.dailyRate ?? 0))
     .map(({ vehicle, rate }) => {
     const blockedWindows = getDateOnlyBookingWindows(vehicle.orders);
+    // What this car is actually rented on: its own figures where it has
+    // them, the fleet's otherwise.
+    const terms = resolveBookingPolicy(policy, vehicle);
     const photo = vehicle.attachments.find((attachment) =>
       isImageAttachment(attachment.contentType, attachment.filename),
     );
@@ -299,8 +303,8 @@ export async function getSiteFleet(input: {
       year: vehicle.year,
       dailyRate: rate.dailyRate ?? 0,
       rateSource: rate.source ?? "suggested",
-      insuranceFee: vehicle.bookingInsuranceFee,
-      depositAmount: vehicle.bookingDepositAmount,
+      insuranceFee: terms.insuranceFee,
+      depositAmount: terms.depositAmount,
       intro: vehicle.bookingIntro,
       photoUrl: photo
         ? `/api/direct-booking/vehicles/${vehicle.id}/attachments/file?attachmentId=${photo.id}`

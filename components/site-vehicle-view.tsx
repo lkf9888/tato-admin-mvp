@@ -148,7 +148,7 @@ export function SiteVehicleView({
                   {copy.insuranceLabel}
                 </p>
                 <p className="mt-2 text-[1.6rem] font-bold tracking-[-0.02em] text-[var(--ink)]">
-                  {formatCurrency(vehicle.bookingInsuranceFee, locale)}
+                  {formatCurrency(policy.insuranceFee, locale)}
                 </p>
               </div>
               <div className="rounded-[18px] bg-[var(--brand-tint)] p-4">
@@ -156,7 +156,7 @@ export function SiteVehicleView({
                   {copy.depositLabel}
                 </p>
                 <p className="mt-2 text-[1.6rem] font-bold tracking-[-0.02em] text-[var(--ink)]">
-                  {formatCurrency(vehicle.bookingDepositAmount, locale)}
+                  {formatCurrency(policy.depositAmount, locale)}
                 </p>
               </div>
             </div>
@@ -191,10 +191,10 @@ export function SiteVehicleView({
             locale={locale}
             vehicleId={vehicle.id}
             bookingDailyRate={dailyRate}
-            bookingInsuranceFee={vehicle.bookingInsuranceFee ?? 0}
-            bookingDepositAmount={vehicle.bookingDepositAmount ?? 0}
-            bookingTaxName={vehicle.bookingTaxName}
-            bookingTaxRate={vehicle.bookingTaxRate ?? 0}
+            bookingInsuranceFee={policy.insuranceFee}
+            bookingDepositAmount={policy.depositAmount}
+            bookingTaxName={policy.taxName}
+            bookingTaxRate={policy.taxRate}
             blockedDateWindows={blockedDateWindows}
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}

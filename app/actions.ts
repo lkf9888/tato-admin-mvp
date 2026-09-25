@@ -1478,90 +1478,6 @@ export async function saveVehiclePurchasePriceAction(formData: FormData) {
   revalidateAdminPages();
 }
 
-export async function saveVehicleDirectBookingAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
-  const id = formData.get("id")?.toString().trim();
-  if (!id) return;
-
-  const directBookingEnabled = formData.get("directBookingEnabled")?.toString() === "on";
-  const rawDailyRate = cleanOptional(formData.get("bookingDailyRate"));
-  const rawInsuranceFee = cleanOptional(formData.get("bookingInsuranceFee"));
-  const rawDepositAmount = cleanOptional(formData.get("bookingDepositAmount"));
-  const bookingTaxName = cleanOptional(formData.get("bookingTaxName"));
-  const rawTaxRate = cleanOptional(formData.get("bookingTaxRate"));
-  const bookingIntro = cleanOptional(formData.get("bookingIntro"));
-  // Null is "follow the fleet", so an empty field has to clear the
-  // override rather than be left alone -- `cleanOptional` returns
-  // undefined for blank, which Prisma reads as "do not touch".
-  const overrideNumber = (name: string, parse: (raw: string) => number) => {
-    const raw = formData.get(name)?.toString().trim();
-    if (!raw) return null;
-    const value = parse(raw);
-    return Number.isFinite(value) ? value : null;
-  };
-  const bookingWeeklyDiscountPercent = overrideNumber("bookingWeeklyDiscountPercent", Number);
-  const bookingMinimumRentalDays = overrideNumber("bookingMinimumRentalDays", (raw) =>
-    Math.round(Number(raw)),
-  );
-  const bookingDailyKmAllowance = overrideNumber("bookingDailyKmAllowance", (raw) =>
-    Math.round(Number(raw)),
-  );
-  const bookingExtraKmRate = overrideNumber("bookingExtraKmRate", Number);
-
-  // Blank is no longer missing data: it is the operator handing
-  // pricing back to the income model.
-  const bookingDailyRate =
-    rawDailyRate == null ? null : z.coerce.number().nonnegative().parse(rawDailyRate);
-  const bookingInsuranceFee =
-    rawInsuranceFee == null ? null : z.coerce.number().nonnegative().parse(rawInsuranceFee);
-  const bookingDepositAmount =
-    rawDepositAmount == null ? null : z.coerce.number().nonnegative().parse(rawDepositAmount);
-  const bookingTaxRate =
-    rawTaxRate == null ? null : z.coerce.number().min(0).max(100).parse(rawTaxRate);
-
-  const existingVehicle = await prisma.vehicle.findFirst({
-    where: { id, workspaceId: workspace.id },
-  });
-  if (!existingVehicle) return;
-
-  const vehicle = await prisma.vehicle.update({
-    where: { id: existingVehicle.id },
-    data: {
-      directBookingEnabled,
-      bookingDailyRate,
-      bookingInsuranceFee,
-      bookingDepositAmount,
-      bookingTaxName,
-      bookingTaxRate: bookingTaxRate == null ? null : +bookingTaxRate.toFixed(3),
-      bookingIntro,
-      bookingWeeklyDiscountPercent,
-      bookingMinimumRentalDays,
-      bookingDailyKmAllowance,
-      bookingExtraKmRate,
-    },
-  });
-
-  await logActivity({
-    workspaceId: workspace.id,
-    actor: user.name,
-    action: "vehicle_direct_booking_updated",
-    entityType: "Vehicle",
-    entityId: vehicle.id,
-    metadata: {
-      plateNumber: vehicle.plateNumber,
-      directBookingEnabled,
-      bookingDailyRate,
-      bookingInsuranceFee,
-      bookingDepositAmount,
-      bookingTaxName,
-      bookingTaxRate,
-    },
-  });
-
-  revalidateAdminPages();
-  revalidatePath(`/reserve/${vehicle.id}`);
-}
-
 export async function deleteVehicleAction(formData: FormData) {
   const { workspace, user } = await requireCurrentAdminContext();
   const id = formData.get("id")?.toString();
@@ -2202,6 +2118,10 @@ export async function saveBookingPolicyAction(formData: FormData) {
     minimumRentalDays: read("minimumRentalDays", BOOKING_POLICY_DEFAULTS.minimumRentalDays),
     dailyKmAllowance: read("dailyKmAllowance", BOOKING_POLICY_DEFAULTS.dailyKmAllowance),
     extraKmRate: read("extraKmRate", BOOKING_POLICY_DEFAULTS.extraKmRate),
+    insuranceFee: read("insuranceFee", BOOKING_POLICY_DEFAULTS.insuranceFee),
+    depositAmount: read("depositAmount", BOOKING_POLICY_DEFAULTS.depositAmount),
+    taxName: formData.get("taxName")?.toString() ?? null,
+    taxRate: read("taxRate", BOOKING_POLICY_DEFAULTS.taxRate),
   });
 
   const saved = await prisma.bookingPricingPolicy.upsert({

@@ -260,9 +260,9 @@ export async function POST(request: Request) {
       seasonalRates,
       pickupLocationFee,
       returnLocationFee,
-      bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
-      bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
-      bookingTaxRate: vehicle.bookingTaxRate ?? 0,
+      bookingInsuranceFee: policy.insuranceFee,
+      bookingDepositAmount: policy.depositAmount,
+      bookingTaxRate: policy.taxRate,
       weeklyDiscountPercent: policy.weeklyDiscountPercent,
     });
 
@@ -291,9 +291,9 @@ export async function POST(request: Request) {
       seasonalRates,
       pickupLocationFee,
       returnLocationFee,
-      bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
-      bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
-      bookingTaxRate: vehicle.bookingTaxRate ?? 0,
+      bookingInsuranceFee: policy.insuranceFee,
+      bookingDepositAmount: policy.depositAmount,
+      bookingTaxRate: policy.taxRate,
       weeklyDiscountPercent: policy.weeklyDiscountPercent,
     });
     const firstPeriod = plan.instalments[0] ?? null;
@@ -375,7 +375,7 @@ export async function POST(request: Request) {
         renterPhone: parsed.renterPhone ?? "",
         // Insurance is part of the price whenever the car has a fee;
         // the webhook reads this to write the contract's insurance line.
-        includeInsurance: (vehicle.bookingInsuranceFee ?? 0) > 0 ? "true" : "false",
+        includeInsurance: policy.insuranceFee > 0 ? "true" : "false",
         bookedDays: String(quote.days),
         isInstalmentPlan: plan.isInstalmentPlan ? "true" : "false",
         instalmentCount: String(plan.instalments.length),
@@ -383,8 +383,8 @@ export async function POST(request: Request) {
         dueNow: String(plan.dueNow),
         dueLater: String(plan.dueLater),
         depositAmount: String(quote.depositAmount),
-        taxName: vehicle.bookingTaxName?.trim() || "",
-        taxRate: String(vehicle.bookingTaxRate ?? 0),
+        taxName: policy.taxName ?? "",
+        taxRate: String(policy.taxRate),
         taxAmount: String(quote.taxAmount),
         pickupLocation: describeBookingLocation(pickupLocation) ?? "",
         returnLocation: describeBookingLocation(returnLocation) ?? "",
@@ -410,13 +410,13 @@ export async function POST(request: Request) {
             },
           },
         },
-        ...((vehicle.bookingInsuranceFee ?? 0) > 0
+        ...(policy.insuranceFee > 0
           ? [
               {
                 quantity: chargedDays,
                 price_data: {
                   currency: "cad",
-                  unit_amount: Math.round((vehicle.bookingInsuranceFee ?? 0) * 100),
+                  unit_amount: Math.round(policy.insuranceFee * 100),
                   product_data: {
                     name: `${vehicle.nickname} insurance`,
                     description: "Daily protection fee",
@@ -433,7 +433,7 @@ export async function POST(request: Request) {
                   currency: "cad",
                   unit_amount: Math.round(chargedTax * 100),
                   product_data: {
-                    name: `${vehicle.bookingTaxName?.trim() || "Tax"} (${(vehicle.bookingTaxRate ?? 0).toFixed(3)}%)`,
+                    name: `${policy.taxName || "Tax"} (${Number(policy.taxRate.toFixed(3))}%)`,
                     description: "Tax on rental and insurance",
                   },
                 },

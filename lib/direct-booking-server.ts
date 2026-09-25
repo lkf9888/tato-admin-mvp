@@ -134,6 +134,7 @@ async function writeInstalmentSchedule(input: {
     bookingDailyRate: number | null;
     bookingInsuranceFee: number | null;
     bookingDepositAmount: number | null;
+    bookingTaxName: string | null;
     bookingTaxRate: number | null;
     bookingWeeklyDiscountPercent: number | null;
     bookingMinimumRentalDays: number | null;
@@ -167,9 +168,9 @@ async function writeInstalmentSchedule(input: {
     bookingDailyRate: rate.dailyRate ?? 0,
     dailyRateOverrides,
     seasonalRates,
-    bookingInsuranceFee: input.vehicle.bookingInsuranceFee ?? 0,
-    bookingDepositAmount: input.vehicle.bookingDepositAmount ?? 0,
-    bookingTaxRate: input.vehicle.bookingTaxRate ?? 0,
+    bookingInsuranceFee: policy.insuranceFee,
+    bookingDepositAmount: policy.depositAmount,
+    bookingTaxRate: policy.taxRate,
     // Split across the two legs only so the quote adds them back up;
     // the plan puts the whole thing on period one either way.
     pickupLocationFee: input.locationFeeAmount,
@@ -428,6 +429,9 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
   // its own failures for the same reason the confirmation does: the
   // booking is already paid for, and an unsent contract is something
   // to chase rather than a reason for Stripe to retry the webhook.
+  // The fleet's insurance rate unless this car overrides it -- the same
+  // resolution checkout priced the booking with.
+  const vehiclePolicy = await getBookingPolicyForVehicle(vehicle);
   await createRentalAgreementEnvelope({
     workspaceId: vehicle.workspaceId,
     orderId: order.id,
@@ -444,16 +448,16 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       depositAmount: order.depositAmount,
       insuranceAmount:
         metadata.includeInsurance === "true" && metadata.bookedDays
-          ? (vehicle.bookingInsuranceFee ?? 0) * Number(metadata.bookedDays)
+          ? vehiclePolicy.insuranceFee * Number(metadata.bookedDays)
           : null,
-      insuranceDailyRate: vehicle.bookingInsuranceFee ?? null,
+      insuranceDailyRate: vehiclePolicy.insuranceFee || null,
       insuranceDays: metadata.bookedDays ? Number(metadata.bookedDays) : null,
       // The card itself stays with Stripe. What the contract records
       // is that one is on file, which is what its payment clause
       // actually needs -- storing the number would be a PCI matter and
       // storing the CVV is prohibited outright.
       paymentMethodOnFile: describeStripePaymentMethod(session),
-      policy: await getBookingPolicyForVehicle(vehicle),
+      policy: vehiclePolicy,
     }),
     appUrl: getAppUrl(),
   });

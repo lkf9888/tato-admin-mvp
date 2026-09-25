@@ -22,6 +22,10 @@ type VehicleForPolicy = {
   bookingMinimumRentalDays: number | null;
   bookingDailyKmAllowance: number | null;
   bookingExtraKmRate: number | null;
+  bookingInsuranceFee: number | null;
+  bookingDepositAmount: number | null;
+  bookingTaxName: string | null;
+  bookingTaxRate: number | null;
 };
 
 /** The fleet policy, before any vehicle has its say. */

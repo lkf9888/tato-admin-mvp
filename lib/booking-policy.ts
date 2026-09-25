@@ -26,6 +26,13 @@ export type BookingPolicy = {
   minimumRentalDays: number;
   dailyKmAllowance: number;
   extraKmRate: number;
+  /** Per rented day. Charged on every booking when above zero. */
+  insuranceFee: number;
+  depositAmount: number;
+  /** Null prints as "Tax". */
+  taxName: string | null;
+  /** Percent, applied to rent only. */
+  taxRate: number;
 };
 
 export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
@@ -34,6 +41,13 @@ export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
   minimumRentalDays: 1,
   dailyKmAllowance: 100,
   extraKmRate: 0.12,
+  // Zero, not a guess: a fleet that never set these charges none of
+  // them, which is exactly what every car did before they were fleet
+  // settings.
+  insuranceFee: 0,
+  depositAmount: 0,
+  taxName: null,
+  taxRate: 0,
 };
 
 type NullablePolicy = {
@@ -42,13 +56,30 @@ type NullablePolicy = {
   minimumRentalDays?: number | null;
   dailyKmAllowance?: number | null;
   extraKmRate?: number | null;
+  insuranceFee?: number | null;
+  depositAmount?: number | null;
+  taxName?: string | null;
+  taxRate?: number | null;
 };
 
+/**
+ * A vehicle's own terms. Null follows the fleet; zero is an answer.
+ *
+ * The insurance, deposit and tax columns predate the fleet settings and
+ * used to mean "none" when empty. They now mean "whatever the fleet
+ * does", and a car that genuinely charges no insurance says 0 -- the
+ * fleet defaults start at zero, so nothing changes until an operator
+ * sets them.
+ */
 type VehicleOverrides = {
   bookingWeeklyDiscountPercent?: number | null;
   bookingMinimumRentalDays?: number | null;
   bookingDailyKmAllowance?: number | null;
   bookingExtraKmRate?: number | null;
+  bookingInsuranceFee?: number | null;
+  bookingDepositAmount?: number | null;
+  bookingTaxName?: string | null;
+  bookingTaxRate?: number | null;
 };
 
 /** Zero is a real answer (no discount, no included mileage); null is not. */
@@ -70,6 +101,14 @@ export function normalizeBookingPolicy(policy?: NullablePolicy | null): BookingP
       Math.round(pick(policy?.dailyKmAllowance, BOOKING_POLICY_DEFAULTS.dailyKmAllowance)),
     ),
     extraKmRate: Math.max(0, pick(policy?.extraKmRate, BOOKING_POLICY_DEFAULTS.extraKmRate)),
+    insuranceFee: roundCents(
+      Math.max(0, pick(policy?.insuranceFee, BOOKING_POLICY_DEFAULTS.insuranceFee)),
+    ),
+    depositAmount: roundCents(
+      Math.max(0, pick(policy?.depositAmount, BOOKING_POLICY_DEFAULTS.depositAmount)),
+    ),
+    taxName: policy?.taxName?.trim() || null,
+    taxRate: Math.min(100, Math.max(0, pick(policy?.taxRate, BOOKING_POLICY_DEFAULTS.taxRate))),
     // Clamped well clear of zero: a multiplier of 0 would suggest
     // every car be rented for nothing, and it is far likelier to be a
     // half-typed number than an intention.
@@ -94,6 +133,14 @@ export function resolveBookingPolicy(
     minimumRentalDays: pick(vehicle?.bookingMinimumRentalDays, fleet.minimumRentalDays),
     dailyKmAllowance: pick(vehicle?.bookingDailyKmAllowance, fleet.dailyKmAllowance),
     extraKmRate: pick(vehicle?.bookingExtraKmRate, fleet.extraKmRate),
+    insuranceFee: pick(vehicle?.bookingInsuranceFee, fleet.insuranceFee),
+    depositAmount: pick(vehicle?.bookingDepositAmount, fleet.depositAmount),
+    // The name follows the rate: a car that overrides the rate without
+    // naming it keeps the fleet's name, which is almost always right.
+    taxName: vehicle?.bookingTaxName?.trim() || fleet.taxName,
+    taxRate: pick(vehicle?.bookingTaxRate, fleet.taxRate),
+    // Not a per-car setting, so it is carried across untouched.
+    suggestedRateMultiplier: fleet.suggestedRateMultiplier,
   });
 }
 
@@ -118,6 +165,10 @@ export function getEffectiveDailyRate(
 
 export function isWeeklyRateApplied(days: number, weeklyDiscountPercent: number) {
   return days >= WEEKLY_DISCOUNT_MIN_DAYS && clampPercent(weeklyDiscountPercent) > 0;
+}
+
+function roundCents(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 function clampPercent(value: number) {

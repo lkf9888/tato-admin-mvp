@@ -1976,6 +1976,13 @@ model BookingPricingPolicy {
   /// 1.6 is the median ratio between this operator's own manual
   /// prices and the model's figure across their fleet.
   suggestedRateMultiplier Float @default(1.6)
+  /// Fleet defaults for what every booking carries. A vehicle's own
+  /// `booking*` column overrides one; null there follows these. Zero
+  /// by default, which is what every car charged before these existed.
+  insuranceFee            Float   @default(0)
+  depositAmount           Float   @default(0)
+  taxName                 String?
+  taxRate                 Float   @default(0)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

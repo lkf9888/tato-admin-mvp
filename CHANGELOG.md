@@ -20,6 +20,23 @@ Photographs used to be filed under one of eight corners and sides worked out fro
 - **The camera-roll read-back no longer raises false alarms.** Reading a just-created asset can return a file Photos is still importing, which hashes differently and looks exactly like a re-encode; the check now retries over a couple of seconds before saying the library altered anything.
 - **Permission strings are edited in `project.yml`.** `xcodegen generate` rewrites `Info.plist` from it, which had silently reverted an earlier wording change.
 
+## v1.5.1 - 2026-09-25
+
+### Insurance is part of the price, and tax is charged on rent only
+
+A car with an insurance fee can no longer be booked without it. The
+booking panel's "Include insurance coverage" checkbox is gone; in its
+place is a line saying insurance is included and at what daily rate.
+The server does not take the renter's word for it either — checkout
+no longer reads an `includeInsurance` field at all, so an edited form
+cannot drop the fee. A car with no insurance fee is unchanged.
+
+Tax is now computed on the rent alone — after the weekly discount —
+and no longer on insurance or collection fees. That is the operator's
+rule and the base their GST/PST filings use. Instalment plans follow
+the same rule period by period, so the periods still add up to the
+quote. The tax line also reads "12%" rather than "12.000%".
+
 ## v1.5.0 - 2026-09-25
 
 ### Import a car's photos from its Turo listing

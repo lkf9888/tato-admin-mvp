@@ -98,7 +98,6 @@ export function getDirectBookingQuote(input: {
   bookingInsuranceFee?: number | null;
   bookingDepositAmount?: number | null;
   bookingTaxRate?: number | null;
-  includeInsurance?: boolean;
   /** Off the rent once the booking reaches a week. */
   weeklyDiscountPercent?: number | null;
   /** `YYYY-MM-DD` → price, for days priced by hand. */
@@ -129,16 +128,19 @@ export function getDirectBookingQuote(input: {
   const listBaseAmount = roundMoney(schedule.reduce((sum, day) => sum + day.rate, 0));
   const baseAmount = roundMoney(listBaseAmount * discountFactor);
   const discountAmount = roundMoney(listBaseAmount - baseAmount);
-  const insuranceFeePerDay = input.includeInsurance ? input.bookingInsuranceFee ?? 0 : 0;
-  const insuranceAmount = days * insuranceFeePerDay;
-  // Delivery is a service the operator performs, so it is taxed with
-  // the rest of what they charge rather than sitting outside the base.
+  // Not an add-on. A car with an insurance fee is not rentable without
+  // it, so the fee is part of the price whenever it is set -- there is
+  // no flag a renter, or an edited form, can use to leave it off.
+  const insuranceFeePerDay = Math.max(0, input.bookingInsuranceFee ?? 0);
+  const insuranceAmount = roundMoney(days * insuranceFeePerDay);
   const locationFeeAmount = roundMoney(
     Math.max(0, input.pickupLocationFee ?? 0) + Math.max(0, input.returnLocationFee ?? 0),
   );
-  const taxableAmount = baseAmount + insuranceAmount + locationFeeAmount;
+  // Tax is charged on the rent only -- the operator's rule, and the one
+  // their GST/PST filings follow. Insurance, collection fees and the
+  // deposit sit outside the base.
   const taxRate = Math.max(0, input.bookingTaxRate ?? 0);
-  const taxAmount = Math.round(taxableAmount * (taxRate / 100) * 100) / 100;
+  const taxAmount = roundMoney(baseAmount * (taxRate / 100));
   const depositAmount = input.bookingDepositAmount ?? 0;
 
   return {
@@ -310,7 +312,6 @@ export function getDirectBookingInstalmentPlan(input: {
   bookingInsuranceFee?: number | null;
   bookingDepositAmount?: number | null;
   bookingTaxRate?: number | null;
-  includeInsurance?: boolean;
   weeklyDiscountPercent?: number | null;
   dailyRateOverrides?: Record<string, number> | null;
   seasonalRates?: Record<string, number> | null;
@@ -336,7 +337,7 @@ export function getDirectBookingInstalmentPlan(input: {
   // the same charge wearing a schedule.
   if (days <= INSTALMENT_PERIOD_DAYS) return single;
 
-  const insurancePerDay = input.includeInsurance ? input.bookingInsuranceFee ?? 0 : 0;
+  const insurancePerDay = Math.max(0, input.bookingInsuranceFee ?? 0);
   const taxRate = Math.max(0, input.bookingTaxRate ?? 0);
   const depositAmount = input.bookingDepositAmount ?? 0;
 
@@ -365,7 +366,8 @@ export function getDirectBookingInstalmentPlan(input: {
     // splitting a one-off across instalments would mean still owing
     // part of the airport drive in month three.
     const locationFee = index === 1 ? quote.locationFeeAmount : 0;
-    const taxAmount = roundMoney((rentAmount + insuranceAmount + locationFee) * (taxRate / 100));
+    // Rent only, as in the quote, so the periods still sum to it.
+    const taxAmount = roundMoney(rentAmount * (taxRate / 100));
     const deposit = index === 1 ? depositAmount : 0;
 
     instalments.push({

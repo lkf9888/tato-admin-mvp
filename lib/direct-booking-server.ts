@@ -142,7 +142,6 @@ async function writeInstalmentSchedule(input: {
   };
   pickupDate: string;
   returnDate: string;
-  includeInsurance: boolean;
   /** Charged once, with the first period. */
   locationFeeAmount: number;
   chargedAmount: number | null;
@@ -171,7 +170,6 @@ async function writeInstalmentSchedule(input: {
     bookingInsuranceFee: input.vehicle.bookingInsuranceFee ?? 0,
     bookingDepositAmount: input.vehicle.bookingDepositAmount ?? 0,
     bookingTaxRate: input.vehicle.bookingTaxRate ?? 0,
-    includeInsurance: input.includeInsurance,
     // Split across the two legs only so the quote adds them back up;
     // the plan puts the whole thing on period one either way.
     pickupLocationFee: input.locationFeeAmount,
@@ -406,7 +404,6 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       vehicle,
       pickupDate,
       returnDate,
-      includeInsurance: metadata.includeInsurance === "true",
       locationFeeAmount: metadata.locationFeeAmount ? Number(metadata.locationFeeAmount) : 0,
       chargedAmount,
     });

@@ -52,7 +52,6 @@ const checkoutSchema = z.object({
   renterName: z.string().trim().min(2),
   renterEmail: z.string().trim().email(),
   renterPhone: z.string().trim().max(50).optional().or(z.literal("")),
-  includeInsurance: z.boolean().optional().default(true),
   pickupLocationId: z.string().trim().max(60).optional(),
   returnLocationId: z.string().trim().max(60).optional(),
   agreementAccepted: z.boolean().refine(Boolean, "Rental agreement must be accepted."),
@@ -145,7 +144,6 @@ async function readCheckoutRequest(request: Request) {
     renterName: readFormString(formData, "renterName"),
     renterEmail: readFormString(formData, "renterEmail"),
     renterPhone: readFormString(formData, "renterPhone"),
-    includeInsurance: readFormBoolean(formData, "includeInsurance"),
     pickupLocationId: readFormString(formData, "pickupLocationId") || undefined,
     returnLocationId: readFormString(formData, "returnLocationId") || undefined,
     agreementAccepted: readFormBoolean(formData, "agreementAccepted"),
@@ -265,7 +263,6 @@ export async function POST(request: Request) {
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       bookingTaxRate: vehicle.bookingTaxRate ?? 0,
-      includeInsurance: parsed.includeInsurance,
       weeklyDiscountPercent: policy.weeklyDiscountPercent,
     });
 
@@ -297,7 +294,6 @@ export async function POST(request: Request) {
       bookingInsuranceFee: vehicle.bookingInsuranceFee ?? 0,
       bookingDepositAmount: vehicle.bookingDepositAmount ?? 0,
       bookingTaxRate: vehicle.bookingTaxRate ?? 0,
-      includeInsurance: parsed.includeInsurance,
       weeklyDiscountPercent: policy.weeklyDiscountPercent,
     });
     const firstPeriod = plan.instalments[0] ?? null;
@@ -377,7 +373,9 @@ export async function POST(request: Request) {
         renterName: parsed.renterName,
         renterEmail: parsed.renterEmail,
         renterPhone: parsed.renterPhone ?? "",
-        includeInsurance: parsed.includeInsurance ? "true" : "false",
+        // Insurance is part of the price whenever the car has a fee;
+        // the webhook reads this to write the contract's insurance line.
+        includeInsurance: (vehicle.bookingInsuranceFee ?? 0) > 0 ? "true" : "false",
         bookedDays: String(quote.days),
         isInstalmentPlan: plan.isInstalmentPlan ? "true" : "false",
         instalmentCount: String(plan.instalments.length),
@@ -412,7 +410,7 @@ export async function POST(request: Request) {
             },
           },
         },
-        ...(parsed.includeInsurance && (vehicle.bookingInsuranceFee ?? 0) > 0
+        ...((vehicle.bookingInsuranceFee ?? 0) > 0
           ? [
               {
                 quantity: chargedDays,

@@ -28,7 +28,6 @@ type StoredBookingState = {
   renterName: string;
   renterEmail: string;
   renterPhone: string;
-  includeInsurance: boolean;
   agreementAccepted: boolean;
 };
 
@@ -291,7 +290,6 @@ export function PublicBookingPanel({
   const [renterName, setRenterName] = useState("");
   const [renterEmail, setRenterEmail] = useState("");
   const [renterPhone, setRenterPhone] = useState("");
-  const [includeInsurance, setIncludeInsurance] = useState(bookingInsuranceFee > 0);
   const [licenseFront, setLicenseFront] = useState<File | null>(null);
   const [licenseBack, setLicenseBack] = useState<File | null>(null);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
@@ -333,7 +331,6 @@ export function PublicBookingPanel({
       setRenterName(parsed.renterName || "");
       setRenterEmail(parsed.renterEmail || "");
       setRenterPhone(parsed.renterPhone || "");
-      setIncludeInsurance(Boolean(parsed.includeInsurance));
       setAgreementAccepted(Boolean(parsed.agreementAccepted));
     } catch {
       window.sessionStorage.removeItem(storageKey);
@@ -367,14 +364,12 @@ export function PublicBookingPanel({
       renterName,
       renterEmail,
       renterPhone,
-      includeInsurance,
       agreementAccepted,
     };
 
     window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
   }, [
     agreementAccepted,
-    includeInsurance,
     pickupDate,
     renterEmail,
     renterName,
@@ -408,14 +403,12 @@ export function PublicBookingPanel({
         bookingInsuranceFee,
         bookingDepositAmount,
         bookingTaxRate,
-        includeInsurance,
       }),
     [
       bookingDailyRate,
       bookingDepositAmount,
       bookingInsuranceFee,
       bookingTaxRate,
-      includeInsurance,
       pickupDate,
       returnDate,
       weeklyDiscountPercent,
@@ -440,14 +433,12 @@ export function PublicBookingPanel({
         bookingInsuranceFee,
         bookingDepositAmount,
         bookingTaxRate,
-        includeInsurance,
       }),
     [
       bookingDailyRate,
       bookingDepositAmount,
       bookingInsuranceFee,
       bookingTaxRate,
-      includeInsurance,
       pickupDate,
       returnDate,
       weeklyDiscountPercent,
@@ -529,7 +520,6 @@ export function PublicBookingPanel({
       formData.set("renterName", renterName);
       formData.set("renterEmail", renterEmail);
       formData.set("renterPhone", renterPhone);
-      formData.set("includeInsurance", includeInsurance ? "true" : "false");
       formData.set("pickupLocationId", pickupLocationId);
       formData.set("returnLocationId", returnLocationId);
       formData.set("agreementAccepted", agreementAccepted ? "true" : "false");
@@ -679,20 +669,16 @@ export function PublicBookingPanel({
         <p className="mt-3 text-xs leading-5 text-[var(--ink-soft)]">{reserveMessages.licenseUploadHint}</p>
       </div>
 
-      <label className="mt-5 flex items-start gap-3 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-4">
-        <input
-          type="checkbox"
-          checked={includeInsurance}
-          onChange={(event) => setIncludeInsurance(event.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-[var(--line-strong)]"
-        />
-        <span className="block">
-          <span className="block text-sm font-medium text-[var(--ink)]">{reserveMessages.insuranceToggle}</span>
-          <span className="mt-1 block text-xs leading-5 text-[var(--ink-soft)]">
-            {reserveMessages.insuranceToggleHint}
-          </span>
-        </span>
-      </label>
+      {/* A statement, not a choice: the fee is part of every booking of
+          a car that has one, and the server charges it regardless. */}
+      {bookingInsuranceFee > 0 ? (
+        <div className="mt-5 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-4">
+          <p className="text-sm font-medium text-[var(--ink)]">{reserveMessages.insuranceToggle}</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">
+            {reserveMessages.insuranceToggleHint(formatCurrency(bookingInsuranceFee, locale))}
+          </p>
+        </div>
+      ) : null}
 
       {locations.length > 1 ? (
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -760,14 +746,16 @@ export function PublicBookingPanel({
               <span>-{formatCurrency(quote.discountAmount, locale)}</span>
             </div>
           ) : null}
-          <div className="flex items-center justify-between">
-            <span>{reserveMessages.quoteInsurance}</span>
-            <span>{includeInsurance ? formatCurrency(quote.insuranceAmount, locale) : "—"}</span>
-          </div>
+          {quote.insuranceAmount > 0 ? (
+            <div className="flex items-center justify-between">
+              <span>{reserveMessages.quoteInsurance}</span>
+              <span>{formatCurrency(quote.insuranceAmount, locale)}</span>
+            </div>
+          ) : null}
           {quote.taxAmount > 0 ? (
             <div className="flex items-center justify-between">
               <span>
-                {bookingTaxName?.trim() || reserveMessages.quoteTax} ({bookingTaxRate.toFixed(3)}%)
+                {bookingTaxName?.trim() || reserveMessages.quoteTax} ({Number(bookingTaxRate.toFixed(3))}%)
               </span>
               <span>{formatCurrency(quote.taxAmount, locale)}</span>
             </div>

@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.6.0 - 2026-09-25
+
+### Walkaround: the phone's own camera, and a shot list that guides instead of gating
+
+The inspection app gives up ARKit. ARKit and the iPhone's photo pipeline cannot hold the back camera at the same time — measured on a real car — and the app had been giving the camera to ARKit for a LiDAR model of the car's surface. It now takes the camera back: photographs come from the full photo pipeline again, the file is written by the camera (`writtenAtCapture`) rather than encoded by the app, and the 0.5× and 1× lenses and tap-to-focus return. Twelve megapixels by default; forty-eight is a setting, because it is roughly four times the file on the phone, the upload and the server's disk. No LiDAR is needed, so a non-Pro iPhone can run it.
+
+"Did they go round the car" is now answered roughly, by the gyroscope: each exterior photograph lights the slice of a 24-sector ring that the camera was facing, and the hint says which way to walk. The heading maths does not depend on which way round Core Motion's rotation matrix is meant — gravity, known in the device frame and straight down in the reference frame, picks the right reading — because the wrong reading does not flip left and right, it stops the heading moving at all.
+
+And the shot list guides rather than gates. Steps advance on their photo count alone; there is no "this photo has no car in it" any more; the finish button appears with the first photograph, and the finish page lists what the plan still wanted as a reminder rather than a condition. An app that is wrong and insistent is an app people stop opening, and on a real car the old one told somebody photographing the rear that the rear was missing.
+
+### Inspections accept an `exterior` region
+
+Photographs used to be filed under one of eight corners and sides worked out from the camera's pose. Without ARKit there is no pose, and the honest filing for a walk-around photograph is "outside, position unknown" — `exterior`, shown as 车外 / 車外 / Exterior on the review page. The server refuses a region it does not recognise, so this has to be deployed before the new app uploads anything; sessions from the ARKit builds keep their corner regions and stay readable side by side.
+
+### Also in the app
+
+- **A crash on the first photograph, fixed.** The camera-roll copy made in v0.89 ran PhotoKit's change blocks inside a `@MainActor` type; Swift 6 infers such a closure as main-actor-isolated, PhotoKit calls it on its own queue, and the runtime isolation check traps before the block runs — with no compiler warning, because PhotoKit is an Objective-C import. All PhotoKit callbacks now live outside any actor. The same latent crash was in the old finish-page exporter, which never ran in testing.
+- **The camera-roll read-back no longer raises false alarms.** Reading a just-created asset can return a file Photos is still importing, which hashes differently and looks exactly like a re-encode; the check now retries over a couple of seconds before saying the library altered anything.
+- **Permission strings are edited in `project.yml`.** `xcodegen generate` rewrites `Info.plist` from it, which had silently reverted an earlier wording change.
+
 ## v1.5.0 - 2026-09-25
 
 ### Import a car's photos from its Turo listing

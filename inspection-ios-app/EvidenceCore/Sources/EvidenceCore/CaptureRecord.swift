@@ -134,9 +134,20 @@ public struct SessionManifest: Sendable, Codable, Equatable {
     public var startedAt: Date
     public var timeZoneIdentifier: String
     public var records: [CaptureRecord]
-    /// Which parts of the car have been photographed well enough to count.
-    /// Persisted so a session survives the app being killed mid-walk.
+    /// Which parts of the car's surface were photographed, as the ARKit build
+    /// measured it.
+    ///
+    /// ⚠️ No longer written. Kept so that sessions archived by that build
+    /// still open, and because the surface model is the optional precision
+    /// layer this app may one day offer on LiDAR phones again — it is not
+    /// what anybody is measured against now. See `headingCoverage`.
     public var coverage: SurfaceCoverage
+    /// Which directions the camera faced while photographing the outside.
+    ///
+    /// Optional in storage only because manifests written before it existed
+    /// have no such key, and an archive that will not open is worse than one
+    /// that has forgotten something. Read it through `headings`.
+    public var headingCoverage: HeadingCoverage?
 
     public init(
         sessionID: String,
@@ -148,7 +159,8 @@ public struct SessionManifest: Sendable, Codable, Equatable {
         startedAt: Date,
         timeZoneIdentifier: String,
         records: [CaptureRecord] = [],
-        coverage: SurfaceCoverage = SurfaceCoverage()
+        coverage: SurfaceCoverage = SurfaceCoverage(),
+        headingCoverage: HeadingCoverage? = nil
     ) {
         self.sessionID = sessionID
         self.kind = kind
@@ -160,7 +172,11 @@ public struct SessionManifest: Sendable, Codable, Equatable {
         self.timeZoneIdentifier = timeZoneIdentifier
         self.records = records
         self.coverage = coverage
+        self.headingCoverage = headingCoverage
     }
+
+    /// The ring of directions, empty for a session that never had one.
+    public var headings: HeadingCoverage { headingCoverage ?? HeadingCoverage() }
 
     public var acceptedRecords: [CaptureRecord] { records.filter(\.accepted) }
 
@@ -180,18 +196,17 @@ public struct SessionManifest: Sendable, Codable, Equatable {
         }
     }
 
-    public func progress(
-        thinnestBearing: Double? = nil,
-        coverageIsMeasurable: Bool = true
-    ) -> ShootingProgress {
+    /// ⚠️ `heading` comes from outside, because it cannot come from here.
+    /// Which way to walk depends on which way the camera is pointing right
+    /// now, and a manifest is a record of what was shot, not a live sensor.
+    /// Passing nil is honest and simply leaves the walking hint out.
+    public func progress(heading: Double? = nil) -> ShootingProgress {
         ShootingProgress(
-            coverage: coverage.fraction,
+            coverage: headings.fraction,
             exteriorShots: exteriorShots,
             interiorShots: interiorShots,
-            roofCoverage: coverage.roofFraction,
             shotsByStep: shotsByStep,
-            coverageIsMeasurable: coverageIsMeasurable,
-            thinnestBearing: thinnestBearing
+            gapBearing: heading.flatMap { headings.gapBearing(from: $0) }
         )
     }
 

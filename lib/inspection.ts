@@ -32,14 +32,21 @@ export type OpenSessionInput = {
 };
 
 /**
- * Where on the car a photograph turned out to be pointing.
+ * Where on the car a photograph was taken.
  *
- * Mirrors the app's `CarRegion`. Worked out on the device from the camera's
- * pose after the shutter, never chosen beforehand -- there is no shot list.
+ * Mirrors the app's `CarRegion`. The eight corners and sides were worked out
+ * from the camera's pose by the ARKit builds of the app; builds since then
+ * file each photograph by the step of the shot list it was taken for, and
+ * most of the outside of the car is honestly `exterior` -- "outside, position
+ * unknown". Sessions from both builds sit side by side here, so every value
+ * stays accepted.
+ *
+ * ⚠️ A value the app sends that is missing from this list gets the whole
+ * photograph refused on upload. Add here first, deploy, then ship the app.
  */
 export const CAR_REGIONS = [
   "front", "frontRight", "right", "rearRight", "rear",
-  "rearLeft", "left", "frontLeft", "roof", "interior",
+  "rearLeft", "left", "frontLeft", "roof", "interior", "exterior",
 ] as const;
 export type CarRegion = (typeof CAR_REGIONS)[number];
 

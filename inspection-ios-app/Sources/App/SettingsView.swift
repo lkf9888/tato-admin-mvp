@@ -6,8 +6,7 @@ import SwiftUI
 /// still be able to do the whole job.
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    let coverage: CoverageTracker
-    let lastStillSize: String?
+    let model: CaptureSessionModel
 
     var body: some View {
         List {
@@ -16,16 +15,32 @@ struct SettingsView: View {
             // used to confirm there is none -- silence would be
             // indistinguishable from a check that was never wired up.
             Section {
-                LabeledContent("状态", value: coverage.status)
-                LabeledContent("画面格式", value: coverage.videoFormatSummary)
-                LabeledContent("上一张照片", value: lastStillSize ?? "还没拍")
+                LabeledContent("镜头", value: model.lens == .ultraWide ? "0.5×" : "1×")
+                LabeledContent("上一张照片", value: model.lastStillSize ?? "还没拍")
+                if model.offersHighResolution {
+                    Toggle("4800 万像素", isOn: Binding(
+                        get: { model.resolution == .high },
+                        set: { high in Task { await model.setResolution(high ? .high : .standard) } }
+                    ))
+                }
+                LabeledContent("相册", value: model.library.summary)
             } header: {
                 Text("相机")
             } footer: {
-                Text("照片和车形图都出自同一个 ARKit 会话 —— 它们抢不起来，因为只有一个。"
-                     + "「画面格式」决定了照片的分辨率：写着「支持高分辨率取帧」时照片比画面大，"
-                     + "没写就是画面多大照片多大。这里持续写「停了」才需要管，"
-                     + "那时照片照拍不误，只是完整度要靠张数判断。")
+                Text("默认 1200 万像素，已经足够看清划痕。4800 万像素的文件大约是它的四倍，"
+                     + "每张处理更慢，暗处噪点更多 —— 光线好、需要放大细节时再开。"
+                     + "只影响主摄；0.5× 在大多数手机上本来就是 1200 万。")
+            }
+
+            Section {
+                LabeledContent("方向传感器", value: headingStatus)
+                LabeledContent("绕车角度", value: "\(Int(model.headings.fraction * 100))%")
+            } header: {
+                Text("绕车")
+            } footer: {
+                Text("靠陀螺仪记录每张照片是朝哪个方向拍的，只用来提示「往哪边走还没拍」，"
+                     + "不会拦下任何一张照片，也不会拦着你交单。"
+                     + "它看不见车本身，所以原地转一圈也会被当成绕了一圈 —— 这是有意的取舍。")
             }
 
             Section {
@@ -45,5 +60,11 @@ struct SettingsView: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } }
         }
+    }
+
+    private var headingStatus: String {
+        guard model.steadiness.canTellHeading else { return "这台手机没有" }
+        guard let heading = model.steadiness.heading else { return "还没读到" }
+        return "正常 · 朝 \(Int(heading.rounded()))°"
     }
 }

@@ -1,9 +1,12 @@
 import Foundation
 
-/// What a session still needs before it can be handed in.
+/// What stops a session being handed in at all.
+///
+/// ⚠️ One thing, and it is not the plan. A session with no photographs in it
+/// is not a session; a session short of the plan is a session with gaps,
+/// and the gaps are reported as warnings. This app guides; it does not hold
+/// anybody's work hostage to a checklist.
 public enum SessionBlocker: Sendable, Equatable, Hashable {
-    /// The car is not covered yet, or the photograph count is below the floor
-    /// a claim needs. Carries the one sentence to put on screen.
     case keepShooting(instruction: String)
 }
 
@@ -17,9 +20,12 @@ public enum SessionBlocker: Sendable, Equatable, Hashable {
 public enum SessionWarning: Sendable, Equatable, Hashable {
     case missingLocation(count: Int)
     case qualityOverridden(count: Int)
-    /// Covered enough to hand in, but not everywhere. Worth seeing before
-    /// walking off, since one more minute closes the gap.
+    /// Not photographed from every direction. Worth seeing before walking
+    /// off, since one more minute closes the gap.
     case partialCoverage(fraction: Double, thinnest: CarRegion?)
+    /// Steps of the plan still short of photographs. A reminder of what a
+    /// claim will want, never a condition.
+    case planIncomplete([Requirement])
 }
 
 public struct SessionReadiness: Sendable, Equatable {
@@ -37,8 +43,11 @@ public extension SessionManifest {
         var blockers: [SessionBlocker] = []
         var warnings: [SessionWarning] = []
 
-        if !progress.canFinish {
-            blockers.append(.keepShooting(instruction: progress.instruction))
+        if !progress.canHandIn {
+            blockers.append(.keepShooting(instruction: "还没有拍照片"))
+        }
+        if !progress.outstanding.isEmpty {
+            warnings.append(.planIncomplete(progress.outstanding))
         }
 
         let missing = recordsMissingEvidence.count
@@ -47,13 +56,11 @@ public extension SessionManifest {
         let overridden = recordsQualityOverridden.count
         if overridden > 0 { warnings.append(.qualityOverridden(count: overridden)) }
 
-        // Only worth saying once the session could actually be handed in;
-        // before that it is just the instruction, said twice.
-        if progress.canFinish && coverage.fraction < 0.999 {
-            warnings.append(.partialCoverage(
-                fraction: coverage.fraction,
-                thinnest: coverage.thinnestRegion()
-            ))
+        // Only when there is a ring to speak of. A phone with no motion
+        // sensor, or a session of nothing but interior photographs, has no
+        // headings at all, and "0% of directions" would be a false alarm.
+        if progress.canHandIn, !headings.isEmpty, headings.fraction < 0.999 {
+            warnings.append(.partialCoverage(fraction: headings.fraction, thinnest: nil))
         }
 
         return SessionReadiness(blockers: blockers, warnings: warnings)

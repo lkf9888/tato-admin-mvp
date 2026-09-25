@@ -36,44 +36,53 @@ private func makeRecord(
 
 /// A session that has filled every step of the plan.
 ///
-/// ⚠️ Built from `ShotStep` rather than from a hand-written count, so a step
-/// added to the plan shows up here as a session that no longer finishes,
-/// which is the truth. The coverage is filled in separately: only the
-/// walk-around is graded against it, and only the three side bands count
-/// towards the percentage — see `SurfaceCoverage.total`.
-private func finishedSession(coverageFraction: Double = 1.0) -> SessionManifest {
-    var coverage = SurfaceCoverage()
-    var patches = Set<CoveragePatch>()
-    let sideBands: [SurfaceBand] = [.sill, .body, .glass]
-    let wanted = Int(Double(SurfaceCoverage.total) * coverageFraction)
-    outer: for sector in 0..<SurfaceCoverage.sectorCount {
-        for band in sideBands {
-            if patches.count >= wanted { break outer }
-            patches.insert(CoveragePatch(sector: sector, band: band))
-        }
+/// Built from `ShotStep` rather than from a hand-written count, so a step
+/// added to the plan shows up here as a gap, which is the truth. The ring of
+/// directions is filled in separately, to whatever share the test asks for.
+private func finishedSession(ringFraction: Double = 1.0) -> SessionManifest {
+    var ring = HeadingCoverage()
+    let wanted = Int((Double(HeadingCoverage.sectorCount) * ringFraction).rounded())
+    for sector in 0..<wanted {
+        ring.record(heading: HeadingCoverage.centre(ofSector: sector), spreadDegrees: 0)
     }
-    coverage.add(patches)
 
     var records: [CaptureRecord] = []
     for step in ShotStep.allCases {
         for _ in 0..<step.required {
-            var record = makeRecord(records.count + 1, region: step.region ?? .front)
+            var record = makeRecord(records.count + 1, region: step.region)
             record.step = step
             records.append(record)
         }
     }
-    return makeManifest(records, coverage: coverage)
+    var manifest = makeManifest(records)
+    manifest.headingCoverage = ring
+    return manifest
 }
 
 final class SessionReadinessTests: XCTestCase {
 
-    func testAFreshSessionJustSaysKeepShooting() {
-        let readiness = makeManifest([makeRecord(1)]).readiness()
-        XCTAssertFalse(readiness.canFinish)
-        XCTAssertEqual(readiness.blockers.count, 1)
+    /// ⚠️ One photograph is something to hand in. The gaps are listed, not
+    /// enforced — this app guides, it does not hold anybody's work hostage
+    /// to a checklist.
+    func testOnePhotographCanBeHandedInWithItsGapsListed() {
+        var record = makeRecord(1, region: .exterior)
+        record.step = .walkAround
+        let readiness = makeManifest([record]).readiness()
+        XCTAssertTrue(readiness.canFinish)
+        XCTAssertTrue(readiness.warnings.contains { warning in
+            if case .planIncomplete(let missing) = warning {
+                return missing.first == Requirement(step: .walkAround, shortBy: 19)
+            }
+            return false
+        })
     }
 
-    func testACoveredSessionPastTheFloorsCanFinish() {
+    /// The only thing that stops a hand-in: there being nothing to hand in.
+    func testAnEmptySessionIsTheOnlyOneThatCannotBeHandedIn() {
+        XCTAssertFalse(makeManifest([]).readiness().canFinish)
+    }
+
+    func testAFullPlanAndAFullRingHaveNothingToSay() {
         let readiness = finishedSession().readiness()
         XCTAssertTrue(readiness.canFinish)
         XCTAssertTrue(readiness.warnings.isEmpty)
@@ -83,9 +92,6 @@ final class SessionReadinessTests: XCTestCase {
     /// somebody walking off without knowing.
     func testTheThingsThatWarnRatherThanBlock() {
         var manifest = finishedSession()
-        // ⚠️ Mutated in place rather than replaced. A fresh record carries no
-        // step, and a session missing two walk-around photographs is a
-        // session that cannot finish — which is not what this test is about.
         manifest.records[0].evidence = EvidenceCheck(gaps: [.noLocation])
         manifest.records[1].acceptedDespite = [.blurry]
 
@@ -96,10 +102,9 @@ final class SessionReadinessTests: XCTestCase {
         XCTAssertTrue(readiness.warnings.contains(.qualityOverridden(count: 1)))
     }
 
-    /// Finishable at 90% still means a tenth of the car was never
-    /// photographed, and the summary has to say so.
-    func testPartialCoverageIsSaidOutLoudEvenWhenItPasses() {
-        let readiness = finishedSession(coverageFraction: 0.93).readiness()
+    /// A ring with a gap in it is worth a line on the finish page.
+    func testAGapInTheRingIsSaidOutLoud() {
+        let readiness = finishedSession(ringFraction: 0.75).readiness()
         XCTAssertTrue(readiness.canFinish)
         XCTAssertTrue(readiness.warnings.contains { warning in
             if case .partialCoverage = warning { return true }
@@ -107,7 +112,17 @@ final class SessionReadinessTests: XCTestCase {
         })
     }
 
-    func testRejectedPhotographsDoNotCountTowardsTheFloors() {
+    /// A phone with no motion sensor has no ring at all, and "0% of
+    /// directions" would be a false alarm about a walk-around that happened.
+    func testNoRingAtAllIsNotReportedAsAnEmptyOne() {
+        let readiness = finishedSession(ringFraction: 0).readiness()
+        XCTAssertFalse(readiness.warnings.contains { warning in
+            if case .partialCoverage = warning { return true }
+            return false
+        })
+    }
+
+    func testRejectedPhotographsDoNotCountTowardsThePlan() {
         var manifest = finishedSession()
         manifest.records = manifest.records.map { record in
             var copy = record
@@ -115,7 +130,14 @@ final class SessionReadinessTests: XCTestCase {
             return copy
         }
         XCTAssertEqual(manifest.interiorShots, 0)
-        XCTAssertFalse(manifest.readiness().canFinish)
+        let readiness = manifest.readiness()
+        XCTAssertTrue(readiness.canFinish)
+        XCTAssertTrue(readiness.warnings.contains { warning in
+            if case .planIncomplete(let missing) = warning {
+                return missing.allSatisfy(\.step.isInterior) && !missing.isEmpty
+            }
+            return false
+        })
     }
 }
 
@@ -173,15 +195,26 @@ final class ExportManifestTests: XCTestCase {
     /// that lists them: the first thing an opponent does is look for what was
     /// left out.
     func testStatesTheWeakPointsInsteadOfBuryingThem() {
-        var manifest = finishedSession(coverageFraction: 0.93)
+        var manifest = finishedSession(ringFraction: 0.75)
         manifest.records[0].evidence = EvidenceCheck(gaps: [.noLocation])
         manifest.records[0].acceptedDespite = [.blurry]
         manifest.records[0].quality.issues = [.blurry]
+        manifest.records.removeAll { $0.step == .wheels }
         let text = ExportManifest.plainText(for: manifest)
 
         XCTAssertTrue(text.contains("no geolocation recorded"))
         XCTAssertTrue(text.contains("accepted despite: blurry"))
-        XCTAssertTrue(text.contains("Least-covered area:"))
+        XCTAssertTrue(text.contains("75% of the directions around the vehicle"), text)
+        XCTAssertTrue(text.contains("The guided shot list was not completed"), text)
+        XCTAssertTrue(text.contains("wheels: 4 more"), text)
+    }
+
+    /// ⚠️ The ring is a motion-sensor figure, and the document an adjuster
+    /// reads must not let it pass for a measurement of the car's surface.
+    func testDoesNotDressTheRingUpAsSurfaceCoverage() {
+        let text = ExportManifest.plainText(for: finishedSession())
+        XCTAssertFalse(text.contains("of the vehicle's surface"), text)
+        XCTAssertFalse(text.contains("Least-covered area"), text)
     }
 
     /// The audience is an adjuster or a lawyer, who will not read Chinese and
@@ -189,7 +222,7 @@ final class ExportManifestTests: XCTestCase {
     func testIsInEnglishAndVerifiableWithStandardTools() {
         let text = ExportManifest.plainText(for: finishedSession())
         XCTAssertTrue(text.contains("SHA-256"))
-        XCTAssertTrue(text.contains("\(String(repeating: "a", count: 64))  001-front.jpg"))
+        XCTAssertTrue(text.contains("\(String(repeating: "a", count: 64))  001-exterior.jpg"))
     }
 }
 

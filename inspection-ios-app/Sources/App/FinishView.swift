@@ -57,8 +57,8 @@ struct FinishView: View {
                 Section("这一单") {
                     LabelledRow("照片", "\(model.progress.totalShots) 张")
                     LabelledRow("外观 / 车内", "\(model.progress.exteriorShots) / \(model.progress.interiorShots)")
-                    if model.coverage.canMeasure {
-                        LabelledRow("覆盖", "\(Int(model.progress.coverage * 100))%")
+                    if !model.headings.isEmpty {
+                        LabelledRow("绕车角度", "\(Int(model.progress.coverage * 100))%")
                     }
                     // ⚠️ The mirror's own counter, not the manifest's. The
                     // manifest lags by however many saves are still in
@@ -191,7 +191,9 @@ private struct WarningRow: View {
         switch warning {
         case .missingLocation(let count): return "\(count) 张没有位置信息"
         case .qualityOverridden(let count): return "\(count) 张是手动放行的"
-        case .partialCoverage(let fraction, _): return "车身覆盖 \(Int(fraction * 100))%"
+        case .partialCoverage(let fraction, _): return "绕车角度 \(Int(fraction * 100))%"
+        case .planIncomplete(let missing):
+            return "还有 \(missing.count) 步没拍满"
         }
     }
 
@@ -201,9 +203,13 @@ private struct WarningRow: View {
             return "Turo 会把缺位置的照片判为无效。车停在地下车库的话，开到室外把这几张补拍一遍。"
         case .qualityOverridden:
             return "清晰度没过但被放行了。谁放的行记在案里，有条件的话重拍。"
-        case .partialCoverage(_, let thinnest):
-            let where_ = thinnest.map { "，\($0.titleZH)最少" } ?? ""
-            return "还有一部分车身没拍到\(where_)。多拍几张，理赔时说服力更强。"
+        case .partialCoverage:
+            return "有些方向还没拍到。多拍几张，理赔时说服力更强。"
+        case .planIncomplete(let missing):
+            // Named, so somebody can decide in a glance whether any of it
+            // matters for this car. It does not stop the hand-in.
+            let names = missing.map { "\($0.step.titleZH)差 \($0.shortBy) 张" }
+            return names.joined(separator: "、") + "。不拍也能交单，补上的话理赔更稳。"
         }
     }
 }

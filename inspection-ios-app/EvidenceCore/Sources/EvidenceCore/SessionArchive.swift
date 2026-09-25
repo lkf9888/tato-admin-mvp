@@ -128,6 +128,19 @@ public actor SessionArchive {
         try persist()
     }
 
+    /// Records which directions the walk-around has been photographed from.
+    ///
+    /// Persisted on every shot, so a session survives the app being killed
+    /// mid-walk. The headings are measured against a reference the motion
+    /// sensor picks when it starts, so a *new* reference after a relaunch is
+    /// not aligned with the old one -- the ring may then show a slice as
+    /// fresh that was already done. That errs towards one photograph too
+    /// many, which is the right way for a guide to be wrong.
+    public func updateHeadingCoverage(_ coverage: HeadingCoverage) throws {
+        manifest.headingCoverage = coverage
+        try persist()
+    }
+
     /// Records what the car's surface coverage looks like now.
     ///
     /// Persisted on every shot so a session survives the app being killed

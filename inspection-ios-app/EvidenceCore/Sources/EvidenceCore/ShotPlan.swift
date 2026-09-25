@@ -108,37 +108,32 @@ public enum ShotStep: String, Sendable, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Where these photographs are filed, when the step knows better than the
-    /// camera pose does. Nil means the pose decides — which is what keeps the
-    /// coverage arithmetic fed while the exterior steps are running.
-    public var region: CarRegion? {
+    /// Where these photographs are filed.
+    ///
+    /// ⚠️ From the step, never from a camera pose — there is no pose any
+    /// more. The old answer came from ARKit working out which corner of the
+    /// car each photograph faced; without it the honest answer for most of
+    /// the outside of the car is "outside, somewhere", and `.exterior` says
+    /// exactly that. Filing forty photographs as `.front` would have put
+    /// every one of them under 车头 on the review page.
+    ///
+    /// Two steps know better than that: the windscreen is at the front of
+    /// every car, and the roof is the roof.
+    public var region: CarRegion {
         if isInterior { return .interior }
-        // ⚠️ Roof photographs are taken from the ground with the phone held
-        // overhead, so the pose puts the camera at chest height beside the
-        // car and files them as a flank. The subject is declared; believe it.
-        return self == .roof ? .roof : nil
+        switch self {
+        case .roof: return .roof
+        case .windscreen: return .front
+        default: return .exterior
+        }
     }
 
-    /// Whether the coverage arithmetic has a say in whether this step is
-    /// done.
+    /// Whether photographs in this step add to the ring of directions.
     ///
-    /// Only the walk-around. A count of twenty says somebody pressed the
-    /// shutter twenty times; coverage says they went round. Every other step
-    /// is a declared subject and the count is the whole of it — which is the
-    /// point, because those are exactly the subjects the geometry gets wrong.
-    public var isGradedByCoverage: Bool { self == .walkAround }
-
-    /// Whether a photograph in this step has to have the car in it.
-    ///
-    /// ⚠️ Only the walk-around, and this is a fix rather than an oversight.
-    /// The frame check exists to stop a photograph of a garage floor counting
-    /// towards the exterior floor, and it works by asking what share of the
-    /// screen the scanned car points fill. A wheel close-up fills the frame
-    /// with one arch, a dashboard is shot from inside the point cloud, and a
-    /// roof is shot from underneath it — the share is meaningless in all
-    /// three. Applying it there rejected exactly the photographs somebody had
-    /// just been told to take.
-    public var needsTheCarInFrame: Bool { self == .walkAround }
+    /// Every exterior step: somebody photographing a wheel is still standing
+    /// on one side of the car, and the ring is only ever a rough answer to
+    /// "have they been round it".
+    public var creditsTheRing: Bool { !isInterior }
 
     /// For the strip under the viewfinder. The overlay draws the real thing.
     public var symbolName: String {

@@ -19,8 +19,9 @@ struct CaptureView: View {
     @State private var model = CaptureSessionModel()
     @State private var showingFinish = false
     @State private var showingSettings = false
-    @State private var showingCoverage = false
     @State private var noticeGeneration = 0
+    @State private var focusPoint: CGPoint?
+    @State private var focusGeneration = 0
     @State private var shutterBlink = false
 
     /// The viewfinder's shape, and the file's. `.photo` gives 4:3, so a frame
@@ -36,6 +37,7 @@ struct CaptureView: View {
             VStack(spacing: 0) {
                 topBar
                 viewfinder
+                lensRow
                 stepStrip
                 Spacer(minLength: 0)
                 shutterRow
@@ -60,12 +62,9 @@ struct CaptureView: View {
         .sheet(isPresented: $showingFinish) {
             FinishView(model: model)
         }
-        .sheet(isPresented: $showingCoverage) {
-            CoverageSheet(coverage: model.coverage.coverage)
-        }
         .sheet(isPresented: $showingSettings) {
             NavigationStack {
-                SettingsView(coverage: model.coverage, lastStillSize: model.lastStillSize)
+                SettingsView(model: model)
             }
         }
         .alert(
@@ -100,7 +99,7 @@ struct CaptureView: View {
 
             HStack(spacing: 6) {
                 Text("\(model.progress.totalShots) 张")
-                if model.coverage.canMeasure && model.coverage.hasFrame {
+                if !model.headings.isEmpty {
                     Text("·")
                     Text("\(Int(model.progress.coverage * 100))%")
                 }
@@ -124,10 +123,14 @@ struct CaptureView: View {
     // MARK: - The frame itself
 
     private var viewfinder: some View {
-        CameraPreview(session: model.coverage.session)
+        CameraPreview(
+            session: model.camera.session,
+            onFocusTap: { device, view in focus(devicePoint: device, viewPoint: view) }
+        )
             .aspectRatio(frameAspect, contentMode: .fit)
             .frame(maxWidth: .infinity)
             .clipped()
+            .overlay { focusSquare }
             .overlay { stepGuide }
             .overlay(alignment: .topLeading) { diagram }
             .overlay(alignment: .bottom) { hud }
@@ -162,17 +165,30 @@ struct CaptureView: View {
         }
     }
 
-    /// Tappable, because at this size it can only point a direction. The
-    /// question "which panel exactly" needs a model you can turn over.
+    /// Which ways round the car have been photographed from, turned so that
+    /// wherever the photographer stands is at the bottom.
+    ///
+    /// ⚠️ Not a car. The drawing it replaced was a car seen from above, and
+    /// it could be — ARKit knew where the car was. The gyroscope does not; it
+    /// knows only which way the camera pointed. A car drawn in the middle of
+    /// this ring would claim a front and a back the app cannot see, and the
+    /// last time it claimed that it sent somebody to the boot to photograph
+    /// the boot.
     @ViewBuilder private var diagram: some View {
-        if model.coverage.canMeasure {
-            Button { showingCoverage = true } label: {
-                CoverageDiagram(coverage: model.coverage.coverage, isLive: model.coverage.hasFrame)
-                    .frame(width: 54, height: 86)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(12)
+        if model.steadiness.canTellHeading, !model.headings.isEmpty {
+            HeadingRing(coverage: model.headings, heading: model.steadiness.heading)
+                .frame(width: 62, height: 62)
+                .padding(12)
+                .allowsHitTesting(false)
+        }
+    }
+
+    @ViewBuilder private var focusSquare: some View {
+        if let focusPoint {
+            FocusSquare()
+                .position(focusPoint)
+                .id(focusGeneration)
+                .allowsHitTesting(false)
         }
     }
 
@@ -186,9 +202,6 @@ struct CaptureView: View {
             if !model.steadiness.isSteady {
                 Chip(icon: "hand.raised.fill", text: "手机在晃，稳一下再拍")
             }
-            if let trouble = model.coverage.trouble {
-                Chip(icon: "cube.transparent", text: trouble)
-            }
             // The shutter greys out for exactly two reasons, and shake is
             // the only one that announced itself. A capture that never
             // finishes would otherwise leave a dead button and no
@@ -198,9 +211,6 @@ struct CaptureView: View {
             // and it looks exactly like one that did.
             if let trouble = model.library.trouble {
                 Chip(icon: "photo.badge.exclamationmark", text: trouble)
-            }
-            if model.missedTheCar {
-                Chip(icon: "questionmark.circle.fill", text: "这张里看不到车 —— 不计数，退开一点重拍")
             }
             if model.isCapturing {
                 Chip(icon: "hourglass", text: "正在保存这一张…")
@@ -227,15 +237,45 @@ struct CaptureView: View {
         .animation(.easeOut(duration: 0.25), value: model.currentStep)
     }
 
+    /// The iPhone's zoom pill, with the two lenses this app uses.
+    ///
+    /// There is no pinch-to-zoom and no 2×: digital zoom is a crop of the
+    /// same sensor, so it throws away the pixels a claim assessor would use to
+    /// see the scratch. Two real lenses, nothing in between. Absent on a phone
+    /// with only one.
+    @ViewBuilder private var lensRow: some View {
+        if model.lenses.count > 1 {
+            HStack(spacing: 4) {
+                ForEach(model.lenses) { lens in
+                    let selected = lens == model.lens
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        Task { await model.select(lens: lens) }
+                    } label: {
+                        Text(lens.label(selected: selected))
+                            .font(.system(size: selected ? 14 : 12, weight: .semibold))
+                            .foregroundStyle(selected ? Color.yellow : .white)
+                            .frame(width: selected ? 40 : 34, height: selected ? 40 : 34)
+                            .background(Circle().fill(.black.opacity(selected ? 0.5 : 0)))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(4)
+            .background(Capsule().fill(.white.opacity(0.12)))
+            .animation(.easeOut(duration: 0.15), value: model.lens)
+            .padding(.top, 10)
+        }
+    }
+
     /// Where the plan has got to, and the way to move along it by hand.
     ///
-    /// ⚠️ The arrows are not a way to skip. Every step still has to be filled
-    /// before the finish button appears — they exist because the order in
-    /// `ShotStep` is a good default and not a law: somebody already standing
-    /// at the back of the car should do the rear wheels now rather than walk
-    /// round twice, and a roof in the rain is a step to come back to. A
-    /// guided app that refuses that gets closed in favour of the camera app,
-    /// and then there is no evidence at all.
+    /// The order in `ShotStep` is a good default and not a law: somebody
+    /// already standing at the back of the car should do the rear wheels now
+    /// rather than walk round twice, and a roof in the rain is a step to come
+    /// back to — or to leave. A step left short is listed on the finish page;
+    /// nothing is refused for it. A guided app that insists gets closed in
+    /// favour of the camera app, and then there is no evidence at all.
     @ViewBuilder private var stepStrip: some View {
         if let step = model.currentStep, let index = ShotStep.allCases.firstIndex(of: step) {
             HStack(spacing: 16) {
@@ -285,8 +325,8 @@ struct CaptureView: View {
     ///
     /// ⚠️ It used to be an `HStack` of three items with the side two pinned
     /// to 60pt each. That looks symmetrical and is not: the trailing item is
-    /// `if progress.canFinish { ... }`, and until the floors are met that is
-    /// an empty view, which SwiftUI gives no width at all. 60pt on the left
+    /// conditional, and while it is absent it is an empty view, which SwiftUI
+    /// gives no width at all. 60pt on the left
     /// against nothing on the right put the shutter 30pt right of centre for
     /// the whole of every session — which is to say, for the entire time
     /// anybody is actually shooting.
@@ -315,10 +355,13 @@ struct CaptureView: View {
             HStack {
                 thumbnail
                 Spacer(minLength: 90)
-                // Appears only once the floors are met. Before that there is
-                // nothing to press, which is the least ambiguous way to say
-                // "keep going".
-                if model.progress.canFinish {
+                // ⚠️ From the first photograph. It used to wait until every
+                // step of the plan was full, which held a walk-around hostage
+                // to a checklist: a guest turns up early, the rain starts,
+                // and forty photographs cannot be handed in because the roof
+                // is short. The finish page lists what the plan still
+                // wanted; whether that matters is the photographer's call.
+                if model.progress.canHandIn {
                     Button("完成") { showingFinish = true }
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.black)
@@ -332,7 +375,7 @@ struct CaptureView: View {
         .frame(height: 74)
         .padding(.horizontal, 24)
         .padding(.vertical, 22)
-        .animation(.easeOut(duration: 0.25), value: model.progress.canFinish)
+        .animation(.easeOut(duration: 0.25), value: model.progress.canHandIn)
     }
 
     /// Grey, and not pressable, while the phone is moving enough to blur.
@@ -425,6 +468,18 @@ struct CaptureView: View {
         Task { await model.capture() }
     }
 
+    private func focus(devicePoint: CGPoint, viewPoint: CGPoint) {
+        model.camera.focus(at: devicePoint)
+        focusGeneration += 1
+        let generation = focusGeneration
+        withAnimation(.easeOut(duration: 0.12)) { focusPoint = viewPoint }
+        Task {
+            try? await Task.sleep(for: .seconds(1.3))
+            guard focusGeneration == generation else { return }
+            withAnimation(.easeIn(duration: 0.3)) { focusPoint = nil }
+        }
+    }
+
     private func respond(to outcome: CaptureSessionModel.Outcome?) {
         guard let outcome else { return }
         switch outcome {
@@ -453,6 +508,25 @@ struct CaptureView: View {
             }
         }
         return names.isEmpty ? "这张需要重拍" : names.joined(separator: "、") + " —— 这张不算"
+    }
+}
+
+/// The iPhone's focus reticle: lands slightly large, settles, fades.
+private struct FocusSquare: View {
+    @State private var scale: CGFloat = 1.4
+    @State private var opacity: Double = 0.4
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 4)
+            .stroke(Color.yellow, lineWidth: 1.2)
+            .frame(width: 74, height: 74)
+            .scaleEffect(scale)
+            .opacity(opacity)
+            .shadow(color: .black.opacity(0.4), radius: 2)
+            .onAppear {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) { scale = 1 }
+                withAnimation(.easeOut(duration: 0.15)) { opacity = 1 }
+            }
     }
 }
 

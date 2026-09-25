@@ -19,7 +19,7 @@ public enum ExportManifest {
             "Software:     \(manifest.appVersion)",
             "Started:      \(formatter.string(from: manifest.startedAt)) (\(manifest.timeZoneIdentifier))",
             "Photographs:  \(manifest.exteriorShots) exterior, \(manifest.interiorShots) interior",
-            "Coverage:     \(Int(manifest.coverage.fraction * 100))% of the vehicle's surface",
+            "Walk-around:  photographed from \(Int(manifest.headings.fraction * 100))% of the directions around the vehicle",
             "",
             "Photographs are the files the camera produced. Their metadata was",
             "written at the moment of capture and nothing has been re-encoded.",
@@ -42,9 +42,17 @@ public enum ExportManifest {
             if !notes.isEmpty { lines.append("          note: " + notes.joined(separator: "; ")) }
         }
 
-        if manifest.coverage.fraction < 0.999, let thin = manifest.coverage.thinnestRegion() {
+        // ⚠️ Stated as what it is. The figure above is which ways the camera
+        // faced, from the phone's motion sensor. It is not a measurement of
+        // the car's surface, and a document an adjuster reads must not let it
+        // pass for one.
+        let missing = manifest.progress().outstanding
+        if !missing.isEmpty {
             lines.append("")
-            lines.append("Least-covered area: \(thin.rawValue).")
+            lines.append("The guided shot list was not completed. Still short:")
+            for requirement in missing {
+                lines.append("  \(requirement.step.rawValue): \(requirement.shortBy) more")
+            }
         }
 
         return lines.joined(separator: "\n") + "\n"

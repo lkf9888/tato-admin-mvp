@@ -1,187 +1,74 @@
 import EvidenceCore
 import SwiftUI
 
-/// The car from above, painted as it gets photographed.
+/// Which ways round the car have been photographed from, as a ring, turned
+/// so the photographer is always at the bottom.
 ///
-/// Small on purpose — it lives in the corner of a viewfinder and has to be
-/// readable in the half second between two photographs. It answers one
-/// question, "which way do I still have to go", and hands the detail to
-/// `CoverageSheet` when somebody taps it.
+/// Green where the camera has faced, faint where it has not. Turning the ring
+/// with the photographer is what makes it readable at a glance: a gap on the
+/// right of the ring is a gap to your right, so "往你右边走" and the picture
+/// say the same thing without anybody translating between them.
 ///
-/// Drawn as a car rather than as a ring of wedges because a ring has no
-/// front: a photographer has to map an abstract dial onto the vehicle in
-/// front of them before it means anything, and they are holding a phone in
-/// one hand in a car park.
-struct CoverageDiagram: View {
-    let coverage: SurfaceCoverage
-    /// False before the car has been located. Everything reads as empty
-    /// then, and painting it all red would be a lie about the photographs
-    /// already taken.
-    let isLive: Bool
+/// ⚠️ Faint rather than red. This replaced a car painted red, amber and
+/// green, and red read as *wrong* — which was fair while the app was
+/// enforcing coverage, and is not now that it only guides. An unphotographed
+/// direction is a suggestion, and it is drawn like one.
+///
+/// ⚠️ And a ring rather than a car. The gyroscope knows which way the camera
+/// pointed, not where the car is or which end is its front, so a car drawn
+/// in the middle would be claiming something the app cannot see.
+struct HeadingRing: View {
+    let coverage: HeadingCoverage
+    /// Where the camera points now. Nil turns the ring to its reference
+    /// frame rather than to the photographer.
+    let heading: Double?
+
+    private static let covered = Color(red: 0.24, green: 0.75, blue: 0.42)
 
     var body: some View {
-        GeometryReader { geometry in
-            let size = geometry.size
-            ZStack {
-                CarSilhouette()
-                    .fill(Color.black.opacity(0.45))
-                sectorRing(in: size)
-                    .opacity(isLive ? 1 : 0.25)
-                CarSilhouette()
-                    .fill(roofTint)
-                    .padding(size.width * 0.26)
-                CarSilhouette()
-                    .stroke(Color.white.opacity(0.85), lineWidth: 1.4)
+        ZStack {
+            Circle().fill(Color.black.opacity(0.45))
+            Canvas { context, size in
+                let centre = CGPoint(x: size.width / 2, y: size.height / 2)
+                let outer = min(size.width, size.height) / 2 - 1
+                let inner = outer * 0.64
+                let width = HeadingCoverage.sectorWidth
+
+                for sector in 0..<HeadingCoverage.sectorCount {
+                    let middle = HeadingCoverage.centre(ofSector: sector)
+                    let start = screenAngle(of: middle - width / 2 + 0.6)
+                    let end = screenAngle(of: middle + width / 2 - 0.6)
+                    var wedge = Path()
+                    wedge.addArc(center: centre, radius: outer, startAngle: start, endAngle: end, clockwise: true)
+                    wedge.addArc(center: centre, radius: inner, startAngle: end, endAngle: start, clockwise: false)
+                    wedge.closeSubpath()
+                    context.fill(
+                        wedge,
+                        with: .color(coverage.isCovered(sector: sector) ? Self.covered : .white.opacity(0.16))
+                    )
+                }
+
+                // You are here: the bottom of the ring, always.
+                let marker = CGRect(x: centre.x - 3, y: centre.y + outer - 7, width: 6, height: 6)
+                context.fill(Path(ellipseIn: marker), with: .color(.white))
             }
+            Text("\(Int(coverage.fraction * 100))%")
+                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white)
         }
-        .accessibilityLabel("车辆覆盖")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("绕车角度")
         .accessibilityValue("\(Int(coverage.fraction * 100))%")
     }
 
-    /// The roof gets the middle of the car, which is where a roof is.
-    private var roofTint: Color {
-        isLive
-            ? CoverageColour.swiftUI(coverage.roofFraction).opacity(0.85)
-            : Color.white.opacity(0.10)
-    }
-
-    /// One wedge per sector, hugging the body.
+    /// Where a heading lands on screen, with the photographer at the bottom.
     ///
-    /// Each is drawn with a gradient into its neighbours' colours so the
-    /// paint runs around the car instead of stepping, which is what makes a
-    /// half-covered flank look half-covered.
-    private func sectorRing(in size: CGSize) -> some View {
-        Canvas { context, canvas in
-            let centre = CGPoint(x: canvas.width / 2, y: canvas.height / 2)
-            let outer = CGSize(width: canvas.width * 0.5, height: canvas.height * 0.5)
-            let inner = CGSize(width: canvas.width * 0.30, height: canvas.height * 0.34)
-            let count = SurfaceCoverage.sectorCount
-            let step = 2 * Double.pi / Double(count)
-
-            for sector in 0..<count {
-                // ⚠️ Sector 0 points along the car's own +X, which on a
-                // bird's-eye view with the nose up is straight up the screen.
-                // Screen y grows downwards, hence the negated sine.
-                let start = Double(sector) * step - .pi / 2
-                let end = start + step
-                var path = Path()
-                path.move(to: point(centre, outer, start))
-                path.addLine(to: point(centre, outer, end))
-                path.addLine(to: point(centre, inner, end))
-                path.addLine(to: point(centre, inner, start))
-                path.closeSubpath()
-
-                let here = coverage.confidence(ofSector: sector)
-                let next = coverage.confidence(ofSector: (sector + 1) % count)
-                context.fill(
-                    path,
-                    with: .linearGradient(
-                        Gradient(colors: [
-                            CoverageColour.swiftUI(here),
-                            CoverageColour.swiftUI((here + next) / 2),
-                        ]),
-                        startPoint: point(centre, outer, start),
-                        endPoint: point(centre, outer, end)
-                    )
-                )
-            }
-        }
-    }
-
-    private func point(_ centre: CGPoint, _ radii: CGSize, _ angle: Double) -> CGPoint {
-        CGPoint(
-            x: centre.x + radii.width * cos(angle),
-            y: centre.y + radii.height * sin(angle)
-        )
-    }
-}
-
-/// A car seen from above, nose up. The same figure as the app's icon, for
-/// the same reason: it is the one shape that says "this is your car and this
-/// is its front" without a caption.
-struct CarSilhouette: Shape {
-    func path(in rect: CGRect) -> Path {
-        let w = rect.width, h = rect.height
-        let nose = rect.minY, tail = rect.maxY
-        let left = rect.minX, right = rect.maxX
-        var path = Path()
-        path.move(to: CGPoint(x: left + w * 0.18, y: nose))
-        path.addLine(to: CGPoint(x: right - w * 0.18, y: nose))
-        path.addQuadCurve(
-            to: CGPoint(x: right, y: nose + h * 0.21),
-            control: CGPoint(x: right, y: nose + h * 0.02)
-        )
-        path.addLine(to: CGPoint(x: right, y: tail - h * 0.26))
-        path.addQuadCurve(
-            to: CGPoint(x: right - w * 0.11, y: tail),
-            control: CGPoint(x: right, y: tail - h * 0.02)
-        )
-        path.addLine(to: CGPoint(x: left + w * 0.11, y: tail))
-        path.addQuadCurve(
-            to: CGPoint(x: left, y: tail - h * 0.26),
-            control: CGPoint(x: left, y: tail - h * 0.02)
-        )
-        path.addLine(to: CGPoint(x: left, y: nose + h * 0.21))
-        path.addQuadCurve(
-            to: CGPoint(x: left + w * 0.18, y: nose),
-            control: CGPoint(x: left, y: nose + h * 0.02)
-        )
-        path.closeSubpath()
-        return path
-    }
-}
-
-/// The big version, for when the corner is not enough.
-struct CoverageSheet: View {
-    let coverage: SurfaceCoverage
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                CarModelView(coverage: coverage)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                legend
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
-            }
-            .navigationTitle("还差哪里")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("继续拍") { dismiss() } }
-            }
-        }
-    }
-
-    private var legend: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 16) {
-                key(0, "还没拍到")
-                key(0.5, "只拍到一个角度")
-                key(1, "拍够了")
-            }
-            HStack(spacing: 14) {
-                Text("车身 \(Int(coverage.fraction * 100))%")
-                Text("车顶 \(Int(coverage.roofFraction * 100))%")
-            }
-            .font(.footnote.monospacedDigit())
-            .foregroundStyle(.secondary)
-
-            Text("拖动转车身，捏合放大。灰的是引擎盖和后备箱盖 —— 那两块目前不计分，"
-                 + "不是你漏拍了。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-    }
-
-    private func key(_ confidence: Double, _ label: String) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(CoverageColour.swiftUI(confidence))
-                .frame(width: 11, height: 11)
-            Text(label).font(.caption)
-        }
+    /// A direction that is a walk to the right — counter-clockwise of where
+    /// the camera points, see `HeadingCoverage.gapBearing` — is drawn to the
+    /// right of the marker. Screen angles run clockwise from 3 o'clock because
+    /// the y axis points down, so the bottom is +90° and the right is 0°.
+    private func screenAngle(of direction: Double) -> SwiftUI.Angle {
+        let bearing = CameraHeading.difference(from: heading ?? 0, to: direction)
+        return .degrees(90 - bearing)
     }
 }

@@ -1,41 +1,54 @@
-import ARKit
-import SceneKit
+import AVFoundation
 import SwiftUI
 
-/// The live camera feed, which is now ARKit's.
+/// The live camera feed, filling whatever it is given.
 ///
-/// ⚠️ Not an `AVCaptureVideoPreviewLayer` any more, and it cannot be: with
-/// tracking running there is no capture session to attach one to. `ARSCNView`
-/// draws the session's camera feed as its background, which is the same
-/// frames the photographs are cut from — so what is on screen is still what
-/// lands in the file.
-///
-/// Nothing is rendered into the scene. This is a viewfinder that happens to
-/// be a renderer, not an AR experience: no lighting, no content, no gestures.
-/// The coverage diagram deliberately stays a flat drawing over the top rather
-/// than becoming geometry in the world, because a photographer needs to see
-/// the whole car at once and the car is the thing they are standing next to.
+/// Tapping it focuses and meters there, the way the iPhone camera does. The
+/// tap is reported twice over: once in the capture device's own normalised
+/// coordinates, which is what AVFoundation wants, and once in the view's
+/// points, which is where the yellow square has to be drawn. Only the
+/// preview layer knows how to get from one to the other, so the conversion
+/// happens here rather than in the view that draws the square.
 struct CameraPreview: UIViewRepresentable {
-    let session: ARSession
+    let session: AVCaptureSession
+    /// `(devicePoint, viewPoint)`.
+    var onFocusTap: ((CGPoint, CGPoint) -> Void)?
 
-    func makeUIView(context: Context) -> ARSCNView {
-        let view = ARSCNView()
-        // Assigned, never run or paused here. The session's lifecycle belongs
-        // to `CoverageTracker`; a view that also started and stopped it would
-        // be a second opinion about who owns the camera, which is the whole
-        // problem this replaced.
-        view.session = session
-        view.scene = SCNScene()
-        view.automaticallyUpdatesLighting = false
-        view.rendersCameraGrain = false
-        view.isUserInteractionEnabled = false
-        view.backgroundColor = .black
-        // The feed is 60fps; the viewfinder does not need to be, and the
-        // photographer is holding a phone that is also running world tracking
-        // and scene reconstruction.
-        view.preferredFramesPerSecond = 30
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> PreviewView {
+        let view = PreviewView()
+        view.previewLayer.session = session
+        view.previewLayer.videoGravity = .resizeAspectFill
+        context.coordinator.view = view
+
+        let tap = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleTap(_:))
+        )
+        view.addGestureRecognizer(tap)
         return view
     }
 
-    func updateUIView(_ view: ARSCNView, context: Context) {}
+    func updateUIView(_ view: PreviewView, context: Context) {
+        context.coordinator.onFocusTap = onFocusTap
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        weak var view: PreviewView?
+        var onFocusTap: ((CGPoint, CGPoint) -> Void)?
+
+        @objc func handleTap(_ recognizer: UITapGestureRecognizer) {
+            guard let view, let onFocusTap else { return }
+            let point = recognizer.location(in: view)
+            let devicePoint = view.previewLayer.captureDevicePointConverted(fromLayerPoint: point)
+            onFocusTap(devicePoint, point)
+        }
+    }
+
+    final class PreviewView: UIView {
+        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
+        var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    }
 }

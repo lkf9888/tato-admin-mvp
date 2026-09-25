@@ -1,4 +1,3 @@
-import CoreLocation
 import EvidenceCore
 import Photos
 
@@ -31,6 +30,134 @@ struct PhotoLibraryExportResult: Sendable {
     var isLossless: Bool { altered.isEmpty && unverified.isEmpty }
 }
 
+// MARK: - Everything that talks to PhotoKit
+
+/// ⚠️⚠️ **Nothing in here may move inside an actor-isolated type, and this is
+/// not a style preference — it is the difference between an app that works
+/// and one that dies on the first photograph.**
+///
+/// PhotoKit's `performChanges` takes a plain, non-`@Sendable` closure, and it
+/// calls it on its own private queue (`com.apple.PHPhotoLibrary.changes`).
+/// Write that closure inside a `@MainActor` type and Swift 6 infers it as
+/// main-actor-isolated, then inserts a runtime check that it really is running
+/// on the main actor. It is not. The check traps — `EXC_BREAKPOINT` in
+/// `_swift_task_checkIsolated` — **before the closure body runs at all**.
+///
+/// The compiler says nothing. There is no warning, no diagnostic, and the
+/// code reads as correct. The same applies to `requestData`'s two handlers,
+/// which PhotoKit also calls off the main thread.
+///
+/// This shipped once already, latent: the old `PhotoLibraryExporter` was
+/// `@MainActor` and had exactly this shape, and never crashed because it only
+/// ran when somebody pressed a button on the finish page — which no test
+/// walk-around ever reached. Moving the same work onto every shutter press
+/// turned a dormant crash into a certain one.
+private enum PhotoKitWork {
+
+    /// A mutable value shared with a PhotoKit callback.
+    ///
+    /// `performChanges` runs its block to completion before it calls back, so
+    /// the write happens-before the read. The box exists because a captured
+    /// local `var` cannot cross into a non-Sendable escaping closure.
+    private final class Box<Value>: @unchecked Sendable {
+        var value: Value
+        init(_ value: Value) { self.value = value }
+    }
+
+    static func albumExists(_ identifier: String) -> Bool {
+        PHAssetCollection
+            .fetchAssetCollections(withLocalIdentifiers: [identifier], options: nil)
+            .firstObject != nil
+    }
+
+    static func createAlbum(titled title: String) async throws -> String {
+        let box = Box<String?>(nil)
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                box.value = PHAssetCollectionChangeRequest
+                    .creationRequestForAssetCollection(withTitle: title)
+                    .placeholderForCreatedAssetCollection
+                    .localIdentifier
+            }
+        } catch {
+            throw PhotoLibraryError.saveFailed(error.localizedDescription)
+        }
+        guard let identifier = box.value else {
+            throw PhotoLibraryError.saveFailed("建不了相簿")
+        }
+        return identifier
+    }
+
+    static func add(
+        jpeg: Data, filename: String, creationDate: Date, toAlbum albumIdentifier: String?
+    ) async throws -> String {
+        let album = albumIdentifier.flatMap {
+            PHAssetCollection
+                .fetchAssetCollections(withLocalIdentifiers: [$0], options: nil)
+                .firstObject
+        }
+        let box = Box<String?>(nil)
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                let request = PHAssetCreationRequest.forAsset()
+                let options = PHAssetResourceCreationOptions()
+                options.originalFilename = filename
+                // ⚠️ `.photo` with the file data stores the bytes as handed
+                // over. Going via a UIImage would re-encode, which is the
+                // whole thing this app exists to avoid.
+                request.addResource(with: .photo, data: jpeg, options: options)
+                // Photos reads this out of the EXIF as well; setting it
+                // explicitly is what keeps the album in shooting order even
+                // if a phone's import does something unexpected.
+                request.creationDate = creationDate
+                if let album,
+                   let created = request.placeholderForCreatedAsset,
+                   let albumRequest = PHAssetCollectionChangeRequest(for: album) {
+                    albumRequest.addAssets([created] as NSArray)
+                }
+                box.value = request.placeholderForCreatedAsset?.localIdentifier
+            }
+        } catch {
+            throw PhotoLibraryError.saveFailed(error.localizedDescription)
+        }
+        guard let identifier = box.value else {
+            throw PhotoLibraryError.saveFailed("相册没有返回这张照片的标识")
+        }
+        return identifier
+    }
+
+    static func rename(albumIdentifier: String, to title: String) async {
+        guard let album = PHAssetCollection
+            .fetchAssetCollections(withLocalIdentifiers: [albumIdentifier], options: nil)
+            .firstObject else { return }
+        try? await PHPhotoLibrary.shared().performChanges {
+            PHAssetCollectionChangeRequest(for: album)?.title = title
+        }
+    }
+
+    /// Pulls one asset's original resource back out, byte for byte.
+    static func readBack(assetIdentifier: String) async -> Data? {
+        guard let asset = PHAsset
+            .fetchAssets(withLocalIdentifiers: [assetIdentifier], options: nil).firstObject,
+            let resource = PHAssetResource.assetResources(for: asset)
+                .first(where: { $0.type == .photo })
+        else { return nil }
+
+        return await withCheckedContinuation { continuation in
+            let options = PHAssetResourceRequestOptions()
+            options.isNetworkAccessAllowed = true
+            let buffer = Box(Data())
+            PHAssetResourceManager.default().requestData(for: resource, options: options) { chunk in
+                buffer.value.append(chunk)
+            } completionHandler: { error in
+                continuation.resume(returning: error == nil ? buffer.value : nil)
+            }
+        }
+    }
+}
+
+// MARK: - The mirror
+
 /// Copies every photograph into the camera roll **as it is taken**.
 ///
 /// ⚠️ This used to happen once, at the end, from the finish page. That was
@@ -53,6 +180,10 @@ struct PhotoLibraryExportResult: Sendable {
 /// is checked immediately, as a canary — if this phone re-encodes, it does it
 /// to all of them, and finding that out on photograph one is worth far more
 /// than finding it out on photograph forty-one.
+///
+/// ⚠️ This type is `@MainActor` and holds no PhotoKit callbacks of its own.
+/// Every one of them lives in `PhotoKitWork`, outside any actor, for the
+/// reason written at length up there. Do not inline one back in here.
 @MainActor
 @Observable
 final class LibraryMirror {
@@ -73,6 +204,9 @@ final class LibraryMirror {
     /// photograph that quietly did not reach the camera roll is the failure
     /// this whole class exists to prevent, so it is never swallowed.
     private(set) var lastError: String?
+    /// What the read-back actually measured, for the settings screen. The
+    /// chip can only say yes or no; this says how it knows.
+    private(set) var canaryNote: String?
 
     /// ⚠️ The canary is read back once and only once. Without this, a phone
     /// that cannot read its own library back (limited access) would pull a
@@ -86,6 +220,22 @@ final class LibraryMirror {
     private var queue: Task<Void, Never>?
 
     var isWriteable: Bool { status == .authorized || status == .limited }
+
+    /// The whole state of the camera-roll copy, in one line for the settings
+    /// screen.
+    var summary: String {
+        let verdictText: String
+        switch verdict {
+        case .unknown: verdictText = "还没核对"
+        case .intact: verdictText = "字节一致"
+        case .altered: verdictText = "被改过"
+        }
+        var line = "存了 \(saved) 张"
+        if failed > 0 { line += "，失败 \(failed) 张" }
+        line += " · \(verdictText)"
+        if let canaryNote { line += "（\(canaryNote)）" }
+        return line
+    }
 
     /// Whether anything needs saying on the camera screen.
     var trouble: String? {
@@ -131,50 +281,28 @@ final class LibraryMirror {
     ) async {
         do {
             let album = try? await ensureAlbum(titled: Self.workingTitle(for: sessionStart))
-            let identifier = try await add(jpeg, record: record, to: album)
+            let identifier = try await PhotoKitWork.add(
+                jpeg: jpeg,
+                filename: record.filename,
+                creationDate: record.capturedAt,
+                toAlbum: album
+            )
             try? await archive.noteLibraryAsset(identifier, forFilename: record.filename)
             saved += 1
             lastError = nil
             // The canary. One read-back at the start of a session, not forty.
             if !canaryDone {
                 canaryDone = true
-                verdict = await verify(identifier, against: record.sha256) ?? .unknown
+                let checked = await Self.check(
+                    identifier, against: record.sha256, expecting: record.byteCount
+                )
+                verdict = checked?.verdict ?? .unknown
+                canaryNote = checked?.note
             }
         } catch {
             failed += 1
             lastError = "有 \(failed) 张没存进相册：\((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)"
         }
-    }
-
-    private func add(_ jpeg: Data, record: CaptureRecord, to album: PHAssetCollection?) async throws -> String {
-        var placeholder: PHObjectPlaceholder?
-        do {
-            try await PHPhotoLibrary.shared().performChanges {
-                let request = PHAssetCreationRequest.forAsset()
-                let options = PHAssetResourceCreationOptions()
-                options.originalFilename = record.filename
-                // ⚠️ `.photo` with the file data stores the bytes as handed
-                // over. Going via a UIImage would re-encode, which is the
-                // whole thing this app exists to avoid.
-                request.addResource(with: .photo, data: jpeg, options: options)
-                // Photos reads this out of the EXIF as well; setting it
-                // explicitly is what keeps the album in shooting order even
-                // if a phone's import does something unexpected.
-                request.creationDate = record.capturedAt
-                if let album,
-                   let created = request.placeholderForCreatedAsset,
-                   let albumRequest = PHAssetCollectionChangeRequest(for: album) {
-                    albumRequest.addAssets([created] as NSArray)
-                }
-                placeholder = request.placeholderForCreatedAsset
-            }
-        } catch {
-            throw PhotoLibraryError.saveFailed(error.localizedDescription)
-        }
-        guard let identifier = placeholder?.localIdentifier else {
-            throw PhotoLibraryError.saveFailed("相册没有返回这张照片的标识")
-        }
-        return identifier
     }
 
     // MARK: - The album
@@ -184,36 +312,14 @@ final class LibraryMirror {
     /// at the start: nobody has said which car this is, and this app refuses
     /// to ask before the first photograph. A folder called「9月21日 15:04」is
     /// findable; a folder called「未命名」is not.
-    private func ensureAlbum(titled title: String) async throws -> PHAssetCollection {
-        if let albumIdentifier,
-           let existing = PHAssetCollection.fetchAssetCollections(
-               withLocalIdentifiers: [albumIdentifier], options: nil).firstObject {
-            return existing
+    private func ensureAlbum(titled title: String) async throws -> String {
+        if let albumIdentifier, PhotoKitWork.albumExists(albumIdentifier) {
+            return albumIdentifier
         }
-        var placeholder: PHObjectPlaceholder?
-        try await PHPhotoLibrary.shared().performChanges {
-            placeholder = PHAssetCollectionChangeRequest
-                .creationRequestForAssetCollection(withTitle: title)
-                .placeholderForCreatedAssetCollection
-        }
-        guard let identifier = placeholder?.localIdentifier,
-              let album = PHAssetCollection.fetchAssetCollections(
-                  withLocalIdentifiers: [identifier], options: nil).firstObject else {
-            throw PhotoLibraryError.saveFailed("建不了相簿")
-        }
+        let identifier = try await PhotoKitWork.createAlbum(titled: title)
         albumIdentifier = identifier
         albumTitle = title
-        return album
-    }
-
-    private func rename(to title: String) async {
-        guard let albumIdentifier,
-              let album = PHAssetCollection.fetchAssetCollections(
-                  withLocalIdentifiers: [albumIdentifier], options: nil).firstObject else { return }
-        try? await PHPhotoLibrary.shared().performChanges {
-            PHAssetCollectionChangeRequest(for: album)?.title = title
-        }
-        albumTitle = title
+        return identifier
     }
 
     private static func workingTitle(for start: Date) -> String {
@@ -252,14 +358,23 @@ final class LibraryMirror {
             let album = try? await ensureAlbum(titled: Self.workingTitle(for: manifest.startedAt))
             for record in missing {
                 guard let data = try? Data(contentsOf: archive.url(of: record)) else { continue }
-                if let identifier = try? await add(data, record: record, to: album) {
+                if let identifier = try? await PhotoKitWork.add(
+                    jpeg: data,
+                    filename: record.filename,
+                    creationDate: record.capturedAt,
+                    toAlbum: album
+                ) {
                     try? await archive.noteLibraryAsset(identifier, forFilename: record.filename)
                     saved += 1
                 }
             }
         }
 
-        await rename(to: Self.finalTitle(for: manifest))
+        let title = Self.finalTitle(for: manifest)
+        if let albumIdentifier {
+            await PhotoKitWork.rename(albumIdentifier: albumIdentifier, to: title)
+            albumTitle = title
+        }
         let current = await archive.manifest
         return await verifyAll(current, albumTitle: albumTitle)
     }
@@ -274,7 +389,9 @@ final class LibraryMirror {
                 unverified.append(record.filename)
                 continue
             }
-            switch await verify(identifier, against: record.sha256) {
+            switch await Self.check(
+                identifier, against: record.sha256, expecting: record.byteCount
+            )?.verdict {
             case .intact: intact.append(record.filename)
             case .altered: altered.append(record.filename)
             case .unknown, nil: unverified.append(record.filename)
@@ -288,24 +405,31 @@ final class LibraryMirror {
         )
     }
 
-    /// Pulls one asset's original resource back out and re-hashes it.
-    private func verify(_ identifier: String, against digest: String) async -> Verdict? {
-        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject,
-              let resource = PHAssetResource.assetResources(for: asset).first(where: { $0.type == .photo }),
-              let data = await Self.data(of: resource) else { return nil }
-        return EvidenceHash.matches(data, digest: digest) ? .intact : .altered
-    }
-
-    private static func data(of resource: PHAssetResource) async -> Data? {
-        await withCheckedContinuation { continuation in
-            let options = PHAssetResourceRequestOptions()
-            options.isNetworkAccessAllowed = true
-            var buffer = Data()
-            PHAssetResourceManager.default().requestData(for: resource, options: options) { chunk in
-                buffer.append(chunk)
-            } completionHandler: { error in
-                continuation.resume(returning: error == nil ? buffer : nil)
+    /// Reads one asset back out and re-hashes it against what went in.
+    ///
+    /// ⚠️ Retried, because `performChanges` returning is not the same as the
+    /// import having finished. Read a just-created asset immediately and
+    /// Photos can hand back a partial file, which hashes differently and
+    /// looks exactly like a re-encode. The first build of this said "这台手机
+    /// 的相册会重新编码照片" on a phone that had done nothing of the kind.
+    ///
+    /// Three attempts over about two and a half seconds. A match at any
+    /// point settles it; bytes that are still wrong at the end are wrong.
+    private static func check(
+        _ identifier: String, against digest: String, expecting byteCount: Int
+    ) async -> (verdict: Verdict, note: String)? {
+        var lastSize: Int?
+        for attempt in 0..<3 {
+            if attempt > 0 {
+                try? await Task.sleep(for: .milliseconds(attempt == 1 ? 600 : 2_000))
             }
+            guard let data = await PhotoKitWork.readBack(assetIdentifier: identifier) else { continue }
+            if EvidenceHash.matches(data, digest: digest) {
+                return (.intact, "\(data.count) 字节，和原件一致")
+            }
+            lastSize = data.count
         }
+        guard let lastSize else { return nil }
+        return (.altered, "读回来 \(lastSize) 字节，原件 \(byteCount) 字节")
     }
 }

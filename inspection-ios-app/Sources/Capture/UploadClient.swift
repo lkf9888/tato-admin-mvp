@@ -96,7 +96,10 @@ struct UploadClient: Sendable {
             "appVersion": manifest.appVersion,
             "startedAt": ISO8601DateFormatter().string(from: manifest.startedAt),
             "timeZone": manifest.timeZoneIdentifier,
-            "coverageFraction": manifest.coverage.fraction,
+            // The ring of directions, from the motion sensor. The server has
+            // always stored this as the phone's claim rather than a fact it
+            // can check, which is exactly what it is.
+            "coverageFraction": manifest.headings.fraction,
             "exteriorShots": manifest.exteriorShots,
             "interiorShots": manifest.interiorShots,
         ]

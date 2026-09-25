@@ -52,6 +52,7 @@ export const inspectionsMessages = {
       region_frontLeft: "左前",
       region_roof: "車頂",
       region_interior: "車內",
+      region_exterior: "車外",
       metadataWrittenAtCapture: "後設資料由相機直接寫入",
       metadataStampedAfterCapture: "後設資料在拍攝後補齊",
       metadataEncodedFromCameraPixels: "由 App 用相機畫素編碼",

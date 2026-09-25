@@ -3,7 +3,6 @@ import EvidenceCore
 import Foundation
 import ImageIO
 import UIKit
-import simd
 
 /// One walk around one car.
 ///
@@ -20,16 +19,6 @@ final class CaptureSessionModel {
     /// quality gate. Low enough not to trap anyone in front of a car.
     static let rejectionsBeforeOverride = 3
 
-    /// The arc of car one photograph documents, across a portrait screen.
-    ///
-    /// ⚠️ A constant now, where it used to be read off the capture device.
-    /// ARKit picks the lens itself and does not say what field of view it
-    /// ended up with, so this is the main camera's figure — about 68° along
-    /// the sensor's long edge, which on a portrait screen is roughly 54°.
-    /// See `CoverageProjection.portraitFieldOfView` for why those are
-    /// different numbers.
-    static let trackingFieldOfView = 54.0
-
     enum Outcome: Equatable, Identifiable {
         case accepted(CaptureRecord)
         case rejected(CaptureRecord)
@@ -44,16 +33,32 @@ final class CaptureSessionModel {
     }
 
     let location = LocationProvider()
+    /// The shutter's steadiness gate, and — from the same sensor — which way
+    /// the camera faces. The heading is what replaced ARKit's surface model
+    /// as the answer to "have they been round the car".
     let steadiness = SteadinessMonitor()
-    let coverage = CoverageTracker()
     /// ⚠️ Every photograph goes to the camera roll as it is taken, not when
     /// the session is handed in. A walk-around that never reaches the finish
     /// page used to leave the whole thing stranded in this app's container,
     /// where Turo's uploader cannot see it.
     let library = LibraryMirror()
-    /// ⚠️ Built on the tracker's session rather than owning one. There is
-    /// exactly one thing holding the camera in this app now, and it is ARKit.
-    let camera: ARCamera
+    /// ⚠️ The iPhone's own camera pipeline, holding the back camera alone.
+    /// It used to be ARKit, for a LiDAR model of the car's surface; that
+    /// model and this camera cannot both hold the lens, and the app chose
+    /// the better photographs and both lenses. See `EvidenceCamera`.
+    let camera = EvidenceCamera()
+    private var cameraReady = false
+
+    /// The lenses this phone has, for the zoom pill. One lens means no pill.
+    private(set) var lenses: [CameraLens] = []
+    private(set) var lens: CameraLens = .wide
+    /// How wide a slice of the ring one photograph from this lens is worth.
+    private(set) var fieldOfView = 54.0
+    private(set) var offersHighResolution = false
+    /// Twelve megapixels unless somebody chose otherwise in settings, and the
+    /// choice is remembered — see `PhotoResolution.standard` for why twelve.
+    private(set) var resolution: PhotoResolution =
+        PhotoResolution(rawValue: UserDefaults.standard.string(forKey: "photoResolution") ?? "") ?? .standard
 
     private(set) var archive: SessionArchive?
     private(set) var manifest: SessionManifest?
@@ -76,13 +81,6 @@ final class CaptureSessionModel {
     /// available depends on the device.
     private(set) var lastStillSize: String?
 
-    /// Set when the last photograph did not show the car.
-    ///
-    /// Not a rejection: the file is archived like any other, because an
-    /// archive that quietly drops frames is worse than one with a stray in
-    /// it. It just does not count towards anything, and it says so.
-    private(set) var missedTheCar = false
-
     /// A step the photographer picked out of order, which sticks until it is
     /// full and then hands control back to the plan.
     ///
@@ -102,27 +100,24 @@ final class CaptureSessionModel {
     private(set) var torchRefused = false
 
     private let plateReader = PlateReader()
-    private var trackingWatch: Task<Void, Never>?
-
-    init() {
-        camera = ARCamera(session: coverage.session)
-    }
+    /// The heading of a photograph the quality gate turned down, kept so that
+    /// waving it through afterwards credits the ring from where it was taken.
+    private var rejectedHeading: Double?
 
     var progress: ShootingProgress {
-        manifest?.progress(
-            thinnestBearing: coverage.bearingToThinnest(),
-            // Nothing to grade the walk-around against until a car has been
-            // located. The count stands on its own until then.
-            coverageIsMeasurable: coverage.canMeasure && coverage.hasFrame
-        ) ?? ShootingProgress(coverage: 0, exteriorShots: 0, interiorShots: 0)
+        manifest?.progress(heading: steadiness.heading)
+            ?? ShootingProgress(coverage: 0, exteriorShots: 0, interiorShots: 0)
     }
+
+    /// The ring of directions photographed from so far.
+    var headings: HeadingCoverage { manifest?.headings ?? HeadingCoverage() }
 
     /// What the overlay is drawing, and what the next photograph counts
     /// towards.
     var currentStep: ShotStep? { manualStep ?? progress.currentStep }
 
-    /// Moves along the plan by hand. Skips nothing — every step still has to
-    /// be filled before the session can be handed in.
+    /// Moves along the plan by hand, in either direction. Nothing is skipped
+    /// for good: a step left short is listed on the finish page.
     func stepAside(by delta: Int) {
         let steps = ShotStep.allCases
         guard let here = currentStep, let index = steps.firstIndex(of: here) else { return }
@@ -187,74 +182,60 @@ final class CaptureSessionModel {
         // appears between somebody and the photograph they are taking is a
         // photograph that does not get taken.
         Task { await library.authorise() }
-        // A fresh budget of recovery attempts every time the screen comes
-        // back. Closing an app and opening it again is what anybody does
-        // when something looks stuck, and it should mean something.
-        coverage.restarts = 0
-        coverage.resume()
-        coverage.fieldOfViewDegrees = Self.trackingFieldOfView
 
-        watchTracking()
-    }
-
-    /// How long to wait before each attempt at putting tracking right.
-    ///
-    /// ⚠️ Bounded, and the bound is not timidity. Re-running the session
-    /// blinks the viewfinder, and a preview that flickers every half minute
-    /// for the rest of a walk-around is a worse app than one whose diagram is
-    /// simply not filling in. Four tries spread over half a minute, then it
-    /// stops and says so.
-    private static let recoveryDelays: [Duration] = [.seconds(4), .seconds(6), .seconds(10), .seconds(16)]
-
-    /// Waits for frames and runs tracking again if none arrive.
-    ///
-    /// Nobody is asked to do this. It was briefly a button in the settings
-    /// screen, which is a confession rather than a feature: "重启车形图"
-    /// means nothing to somebody holding a phone in front of a car, and the
-    /// app knows perfectly well when it needs doing.
-    private func watchTracking() {
-        trackingWatch?.cancel()
-        guard coverage.canMeasure else { return }
-        trackingWatch = Task { [weak self] in
-            for delay in Self.recoveryDelays {
-                try? await Task.sleep(for: delay)
-                guard !Task.isCancelled, let self, self.coverage.needsHelp else { return }
-                await self.recoverTracking()
-                // A recovery that worked shows up as frames within a second.
-                try? await Task.sleep(for: .seconds(1.5))
-                guard !Task.isCancelled, self.coverage.needsHelp else { return }
+        if !cameraReady {
+            do {
+                try await camera.configure(resolution: resolution)
+                cameraReady = true
+                lenses = camera.availableLenses
+                lens = camera.lens
+                fieldOfView = camera.horizontalFieldOfView
+                offersHighResolution = camera.offersHighResolution
+            } catch {
+                startupError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                return
             }
         }
+        // ⚠️ Every time, not only the first. Tearing the session down on the
+        // way out and guarding the rebuild behind "have we started before?"
+        // is what once left the viewfinder frozen on a stale frame after any
+        // trip away from this screen.
+        await camera.start()
     }
 
-    /// Runs tracking again after it has stopped producing frames.
-    ///
-    /// Far simpler than it had to be when two sessions were competing for the
-    /// camera: there is only one of them now, so there is nothing to stand
-    /// aside for.
-    private func recoverTracking() async {
-        guard coverage.canMeasure else { return }
-        coverage.restarts += 1
-        coverage.restart()
-    }
-
-    /// ⚠️ The lamp is put out explicitly. It used to go out as a side effect
-    /// of stopping the capture session; there is no capture session now, and
-    /// a torch left burning in a pocket is a hot phone and a flat battery.
+    /// ⚠️ The lamp goes out with the camera, and the camera goes down with
+    /// the screen. A torch left burning in a pocket is a hot phone and a flat
+    /// battery.
     func sleep() async {
-        trackingWatch?.cancel()
-        trackingWatch = nil
-        camera.setTorch(false)
         isTorchOn = false
         torchRefused = false
-        coverage.pause()
+        await camera.stop()
         steadiness.stop()
     }
 
     func end() async {
         await sleep()
         location.stop()
-        coverage.stop()
+    }
+
+    // MARK: - Lenses and size
+
+    func select(lens: CameraLens) async {
+        do {
+            fieldOfView = try await camera.select(lens)
+            self.lens = camera.lens
+            // Swapping the input drops the torch; the camera relights it,
+            // and this reads back whether it managed to.
+            isTorchOn = camera.isTorchOn
+        } catch {
+            outcome = .failed((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    func setResolution(_ resolution: PhotoResolution) async {
+        self.resolution = resolution
+        UserDefaults.standard.set(resolution.rawValue, forKey: "photoResolution")
+        await camera.setResolution(resolution)
     }
 
     // MARK: - The lamp
@@ -269,9 +250,11 @@ final class CaptureSessionModel {
     /// the file.
     func toggleTorch() {
         let wanted = !isTorchOn
-        let actual = camera.setTorch(wanted)
-        isTorchOn = actual
-        torchRefused = wanted && !actual
+        Task {
+            let actual = await camera.setTorch(wanted)
+            isTorchOn = actual
+            torchRefused = wanted && !actual
+        }
     }
 
     // MARK: - Capture
@@ -291,61 +274,35 @@ final class CaptureSessionModel {
             software: DeviceIdentity.appVersion
         )
 
+        // ⚠️ Read before the shutter, not after. A capture takes hundreds of
+        // milliseconds and the phone starts moving the instant somebody has
+        // pressed the button; asking afterwards asks about a direction the
+        // photograph was never taken in -- often the floor, on the way down.
+        let step = currentStep
+        let heading = steadiness.headingNow
+        // Whether this step still owed photographs *before* this one.
+        // ⚠️ Somebody who walked back to a step that is already full wants to
+        // add to it, so that case must not hand control back after a single
+        // frame — see below.
+        let wasShort = step.map { !progress.isComplete($0) } ?? false
+
         do {
             let shot = try await camera.capturePhoto(stamp: stamp)
-            // Portrait: the frame arrives on its side, so the long edge is
+            // Portrait: the sensor delivers landscape, so the long edge is
             // the height a person sees.
-            lastStillSize = "\(shot.pixelHeight)×\(shot.pixelWidth)"
+            lastStillSize = "\(min(shot.pixelWidth, shot.pixelHeight))×\(max(shot.pixelWidth, shot.pixelHeight))"
             let finished = MetadataFinisher.finish(encoded: shot.data)
             let quality = try ImageQualityGate.evaluate(jpeg: finished.data)
 
-            // What this photograph was taken for, taken from the screen at
-            // the moment of the shutter rather than guessed afterwards.
-            let step = currentStep
-            // Whether this step still owed photographs *before* this one.
-            // ⚠️ Somebody who walked back to a step that is already full
-            // wants to add to it, so that case must not hand control back
-            // after a single frame — see below.
-            let wasShort = step.map { !progress.isComplete($0) } ?? false
-
-            // ⚠️ Asked before anything is credited. A photograph of a garage
-            // floor used to count towards the exterior floor exactly like a
-            // photograph of a door.
-            //
-            // ⚠️ And asked only of the walk-around. The check reads what
-            // share of the frame the scanned car fills, which means nothing
-            // when the subject is one wheel arch, the view from the driver's
-            // seat, or a roof shot from underneath it. Applied to those, it
-            // turned down the photographs somebody had just been told to
-            // take. See `ShotStep.needsTheCarInFrame`.
-            let checkFraming = step?.needsTheCarInFrame ?? true
-            let framing = checkFraming ? coverage.framingNow() : nil
-            let showsCar = framing?.showsTheCar ?? true
-            missedTheCar = !showsCar
-            let counts = quality.passes && showsCar
-
-            let region: CarRegion
-            if !counts {
-                region = .front
-            } else if step?.isInterior == true {
-                region = .interior
-            } else {
-                // The pose credits the coverage whatever the subject was —
-                // somebody photographing a wheel is still standing on that
-                // side of the car. The step gets the last word on the label,
-                // because a roof is shot from beside the car and the pose
-                // would file it as a flank.
-                let fromPose = coverage.recordShot()
-                region = step?.region ?? fromPose
-            }
-
             let record = try await archive.store(
                 jpeg: finished.data,
-                region: region,
+                // From the step: there is no camera pose to file by. See
+                // `ShotStep.region`.
+                region: step?.region ?? .exterior,
                 capturedAt: now,
                 quality: quality,
                 metadataPath: finished.path,
-                accepted: counts,
+                accepted: quality.passes,
                 // Recorded even when it did not count: what somebody was
                 // aiming at is part of the record, and a shot waved through
                 // afterwards has to land on the right step.
@@ -357,10 +314,14 @@ final class CaptureSessionModel {
             library.mirror(finished.data, as: record, into: archive, sessionStart: archive.startedAt)
 
             if quality.passes {
-                try await archive.updateCoverage(coverage.coverage)
+                if step?.creditsTheRing == true, let heading {
+                    await credit(heading: heading, in: archive)
+                }
                 consecutiveRejections = 0
+                rejectedHeading = nil
             } else {
                 consecutiveRejections += 1
+                rejectedHeading = step?.creditsTheRing == true ? heading : nil
             }
             manifest = await archive.manifest
             // Hand control back to the plan once a hand-picked step that
@@ -386,11 +347,18 @@ final class CaptureSessionModel {
     func acceptAnyway() async {
         guard let archive, case .rejected(let record) = outcome else { return }
         try? await archive.accept(record, despite: record.quality.issues)
-        if record.step?.isInterior != true { coverage.recordShot() }
-        try? await archive.updateCoverage(coverage.coverage)
+        if let rejectedHeading { await credit(heading: rejectedHeading, in: archive) }
+        rejectedHeading = nil
         manifest = await archive.manifest
         consecutiveRejections = 0
         outcome = nil
+    }
+
+    /// Adds one photograph's direction to the ring, and keeps it.
+    private func credit(heading: Double, in archive: SessionArchive) async {
+        var ring = await archive.manifest.headings
+        ring.record(heading: heading, spreadDegrees: HeadingCoverage.spread(forFieldOfView: fieldOfView))
+        try? await archive.updateHeadingCoverage(ring)
     }
 
     func dismissOutcome() { outcome = nil }
@@ -402,12 +370,9 @@ final class CaptureSessionModel {
 
     func clearStartupError() { startupError = nil }
 
-    /// Reads the JPEG's own embedded preview rather than decoding it.
-    ///
-    /// ⚠️ `...IfAbsent` rather than `...Always`, which used to be free: a
-    /// camera JPEG always carried a hardware thumbnail to take. This app
-    /// writes the file now and does not embed one, so this decodes the frame
-    /// at reduced scale instead. Still far cheaper than a full decode.
+    /// Reads the JPEG's own embedded preview where there is one, and decodes
+    /// the frame at reduced scale where there is not. Either is far cheaper
+    /// than a full decode.
     private static func thumbnail(of jpeg: Data, maxPixel: Int = 200) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(jpeg as CFData, nil) else { return nil }
         let options: [CFString: Any] = [

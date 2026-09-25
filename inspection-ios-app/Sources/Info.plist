@@ -32,7 +32,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Each photo records where it was taken. Insurance claims reject photographs whose metadata has no location.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>Motion sensors detect camera shake, so you are asked to retake a photo before it is too blurred to prove anything.</string>
+	<string>Motion sensors detect camera shake, so you are asked to retake a photo before it is too blurred to prove anything, and note which way each photo faces, so the app can suggest which side of the car is still to be photographed.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Each photo is copied into an album as it is taken, so you can attach them to a Turo claim even if you stop part-way.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -93,6 +93,14 @@ public struct CoveragePatch: Sendable, Codable, Hashable {
 /// constraint on it.
 public enum CarRegion: String, Sendable, Codable, CaseIterable {
     case front, frontRight, right, rearRight, rear, rearLeft, left, frontLeft, roof, interior
+    /// Outside the car, position unknown.
+    ///
+    /// ⚠️ Added when ARKit left the app. Every other exterior region was
+    /// worked out from where the camera stood relative to a fitted car, and
+    /// with no fitted car the truthful answer for a walk-around photograph is
+    /// this one. The server's list of regions has to carry it too, or every
+    /// upload is refused -- see `CAR_REGIONS` in lib/inspection.ts.
+    case exterior
 
     public var titleZH: String {
         switch self {
@@ -106,6 +114,7 @@ public enum CarRegion: String, Sendable, Codable, CaseIterable {
         case .frontLeft: return "左前"
         case .roof: return "车顶"
         case .interior: return "车内"
+        case .exterior: return "车外"
         }
     }
 }
@@ -202,7 +211,7 @@ public struct SurfaceCoverage: Sendable, Codable, Equatable {
     /// The region with the least coverage — where to send somebody next.
     public func thinnestRegion() -> CarRegion? {
         CarRegion.allCases
-            .filter { $0 != .interior && $0 != .roof }
+            .filter { $0 != .interior && $0 != .roof && $0 != .exterior }
             .map { ($0, fraction(of: $0)) }
             .filter { $0.1 < 1 }
             .min { $0.1 < $1.1 }?
@@ -210,7 +219,7 @@ public struct SurfaceCoverage: Sendable, Codable, Equatable {
     }
 
     static func sectors(in region: CarRegion) -> Set<Int> {
-        guard region != .interior else { return [] }
+        guard region != .interior, region != .exterior else { return [] }
         if region == .roof { return Set(0..<sectorCount) }
         // Eight regions of three sectors each, centred on the compass points.
         let index = CarRegion.allCases.firstIndex(of: region) ?? 0

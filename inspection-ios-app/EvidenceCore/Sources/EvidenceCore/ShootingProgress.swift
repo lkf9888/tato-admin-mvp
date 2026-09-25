@@ -1,73 +1,63 @@
 import Foundation
 
-/// What a session still needs before it can be handed in.
-public enum Requirement: Sendable, Equatable {
-    /// A step of the plan, and how many photographs short it is.
-    case step(ShotStep, shortBy: Int)
-    /// The walk-around has the photographs but not the angles. Carries the
-    /// bearing of the thinnest part **relative to where the photographer is
-    /// looking**, in signed degrees, so the screen can say "on your left"
-    /// rather than naming an end of the car it cannot actually identify.
-    case moreCoverage(bearing: Double?, fraction: Double)
+/// A step of the plan that is still short of photographs.
+public struct Requirement: Sendable, Equatable, Hashable {
+    public var step: ShotStep
+    public var shortBy: Int
 }
 
 /// How a shoot is going.
 ///
-/// **There is no upper bound anywhere in here, by decision.** More
-/// photographs make a claim more likely to succeed, so nothing in the app may
-/// suggest that enough have been taken — the numbers in `ShotStep.required`
-/// are floors that unlock the finish button, never a target that closes the
-/// session. Once they are met the photographer decides when to stop, and the
-/// screen goes on encouraging rather than congratulating.
+/// ## A guide, not a gate
+///
+/// ⚠️ Nothing in here stops anybody doing anything. It used to: the finish
+/// button stayed hidden until every step of the plan was full, and the
+/// walk-around would not advance until a surface model agreed it had been
+/// photographed from ninety per cent of the way round. On a real car that
+/// meant somebody photographing the rear over and over while the app insisted
+/// the rear was missing, and an app that is wrong *and* insistent is an app
+/// people stop opening.
+///
+/// So the plan now says what a claim will want, in order, and gets out of the
+/// way. Steps advance on their count alone. The ring of directions says which
+/// way round is still thin, and nothing more. The session can be handed in
+/// the moment there is a photograph in it; the finish page lists what the
+/// plan still expected, as information, not as a condition.
+///
+/// **There is no upper bound either.** More photographs make a claim more
+/// likely to succeed, so nothing may suggest that enough have been taken.
 public struct ShootingProgress: Sendable, Equatable {
-
-    /// Where the walk-around stops asking. Not 100%: a tow bar, a roof box or
-    /// a car parked tight against a wall can leave patches permanently
-    /// unreachable, and a photographer who cannot finish is a photographer
-    /// who goes back to the camera app.
-    public static let coverageToFinish = 0.90
 
     /// The fleet's own floors, above Turo's published fifteen.
     ///
-    /// ⚠️ Not gates any more — `ShotPlan` is the gate. They are kept because
-    /// they are the promise the fleet made, and `testThePlanClearsTheFleetFloors`
-    /// holds the plan to them: change a step's quota and that test says
-    /// whether the promise still holds, instead of two sets of rules
-    /// disagreeing on a phone in a car park.
+    /// Not enforced anywhere. They are the promise the fleet made about what a
+    /// complete walk-around contains, and `testThePlanClearsTheFleetFloors`
+    /// holds the plan to them.
     public static let exteriorFloor = 30
     public static let interiorFloor = 8
 
+    /// How much of the ring of directions has been photographed from, `0...1`.
     public var coverage: Double
-    public var roofCoverage: Double
     public var exteriorShots: Int
     public var interiorShots: Int
     /// Accepted photographs filed against each step of the plan.
     public var shotsByStep: [ShotStep: Int]
-    /// False when the geometry has nothing to grade the walk-around against —
-    /// no car located, or a device that cannot scan. The count then stands on
-    /// its own, because a requirement nobody can clear teaches people to
-    /// ignore the others.
-    public var coverageIsMeasurable: Bool
-    /// Signed degrees from where the camera points to the thinnest part of
-    /// the car, positive to the photographer's right.
-    public var thinnestBearing: Double?
+    /// Signed degrees from where the camera points now to the widest stretch
+    /// of the ring not yet photographed from. Positive means walk right.
+    public var gapBearing: Double?
 
     public init(
         coverage: Double,
         exteriorShots: Int,
         interiorShots: Int,
-        roofCoverage: Double = 0,
         shotsByStep: [ShotStep: Int] = [:],
-        coverageIsMeasurable: Bool = true,
-        thinnestBearing: Double? = nil
+        gapBearing: Double? = nil
     ) {
         self.coverage = coverage
-        self.roofCoverage = roofCoverage
         self.exteriorShots = exteriorShots
         self.interiorShots = interiorShots
         self.shotsByStep = shotsByStep
-        self.coverageIsMeasurable = coverageIsMeasurable
-        self.thinnestBearing = thinnestBearing
+        self.gapBearing = gapBearing
     }
 
     public var totalShots: Int { exteriorShots + interiorShots }
@@ -78,70 +68,60 @@ public struct ShootingProgress: Sendable, Equatable {
 
     public func shortBy(_ step: ShotStep) -> Int { max(step.required - taken(step), 0) }
 
-    public func isComplete(_ step: ShotStep) -> Bool {
-        guard taken(step) >= step.required else { return false }
-        if step.isGradedByCoverage && coverageIsMeasurable {
-            return coverage >= Self.coverageToFinish
-        }
-        return true
-    }
+    /// A step is done when it has its photographs. Nothing else is asked of
+    /// it — see the type's documentation for why.
+    public func isComplete(_ step: ShotStep) -> Bool { taken(step) >= step.required }
 
     /// The step the overlay is drawing and the next photograph will be filed
-    /// against. Nil once the whole plan is met, which is when the finish
-    /// button appears.
+    /// against. Nil once every step has its photographs.
     public var currentStep: ShotStep? {
         ShotStep.allCases.first { !isComplete($0) }
     }
 
-    /// Everything still outstanding, in the order it is asked for.
+    /// Every step still short, in the order it is asked for. Shown on the
+    /// finish page as a reminder; never used to refuse anything.
     public var outstanding: [Requirement] {
         ShotStep.allCases.compactMap { step in
-            guard !isComplete(step) else { return nil }
             let short = shortBy(step)
-            // A graded step with its photographs in is short of angles, not
-            // of shutter presses.
-            guard short > 0 else {
-                return .moreCoverage(bearing: thinnestBearing, fraction: coverage)
-            }
-            return .step(step, shortBy: short)
+            return short > 0 ? Requirement(step: step, shortBy: short) : nil
         }
     }
 
-    public var canFinish: Bool { currentStep == nil }
+    /// Whether everything the plan asks for is in.
+    public var planComplete: Bool { currentStep == nil }
+
+    /// Whether there is anything to hand in. One photograph is enough to make
+    /// a session worth keeping; the plan is advice about how to make it a
+    /// better one.
+    public var canHandIn: Bool { totalShots > 0 }
 
     /// The one thing to put on screen. A list of outstanding requirements is
     /// a form; one sentence is an instruction.
     ///
-    /// ⚠️ It does not repeat the count. The strip under the viewfinder shows
-    /// "12 / 20" already, and the sentence is worth more spent on the thing
-    /// the counter cannot say — which way to walk.
+    /// It does not repeat the count — the caption under the drawing says
+    /// "12 / 20" already — and it spends the sentence on the thing the counter
+    /// cannot say: which way round is still thin.
     public var instruction: String {
         guard let step = currentStep else {
             // Past the plan, and the session is still open. Say something
             // that invites more rather than declaring victory.
-            return "够交单了 —— 多拍几张，理赔更稳"
+            return "计划里的都拍到了 —— 多拍几张，理赔更稳"
         }
-        guard step.isGradedByCoverage else { return step.hintZH }
-
-        // The walk-around, where the app has something to add. Before a few
-        // photographs are in there is no fitted car and no bearing worth
-        // trusting, so it just says what to do.
-        if taken(step) < 3 || !coverageIsMeasurable { return step.hintZH }
-        guard coverage < Self.coverageToFinish, let bearing = thinnestBearing else {
-            return shortBy(step) > 0 ? step.hintZH : "绕着车继续拍"
-        }
-        return Self.walkThisWay(bearing)
+        // Only the walk-around has anything to add, and only once there are a
+        // few photographs to measure a gap against.
+        guard step == .walkAround, taken(step) >= 3, let gapBearing else { return step.hintZH }
+        return Self.walkThisWay(gapBearing)
     }
 
     /// What to put **under** the frame, when the drawing in the middle of it
     /// is not already saying the same thing.
     ///
-    /// ⚠️ Nil for most steps, and that is the point. The guide overlay now
-    /// carries the step's own words; printing them again at the bottom of the
+    /// ⚠️ Nil for most steps, and that is the point. The guide overlay carries
+    /// the step's own words; printing them again at the bottom of the
     /// viewfinder reads as *two* instructions, and somebody stops to work out
     /// how the second one differs from the first. What is left here is only
-    /// what a drawing cannot hold: which way to walk, and that the session may
-    /// now be handed in.
+    /// what a drawing cannot hold: which way to walk, and that the plan is
+    /// done.
     public var directive: String? {
         let sentence = instruction
         return sentence == currentStep?.hintZH ? nil : sentence
@@ -149,18 +129,15 @@ public struct ShootingProgress: Sendable, Equatable {
 
     /// ⚠️ A direction, never a part of the car.
     ///
-    /// The app cannot tell a bonnet from a boot. The shape is fitted by
-    /// principal component analysis, which finds an axis and not a heading,
-    /// and the end nearest the photographer at the moment of the fit was
-    /// called the front — which was defensible only while a shot list made
-    /// everyone start there. That list named positions; this one names
-    /// subjects and still says nothing about which end is which. Saying
-    /// "还差车尾" when the photographer has been shooting nothing but the boot
-    /// is worse than saying nothing, because they stop believing the next
-    /// instruction too.
-    static func walkThisWay(_ bearing: Double) -> String {
+    /// The app has no idea which end of the car is which — it knows only
+    /// which way the camera has been pointed. Saying "还差车尾" to somebody
+    /// who has been photographing nothing but the boot is worse than saying
+    /// nothing, because they stop believing the next instruction too.
+    ///
+    /// `bearing` is positive to the photographer's right.
+    public static func walkThisWay(_ bearing: Double) -> String {
         switch abs(bearing) {
-        case ..<25: return "还差你正前方那块，走近一点拍"
+        case ..<25: return "就在这一边，再多拍几张"
         case ..<115: return bearing < 0 ? "往你左边走，那边还没拍" : "往你右边走，那边还没拍"
         default: return "绕到车的另一边，那边还没拍"
         }

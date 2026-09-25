@@ -16,23 +16,39 @@ import simd
 /// something.
 public enum CarInFrame {
 
-    /// How much of the frame the car has to fill to count as photographed.
+    /// How many scanned car points have to land in the frame.
     ///
-    /// Low on purpose. A photograph of one wheel arch from close up is a
-    /// legitimate evidence photograph and fills a fair bit of frame; a
-    /// photograph taken while walking, of the floor, fills none. This only
-    /// has to tell those apart, and anything stricter starts rejecting real
-    /// work — which is far more expensive than letting a stray frame
-    /// through.
-    public static let minimumShare = 0.06
+    /// ⚠️ A count, and it used to be an area. The area was the bounding box
+    /// of the visible points as a fraction of the frame, which sounds like
+    /// the right question — "how much of the picture is car" — and is
+    /// measured off a cloud thinned to four hundred points across a whole
+    /// vehicle. The closer the phone gets, the fewer of those points are in
+    /// shot, so the metric falls exactly as the car fills more of the frame.
+    /// It rejected a photograph of nothing but bonnet, from a metre away,
+    /// over and over, from the same spot.
+    ///
+    /// So this asks only the question the gate was built for: **did the
+    /// camera look at where the car is?** A photograph of a garage floor has
+    /// no car points in it at all. Everything else — how much frame, how
+    /// close, how oblique — is guesswork off a sparse cloud, and guessing
+    /// wrong here rejects real work, which costs far more than letting a
+    /// stray frame through.
+    ///
+    /// Three rather than one, because a stray vertex from a neighbouring car
+    /// can end up inside the fitted box.
+    public static let minimumPoints = 3
 
     public struct Reading: Sendable, Equatable {
         /// Fraction of the scanned car points that fall inside the frame.
         public var visible: Double
-        /// Fraction of the frame's area their bounding box covers.
+        /// Fraction of the frame's area their bounding box covers. Reported
+        /// for the diagnostics line, never used to refuse a photograph — see
+        /// `minimumPoints`.
         public var share: Double
+        /// How many points landed in frame.
+        public var pointsInFrame: Int
 
-        public var showsTheCar: Bool { share >= CarInFrame.minimumShare }
+        public var showsTheCar: Bool { pointsInFrame >= CarInFrame.minimumPoints }
     }
 
     /// Projects the car's points into the camera and measures what lands.
@@ -46,7 +62,7 @@ public enum CarInFrame {
         looking direction: SIMD3<Float>,
         horizontalFieldOfViewDegrees: Double
     ) -> Reading {
-        guard !points.isEmpty else { return Reading(visible: 0, share: 0) }
+        guard !points.isEmpty else { return Reading(visible: 0, share: 0, pointsInFrame: 0) }
 
         let view = simd_normalize(direction)
         let flatRight = simd_cross(view, SIMD3<Float>(0, 1, 0))
@@ -76,9 +92,13 @@ public enum CarInFrame {
             minY = min(minY, y); maxY = max(maxY, y)
         }
 
-        guard inside > 0 else { return Reading(visible: 0, share: 0) }
+        guard inside > 0 else { return Reading(visible: 0, share: 0, pointsInFrame: 0) }
         // The frame spans 2 by 2 in these coordinates, so its area is 4.
         let share = ((maxX - minX) * (maxY - minY)) / 4
-        return Reading(visible: Double(inside) / Double(points.count), share: min(share, 1))
+        return Reading(
+            visible: Double(inside) / Double(points.count),
+            share: min(share, 1),
+            pointsInFrame: inside
+        )
     }
 }

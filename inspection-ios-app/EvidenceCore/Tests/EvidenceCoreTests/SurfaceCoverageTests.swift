@@ -185,8 +185,7 @@ final class SurfaceCoverageTests: XCTestCase {
     }
 }
 
-/// A session with every step of the plan filled, which is what the finish
-/// button waits for.
+/// A session with every step of the plan filled.
 private func wholePlan(except skipped: ShotStep? = nil) -> [ShotStep: Int] {
     var counts: [ShotStep: Int] = [:]
     for step in ShotStep.allCases where step != skipped { counts[step] = step.required }
@@ -196,14 +195,13 @@ private func wholePlan(except skipped: ShotStep? = nil) -> [ShotStep: Int] {
 private func progress(
     coverage: Double = 1.0,
     steps: [ShotStep: Int],
-    measurable: Bool = true,
     bearing: Double? = nil
 ) -> ShootingProgress {
     let exterior = steps.filter { !$0.key.isInterior }.values.reduce(0, +)
     let interior = steps.filter { $0.key.isInterior }.values.reduce(0, +)
     return ShootingProgress(
         coverage: coverage, exteriorShots: exterior, interiorShots: interior,
-        shotsByStep: steps, coverageIsMeasurable: measurable, thinnestBearing: bearing
+        shotsByStep: steps, gapBearing: bearing
     )
 }
 
@@ -216,28 +214,17 @@ final class ShootingProgressTests: XCTestCase {
         let fresh = progress(coverage: 0, steps: [:], bearing: -90)
         XCTAssertEqual(fresh.currentStep, .walkAround)
         XCTAssertEqual(fresh.instruction, ShotStep.walkAround.hintZH)
-        XCTAssertFalse(fresh.canFinish)
+        XCTAssertFalse(fresh.planComplete)
     }
 
-    /// ⚠️ Twenty photographs is not a walk around a car. It is twenty
-    /// photographs, and twenty of the same door satisfies a counter.
-    func testTheWalkAroundIsNotDoneOnCountAlone() {
-        let stoodStill = progress(coverage: 0.4, steps: [.walkAround: 20], bearing: 40)
-        XCTAssertEqual(stoodStill.currentStep, .walkAround)
-        XCTAssertEqual(stoodStill.instruction, "往你右边走，那边还没拍")
-
-        let wentRound = progress(coverage: 0.93, steps: [.walkAround: 20])
-        XCTAssertEqual(wentRound.currentStep, .bumperCorners)
-    }
-
-    /// ⚠️ And the reverse: when there is no car fitted there is nothing to
-    /// grade against, and the count has to stand on its own. A requirement
-    /// nobody can clear teaches people to ignore the others.
-    func testAnUngradableWalkAroundPassesOnItsCount() {
-        let blind = progress(coverage: 0, steps: [.walkAround: 20], measurable: false)
-        XCTAssertEqual(blind.currentStep, .bumperCorners)
-        XCTAssertEqual(progress(coverage: 0, steps: [.walkAround: 19], measurable: false).currentStep,
-                       .walkAround)
+    /// ⚠️ A guide, not a gate. Twenty photographs advance the walk-around
+    /// whatever the ring says. It used to hold the step until a surface model
+    /// agreed the car had been photographed from nine-tenths of the way
+    /// round, and on a real car that meant being told to photograph the rear
+    /// while photographing the rear.
+    func testStepsAdvanceOnTheirCountAlone() {
+        let stoodStill = progress(coverage: 0.2, steps: [.walkAround: 20], bearing: 40)
+        XCTAssertEqual(stoodStill.currentStep, .bumperCorners)
     }
 
     func testTheStepsAreAskedForInOrder() {
@@ -246,17 +233,36 @@ final class ShootingProgressTests: XCTestCase {
             XCTAssertEqual(progress(steps: counts).currentStep, step)
             counts[step] = step.required
         }
-        XCTAssertTrue(progress(steps: counts).canFinish)
+        XCTAssertTrue(progress(steps: counts).planComplete)
     }
 
-    /// ⚠️ The app cannot tell a bonnet from a boot — PCA finds an axis, not a
-    /// heading — so it must never claim to. This is the assertion that stops
-    /// somebody reintroducing "还差车尾" because it reads better.
+    /// ⚠️ One photograph is something to hand in. The plan says what would
+    /// make the session better; it does not hold the work hostage.
+    func testNothingInThePlanStopsAHandIn() {
+        let one = progress(coverage: 0.05, steps: [.walkAround: 1])
+        XCTAssertTrue(one.canHandIn)
+        XCTAssertFalse(one.planComplete)
+        XCTAssertFalse(progress(coverage: 0, steps: [:]).canHandIn)
+    }
+
+    /// Before a few photographs there is no gap worth pointing at, so the
+    /// step just says what to do. After that, the one sentence is spent on
+    /// which way round is still thin.
+    func testTheWalkingHintWaitsForAFewPhotographs() {
+        XCTAssertEqual(progress(coverage: 0.1, steps: [.walkAround: 2], bearing: 60).instruction,
+                       ShotStep.walkAround.hintZH)
+        XCTAssertEqual(progress(coverage: 0.3, steps: [.walkAround: 5], bearing: 60).instruction,
+                       "往你右边走，那边还没拍")
+        XCTAssertEqual(progress(coverage: 0.3, steps: [.walkAround: 5], bearing: -60).instruction,
+                       "往你左边走，那边还没拍")
+    }
+
+    /// ⚠️ The app cannot tell a bonnet from a boot — it knows only which way
+    /// the camera pointed — so it must never claim to. This is the assertion
+    /// that stops somebody reintroducing "还差车尾" because it reads better.
     func testItNeverNamesAnEndOfTheCar() {
         for bearing in stride(from: -180.0, through: 180.0, by: 7.5) {
-            let said = progress(
-                coverage: 0.3, steps: [.walkAround: 5], bearing: bearing
-            ).instruction
+            let said = progress(coverage: 0.3, steps: [.walkAround: 5], bearing: bearing).instruction
             XCTAssertFalse(said.contains("车头"), said)
             XCTAssertFalse(said.contains("车尾"), said)
         }
@@ -266,41 +272,30 @@ final class ShootingProgressTests: XCTestCase {
         }
     }
 
-    /// Ninety per cent, not a hundred. A tow bar, a roof box or a car parked
-    /// against a wall leaves patches nobody can reach, and a photographer who
-    /// cannot finish goes back to the camera app.
-    func testTheFinishButtonUnlocksBelowFullCoverage() {
-        XCTAssertFalse(progress(coverage: 0.88, steps: wholePlan()).canFinish)
-        XCTAssertTrue(progress(coverage: 0.91, steps: wholePlan()).canFinish)
-    }
-
-    /// ⚠️ The roof is asked for as four photographs, not as geometry.
-    ///
-    /// It used to be a coverage band, and the arithmetic wanted the phone
-    /// above the real roofline pointing down — reachable on a 1.45m saloon,
-    /// impossible on a 1.68m RAV4, which is what the fleet drives. Somebody
-    /// photographing the roof watched the number not move. Declared
-    /// subjects do not have this problem.
-    func testTheRoofIsFourPhotographsRatherThanAnUnreachableAngle() {
+    /// The roof is four photographs the photographer declares by taking them
+    /// while the roof is on screen — not an angle a model has to agree was
+    /// reached.
+    func testTheRoofIsFourPhotographs() {
         XCTAssertEqual(ShotStep.roof.required, 4)
-        XCTAssertFalse(ShotStep.roof.isGradedByCoverage)
         XCTAssertEqual(ShotStep.roof.region, .roof)
-        XCTAssertFalse(progress(steps: wholePlan(except: .roof)).canFinish)
+        XCTAssertFalse(progress(steps: wholePlan(except: .roof)).planComplete)
     }
 
-    /// ⚠️ Only the walk-around asks whether the car is in the frame. The
-    /// check reads what share of the screen the scanned car fills, which is
-    /// meaningless for one wheel arch, for the view from the driver's seat,
-    /// and for a roof shot from underneath.
-    func testOnlyTheWalkAroundIsCheckedForHavingTheCarInFrame() {
-        XCTAssertTrue(ShotStep.walkAround.needsTheCarInFrame)
-        for step in ShotStep.allCases where step != .walkAround {
-            XCTAssertFalse(step.needsTheCarInFrame, step.rawValue)
-        }
+    /// ⚠️ Filed by step, because there is no camera pose to file by. Most of
+    /// the outside is honestly "outside, somewhere"; the two steps that know
+    /// better say so.
+    func testPhotographsAreFiledByTheirStep() {
+        XCTAssertEqual(ShotStep.walkAround.region, .exterior)
+        XCTAssertEqual(ShotStep.wheels.region, .exterior)
+        XCTAssertEqual(ShotStep.windscreen.region, .front)
+        XCTAssertEqual(ShotStep.roof.region, .roof)
+        XCTAssertEqual(ShotStep.dashboard.region, .interior)
+        XCTAssertTrue(ShotStep.wheels.creditsTheRing)
+        XCTAssertFalse(ShotStep.dashboard.creditsTheRing)
     }
 
-    /// The plan is the gate now, so the plan has to clear the promise the
-    /// fleet made: thirty exterior, eight interior, dashboard among them.
+    /// The plan has to clear the promise the fleet made: thirty exterior,
+    /// eight interior, dashboard among them.
     func testThePlanClearsTheFleetFloors() {
         XCTAssertGreaterThanOrEqual(ShotStep.exteriorRequired, ShootingProgress.exteriorFloor)
         XCTAssertGreaterThanOrEqual(ShotStep.interiorRequired, ShootingProgress.interiorFloor)
@@ -311,21 +306,20 @@ final class ShootingProgressTests: XCTestCase {
     }
 
     /// More photographs make a claim more likely to succeed, so nothing may
-    /// tell the photographer they are done — only that they *may* stop.
+    /// tell the photographer they are done — only that the plan is.
     func testPastThePlanItAsksForMoreRatherThanDeclaringVictory() {
         let done = progress(coverage: 0.97, steps: wholePlan())
-        XCTAssertTrue(done.canFinish)
+        XCTAssertTrue(done.planComplete)
         XCTAssertTrue(done.instruction.contains("多拍"), done.instruction)
         XCTAssertFalse(done.instruction.contains("完成"))
     }
 
-    /// There is no ceiling anywhere: a hundred photographs is a better
-    /// session than forty-one, and the model must not disagree.
+    /// There is no ceiling anywhere.
     func testThereIsNoUpperBound() {
         var over = wholePlan()
         for step in ShotStep.allCases { over[step] = step.required * 3 }
         let many = progress(coverage: 1.0, steps: over)
-        XCTAssertTrue(many.canFinish)
+        XCTAssertTrue(many.planComplete)
         XCTAssertTrue(many.outstanding.isEmpty)
         XCTAssertEqual(many.totalShots, ShotStep.totalRequired * 3)
     }

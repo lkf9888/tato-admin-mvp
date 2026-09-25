@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.6.2 - 2026-09-25
+
+### The contract says insurance is mandatory — and new contracts actually say it
+
+The agreement's Insurance clause used to read that rentals include no
+insurance and that the renter is charged per an ICBC quote. It now says
+insurance is mandatory for every rental, cannot be declined, and is
+charged per day at the rate on the first page. The first page's
+insurance line states that rate: "$29.00/day x 3 days = $87.00,
+mandatory". The rate stays on the first page rather than in the
+clause because it is a per-vehicle setting, the same reason the mileage
+clause points at the page instead of naming a figure. The clause
+summary shown before payment says the same, in English and Chinese.
+
+Changing the clause in code used to change nothing a renter signed.
+Each workspace's template PDF is generated once, with the clauses
+printed into it, and reused for every booking. Generated templates now
+carry a fingerprint of the clause text; one generated from older text
+is retired and rebuilt on the next booking. Retired, not deleted —
+contracts already signed keep pointing at the PDF the renter saw. A
+template whose description an operator has rewritten is treated as
+theirs and left alone. Rebuilding also picks up the site's current
+brand name and address as the Owner.
+
 ## v1.6.1 - 2026-09-25
 
 ### Insurance is part of the price, and tax is charged on rent only

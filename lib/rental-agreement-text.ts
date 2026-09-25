@@ -41,8 +41,14 @@ export const RENTAL_AGREEMENT_CLAUSES: RentalAgreementClause[] = [
   },
   {
     heading: "Insurance",
+    // Changed at the operator's instruction on 2026-09-25: insurance is
+    // now a mandatory daily fee rather than a separate ICBC quote. The
+    // rate itself is printed on the first page -- it is a per-vehicle
+    // setting, and a clause naming one figure while the page prints
+    // another is worse than a clause naming none. The rest of the
+    // clause is the paper wording, unchanged.
     body:
-      "Rentals do not include any insurance, renters will need to provide driver's license information to confirm the actual price of insurance for the vehicle, the rental company will charge the renter the cost of insurance based on ICBC's quote. The renter agrees to have their personal information added to the vehicle's ICBC insurance paper. In the event of an accident, the Renter agrees to notify the Rental Company immediately and to cooperate fully in any investigation. The Renter acknowledges that insurance coverage may be limited or void if terms are breached. The Renter agrees to pay any deductible resulting from an insurance claim and agrees to assume liability for uninsured parties in the event of an accident.",
+      "Insurance is mandatory for every rental and cannot be declined. It is charged for each day of the rental at the daily insurance rate stated on the first page of this Agreement, and is included in the amount the Renter pays. The renter agrees to have their personal information added to the vehicle's ICBC insurance paper. In the event of an accident, the Renter agrees to notify the Rental Company immediately and to cooperate fully in any investigation. The Renter acknowledges that insurance coverage may be limited or void if terms are breached. The Renter agrees to pay any deductible resulting from an insurance claim and agrees to assume liability for uninsured parties in the event of an accident.",
   },
   {
     heading: "Vehicle Damage Responsibility",

@@ -118,7 +118,7 @@ export const shareMessages = {
         },
         {
           title: "Insurance",
-          copy: "Rentals do not include insurance unless selected. The renter must provide license information so the rental company can confirm insurance pricing and eligibility. The renter must notify the company immediately after any accident and cooperate with all investigations.",
+          copy: "Insurance is mandatory for every rental and cannot be declined. It is charged for each rental day at the daily rate shown in the price above and on the agreement. The renter must notify the company immediately after any accident and cooperate with all investigations.",
         },
         {
           title: "Damage Responsibility",
@@ -268,7 +268,7 @@ export const shareMessages = {
         },
         {
           title: "保险",
-          copy: "除非已选择保险，租金不包含保险费用。租客需要提供驾驶执照信息，以便租车公司确认保险价格和资格。发生事故后，租客必须立即通知租车公司并配合调查。",
+          copy: "每笔租赁都必须购买保险，不可取消。保险按租用天数收取，每日费率见上方价格和租车合同。发生事故后，租客必须立即通知租车公司并配合调查。",
         },
         {
           title: "车辆损坏责任",

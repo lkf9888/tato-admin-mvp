@@ -446,6 +446,8 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
         metadata.includeInsurance === "true" && metadata.bookedDays
           ? (vehicle.bookingInsuranceFee ?? 0) * Number(metadata.bookedDays)
           : null,
+      insuranceDailyRate: vehicle.bookingInsuranceFee ?? null,
+      insuranceDays: metadata.bookedDays ? Number(metadata.bookedDays) : null,
       // The card itself stays with Stripe. What the contract records
       // is that one is on file, which is what its payment clause
       // actually needs -- storing the number would be a PCI matter and

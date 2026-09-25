@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.5.0 - 2026-09-25
+
+### Import a car's photos from its Turo listing
+
+`POST /api/vehicles/:id/attachments/import` takes up to twelve image
+URLs and stores them as the car's photos, in order — the first is the
+cover on the rental site. The browser cannot copy Turo photos itself,
+because Turo's image CDN sends no CORS headers, so the server fetches
+them.
+
+Because the server fetches what it is given, the check is an
+allowlist: `https://images.turo.com/media/vehicle/images/…` only, no
+redirects followed, image content types only, 8 MB per photo. Each
+photo is saved as `turo-<imageId>`, and one already on the car is
+skipped, so an import that failed halfway can simply be run again.
+
 ## v1.4.1 - 2026-09-24
 
 ### Crawlers may fetch a site's car photos and logo

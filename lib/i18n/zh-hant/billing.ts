@@ -82,6 +82,14 @@ export const billingMessages = {
       refreshAction: "從 Stripe 同步最新狀態",
       refreshing: "正在檢查狀態...",
       genericError: "當前無法連線 Stripe，請稍後再試。",
+      errorConnectNotEnabled:
+        "平台的 Stripe 帳戶還沒有開通 Connect，所以暫時無法建立收款帳戶。平台管理員需要先在 Stripe 後台完成一次 Connect 設定，之後這個按鈕就能用了。",
+      errorConnectUnderReview:
+        "Stripe 還在審核平台的 Connect 設定。審核通過後才能建立收款帳戶，一般需要幾個工作日。",
+      errorNotConfigured: "伺服器沒有配置 Stripe。",
+      errorInvalidCountry: "請先選擇加拿大或美國。",
+      errorStripeSays: (detail: string) => `Stripe 返回：${detail}`,
+      connectSetupLink: "開啟 Stripe Connect 設定",
       returnedNotice: "已從 Stripe 返回。如果狀態沒有立即重新整理，請點選『同步狀態』。",
       refreshedNotice: "已從 Stripe 同步最新狀態。",
       refreshedPendingNotice: "Stripe 還需要補充一些資訊才能把帳戶置為可用。",

@@ -89,6 +89,14 @@ export const billingMessages = {
       refreshAction: "Refresh status from Stripe",
       refreshing: "Checking status...",
       genericError: "We couldn't talk to Stripe right now. Please try again in a moment.",
+      errorConnectNotEnabled:
+        "The platform's Stripe account hasn't turned on Connect yet, so payout accounts can't be created. The platform owner finishes Connect setup in the Stripe dashboard once, then this button works.",
+      errorConnectUnderReview:
+        "Stripe is still reviewing the platform's Connect setup. Payout accounts can be created once the review is approved — usually within a few business days.",
+      errorNotConfigured: "Stripe is not configured on this server.",
+      errorInvalidCountry: "Choose Canada or the United States first.",
+      errorStripeSays: (detail: string) => `Stripe said: ${detail}`,
+      connectSetupLink: "Open Stripe Connect setup",
       returnedNotice: "Welcome back from Stripe. Click Refresh status if your badge hasn't updated yet.",
       refreshedNotice: "Latest status synced from Stripe.",
       refreshedPendingNotice: "Stripe still needs a few more details before your account is fully active.",
@@ -184,6 +192,14 @@ export const billingMessages = {
       refreshAction: "从 Stripe 同步最新状态",
       refreshing: "正在检查状态...",
       genericError: "当前无法连接 Stripe，请稍后再试。",
+      errorConnectNotEnabled:
+        "平台的 Stripe 账户还没有开通 Connect，所以暂时无法创建收款账户。平台管理员需要先在 Stripe 后台完成一次 Connect 设置，之后这个按钮就能用了。",
+      errorConnectUnderReview:
+        "Stripe 还在审核平台的 Connect 设置。审核通过后才能创建收款账户，一般需要几个工作日。",
+      errorNotConfigured: "服务器没有配置 Stripe。",
+      errorInvalidCountry: "请先选择加拿大或美国。",
+      errorStripeSays: (detail: string) => `Stripe 返回：${detail}`,
+      connectSetupLink: "打开 Stripe Connect 设置",
       returnedNotice: "已从 Stripe 返回。如果状态没有立即刷新，请点击『同步状态』。",
       refreshedNotice: "已从 Stripe 同步最新状态。",
       refreshedPendingNotice: "Stripe 还需要补充一些信息才能把账户置为可用。",

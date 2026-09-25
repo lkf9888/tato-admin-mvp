@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.6.3 - 2026-09-25
+
+### The payouts page explains Stripe Connect errors instead of relaying them
+
+Starting onboarding on a platform whose Stripe account has not turned
+on Connect used to show Stripe's own English sentence — "You can only
+create new accounts if you've signed up for Connect" — which reads to
+an operator as their mistake, when it is a one-time switch on the
+platform's account. The payouts actions now sort Stripe failures into
+codes (Connect not enabled, Connect under review, Stripe not
+configured, bad country) and the page explains each in the viewer's
+language, with a link to Stripe's Connect setup where that is the fix.
+Anything unrecognised still shows Stripe's words, so nothing is hidden.
+
+The local dev server now takes a free port when 3000 is busy
+(`.claude/launch.json` `autoPort`).
+
 ## v1.6.2 - 2026-09-25
 
 ### The contract says insurance is mandatory — and new contracts actually say it

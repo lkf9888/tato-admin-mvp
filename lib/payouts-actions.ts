@@ -18,6 +18,40 @@ const startOnboardingSchema = z.object({
   country: z.enum(["CA", "US"]),
 });
 
+export type ConnectErrorCode =
+  | "NOT_CONFIGURED"
+  | "CONNECT_NOT_ENABLED"
+  | "CONNECT_UNDER_REVIEW"
+  | "INVALID_COUNTRY"
+  | "UNKNOWN";
+
+/**
+ * Sort a Stripe failure into something the page can explain.
+ *
+ * Stripe's own message went straight to the screen before, in English,
+ * and the commonest one -- "You can only create new accounts if you've
+ * signed up for Connect" -- reads to an operator as if they had done
+ * something wrong, when it is a one-time switch on the platform's
+ * Stripe account. The raw text is still returned for anything this
+ * does not recognise, so nothing is hidden.
+ */
+function describeConnectError(error: unknown): { code: ConnectErrorCode; error: string } {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (/signed up for connect/i.test(message)) {
+    return { code: "CONNECT_NOT_ENABLED", error: message };
+  }
+  if (/under review|cannot (currently )?create live|not (yet )?(been )?approved|review (of )?your (platform|application)/i.test(message)) {
+    return { code: "CONNECT_UNDER_REVIEW", error: message };
+  }
+  return { code: "UNKNOWN", error: message };
+}
+
+const NOT_CONFIGURED = {
+  ok: false,
+  code: "NOT_CONFIGURED" as ConnectErrorCode,
+  error: "Stripe is not configured on the server.",
+} as const;
+
 async function resolveOrigin() {
   try {
     const incoming = await headers();
@@ -31,7 +65,7 @@ async function resolveOrigin() {
 
 export async function startConnectOnboarding(formData: FormData) {
   if (!isStripeConnectConfigured()) {
-    return { ok: false, error: "Stripe is not configured on the server." } as const;
+    return NOT_CONFIGURED;
   }
 
   const parsed = startOnboardingSchema.safeParse({
@@ -40,6 +74,7 @@ export async function startConnectOnboarding(formData: FormData) {
   if (!parsed.success) {
     return {
       ok: false,
+      code: "INVALID_COUNTRY" as ConnectErrorCode,
       error: "Please pick a supported country (CA or US) before continuing.",
     } as const;
   }
@@ -63,16 +98,13 @@ export async function startConnectOnboarding(formData: FormData) {
 
     return { ok: true, url } as const;
   } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Could not start Stripe onboarding.",
-    } as const;
+    return { ok: false, ...describeConnectError(error) } as const;
   }
 }
 
 export async function continueConnectOnboarding() {
   if (!isStripeConnectConfigured()) {
-    return { ok: false, error: "Stripe is not configured on the server." } as const;
+    return NOT_CONFIGURED;
   }
 
   const { workspace } = await requireCurrentAdminContext();
@@ -85,16 +117,13 @@ export async function continueConnectOnboarding() {
     });
     return { ok: true, url } as const;
   } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Could not resume Stripe onboarding.",
-    } as const;
+    return { ok: false, ...describeConnectError(error) } as const;
   }
 }
 
 export async function openConnectDashboard() {
   if (!isStripeConnectConfigured()) {
-    return { ok: false, error: "Stripe is not configured on the server." } as const;
+    return NOT_CONFIGURED;
   }
 
   const { workspace } = await requireCurrentAdminContext();
@@ -103,16 +132,13 @@ export async function openConnectDashboard() {
     const url = await createConnectLoginLink({ workspaceId: workspace.id });
     return { ok: true, url } as const;
   } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Could not open the Stripe dashboard.",
-    } as const;
+    return { ok: false, ...describeConnectError(error) } as const;
   }
 }
 
 export async function refreshConnectStatus() {
   if (!isStripeConnectConfigured()) {
-    return { ok: false, error: "Stripe is not configured on the server." } as const;
+    return NOT_CONFIGURED;
   }
 
   const { workspace } = await requireCurrentAdminContext();
@@ -122,9 +148,6 @@ export async function refreshConnectStatus() {
     revalidatePath("/payouts");
     return { ok: true } as const;
   } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Could not refresh Stripe status.",
-    } as const;
+    return { ok: false, ...describeConnectError(error) } as const;
   }
 }

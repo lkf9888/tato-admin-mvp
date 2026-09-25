@@ -63,7 +63,7 @@ export function PayoutsPanel({
   const t = messages.payoutsPage;
 
   const [country, setCountry] = useState<"CA" | "US">(snapshot.country ?? "CA");
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState<{ code?: string; detail?: string } | null>(null);
   const [notice, setNotice] = useState<string>(returnedFromStripe ? t.returnedNotice : "");
   const [isStarting, startStart] = useTransition();
   const [isResuming, startResume] = useTransition();
@@ -91,14 +91,14 @@ export function PayoutsPanel({
 
   function handleStart() {
     if (!configured) return;
-    setError("");
+    setError(null);
     setNotice("");
     const formData = new FormData();
     formData.set("country", country);
     startStart(async () => {
       const result = await startConnectOnboarding(formData);
       if (!result.ok) {
-        setError(result.error || t.genericError);
+        setError({ code: result.code, detail: result.error });
         return;
       }
       window.location.href = result.url;
@@ -107,12 +107,12 @@ export function PayoutsPanel({
 
   function handleResume() {
     if (!configured) return;
-    setError("");
+    setError(null);
     setNotice("");
     startResume(async () => {
       const result = await continueConnectOnboarding();
       if (!result.ok) {
-        setError(result.error || t.genericError);
+        setError({ code: result.code, detail: result.error });
         return;
       }
       window.location.href = result.url;
@@ -121,12 +121,12 @@ export function PayoutsPanel({
 
   function handleDashboard() {
     if (!configured) return;
-    setError("");
+    setError(null);
     setNotice("");
     startDashboard(async () => {
       const result = await openConnectDashboard();
       if (!result.ok) {
-        setError(result.error || t.genericError);
+        setError({ code: result.code, detail: result.error });
         return;
       }
       window.open(result.url, "_blank", "noopener,noreferrer");
@@ -135,12 +135,12 @@ export function PayoutsPanel({
 
   function handleRefresh() {
     if (!configured) return;
-    setError("");
+    setError(null);
     setNotice("");
     startRefresh(async () => {
       const result = await refreshConnectStatus();
       if (!result.ok) {
-        setError(result.error || t.genericError);
+        setError({ code: result.code, detail: result.error });
         return;
       }
       setNotice(status === "active" ? t.refreshedNotice : t.refreshedPendingNotice);
@@ -311,9 +311,35 @@ export function PayoutsPanel({
         )}
 
         {error && (
-          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-800">
-            {error}
-          </p>
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] leading-5 text-red-800">
+            <p>
+              {error.code === "CONNECT_NOT_ENABLED"
+                ? t.errorConnectNotEnabled
+                : error.code === "CONNECT_UNDER_REVIEW"
+                  ? t.errorConnectUnderReview
+                  : error.code === "NOT_CONFIGURED"
+                    ? t.errorNotConfigured
+                    : error.code === "INVALID_COUNTRY"
+                      ? t.errorInvalidCountry
+                      : t.genericError}
+            </p>
+            {error.code === "CONNECT_NOT_ENABLED" || error.code === "CONNECT_UNDER_REVIEW" ? (
+              <a
+                href="https://dashboard.stripe.com/connect/set-up"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block font-medium underline underline-offset-2"
+              >
+                {t.connectSetupLink} ↗
+              </a>
+            ) : null}
+            {/* Stripe's own words stay visible for anything we could not
+                name -- a translated guess would hide the one line that
+                says what actually went wrong. */}
+            {error.detail && (error.code === "UNKNOWN" || !error.code) ? (
+              <p className="mt-1 text-red-700/80">{t.errorStripeSays(error.detail)}</p>
+            ) : null}
+          </div>
         )}
         {notice && !error && (
           <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800">

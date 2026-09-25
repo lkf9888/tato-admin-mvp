@@ -1070,6 +1070,80 @@ A **Refresh** button that reloads orders only and keeps your zoom, scroll positi
 With no fixed block left to page through, prev/next now move one screenful of days — computed from the viewport width and the current zoom, minus two days of overlap so the edge you were reading is still on screen. The buttons say how far they will go ("← Back 11 days"). Dragging the timeline shows the same readout live, written straight to the DOM so a drag still never re-renders the grid.
 
 
+## v0.79.0 - 2026-09-20
+
+- **Field labels come from the hub, so a new sender needs no mini program release.** The mini program named each field from a dictionary compiled into the client. That held while TATO was the only sender; the day HostHub sends `room`, the message reads "room 302" until a new client version clears WeChat review — days, for one word. Labels are now `NotifyApp.fieldLabels`, set with `npm run notify-hub -- app:labels --app hosthub --labels '{"room":"房间"}'`, and `/api/v1/mp/inbox` resolves them per app at **read** time rather than send time: renaming a field updates messages already delivered, and nothing is copied into every stored payload. They ride at the response level keyed by app, not repeated on each item.
+
+  A small default set covers vocabulary more than one app uses (内容 / 时间 / 车辆 / 类型 / 备注 / 来源 / 地点 / 金额); an app adds its own and may override a default without affecting its neighbour. An unnamed field still shows its raw name — never blank, and a visible sign something new arrived wanting a name.
+
+  Writing the defaults nearly dropped `vehicle` as TATO-specific, which would have rendered "vehicle 7ABC" on every handover notification, because TATO's `fieldLabels` starts as `{}`. A fleet system has two apps that talk about cars; it is a default, and the verification now asserts TATO sends no unlabelled field.
+
+## v0.78.0 - 2026-09-20
+
+- **The mini program is registered to an individual, so `web-view` goes.** That subject cannot use `web-view`, which means a notification cannot open the sending system's own page. Checking what that actually costs showed the earlier estimate was too gloomy: of the five pages only `pages/webview` uses it. The task list — completing work, uploading photos — is native (`wx.uploadFile`), so a driver's day does not change, only the route to it.
+- **The detail button does what it can instead of failing every time.** It used to navigate to `pages/webview` and show an apology on failure; under this subject that failure is certain. It now resolves per sender: a TATO message offers **查看任务** and opens the native task list; any other sender offers **复制链接**; no link, no button.
+- `pages/webview` is **unregistered from `app.json`, not deleted.** The restriction belongs to the subject, not the code, and registering under a company later is the way back; the file's header says how.
+- The real cost is recorded in the launch checklist rather than left in a conversation: HostHub and the wash bay have no native page here, so their notifications can only offer to copy the link. It falls due when those systems are connected.
+
+## v0.77.0 - 2026-09-20
+
+- **The hub's settings are in every example env file.** `.env.production.example` and `.env.railway.example` carried none of them, and the Railway file is the one copied when setting the service up. The dangerous omission was not the timezone but `NOTIFY_HUB_SESSION_SECRET`: with it and `SESSION_SECRET` both unset the hub throws in production rather than sign with a default, so following that file to the letter produced a mini program whose session endpoint returned 500 with no hint why.
+- **`WECHAT_MINIPROGRAM_STATE` is no longer read by anything.** `miniprogram_state` became a column on `NotifyMiniProgram` when the hub landed, but the variable was still listed in three env files, the README, and the launch checklist — which told the reader to set it to `trial` before review "or messages will not arrive". Do as told, set a variable nothing reads, watch messages fail with no thread to pull. Every one of them — six files, counting both copies of the checklist — now points at the column.
+- **`npm run notify-hub -- mini-program:set --app-id … --state trial|formal|developer`.** There was no way to change the state after `mini-program:add`, which made the corrected instruction unfollowable. Trial becomes formal on approval day, and that should not need a redeploy.
+
+## v0.76.1 - 2026-09-20
+
+- Documentation only. Every claim in the Dockerfile's `TZ` comment re-checked against the code and a live run (the same `2026-04-22T09:00` resolves to 16:00Z under America/Vancouver and 09:00Z under UTC — the seven hours it cites). Four held. The fifth was left incomplete by the hub, which added a third reader of the fleet's timezone: `NOTIFY_TIMEZONE`, falling back to `CSV_IMPORT_TIMEZONE`. The comment now names it and why it never reads the container clock: a page in the wrong timezone looks wrong, a WeChat reminder seven hours out looks ordinary.
+
+## v0.76.0 - 2026-09-19
+
+- **Build and run on Node 24.** Node 20 reached end of life in April; both places that pin it — `node-version` in CI and `FROM node:20-slim` in the Dockerfile Railway builds — were quiet about it, so production had run an unsupported runtime for five months with CI certifying it. Both moved together: bumping CI alone would have left a green build proving nothing about a container still on 20. 24 rather than 22 because 22 is already in maintenance (security fixes until 2027-04); 24 is active LTS to 2028-04.
+
+  Checked beforehand: `node:24-slim` is published for amd64 and arm64, and no dependency declares an engines range excluding 24. The image itself was first built by the deploy (CI runs `next build` on the runner, not Docker); it came up healthy with the database check passing, which is where a native-module problem across two majors would have shown. No `engines` field — it would restate these two lines and warn on every `npm ci` from a machine still on 22.
+
+## v0.75.3 - 2026-09-19
+
+- CI only. `actions/checkout` and `actions/setup-node` from v4 to v7: v4 is built on Node 20, which GitHub was forcing onto Node 24 with a deprecation notice on every run. Straight to v7 rather than v5 (the first major on node24, already two behind); the behaviour changes in between were checked against this workflow — checkout v7 blocks fork checkouts under `pull_request_target`/`workflow_run`, which it does not use; setup-node v6 limits automatic caching to npm, which is the `cache: npm` it already pins.
+
+## v0.75.2 - 2026-09-19
+
+- CI only. **`npm run check:docs`** keeps the two copies of the launch checklist in step: `docs/wechat-mini-program-launch.md` and the HTML published as the Artifact page. It compares what must never differ — the same steps in the same order under the same phases, and the same errcode table — and deliberately not their prose, since a table in Markdown and a pair of cards on a page are rightly different shapes. Steps pair by id (`data-id` in the HTML, a trailing `<!-- id:… -->` on the Markdown item); an untagged item would silently drop out, so the tagged count is checked against the checkbox count. Verified against six kinds of drift, all of which fail with the file and id named. It cannot check the **published** Artifact, which sits behind claude.ai auth — republishing after an edit stays a human step, and the checklist says so.
+
+## v0.75.1 - 2026-09-19
+
+- Documentation only. `docs/wechat-mini-program-launch.md`: the order of operations for turning the hub on, sequenced by dependency, with the traps called out where they bite (the AppSecret shows once; a `phrase` field takes five characters and rejects the whole message at six; the timezone must not be the server's) and an errcode table for when someone says they are not getting anything. Platform rules are marked as WeChat's to confirm. Linked from the README.
+
+## v0.75.0 - 2026-09-19
+
+### A notification channel three systems can share
+
+Staff work in WeChat, and TATO, HostHub and the wash bay all need to reach them there. Three mini programs is the obvious shape and the wrong one: an openid belongs to one appid, so the same person would bind three times and appear as three strangers. One mini program is the channel; the hub owns its credentials, subscriber bindings and quota, and knows nothing about what any message means.
+
+`POST /api/v1/notify` with a per-app API key (`ntfy_…`, stored hashed, individually revocable). Callers name a **channel** and a logical **template** (`task`, `alert`) — never a template id, an appid or a mini program path. Apps are isolated: a key addresses only its own app's channels. A channel is the routing unit, as fine as one person or as coarse as a crew, many-to-many with subscribers. `NotifyApp.miniProgramId` is why selling HostHub later is `app:move`, one row, rather than a rewrite. Provisioning is `npm run notify-hub -- status | mini-program:add | template:set | app:add | key:mint | channel:add | tato:sync`.
+
+### One authorisation buys one message
+
+WeChat's one-off subscription grants exactly one message per accepted tap, grants accumulate, and there is no API to read the balance. The first integration treated a tap as a permanent switch: the first message arrived, every one after it came back 43101 and was discarded silently, and the staff schedule kept showing "WeChat alerts on". The hub now counts grants, spends before sending (refunding on any failure other than 43101), and zeroes on 43101. Priority floors — high spends the last slot, normal needs two, low three — stop routine traffic eating the slot an urgent handover needed. The balance shows in three places: the schedule, the mini program's banner, and a per-subscriber `no_quota` in the API response so a caller can fall back to email. The legacy send path turns `wechatNotificationEnabled` off on 43101, so the old screen stops lying too.
+
+### Correctness fixes found building it
+
+- Access tokens come from `stable_token`. `/cgi-bin/token` mints a new one and invalidates the last — harmless on one container, intermittent 40001s on two.
+- Time fields render in the fleet's timezone (`NOTIFY_TIMEZONE` → `CSV_IMPORT_TIMEZONE` → America/Vancouver), not the server's. A UTC container would have put every reminder seven or eight hours out, looking perfectly ordinary.
+- Field lengths are derived from the field name: `phrase` takes 5 characters, `thing` 20. The old code allowed 10 for a phrase field, which WeChat rejects as 47003 for the whole message.
+- `server-only` is now a real dependency. Next aliases it internally, so nothing outside the bundler could load a module that imports it; the CLI runs under `--conditions=react-server`.
+
+### TATO sends through it
+
+Staff task notifications go through `lib/notify-client.ts` to a `staff:<id>` channel created on first use. In-process by default — the hub lives in this app — and over HTTP once `NOTIFY_HUB_URL` and `NOTIFY_HUB_API_KEY` are set, so moving the hub out is configuration. A send never throws: email and SMS have already gone. Deduplicated on the task, the action and `updatedAt`, so a retried save sends once and a genuine second edit sends again. A transitional bridge keeps the existing staff-code login and subscribe routes feeding the hub.
+
+### The mini program is the channel's client
+
+New pages: `pages/message` (the landing page every subscribe message links to — the path is fixed), `pages/bind` (join a channel by code, several per person), `pages/webview`. TATO's own task list is untouched and reachable. Topping up runs on every open, after every join and from the banner, because someone who ticks "always keep this choice" tops up silently from then on — the only way a balance recovers by itself.
+
+### Bind codes on the staff schedule
+
+Each staff card shows the channel's bind code (click to copy), how many accounts are bound, and how many messages are left — red at zero. Channels are created on render, the same way the page already generated mini program codes. Copying to the clipboard no longer fails into the console when the browser refuses it: both that and the existing **Copy link** now say so.
+
 ## v0.26.0 - 2026-08-18
 
 ### Fleet assistant

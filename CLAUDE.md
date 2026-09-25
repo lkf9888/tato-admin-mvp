@@ -32,6 +32,8 @@
 - `app/actions.ts`：所有领域的 server action 挤在这一个文件里。只加自己的，不重排、不改别人的
 - `lib/i18n.ts`、`lib/i18n/messages/shell.ts`（导航）：归底座，各领域只追加；其余 `messages/*.ts` 按文件名归领域。
   `lib/i18n/zh-hant/` 是生成的——改完简体跑 `npm run i18n:zh-hant`，否则 CI 红
+- `lib/zh-hant-convert.ts`：归底座，但有两个调用方、两种模式——界面文案（`scripts/generate-zh-hant.ts`）转成台湾用语；
+  网站运营方自己写的内容（`lib/rental-site-page.tsx`）只转字形，否则「列治文本地」会变成「列治文字地」。改覆盖规则两边都要顾到
 - `components/app-shell.tsx` `nav-icons.ts`：归底座。加页面要同时加导航，并在 `middleware.ts` 的 `protectedPrefixes` 里登记
 - `middleware.ts`：登录保护归底座，网站多语言路由（`site-locale`）归租车网站
 - `components/calendar-view.tsx`、`app/(admin)/calendar/page.tsx`、`messages/calendar.ts`：网格、订单、备注、选择、订阅归运营；
@@ -86,7 +88,12 @@
 
 - **开工前**看 `git log --oneline -20` 和 `git status`
 - **同一套计算只写一份。** 需要别处已有的公式就调用它，不要复制。副本会在别的会话改动原版时悄悄偏离
-- 同一个目录只能跑一个 `next dev`。3000 被占就说明别的会话在用，不要去停它的服务器
+- **别打断别的会话的 dev server。** 共用一个目录，也就共用一个 `.next`，三件事都会把正在跑的 dev server 弄坏：
+  `pkill -f "next dev"`、`rm -rf .next`，以及 `npm run build`（它会覆盖同一个 `.next`）。
+  本地验证只跑 `npx tsc --noEmit`，生产构建交给 CI。非要本地构建，先用
+  `lsof -a -c node -d cwd | grep tato-admin-mvp` 确认这个目录里没有别的 node 进程在跑。
+  `.claude/launch.json` 开了 `autoPort`，所以别的会话的 dev server 不一定在 3000——不能只看端口
+  （`ps | grep "next dev"` 也不行，会匹配到 grep 自己所在的 shell）
 - localhost:3000 上注册着一个 **HostHub 的 service worker**，会把别的应用的旧文件喂给 TATO——
   删 `.next`、重启都绕不过去。前端改动「没生效」时，先在页面里 unregister 它并清空 `caches`，然后再加载两次
 

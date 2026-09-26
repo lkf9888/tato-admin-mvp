@@ -141,6 +141,8 @@ export function DirectBookingFleetTable({
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (event.key !== "/" || target?.closest("input, textarea, select, [contenteditable]")) return;
+      // The table sits in a tab; on another tab "/" is just a key.
+      if (!searchRef.current?.offsetParent) return;
       event.preventDefault();
       searchRef.current?.focus();
     }

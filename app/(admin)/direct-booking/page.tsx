@@ -13,6 +13,7 @@ import {
   type FleetRow,
 } from "@/components/direct-booking-fleet-table";
 import { DirectBookingEmailEditor } from "@/components/direct-booking-email-editor";
+import { DirectBookingTabs } from "@/components/direct-booking-tabs";
 import { normalizeDirectBookingEmailTemplate } from "@/lib/direct-booking-email-template";
 import { isEmailConfigured } from "@/lib/email";
 import { requireCurrentWorkspace } from "@/lib/auth";
@@ -26,7 +27,12 @@ import { isImageAttachment } from "@/lib/uploads";
 export default async function DirectBookingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ emailSaved?: string; policySaved?: string; locationsSaved?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    emailSaved?: string;
+    policySaved?: string;
+    locationsSaved?: string;
+  }>;
 }) {
   const workspace = await requireCurrentWorkspace();
   const bookableFrom = new Date();
@@ -164,50 +170,19 @@ export default async function DirectBookingPage({
   });
   const stripeReady = Boolean(getStripeSecretKey());
 
-  return (
-    <div className="space-y-3">
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.94),rgba(255,240,231,0.97))] p-3 shadow-[0_20px_48px_-40px_rgba(17,19,24,0.45)] sm:p-4">
-        <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
-          {directMessages.kicker}
-        </p>
-        <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-4xl">
-            <h2 className="font-serif text-[1.25rem] leading-tight text-[color:var(--ink)] sm:text-[1.45rem]">
-              {directMessages.title}
-            </h2>
-            <p className="mt-2 text-[12px] leading-5 text-[color:var(--ink-soft)]">
-              {directMessages.copy}
-            </p>
-          </div>
-          <div className="rounded-full border border-[rgba(17,19,24,0.08)] bg-white/78 px-3 py-1.5 text-[11px] text-[color:var(--ink-soft)] shadow-[0_12px_24px_-24px_rgba(17,19,24,0.55)]">
-            {stripeReady ? directMessages.stripeReady : directMessages.stripeMissing}
-          </div>
-        </div>
+  const emailEnabled = emailTemplate?.isEnabled ?? true;
+  const stats = [
+    { label: directMessages.enabledCount, value: enabledCount },
+    { label: directMessages.readyCount, value: readyCount },
+    {
+      label: directMessages.stripeStatus,
+      value: stripeReady ? directMessages.stripeReady : directMessages.stripeMissing,
+      tone: stripeReady ? "ok" : "bad",
+    },
+  ];
 
-        <div className="mt-3 grid gap-2.5 md:grid-cols-3">
-          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[var(--surface)] px-3 py-2.5 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-              {directMessages.enabledCount}
-            </p>
-            <p className="mt-1.5 text-[1.35rem] font-semibold text-[color:var(--ink)]">{enabledCount}</p>
-          </div>
-          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[var(--surface)] px-3 py-2.5 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-              {directMessages.readyCount}
-            </p>
-            <p className="mt-1.5 text-[1.35rem] font-semibold text-[color:var(--ink)]">{readyCount}</p>
-          </div>
-          <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[var(--surface)] px-3 py-2.5 shadow-[0_18px_38px_-34px_rgba(17,19,24,0.45)]">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-              {directMessages.stripeStatus}
-            </p>
-            <p className="mt-1.5 text-[1.35rem] font-semibold text-[color:var(--ink)]">
-              {stripeReady ? directMessages.stripeReady : directMessages.stripeMissing}
-            </p>
-          </div>
-        </div>
-      </section>
-
+  const rulesPanel = (
+    <>
       <form
         action={saveBookingPolicyAction}
         className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-3 py-3 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
@@ -375,30 +350,39 @@ export default async function DirectBookingPage({
         ) : null}
       </section>
 
-      <BookingLocationsEditor
-        locale={locale}
-        initialRows={bookingLocations.map((location) => ({
-          id: location.id,
-          label: location.label,
-          address: location.address ?? "",
-          fee: String(location.fee),
-        }))}
-        defaultIndex={Math.max(
-          0,
-          bookingLocations.findIndex((location) => location.isDefault),
-        )}
-        saved={Boolean(query.locationsSaved)}
-      />
+    </>
+  );
 
-      <DirectBookingEmailEditor
-        locale={locale}
-        initialEnabled={emailTemplate?.isEnabled ?? true}
-        initialSubject={normalizeDirectBookingEmailTemplate(emailTemplate).subjectTemplate}
-        initialBody={normalizeDirectBookingEmailTemplate(emailTemplate).bodyTemplate}
-        emailConfigured={isEmailConfigured()}
-        saved={Boolean(query.emailSaved)}
-      />
+  const locationsPanel = (
+    <BookingLocationsEditor
+      locale={locale}
+      initialRows={bookingLocations.map((location) => ({
+        id: location.id,
+        label: location.label,
+        address: location.address ?? "",
+        fee: String(location.fee),
+      }))}
+      defaultIndex={Math.max(
+        0,
+        bookingLocations.findIndex((location) => location.isDefault),
+      )}
+      saved={Boolean(query.locationsSaved)}
+    />
+  );
 
+  const emailPanel = (
+    <DirectBookingEmailEditor
+      locale={locale}
+      initialEnabled={emailEnabled}
+      initialSubject={normalizeDirectBookingEmailTemplate(emailTemplate).subjectTemplate}
+      initialBody={normalizeDirectBookingEmailTemplate(emailTemplate).bodyTemplate}
+      emailConfigured={isEmailConfigured()}
+      saved={Boolean(query.emailSaved)}
+    />
+  );
+
+  const vehiclesPanel = (
+    <>
       {vehicles.length === 0 ? (
         <section className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-5 text-[12px] text-[color:var(--ink-soft)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
           {directMessages.emptyState}
@@ -406,6 +390,70 @@ export default async function DirectBookingPage({
       ) : null}
 
       <DirectBookingFleetTable locale={locale} rows={fleetRows} fleet={fleetDefaults} />
+    </>
+  );
+
+  return (
+    <div className="space-y-3">
+      <section className="rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.94),rgba(255,240,231,0.97))] px-3 py-2.5 shadow-[0_20px_48px_-40px_rgba(17,19,24,0.45)] sm:px-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
+              {directMessages.kicker}
+            </p>
+            <h2 className="mt-0.5 font-serif text-[1.15rem] leading-tight text-[color:var(--ink)] sm:text-[1.25rem]">
+              {directMessages.title}
+            </h2>
+          </div>
+          <dl className="flex flex-wrap gap-1.5">
+            {stats.map((stat) => (
+              <div
+                key={stat.label}
+                className="flex items-baseline gap-1.5 rounded-full border border-[rgba(17,19,24,0.08)] bg-white/80 px-3 py-1 text-[11px]"
+              >
+                <dt className="text-[color:var(--ink-soft)]">{stat.label}</dt>
+                <dd
+                  className={`font-semibold tabular-nums ${
+                    stat.tone === "ok"
+                      ? "text-[color:var(--ok-fg)]"
+                      : stat.tone === "bad"
+                        ? "text-[color:var(--bad-fg)]"
+                        : "text-[color:var(--ink)]"
+                  }`}
+                >
+                  {stat.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      <DirectBookingTabs
+        label={directMessages.tabsLabel}
+        initialTab={query.tab ?? "vehicles"}
+        tabs={[
+          {
+            key: "vehicles",
+            label: directMessages.tabVehicles,
+            badge: activeVehicles.length,
+            panel: vehiclesPanel,
+          },
+          { key: "rules", label: directMessages.tabRules, panel: rulesPanel },
+          {
+            key: "locations",
+            label: directMessages.tabLocations,
+            badge: bookingLocations.length,
+            panel: locationsPanel,
+          },
+          {
+            key: "email",
+            label: directMessages.tabEmail,
+            badge: emailEnabled ? directMessages.emailOn : directMessages.emailOff,
+            panel: emailPanel,
+          },
+        ]}
+      />
     </div>
   );
 }

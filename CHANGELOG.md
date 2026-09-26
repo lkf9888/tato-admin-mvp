@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.7.1 - 2026-09-25
+
+### Direct booking is split into tabs, with the car list first
+
+/direct-booking stacked the header, pricing rules, seasonality,
+locations and the confirmation email above the car list, so the list
+an operator uses every day sat at the bottom. The page is now a
+one-line header (live pages, share-ready cars, Stripe) and four tabs:
+Vehicles (the default, with the car count), Pricing rules, Pickup &
+return (with the location count) and Confirmation email (on/off).
+
+The tab is in the URL (`?tab=rules`), and each save redirects back to
+the tab it was made on, so the "saved" notice appears where the save
+happened. All panels stay mounted, so switching tabs keeps edits not
+yet saved; arrow keys move between tabs. The fleet table's `/`
+shortcut only fires while its tab is showing.
+
 ## v1.7.0 - 2026-09-25
 
 ### Direct booking: the fleet list is a table, and fees have fleet defaults

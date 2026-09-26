@@ -4,6 +4,13 @@
 export const directBookingMessages = {
     directBookingPage: {
       kicker: "線上預訂",
+      tabsLabel: "線上預訂分割槽",
+      tabVehicles: "車輛",
+      tabRules: "定價規則",
+      tabLocations: "取還車地點",
+      tabEmail: "確認郵件",
+      emailOn: "開",
+      emailOff: "關",
       title: "為每台車生成可分享的預定頁面",
       copy:
         "把已上傳的車輛直接變成公開預定頁。後台可以設定空白日期日租、保險費，併為每台車生成一個可直接發給租車人的付款連結。",
@@ -36,7 +43,7 @@ export const directBookingMessages = {
       policyKicker: "車隊預訂政策",
       policyTitle: "每台車的預設值從這裡來",
       policyCopy:
-        "給整個車隊設一次。某台車條件不同，就在下面它自己的卡片裡覆蓋；車輛那欄留空，就跟著這裡走。",
+        "給整個車隊設一次。某台車條件不同，就在「車輛」頁籤裡點它的「編輯」覆蓋；車輛那欄留空，就跟著這裡走。",
       policyWeeklyLabel: "周租折扣 %",
       policyWeeklyHint: "租期滿 7 天后從租金裡減。填 0 表示不打折。",
       policyMinDaysLabel: "最短租期（天）",

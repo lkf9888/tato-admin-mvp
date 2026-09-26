@@ -2088,7 +2088,7 @@ export async function saveDirectBookingEmailTemplateAction(formData: FormData) {
   });
 
   revalidatePath("/direct-booking");
-  redirect("/direct-booking?emailSaved=1");
+  redirect("/direct-booking?tab=email&emailSaved=1");
 }
 
 /**
@@ -2140,7 +2140,7 @@ export async function saveBookingPolicyAction(formData: FormData) {
   });
 
   revalidateAdminPages();
-  redirect("/direct-booking?policySaved=1");
+  redirect("/direct-booking?tab=rules&policySaved=1");
 }
 
 /**
@@ -2210,5 +2210,5 @@ export async function saveBookingLocationsAction(formData: FormData) {
   });
 
   revalidateAdminPages();
-  redirect("/direct-booking?locationsSaved=1");
+  redirect("/direct-booking?tab=locations&locationsSaved=1");
 }

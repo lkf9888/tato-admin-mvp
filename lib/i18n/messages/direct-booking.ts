@@ -8,6 +8,13 @@ export const directBookingMessages = {
   en: {
     directBookingPage: {
       kicker: "Direct booking",
+      tabsLabel: "Direct booking sections",
+      tabVehicles: "Vehicles",
+      tabRules: "Pricing rules",
+      tabLocations: "Pickup & return",
+      tabEmail: "Confirmation email",
+      emailOn: "On",
+      emailOff: "Off",
       title: "Shareable booking pages for every vehicle",
       copy:
         "Turn uploaded fleet records into customer-facing booking pages. Set an open-date daily rate, optional insurance fee, and share one public payment link per vehicle.",
@@ -40,7 +47,7 @@ export const directBookingMessages = {
       policyKicker: "Fleet booking policy",
       policyTitle: "The defaults every vehicle starts from",
       policyCopy:
-        "Set these once for the whole fleet. A vehicle that needs different terms overrides them on its own card below; leave a vehicle field blank and it follows whatever is set here.",
+        "Set these once for the whole fleet. A vehicle that needs different terms overrides them from its Edit drawer on the Vehicles tab; leave a vehicle field blank and it follows whatever is set here.",
       policyWeeklyLabel: "Weekly discount %",
       policyWeeklyHint: "Off the rent once a booking reaches 7 days. 0 disables it.",
       policyMinDaysLabel: "Minimum rental days",
@@ -191,6 +198,13 @@ export const directBookingMessages = {
   zh: {
     directBookingPage: {
       kicker: "在线预定",
+      tabsLabel: "在线预定分区",
+      tabVehicles: "车辆",
+      tabRules: "定价规则",
+      tabLocations: "取还车地点",
+      tabEmail: "确认邮件",
+      emailOn: "开",
+      emailOff: "关",
       title: "为每台车生成可分享的预定页面",
       copy:
         "把已上传的车辆直接变成公开预定页。后台可以设置空白日期日租、保险费，并为每台车生成一个可直接发给租车人的付款链接。",
@@ -223,7 +237,7 @@ export const directBookingMessages = {
       policyKicker: "车队预订政策",
       policyTitle: "每台车的默认值从这里来",
       policyCopy:
-        "给整个车队设一次。某台车条件不同，就在下面它自己的卡片里覆盖；车辆那栏留空，就跟着这里走。",
+        "给整个车队设一次。某台车条件不同，就在「车辆」页签里点它的「编辑」覆盖；车辆那栏留空，就跟着这里走。",
       policyWeeklyLabel: "周租折扣 %",
       policyWeeklyHint: "租期满 7 天后从租金里减。填 0 表示不打折。",
       policyMinDaysLabel: "最短租期（天）",

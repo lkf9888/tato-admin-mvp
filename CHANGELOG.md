@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.7.2 - 2026-09-25
+
+### The rental website page has a launch checklist
+
+/rental-site now opens with twelve checks on whether a stranger can
+find the site and pay on it. Four stop bookings outright (not
+published, no bookable car, Stripe payouts not active, no pickup
+location); the rest cost bookings or reach (listed cars with no price
+or no photos, no own domain, Google Analytics or the Ads conversion
+missing, the confirmation email off or unsendable, Simplified Chinese
+missing where English exists, no contact details, no logo). Each open
+item links to where it is fixed — an anchor on this page, or the
+direct-booking tab or fleet filter that holds it. Items that pass
+collapse into one line of chips, and the panel folds itself when
+everything passes.
+
+The domain check asks the operator's domain for its robots.txt and
+looks for that domain's own sitemap line, which only this site
+serves -- one request proves DNS, TLS, routing and publishing. It
+times out after three seconds and only asks names that look like
+public hostnames, since the value is operator-typed.
+
 ## v1.7.1 - 2026-09-25
 
 ### Direct booking is split into tabs, with the car list first

@@ -2,6 +2,76 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const rentalSiteMessages = {
+    rentalSiteHealth: {
+      title: "上線檢查",
+      summary: (ready: number, total: number) => `${ready}/${total} 項就緒`,
+      blockers: (n: number) => `${n} 項阻止預訂`,
+      warnings: (n: number) => `${n} 項待完善`,
+      allClear: "全部就緒。",
+      statusBlocker: "阻止預訂",
+      statusWarn: "待完善",
+      statusOk: "就緒",
+      fix: "去處理",
+      published: {
+        ok: "網站已釋出。",
+        bad: "網站還沒釋出，租車人什麼都看不到。",
+      },
+      bookable: {
+        ok: (n: number) => `${n} 台車可以預訂。`,
+        bad: "還沒有可預訂的車。先上架車輛並設好價格。",
+      },
+      unpriced: {
+        ok: "已上架的車都有價格。",
+        bad: (n: number) => `${n} 台已上架的車沒有價格，網站上不會顯示。`,
+      },
+      photos: {
+        ok: "已上架的車都有照片。",
+        bad: (n: number) => `${n} 台已上架的車沒有照片。`,
+      },
+      payouts: {
+        ok: "Stripe 收款已開通，網站可以收錢。",
+        no_platform: "這個部署沒有配置 Stripe。",
+        not_started: "還沒開通收款，結帳功能關閉中。請先完成 Stripe 開戶。",
+        pending: "Stripe 開戶已開始但沒有完成。",
+        restricted: "Stripe 還需要補充資料才能收款。",
+      },
+      locations: {
+        ok: (n: number) => `${n} 個取車地點。`,
+        bad: "沒有取車地點，租車人無法選擇在哪取車。",
+      },
+      domain: {
+        live: (domain: string) => `${domain} 已指向網站，Google 可以收錄。`,
+        none: "還沒繫結自己的域名。預覽地址按設計不讓 Google 收錄。",
+        unreachable: (domain: string) => `${domain} 還連不到 TATO，請檢查它的 DNS 記錄。`,
+        not_ours: (domain: string) => `${domain} 有響應，但不是這個網站，請檢查 DNS 指向哪裡。`,
+      },
+      tracking: {
+        ok: "Google 分析和廣告轉化都已設定。",
+        bad: (analytics: boolean, ads: boolean) =>
+          !analytics && !ads
+            ? "沒有 Google 程式碼，廣告花費無法衡量效果。"
+            : !analytics
+              ? "沒有 Google 分析 ID。"
+              : "沒有 Google 廣告轉化，廣告統計不到預訂。",
+      },
+      email: {
+        on: "租車人付款後會收到確認郵件。",
+        off: "確認郵件已關閉。",
+        not_configured: "這個部署沒有配置郵件傳送。",
+      },
+      translations: {
+        ok: "簡體中文內容已填全。",
+        bad: (n: number) => `${n} 項有英文但沒有簡體中文。`,
+      },
+      contact: {
+        ok: "網站上顯示了聯絡郵箱或電話。",
+        bad: "網站上沒有聯絡郵箱或電話。",
+      },
+      logo: {
+        ok: "已上傳 Logo。",
+        bad: "沒有 Logo，品牌名以文字顯示。",
+      },
+    },
     rentalSitePage: {
       kicker: "租車網站",
       title: "你自己的預訂網站，掛在你自己的域名上",

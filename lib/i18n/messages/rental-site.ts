@@ -9,6 +9,76 @@
  */
 export const rentalSiteMessages = {
   en: {
+    rentalSiteHealth: {
+      title: "Launch checklist",
+      summary: (ready: number, total: number) => `${ready} of ${total} ready`,
+      blockers: (n: number) => `${n} stopping bookings`,
+      warnings: (n: number) => `${n} to improve`,
+      allClear: "Everything is in place.",
+      statusBlocker: "Blocks bookings",
+      statusWarn: "Improve",
+      statusOk: "Ready",
+      fix: "Fix",
+      published: {
+        ok: "The site is published.",
+        bad: "The site is not published — renters see nothing.",
+      },
+      bookable: {
+        ok: (n: number) => `${n} cars can be booked.`,
+        bad: "No car can be booked yet. List cars and give them a price.",
+      },
+      unpriced: {
+        ok: "Every listed car has a price.",
+        bad: (n: number) => `${n} listed cars have no price and are hidden from the site.`,
+      },
+      photos: {
+        ok: "Every listed car has photos.",
+        bad: (n: number) => `${n} listed cars have no photos.`,
+      },
+      payouts: {
+        ok: "Stripe payouts are active — the site can take payment.",
+        no_platform: "Stripe is not configured on this deployment.",
+        not_started: "Payouts are not set up, so checkout is off. Start Stripe onboarding.",
+        pending: "Stripe onboarding was started but not finished.",
+        restricted: "Stripe needs more information before it can take payments.",
+      },
+      locations: {
+        ok: (n: number) => `${n} pickup location${n === 1 ? "" : "s"}.`,
+        bad: "No pickup location — renters cannot choose where to collect.",
+      },
+      domain: {
+        live: (domain: string) => `${domain} serves the site; Google can index it.`,
+        none: "No domain of your own. The preview address is hidden from Google by design.",
+        unreachable: (domain: string) => `${domain} does not reach TATO yet — check its DNS record.`,
+        not_ours: (domain: string) => `${domain} answers, but not with this site — check where its DNS points.`,
+      },
+      tracking: {
+        ok: "Google Analytics and the Ads conversion are both set.",
+        bad: (analytics: boolean, ads: boolean) =>
+          !analytics && !ads
+            ? "No Google tag — ad spend cannot be measured."
+            : !analytics
+              ? "No Google Analytics id."
+              : "No Google Ads conversion — Ads cannot count bookings.",
+      },
+      email: {
+        on: "Renters get a confirmation email after paying.",
+        off: "The confirmation email is turned off.",
+        not_configured: "Email sending is not configured on this deployment.",
+      },
+      translations: {
+        ok: "Simplified Chinese content is complete.",
+        bad: (n: number) => `${n} field${n === 1 ? "" : "s"} have English but no Simplified Chinese.`,
+      },
+      contact: {
+        ok: "Contact email or phone is shown.",
+        bad: "No contact email or phone on the site.",
+      },
+      logo: {
+        ok: "Logo uploaded.",
+        bad: "No logo — the brand name is shown as text.",
+      },
+    },
     rentalSitePage: {
       kicker: "Rental website",
       title: "Your own booking site, on your own domain",
@@ -154,6 +224,76 @@ export const rentalSiteMessages = {
     },
   },
   zh: {
+    rentalSiteHealth: {
+      title: "上线检查",
+      summary: (ready: number, total: number) => `${ready}/${total} 项就绪`,
+      blockers: (n: number) => `${n} 项阻止预订`,
+      warnings: (n: number) => `${n} 项待完善`,
+      allClear: "全部就绪。",
+      statusBlocker: "阻止预订",
+      statusWarn: "待完善",
+      statusOk: "就绪",
+      fix: "去处理",
+      published: {
+        ok: "网站已发布。",
+        bad: "网站还没发布，租车人什么都看不到。",
+      },
+      bookable: {
+        ok: (n: number) => `${n} 台车可以预订。`,
+        bad: "还没有可预订的车。先上架车辆并设好价格。",
+      },
+      unpriced: {
+        ok: "已上架的车都有价格。",
+        bad: (n: number) => `${n} 台已上架的车没有价格，网站上不会显示。`,
+      },
+      photos: {
+        ok: "已上架的车都有照片。",
+        bad: (n: number) => `${n} 台已上架的车没有照片。`,
+      },
+      payouts: {
+        ok: "Stripe 收款已开通，网站可以收钱。",
+        no_platform: "这个部署没有配置 Stripe。",
+        not_started: "还没开通收款，结账功能关闭中。请先完成 Stripe 开户。",
+        pending: "Stripe 开户已开始但没有完成。",
+        restricted: "Stripe 还需要补充资料才能收款。",
+      },
+      locations: {
+        ok: (n: number) => `${n} 个取车地点。`,
+        bad: "没有取车地点，租车人无法选择在哪取车。",
+      },
+      domain: {
+        live: (domain: string) => `${domain} 已指向网站，Google 可以收录。`,
+        none: "还没绑定自己的域名。预览地址按设计不让 Google 收录。",
+        unreachable: (domain: string) => `${domain} 还连不到 TATO，请检查它的 DNS 记录。`,
+        not_ours: (domain: string) => `${domain} 有响应，但不是这个网站，请检查 DNS 指向哪里。`,
+      },
+      tracking: {
+        ok: "Google 分析和广告转化都已设置。",
+        bad: (analytics: boolean, ads: boolean) =>
+          !analytics && !ads
+            ? "没有 Google 代码，广告花费无法衡量效果。"
+            : !analytics
+              ? "没有 Google 分析 ID。"
+              : "没有 Google 广告转化，广告统计不到预订。",
+      },
+      email: {
+        on: "租车人付款后会收到确认邮件。",
+        off: "确认邮件已关闭。",
+        not_configured: "这个部署没有配置邮件发送。",
+      },
+      translations: {
+        ok: "简体中文内容已填全。",
+        bad: (n: number) => `${n} 项有英文但没有简体中文。`,
+      },
+      contact: {
+        ok: "网站上显示了联系邮箱或电话。",
+        bad: "网站上没有联系邮箱或电话。",
+      },
+      logo: {
+        ok: "已上传 Logo。",
+        bad: "没有 Logo，品牌名以文字显示。",
+      },
+    },
     rentalSitePage: {
       kicker: "租车网站",
       title: "你自己的预订网站，挂在你自己的域名上",

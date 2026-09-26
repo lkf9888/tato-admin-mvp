@@ -3,12 +3,14 @@ import { VehicleStatus } from "@prisma/client";
 
 import { saveRentalSiteAction } from "@/app/actions";
 import { SiteContentEditor } from "@/components/site-content-editor";
+import { SiteHealthPanel } from "@/components/site-health-panel";
 import { parseHighlights, parseSiteTranslations } from "@/lib/rental-site-content";
 import { SITE_LOCALES, SITE_LOCALE_LABELS } from "@/lib/site-locale";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
 import { prisma } from "@/lib/prisma";
+import { getRentalSiteHealth } from "@/lib/rental-site-health";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import {
   getPlatformHost,
@@ -50,6 +52,7 @@ export default async function RentalSitePage({
 
   // A price can now come from the income model, which no `count()`
   // can see -- so the candidates are loaded and resolved instead.
+  const health = await getRentalSiteHealth({ workspaceId: workspace.id, site });
   const bookableCount = bookableVehicles.filter((vehicle) =>
     isVehicleBookable(resolveVehicleDailyRate(vehicle, fleetPolicy)),
   ).length;
@@ -155,6 +158,8 @@ export default async function RentalSitePage({
         </div>
       </section>
 
+      <SiteHealthPanel locale={locale} checks={health} />
+
       {errorMessage ? (
         <p className="rounded-lg border border-[color:var(--bad-fg)]/20 bg-[var(--bad-bg)] px-3 py-2 text-[12px] text-[color:var(--bad-fg)]">
           {errorMessage}
@@ -167,7 +172,7 @@ export default async function RentalSitePage({
       ) : null}
 
       <form action={saveRentalSiteAction} className="space-y-3">
-        <section className={SECTION_CLASS}>
+        <section id="site-address" className={`${SECTION_CLASS} scroll-mt-20`}>
           <h3 className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
             {copy.sectionAddress}
           </h3>
@@ -221,7 +226,7 @@ export default async function RentalSitePage({
           </label>
         </section>
 
-        <section className={SECTION_CLASS}>
+        <section id="site-content" className={`${SECTION_CLASS} scroll-mt-20`}>
           <h3 className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
             {copy.sectionContent}
           </h3>
@@ -248,7 +253,7 @@ export default async function RentalSitePage({
           </div>
         </section>
 
-        <section className={SECTION_CLASS}>
+        <section id="site-brand" className={`${SECTION_CLASS} scroll-mt-20`}>
           <h3 className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
             {copy.sectionBrand}
           </h3>
@@ -293,7 +298,7 @@ export default async function RentalSitePage({
           </div>
         </section>
 
-        <section className={SECTION_CLASS}>
+        <section id="site-contact" className={`${SECTION_CLASS} scroll-mt-20`}>
           <h3 className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
             {copy.sectionContact}
           </h3>
@@ -337,7 +342,7 @@ export default async function RentalSitePage({
           </div>
         </section>
 
-        <section className={SECTION_CLASS}>
+        <section id="site-tracking" className={`${SECTION_CLASS} scroll-mt-20`}>
           <h3 className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
             {copy.sectionTracking}
           </h3>

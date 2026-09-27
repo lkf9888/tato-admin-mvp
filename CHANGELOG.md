@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.7.3 - 2026-09-27
+
+### Settings forms keep their save button on screen
+
+The rental website settings and the fleet pricing rules end in a save
+button far below most of what they edit. Both now have a save bar that
+sticks to the bottom of the screen (above the phone tab bar), turns
+amber with "Unsaved changes" once anything is edited, asks before the
+page is left with edits unsaved, and saves on Cmd/Ctrl+S. On
+/direct-booking the shortcut only answers while the rules tab is
+showing, so it cannot submit a form the operator is not looking at.
+The forms are unchanged server-action forms; the bar only adds.
+
+The site content's Simplified and Traditional tabs show how many
+fields are translated out of those filled in English, live as the
+operator types. Traditional counts a field done when Simplified has
+it, since the site converts that.
+
+The site's three addresses each get Copy and Open buttons, and the
+address card is wider so they are no longer cut off.
+
 ## v1.7.2 - 2026-09-25
 
 ### The rental website page has a launch checklist

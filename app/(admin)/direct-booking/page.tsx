@@ -14,6 +14,7 @@ import {
 } from "@/components/direct-booking-fleet-table";
 import { DirectBookingEmailEditor } from "@/components/direct-booking-email-editor";
 import { DirectBookingTabs } from "@/components/direct-booking-tabs";
+import { StickySaveBar } from "@/components/sticky-save-bar";
 import { normalizeDirectBookingEmailTemplate } from "@/lib/direct-booking-email-template";
 import { isEmailConfigured } from "@/lib/email";
 import { requireCurrentWorkspace } from "@/lib/auth";
@@ -299,13 +300,13 @@ export default async function DirectBookingPage({
           </label>
         </div>
 
-        <button
-          type="submit"
-          className="mt-3 rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white"
-          style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
-        >
-          {directMessages.policySaveAction}
-        </button>
+        <StickySaveBar
+          className="mt-3"
+          saveLabel={directMessages.policySaveAction}
+          savingLabel={directMessages.policySavingAction}
+          dirtyLabel={directMessages.policyUnsaved}
+          cleanLabel={directMessages.policyAllSaved}
+        />
       </form>
 
       <section className="rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] px-3 py-3 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">

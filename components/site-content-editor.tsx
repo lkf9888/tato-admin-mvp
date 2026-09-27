@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getMessages, type Locale } from "@/lib/i18n";
 
@@ -11,6 +11,7 @@ type Tab = "en" | "zh" | "zh-Hant";
 /** Form-field prefix per language. English keeps the original names so
  *  the save action's English path is unchanged. */
 const PREFIX: Record<Tab, string> = { en: "", zh: "zh_", "zh-Hant": "zhHant_" };
+const FIELDS: Field[] = ["brandName", "eyebrow", "tagline", "description", "hours", "footerNote"];
 
 const FIELD_CLASS =
   "w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px] text-[color:var(--ink)]";
@@ -40,10 +41,43 @@ export function SiteContentEditor({
     { id: "zh", label: copy.contentTabZh },
     { id: "zh-Hant", label: copy.contentTabHant },
   ];
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [progress, setProgress] = useState<Record<"zh" | "zh-Hant", { filled: number; total: number }> | null>(
+    null,
+  );
+
+  // Counted from the inputs themselves, so the badge follows typing
+  // rather than the last save. Only fields with English count: an empty
+  // English field has nothing to translate. Traditional counts a field
+  // as done when Simplified has it too, because the site converts that.
+  const recount = useCallback(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const read = (name: string) =>
+      (root.querySelector(`[name="${name}"]`) as HTMLInputElement | HTMLTextAreaElement | null)?.value.trim() ?? "";
+    const names = [
+      ...FIELDS,
+      ...Array.from({ length: 4 }, (_, index) => `highlightLabel_${index}`),
+    ];
+    let total = 0;
+    let zh = 0;
+    let hant = 0;
+    for (const name of names) {
+      if (!read(`${PREFIX.en}${name}`)) continue;
+      total += 1;
+      const simplified = Boolean(read(`${PREFIX.zh}${name}`));
+      if (simplified) zh += 1;
+      if (simplified || read(`${PREFIX["zh-Hant"]}${name}`)) hant += 1;
+    }
+    setProgress({ zh: { filled: zh, total }, "zh-Hant": { filled: hant, total } });
+  }, []);
+
+  useEffect(recount, [recount]);
+
   const highlightRows = Array.from({ length: 4 }, (_, index) => highlights[index] ?? { value: "", label: "" });
 
   return (
-    <div>
+    <div ref={rootRef} onInput={recount}>
       <div role="tablist" className="inline-flex gap-1 rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] p-1">
         {tabs.map((item) => (
           <button
@@ -57,6 +91,18 @@ export function SiteContentEditor({
             }`}
           >
             {item.label}
+            {item.id !== "en" && progress && progress[item.id].total > 0 ? (
+              <span
+                title={copy.translationProgressHint}
+                className={`ml-1.5 rounded-full px-1.5 text-[10px] tabular-nums ${
+                  progress[item.id].filled >= progress[item.id].total
+                    ? "bg-[var(--ok-bg)] text-[color:var(--ok-fg)]"
+                    : "bg-[#fef3c7] text-[#92400e]"
+                }`}
+              >
+                {copy.translationProgress(progress[item.id].filled, progress[item.id].total)}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>

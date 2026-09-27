@@ -2,8 +2,10 @@ import Link from "next/link";
 import { VehicleStatus } from "@prisma/client";
 
 import { saveRentalSiteAction } from "@/app/actions";
+import { CopyUrlRow } from "@/components/copy-url-row";
 import { SiteContentEditor } from "@/components/site-content-editor";
 import { SiteHealthPanel } from "@/components/site-health-panel";
+import { StickySaveBar } from "@/components/sticky-save-bar";
 import { parseHighlights, parseSiteTranslations } from "@/lib/rental-site-content";
 import { SITE_LOCALES, SITE_LOCALE_LABELS } from "@/lib/site-locale";
 import { requireCurrentWorkspace } from "@/lib/auth";
@@ -118,7 +120,7 @@ export default async function RentalSitePage({
           </div>
         </div>
 
-        <div className="mt-3 grid gap-2.5 md:grid-cols-2">
+        <div className="mt-3 grid gap-2.5 md:grid-cols-[minmax(0,1fr)_minmax(0,2.2fr)]">
           <div className="rounded-lg border border-[rgba(17,19,24,0.06)] bg-[var(--surface)] px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
               {copy.bookableCount}
@@ -139,13 +141,16 @@ export default async function RentalSitePage({
             {site ? (
               <ul className="mt-1.5 space-y-0.5">
                 {SITE_LOCALES.map((each) => (
-                  <li key={each} className="flex min-w-0 items-baseline gap-2 text-[12px]">
+                  <li key={each} className="flex min-w-0 items-center gap-2 text-[12px]">
                     <span className="w-16 shrink-0 text-[color:var(--ink-soft)]">
                       {SITE_LOCALE_LABELS[each]}
                     </span>
-                    <span className="truncate font-medium text-[color:var(--ink)]">
-                      {getSiteUrl(site, "/", requestHost, each)}
-                    </span>
+                    <CopyUrlRow
+                      url={getSiteUrl(site, "/", requestHost, each)}
+                      copyLabel={copy.copyUrl}
+                      copiedLabel={copy.copiedUrl}
+                      openLabel={copy.openUrl}
+                    />
                   </li>
                 ))}
               </ul>
@@ -373,13 +378,12 @@ export default async function RentalSitePage({
           </p>
         </section>
 
-        <button
-          type="submit"
-          className="rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white"
-          style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
-        >
-          {site ? copy.saveAction : copy.createAction}
-        </button>
+        <StickySaveBar
+          saveLabel={site ? copy.saveAction : copy.createAction}
+          savingLabel={copy.savingAction}
+          dirtyLabel={copy.unsavedChanges}
+          cleanLabel={copy.allSaved}
+        />
       </form>
     </div>
   );

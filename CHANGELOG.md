@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.7.4 - 2026-09-28
+
+### Stripe onboarding asks whether the host is a person or a company
+
+Payout accounts were created with `business_type: "individual"`, so a
+host that is a company was walked through onboarding as a private
+person — their own ID, their own bank account, the business nowhere.
+The type is no longer set; Stripe's hosted onboarding asks for it.
+No account had been created with the old value: every attempt so far
+failed earlier, because the production Stripe account had not yet
+enabled Connect.
+
 ## v1.7.3 - 2026-09-27
 
 ### Settings forms keep their save button on screen

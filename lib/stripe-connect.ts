@@ -70,7 +70,9 @@ export async function ensureWorkspaceConnectAccount(input: {
       card_payments: { requested: true },
       transfers: { requested: true },
     },
-    business_type: "individual",
+    // No business_type: Stripe's onboarding asks. Most hosts are a
+    // company, and fixing it to "individual" made Stripe collect a
+    // person's details and pay out to them instead of the business.
     metadata: {
       tato_workspace_id: input.workspaceId,
     },

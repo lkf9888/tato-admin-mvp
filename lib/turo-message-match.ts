@@ -252,3 +252,63 @@ export function matchVehiclesForEmail(
   const unscoped = matchVehicles(vehicleText, vehicles);
   return { matches: unscoped, usedAccountFallback: unscoped.length > 0 };
 }
+
+export type BookingPlacement =
+  | { kind: "placed"; vehicle: VehicleForMatch }
+  | {
+      kind: "pending";
+      /** Cars that could still be the one: active matches, plus
+       *  deactivated ones that were taking bookings when this trip
+       *  began. Stored as the pending row's match count. */
+      candidates: number;
+      /** Every car that answers to the model is deactivated. The
+       *  booking is real and the fleet has the car -- it just is not
+       *  one the operator wants trips filed against by default. */
+      allDeactivated: boolean;
+    };
+
+/**
+ * Which car a booking email's trip goes on, with deactivated cars
+ * (`VehicleStatus.inactive`, shown as 停用) taken into account.
+ *
+ * A deactivated car is never placed automatically: an operator who
+ * switches a car off is saying it should stop receiving trips, and a
+ * booking filed against it would land on the calendar and in its
+ * owner's ledger regardless.
+ *
+ * But it is only *ruled out* for trips that began after its last
+ * booking. Every sync re-reads every booking email, so the moment a
+ * car is deactivated, its whole history is re-judged -- and a trip it
+ * really did take in April must not quietly move to its twin because
+ * it was switched off in May. Where the deactivated car was still
+ * taking trips at the time, it stays a candidate, the model stays
+ * ambiguous, and the booking waits for a person or a plate: the same
+ * refusal to guess as everywhere else in this file.
+ *
+ * `lastBookedAt` is the latest pickup on each deactivated car.
+ * Missing means it never took one, which rules it out everywhere.
+ */
+export function placeBooking(input: {
+  matches: VehicleForMatch[];
+  deactivatedIds: ReadonlySet<string>;
+  lastBookedAt: ReadonlyMap<string, Date>;
+  tripStart: Date;
+}): BookingPlacement {
+  const active = input.matches.filter((vehicle) => !input.deactivatedIds.has(vehicle.id));
+  const deactivated = input.matches.filter((vehicle) => input.deactivatedIds.has(vehicle.id));
+
+  const stillInService = deactivated.filter((vehicle) => {
+    const last = input.lastBookedAt.get(vehicle.id);
+    return last !== undefined && last.getTime() >= input.tripStart.getTime();
+  });
+
+  if (active.length === 1 && stillInService.length === 0) {
+    return { kind: "placed", vehicle: active[0] };
+  }
+
+  return {
+    kind: "pending",
+    candidates: active.length + stillInService.length,
+    allDeactivated: active.length === 0 && deactivated.length > 0,
+  };
+}

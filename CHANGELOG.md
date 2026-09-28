@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.8.0 - 2026-09-28
+
+### Deactivated cars are not given Turo bookings
+
+Booking email names a model and never a plate, so a trip is placed on a
+car only when exactly one car in the fleet answers to the model. A car
+marked **停用** (deactivated) used to count as one of those — so a
+second Sequoia 2016 kept on a placeholder plate, taking no trips since
+May, left every Sequoia booking ambiguous and parked in 待分配.
+
+Sync now never places a booking on a deactivated car by itself. But it
+only *rules one out* for trips that began after that car's last
+booking. Every sync re-reads every booking email, so switching a car
+off re-judges its whole history at once; a trip it really took in April
+must not move to its twin, and into the twin owner's ledger, because
+it was switched off in May. Where the deactivated car was still taking
+trips at the time, it stays a candidate and the booking keeps waiting
+for a person or a plate — the same refusal to guess as before. A plate
+typed by the operator still wins, deactivated or not.
+
+The rule lives in `placeBooking` in `lib/turo-message-match.ts`, the
+one place vehicles are chosen. A dry run of
+`POST /api/assistant/email-orders` (`{"apply": false}`) now lists
+`placedPastDeactivated`: exactly the bookings a deactivation would
+move, so its effect can be read before it happens.
+
+In the 待分配 panel a deactivated car loses its ★, is tagged 停用 and
+ranks after the live candidates, but stays pickable — a trip it took
+before being switched off is still its. When every car that answers to
+the model is deactivated, the row says so instead of claiming the fleet
+has no such car. (The flag comes from the orders page.)
+
+Verified on nine rule cases modelled on the Sequoia pair, and end to
+end against a copy of the database with booking mail in Turo's own
+format: the June trip landed on the active car, the April one stayed
+parked with two candidates, nothing was placed on the deactivated car,
+and re-enabling it restored the old refusal.
+
 ## v1.7.4 - 2026-09-28
 
 ### Stripe onboarding asks whether the host is a person or a company

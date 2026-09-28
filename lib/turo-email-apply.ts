@@ -1,11 +1,11 @@
 import "server-only";
 
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, VehicleStatus } from "@prisma/client";
 
 import { reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { parseTuroOrderEmail, type TuroOrderFacts } from "@/lib/turo-email-order";
-import { matchVehiclesForEmail } from "@/lib/turo-message-match";
+import { matchVehiclesForEmail, placeBooking } from "@/lib/turo-message-match";
 import { foldLatinLookalikes } from "@/lib/utils";
 
 /**
@@ -65,6 +65,11 @@ export type ApplyOutcome = {
      *  cars may simply not be in the fleet table yet. */
     turoAccount: string | null;
   }[];
+  /** Bookings placed on a car only because a deactivated (停用) twin
+   *  was ruled out. Listed, not just counted: this is the one way a
+   *  deactivation changes where trips land, so a dry run should show
+   *  exactly which ones it would move. */
+  placedPastDeactivated: { reservationId: string; vehicleId: string }[];
   /** How many reservations each account contributed, so a co-hosted
    *  account that has stopped arriving is visible. */
   byAccount: Record<string, number>;
@@ -149,6 +154,7 @@ export async function applyTuroEmailsToOrders(input: {
     pending: 0,
     ambiguousVehicle: [],
     unknownPlates: [],
+    placedPastDeactivated: [],
     byAccount: {},
     conflictsRechecked: 0,
     unchanged: 0,
@@ -192,9 +198,35 @@ export async function applyTuroEmailsToOrders(input: {
         turoListingName: true,
         turoAccount: true,
         plateNumber: true,
+        status: true,
       },
     }),
   ]);
+
+  // Deactivated cars stay in the fleet -- a plate typed by an operator
+  // still resolves to one -- but are never chosen from a model match.
+  // Each one's latest booking decides which trips it can be ruled out
+  // for; see `placeBooking`.
+  const deactivatedIds = new Set(
+    fleet.filter((vehicle) => vehicle.status === VehicleStatus.inactive).map((vehicle) => vehicle.id),
+  );
+  const lastBookedAt = new Map<string, Date>();
+  if (deactivatedIds.size > 0) {
+    const latest = await prisma.order.groupBy({
+      by: ["vehicleId"],
+      where: {
+        workspaceId: input.workspaceId,
+        vehicleId: { in: [...deactivatedIds] },
+        // A deleted booking says nothing about whether the car was
+        // taking trips; a cancelled one does -- it was bookable.
+        isArchived: false,
+      },
+      _max: { pickupDatetime: true },
+    });
+    for (const row of latest) {
+      if (row._max.pickupDatetime) lastBookedAt.set(row.vehicleId, row._max.pickupDatetime);
+    }
+  }
 
   const byExternalId = new Map(orders.map((order) => [order.externalOrderId ?? "", order]));
 
@@ -238,10 +270,21 @@ export async function applyTuroEmailsToOrders(input: {
       // runs four Tesla Model Y 2020s and two Ford Explorer 2014s
       // across two accounts, so the account is often the only thing
       // that turns an ambiguous model into one car.
-      const matches = overrideVehicle
-        ? [overrideVehicle]
+      // A plate the operator typed is honoured even on a deactivated
+      // car: they can see what the email cannot. Everything else goes
+      // through `placeBooking`, which never picks a deactivated car.
+      const modelMatches = overrideVehicle
+        ? []
         : matchVehiclesForEmail(facts.vehicleText, fleet, facts.coHostAccount).matches;
-      if (matches.length !== 1) {
+      const placement = overrideVehicle
+        ? ({ kind: "placed", vehicle: overrideVehicle } as const)
+        : placeBooking({
+            matches: modelMatches,
+            deactivatedIds,
+            lastBookedAt,
+            tripStart: facts.tripStart,
+          });
+      if (placement.kind === "pending") {
         // Several cars of one model is normal here, and the mail names
         // no plate. Guessing would file a real booking against the
         // wrong vehicle, which shows up as a phantom conflict on the
@@ -255,7 +298,7 @@ export async function applyTuroEmailsToOrders(input: {
         outcome.ambiguousVehicle.push({
           reservationId,
           vehicleText: facts.vehicleText,
-          matches: matches.length,
+          matches: placement.candidates,
           turoAccount: facts.coHostAccount,
         });
 
@@ -269,7 +312,7 @@ export async function applyTuroEmailsToOrders(input: {
             status: statusFor(facts),
             vehicleText: facts.vehicleText,
             turoAccount: facts.coHostAccount ?? null,
-            matchCount: matches.length,
+            matchCount: placement.candidates,
           };
           await prisma.pendingOrder.upsert({
             where: {
@@ -290,13 +333,17 @@ export async function applyTuroEmailsToOrders(input: {
         continue;
       }
 
-      touchedVehicles.add(matches[0].id);
+      const vehicle = placement.vehicle;
+      touchedVehicles.add(vehicle.id);
+      if (modelMatches.some((match) => deactivatedIds.has(match.id))) {
+        outcome.placedPastDeactivated.push({ reservationId, vehicleId: vehicle.id });
+      }
 
       if (input.apply) {
         await prisma.order.create({
           data: {
             workspaceId: input.workspaceId,
-            vehicleId: matches[0].id,
+            vehicleId: vehicle.id,
             externalOrderId: reservationId,
             renterName: facts.guestName ?? "Turo guest",
             renterPhone: facts.guestPhone,

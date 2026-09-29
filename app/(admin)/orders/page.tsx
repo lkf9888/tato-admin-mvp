@@ -376,6 +376,10 @@ export default async function OrdersPage({
           label: vehicle.plateNumber
             ? `${vehicle.plateNumber} · ${vehicle.nickname}`
             : vehicle.nickname,
+          // The panel ranks these after the live candidates and never
+          // pre-selects one, matching the sync, which will not place a
+          // booking on a deactivated car on its own.
+          deactivated: vehicle.status === "inactive",
           searchText: [
             vehicle.plateNumber,
             vehicle.nickname,

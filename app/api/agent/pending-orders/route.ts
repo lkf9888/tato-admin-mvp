@@ -47,11 +47,17 @@ export async function GET(request: Request) {
         turoListingName: true,
         turoAccount: true,
         plateNumber: true,
+        status: true,
       },
     }),
   ]);
 
   const { data, nextCursor } = paginate(rows, limit);
+  // The matcher hands back its own narrow vehicle type, so status is
+  // looked up here rather than widened into the matcher's contract.
+  const deactivated = new Set(
+    fleet.filter((vehicle) => vehicle.status === "inactive").map((vehicle) => vehicle.id),
+  );
 
   return withCors({
     data: data.map((pending) => {
@@ -85,6 +91,10 @@ export async function GET(request: Request) {
           id: vehicle.id,
           plateNumber: vehicle.plateNumber,
           label: `${vehicle.year} ${vehicle.brand} ${vehicle.model}`,
+          /** Deactivated (停用) cars are still listed, since a person
+           *  may place a booking on one by hand, but the sync never
+           *  places one there on its own. Same rule as the orders page. */
+          deactivated: deactivated.has(vehicle.id),
         })),
         createdAt: iso(pending.createdAt),
       };

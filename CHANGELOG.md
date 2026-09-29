@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.8.1 - 2026-09-28
+
+### The unassigned panel and the API know which cars are deactivated
+
+v1.8.0 stopped the Turo sync placing bookings on deactivated (停用) cars, and taught the **Unassigned** panel to show them last, tagged, and never pre-selected. The orders page was not yet telling the panel which cars those were, so until now every candidate looked active. It does now.
+
+The agent API's `GET /api/agent/pending-orders` carries the same fact: each candidate has a `deactivated` flag. Deactivated cars are still listed rather than dropped, because a person may still place a booking on one by hand; only the automatic placement skips them. The field is new, so existing callers are unaffected.
+
+
 ## v1.8.0 - 2026-09-28
 
 ### Deactivated cars are not given Turo bookings

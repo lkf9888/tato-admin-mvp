@@ -55,6 +55,13 @@ export type ApplyOutcome = {
    *  Reported rather than ignored: a typo here files nothing, and
    *  silence would look identical to the trip not existing. */
   unknownPlates: { reservationId: string; plate: string }[];
+  /** Plates the agent read off a trip page that match no car here --
+   *  a placeholder plate, a co-host's car not imported yet. Unlike an
+   *  operator's override these do not drop the booking: it is parked in
+   *  the unassigned basket, and never matched by model instead, because
+   *  the page has just said which car it is and that car is not one of
+   *  ours. */
+  unresolvedPlateHints: { reservationId: string; plate: string }[];
   /** Mail for a trip we have no order for, whose vehicle could not be
    *  pinned to exactly one car in the fleet. */
   ambiguousVehicle: {
@@ -80,25 +87,36 @@ export type ApplyOutcome = {
 };
 
 /** Fold one reservation's mail, oldest first, so later state wins. */
-function foldByReservation(
-  emails: { subject: string; bodyText: string }[],
-): Map<string, TuroOrderFacts> {
+/** One observation of a reservation, from mail or from the trip page. */
+type FactsEvent = { at: Date; facts: TuroOrderFacts };
+
+/**
+ * Fold observations into one set of facts per reservation, oldest first.
+ *
+ * Mail and trip-page snapshots are folded together, by the time each was
+ * observed. "Mail wins on an unfinished trip" (above) was always a claim
+ * about freshness -- mail knows sooner than a CSV export -- and a trip
+ * page read after the last email is fresher still. So whichever was seen
+ * later wins, and a later email (a cancellation) still beats an earlier
+ * look at the page. Ties go to the snapshot: callers pass mail events
+ * first, and the sort is stable, so at the same instant the page read --
+ * which reflects the mail already sent -- is applied last.
+ */
+function foldFacts(events: FactsEvent[]): Map<string, TuroOrderFacts> {
+  const ordered = [...events].sort((a, b) => a.at.getTime() - b.at.getTime());
   const byReservation = new Map<string, TuroOrderFacts>();
 
-  for (const email of emails) {
-    const facts = parseTuroOrderEmail(email);
-    if (!facts) continue;
-
+  for (const { facts } of ordered) {
     const existing = byReservation.get(facts.reservationId);
     if (!existing) {
       byReservation.set(facts.reservationId, facts);
       continue;
     }
 
-    // Field by field, and only where the newer mail actually said
-    // something: the trip-ended template names the reservation and
-    // nothing else, and letting its blanks through would erase what
-    // the booking mail correctly established.
+    // Field by field, and only where the newer observation actually
+    // said something: the trip-ended template names the reservation and
+    // nothing else, and letting its blanks through would erase what the
+    // booking mail correctly established.
     const merged: TuroOrderFacts = { ...existing };
     for (const key of Object.keys(facts) as (keyof TuroOrderFacts)[]) {
       const value = facts[key];
@@ -111,6 +129,53 @@ function foldByReservation(
   }
 
   return byReservation;
+}
+
+function mailEvents(emails: { subject: string; bodyText: string; receivedAt: Date }[]): FactsEvent[] {
+  const events: FactsEvent[] = [];
+  for (const email of emails) {
+    const facts = parseTuroOrderEmail(email);
+    if (facts) events.push({ at: email.receivedAt, facts });
+  }
+  return events;
+}
+
+type StoredSnapshot = {
+  reservationId: string;
+  observedAt: Date;
+  facts: string;
+  plate: string | null;
+};
+
+/** Stored snapshot facts, with dates revived. Unreadable rows are skipped
+ *  rather than allowed to stop the sync that every other booking needs. */
+function readSnapshotFacts(snapshot: StoredSnapshot): TuroOrderFacts | null {
+  try {
+    const raw = JSON.parse(snapshot.facts) as Record<string, unknown>;
+    return {
+      ...(raw as unknown as TuroOrderFacts),
+      reservationId: snapshot.reservationId,
+      tripStart: typeof raw.tripStart === "string" ? new Date(raw.tripStart) : null,
+      tripEnd: typeof raw.tripEnd === "string" ? new Date(raw.tripEnd) : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function snapshotEvents(snapshots: StoredSnapshot[]): FactsEvent[] {
+  return snapshots.flatMap((snapshot) => {
+    const facts = readSnapshotFacts(snapshot);
+    return facts ? [{ at: snapshot.observedAt, facts }] : [];
+  });
+}
+
+function snapshotPlates(snapshots: StoredSnapshot[]): Record<string, string> {
+  const plates: Record<string, string> = {};
+  for (const snapshot of snapshots) {
+    if (snapshot.plate?.trim()) plates[snapshot.reservationId] = snapshot.plate.trim();
+  }
+  return plates;
 }
 
 function statusFor(facts: TuroOrderFacts, current?: OrderStatus): OrderStatus {
@@ -137,16 +202,58 @@ export async function applyTuroEmailsToOrders(input: {
    *  order matches on its reservation id like any other. */
   plateOverrides?: Record<string, string>;
 }): Promise<ApplyOutcome> {
-  const emails = await prisma.inboundEmail.findMany({
-    where: { workspaceId: input.workspaceId },
-    orderBy: { receivedAt: "asc" },
-    select: { subject: true, bodyText: true },
-  });
+  const [emails, snapshots] = await Promise.all([
+    prisma.inboundEmail.findMany({
+      where: { workspaceId: input.workspaceId },
+      orderBy: { receivedAt: "asc" },
+      select: { subject: true, bodyText: true, receivedAt: true },
+    }),
+    prisma.turoTripSnapshot.findMany({
+      where: { workspaceId: input.workspaceId },
+      select: { reservationId: true, observedAt: true, facts: true, plate: true },
+    }),
+  ]);
 
-  const folded = foldByReservation(emails);
+  const outcome = await applyTuroOrderFacts({
+    workspaceId: input.workspaceId,
+    facts: foldFacts([...mailEvents(emails), ...snapshotEvents(snapshots)]),
+    apply: input.apply,
+    actor: input.actor,
+    plateOverrides: input.plateOverrides,
+    plateHints: snapshotPlates(snapshots),
+  });
+  return { ...outcome, scanned: emails.length };
+}
+
+/**
+ * Write folded facts into orders: place new bookings, park the ones that
+ * cannot be placed, move dates on unfinished trips, and recompute
+ * conflicts on every car touched.
+ *
+ * Takes facts rather than mail so that any source can feed it. Callers
+ * that are a new *source* -- the agent -- should go through
+ * `ingestTuroTripSnapshots`, which records the observation first; facts
+ * handed straight to this function are forgotten, and the next mail sync
+ * will re-derive the trip without them.
+ */
+export async function applyTuroOrderFacts(input: {
+  workspaceId: string;
+  facts: Map<string, TuroOrderFacts>;
+  /** When false, nothing is written. */
+  apply: boolean;
+  actor?: string;
+  /** An operator's plate: wins outright, and one that matches no car
+   *  drops the booking and is reported, since it is a typo. */
+  plateOverrides?: Record<string, string>;
+  /** A plate read off Turo's own trip page: wins when it matches a car
+   *  (a deactivated one included -- this is evidence, not a model
+   *  guess), and parks the booking when it matches none. */
+  plateHints?: Record<string, string>;
+}): Promise<ApplyOutcome> {
+  const folded = input.facts;
 
   const outcome: ApplyOutcome = {
-    scanned: emails.length,
+    scanned: folded.size,
     reservations: folded.size,
     created: 0,
     updated: 0,
@@ -154,6 +261,7 @@ export async function applyTuroEmailsToOrders(input: {
     pending: 0,
     ambiguousVehicle: [],
     unknownPlates: [],
+    unresolvedPlateHints: [],
     placedPastDeactivated: [],
     byAccount: {},
     conflictsRechecked: 0,
@@ -244,46 +352,62 @@ export async function applyTuroEmailsToOrders(input: {
         continue;
       }
 
+      const findByPlate = (plate: string) =>
+        fleet.find(
+          (vehicle) =>
+            vehicle.plateNumber &&
+            foldLatinLookalikes(vehicle.plateNumber).toUpperCase() === plate,
+        );
+
       // A plate the operator supplied wins outright: they can see what
       // the email cannot, and there is nothing here to second-guess
-      // them with.
-      // Typed by a person, matched against a stored plate that may
-      // have come from Turo -- so both sides are folded, or an
+      // them with. Typed by a person, matched against a stored plate
+      // that may have come from Turo -- so both sides are folded, or an
       // override typed with an ordinary A silently finds nothing.
       const overridePlate = input.plateOverrides?.[reservationId]
         ? foldLatinLookalikes(input.plateOverrides[reservationId].trim()).toUpperCase()
         : undefined;
-      const overrideVehicle = overridePlate
-        ? fleet.find(
-            (vehicle) =>
-              vehicle.plateNumber &&
-              foldLatinLookalikes(vehicle.plateNumber).toUpperCase() === overridePlate,
-          )
-        : undefined;
+      const overrideVehicle = overridePlate ? findByPlate(overridePlate) : undefined;
 
       if (overridePlate && !overrideVehicle) {
         outcome.unknownPlates.push({ reservationId, plate: overridePlate });
         continue;
       }
 
+      const hintPlate =
+        !overridePlate && input.plateHints?.[reservationId]
+          ? foldLatinLookalikes(input.plateHints[reservationId].trim()).toUpperCase()
+          : undefined;
+      const hintVehicle = hintPlate ? findByPlate(hintPlate) : undefined;
+      if (hintPlate && !hintVehicle) {
+        outcome.unresolvedPlateHints.push({ reservationId, plate: hintPlate });
+      }
+
       // Otherwise scope to the account the mail came from. This fleet
       // runs four Tesla Model Y 2020s and two Ford Explorer 2014s
       // across two accounts, so the account is often the only thing
       // that turns an ambiguous model into one car.
-      // A plate the operator typed is honoured even on a deactivated
-      // car: they can see what the email cannot. Everything else goes
-      // through `placeBooking`, which never picks a deactivated car.
-      const modelMatches = overrideVehicle
+      //
+      // A plate -- the operator's, or one the page showed -- is honoured
+      // even on a deactivated car: it names the car. Everything else
+      // goes through `placeBooking`, which never picks a deactivated
+      // car. And a page plate that names no car of ours parks the
+      // booking: the page has said which car it is, so matching by
+      // model would be choosing a different one.
+      const byPlate = overrideVehicle ?? hintVehicle;
+      const modelMatches = byPlate
         ? []
         : matchVehiclesForEmail(facts.vehicleText, fleet, facts.coHostAccount).matches;
-      const placement = overrideVehicle
-        ? ({ kind: "placed", vehicle: overrideVehicle } as const)
-        : placeBooking({
-            matches: modelMatches,
-            deactivatedIds,
-            lastBookedAt,
-            tripStart: facts.tripStart,
-          });
+      const placement = byPlate
+        ? ({ kind: "placed", vehicle: byPlate } as const)
+        : hintPlate
+          ? ({ kind: "pending", candidates: modelMatches.length, allDeactivated: false } as const)
+          : placeBooking({
+              matches: modelMatches,
+              deactivatedIds,
+              lastBookedAt,
+              tripStart: facts.tripStart,
+            });
       if (placement.kind === "pending") {
         // Several cars of one model is normal here, and the mail names
         // no plate. Guessing would file a real booking against the
@@ -328,8 +452,12 @@ export async function applyTuroEmailsToOrders(input: {
               ...pending,
             },
           });
-          outcome.pending += 1;
         }
+        // Counted whether or not it was written: with `apply: false` the
+        // counts describe what would happen, as `created` and `updated`
+        // always have. This one alone used to read 0 on a dry run while
+        // `ambiguousVehicle` listed the same bookings.
+        outcome.pending += 1;
         continue;
       }
 
@@ -437,4 +565,121 @@ export async function applyTuroEmailsToOrders(input: {
   outcome.conflictsRechecked = touchedVehicles.size;
 
   return outcome;
+}
+
+/**
+ * A trip as the agent read it off Turo's trip page.
+ *
+ * `intent` follows the mail's vocabulary: `created` for a booked or
+ * running trip, `changed` after a modification, `cancelled`, `ended`.
+ * `earnings` may be sent but is never written, as with mail: the ledger
+ * settles on the CSV's figure.
+ */
+export type TuroTripObservation = TuroOrderFacts & {
+  /** Plate shown on the page, if any. A hint: see `applyTuroOrderFacts`. */
+  plate?: string | null;
+};
+
+/**
+ * Record what the agent saw, then apply it -- the entry point for the
+ * agent's per-trip route.
+ *
+ * Recording first is the point. Mail is re-folded every five minutes and
+ * wins on any unfinished trip, so an extension the agent saw on the page,
+ * made in Turo's own interface and never emailed, would be moved back on
+ * the next sync if it were only written to the order. Stored as a
+ * snapshot, it is folded against the mail by time on every later sync
+ * too, and keeps winning until something newer arrives.
+ *
+ * Applies only the reservations in `trips`, each re-derived from its
+ * mail and its snapshot together, so the result is exactly what the next
+ * full sync will produce for them. With `apply: false` nothing is stored
+ * or written; the outcome says what would happen.
+ */
+export async function ingestTuroTripSnapshots(input: {
+  workspaceId: string;
+  actor?: string;
+  apply: boolean;
+  /** When the pages were read. Defaults to now. */
+  observedAt?: Date;
+  trips: TuroTripObservation[];
+}): Promise<ApplyOutcome> {
+  const observedAt = input.observedAt ?? new Date();
+  const trips = input.trips.filter((trip) => trip.reservationId?.trim());
+  const ids = [...new Set(trips.map((trip) => trip.reservationId.trim()))];
+
+  const stored = ids.length
+    ? await prisma.turoTripSnapshot.findMany({
+        where: { workspaceId: input.workspaceId, reservationId: { in: ids } },
+        select: { reservationId: true, observedAt: true, facts: true, plate: true },
+      })
+    : [];
+  const latest = new Map<string, StoredSnapshot>(stored.map((row) => [row.reservationId, row]));
+
+  for (const trip of trips) {
+    const { plate, ...facts } = trip;
+    const reservationId = trip.reservationId.trim();
+    const previous = latest.get(reservationId);
+
+    // A read older than the one on file is not news. Keep the newer.
+    if (previous && previous.observedAt.getTime() > observedAt.getTime()) continue;
+
+    // Merged over the last read with the same rule as mail, so a field
+    // the page did not show this time does not erase one it showed before.
+    const previousFacts = previous ? readSnapshotFacts(previous) : null;
+    const merged =
+      foldFacts([
+        ...(previousFacts ? [{ at: previous!.observedAt, facts: previousFacts }] : []),
+        { at: observedAt, facts: { ...facts, reservationId } },
+      ]).get(reservationId) ?? { ...facts, reservationId };
+
+    latest.set(reservationId, {
+      reservationId,
+      observedAt,
+      facts: JSON.stringify(merged),
+      plate: plate?.trim() || previous?.plate || null,
+    });
+  }
+
+  if (input.apply) {
+    for (const row of latest.values()) {
+      await prisma.turoTripSnapshot.upsert({
+        where: {
+          workspaceId_reservationId: {
+            workspaceId: input.workspaceId,
+            reservationId: row.reservationId,
+          },
+        },
+        create: { workspaceId: input.workspaceId, ...row },
+        update: { observedAt: row.observedAt, facts: row.facts, plate: row.plate },
+      });
+    }
+  }
+
+  // Only the mail that mentions these reservations; the fold below keeps
+  // only the reservations asked about, so a stray number match is
+  // harmless.
+  const emails = ids.length
+    ? await prisma.inboundEmail.findMany({
+        where: {
+          workspaceId: input.workspaceId,
+          OR: ids.flatMap((id) => [{ bodyText: { contains: id } }, { subject: { contains: id } }]),
+        },
+        orderBy: { receivedAt: "asc" },
+        select: { subject: true, bodyText: true, receivedAt: true },
+      })
+    : [];
+
+  const snapshots = [...latest.values()];
+  const folded = foldFacts([...mailEvents(emails), ...snapshotEvents(snapshots)]);
+  const wanted = new Set(ids);
+
+  const outcome = await applyTuroOrderFacts({
+    workspaceId: input.workspaceId,
+    facts: new Map([...folded].filter(([id]) => wanted.has(id))),
+    apply: input.apply,
+    actor: input.actor ?? "turo-agent",
+    plateHints: snapshotPlates(snapshots),
+  });
+  return { ...outcome, scanned: trips.length };
 }

@@ -539,6 +539,38 @@ model PendingOrder {
   @@index([workspaceId, pickupDatetime])
 }
 
+/// What the Turo agent saw on a reservation's trip page, and when.
+///
+/// Mail describes a trip as of the last email Turo sent; the trip page
+/// describes it as of right now. An extension made in Turo's own
+/// interface sends no mail, so without this row the next Gmail sync --
+/// which lets mail win on any unfinished trip -- would move the agent's
+/// newer dates straight back. The sync folds these rows and the mail
+/// together by time instead: whichever was observed later wins, field by
+/// field, and a later email (a cancellation) still beats an older look.
+///
+/// One row per reservation, the latest observation merged over the last.
+/// No relation to Workspace, deliberately: that would put a field on a
+/// model this domain does not own. Every query scopes on workspaceId.
+model TuroTripSnapshot {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  reservationId String
+  /// When the page was read. The fold orders on this against the mail's
+  /// receivedAt; it is not when the row was written.
+  observedAt    DateTime
+  /// JSON of the TuroOrderFacts fields the page stated; dates as ISO.
+  facts         String
+  /// Plate shown on the trip page, if any. A hint, not an override: one
+  /// that matches no car parks the booking instead of dropping it.
+  plate         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([workspaceId, reservationId])
+  @@index([workspaceId])
+}
+
 model OwnerLedgerItem {
   workspaceId        String?
   id                 String               @id @default(cuid())

@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.17.0 - 2026-09-29
+
+### Trips an agent reads off Turo are kept, and merged with the booking mail
+
+An agent reading a trip page on Turo sees things the booking emails never say -- the car's plate, a guest's phone, the times after a change that sent no mail. `ingestTuroTripSnapshots` in `lib/turo-email-apply.ts` takes those observations, keeps the latest one per reservation in a new `TuroTripSnapshot` table, and applies them through the same path as the Gmail sync. The route that exposes it to agents (`/api/agent/trips`) ships separately.
+
+Mail and snapshots are folded together, oldest first, so the freshest observation wins field by field. A trip extended on Turo stays extended when the next mail sync runs; a later email still overrides an older snapshot. An observation older than the stored one is ignored, and fields it leaves out keep their previous values.
+
+A plate from the agent places a trip on that car, even a deactivated one, since the agent saw it there. A plate the fleet does not have sends the trip to 待分配 and is reported back -- it is never replaced by a guess from the model name.
+
+A dry run of the mail sync now counts 待分配 trips too; it used to report 0 because the count sat inside the write.
+
+
 ## v1.16.0 - 2026-09-29
 
 ### An AI agent can import Turo's CSV export

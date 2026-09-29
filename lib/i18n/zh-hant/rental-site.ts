@@ -160,6 +160,10 @@ export const rentalSiteMessages = {
       highlightValuePlaceholder: "5,000+",
       highlightLabelPlaceholder: "完成訂單",
       wechatIdLabel: "微訊號",
+      senderEmailLabel: "給租車人發郵件的地址",
+      senderEmailHint:
+        "用你自己域名的郵箱，例如 booking@yourdomain.com。預訂確認和租車合同會以你的品牌名從這個地址發出。這個域名需要先在 TATO 的郵件服務裡驗證，請聯絡我們設定。留空則從 TATO 發出。",
+      senderInvalid: "發件地址不是有效的郵箱。",
       liveAddresses: "當前網址",
     },
     sitePublic: {

@@ -5,6 +5,7 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { sendContractSigningEmail } from "@/lib/contract-email";
 import { writeContractAuditLog } from "@/lib/contract-signing";
 import { prisma } from "@/lib/prisma";
+import { getWorkspaceSender } from "@/lib/site-sender";
 
 type RecipientInput = {
   name: string;
@@ -145,6 +146,7 @@ export async function POST(req: NextRequest) {
       senderName: user.name,
       signingUrl,
       message: envelope.message,
+      from: await getWorkspaceSender(workspace.id),
     });
     if (!result.ok) {
       emailFailures.push({

@@ -172,6 +172,10 @@ export const rentalSiteMessages = {
       highlightValuePlaceholder: "5,000+",
       highlightLabelPlaceholder: "Trips completed",
       wechatIdLabel: "WeChat ID",
+      senderEmailLabel: "Send renter emails from",
+      senderEmailHint:
+        "An address on your own domain, e.g. booking@yourdomain.com. Booking confirmations and agreements arrive from it under your brand name. The domain must be verified with TATO's email provider — ask us to set it up. Leave empty to send from TATO.",
+      senderInvalid: "The sender address is not a valid email address.",
       liveAddresses: "Live addresses",
     },
     sitePublic: {
@@ -390,6 +394,10 @@ export const rentalSiteMessages = {
       highlightValuePlaceholder: "5,000+",
       highlightLabelPlaceholder: "完成订单",
       wechatIdLabel: "微信号",
+      senderEmailLabel: "给租车人发邮件的地址",
+      senderEmailHint:
+        "用你自己域名的邮箱，例如 booking@yourdomain.com。预订确认和租车合同会以你的品牌名从这个地址发出。这个域名需要先在 TATO 的邮件服务里验证，请联系我们设置。留空则从 TATO 发出。",
+      senderInvalid: "发件地址不是有效的邮箱。",
       liveAddresses: "当前网址",
     },
     sitePublic: {

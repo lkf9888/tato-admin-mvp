@@ -10,6 +10,7 @@ import {
   type DirectBookingEmailValues,
 } from "@/lib/direct-booking-email-template";
 import { getDirectBookingDays } from "@/lib/direct-booking";
+import { formatSiteSender } from "@/lib/site-sender";
 import { sendMail } from "@/lib/email";
 import { getAppUrl } from "@/lib/stripe";
 import { logActivity } from "@/lib/orders";
@@ -185,6 +186,7 @@ export async function sendDirectBookingConfirmationEmail(input: {
       // A renter hitting Reply should reach the operator, not the
       // platform's envelope sender.
       replyTo: site?.contactEmail?.trim() || undefined,
+      from: formatSiteSender(site),
     });
 
     await logActivity({
@@ -275,6 +277,7 @@ export async function sendDepositSettlementEmail(input: {
       text,
       html: toHtmlBody(text),
       replyTo: site?.contactEmail?.trim() || undefined,
+      from: formatSiteSender(site),
     });
 
     await logActivity({

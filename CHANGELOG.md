@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.9.4 - 2026-09-29
+
+### Renter emails can come from the operator's own domain
+
+Every email TATO sends goes out as `noreply@tatocar.co`, and that
+domain is not verified with the email provider (Resend), so none of
+them arrived: the first real direct booking's confirmation and its
+rental agreement both failed with Resend's "domain is not verified".
+The Resend account already verifies domains of its own, SPEEDX's among
+them, and a renter who booked on SPEEDX's site should hear from SPEEDX
+anyway.
+
+The rental website settings gain "Send renter emails from" (for
+example `booking@speedxrental.com`, on `RentalSite.senderEmail`).
+When set, everything addressed to that operator's renters goes out as
+"Brand <sender>": the booking confirmation, the deposit settlement
+notice, the rental agreement invitation, the signed-agreement email
+(whose subject now names the brand instead of TATO), and agreements
+sent by hand from the admin. Replies still go to the site's contact
+email. Left empty, mail comes from the platform address as before. The
+domain has to be verified with Resend by whoever runs the platform;
+the field says so.
+
+The platform's own mail (sign-up codes and the like) still sends from
+tatocar.co and still needs that domain verified.
+
 ## v1.9.3 - 2026-09-29
 
 ### A renter can move their pickup later than the dates already chosen

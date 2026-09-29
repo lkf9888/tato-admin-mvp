@@ -16,6 +16,8 @@ type ContractSigningEmailInput = {
    * agreement instead of theirs, so that path passes its own brand.
    */
   brandName?: string | null;
+  /** The operator's own sender, when they have one (`lib/site-sender`). */
+  from?: string | null;
 };
 
 type ContractCompletedEmailInput = {
@@ -28,6 +30,9 @@ type ContractCompletedEmailInput = {
     content: Buffer;
     contentType: string;
   };
+  /** As for the signing email: whose name and address it arrives under. */
+  brandName?: string | null;
+  from?: string | null;
 };
 
 export type ContractEmailResult =
@@ -76,14 +81,22 @@ export async function sendContractSigningEmail(
 </html>`;
 
   return toContractResult(
-    await sendMail({ to: input.to, subject, text, html, timeoutMs: 30_000 }),
+    await sendMail({
+      to: input.to,
+      subject,
+      text,
+      html,
+      from: input.from ?? undefined,
+      timeoutMs: 30_000,
+    }),
   );
 }
 
 export async function sendContractCompletedEmail(
   input: ContractCompletedEmailInput,
 ): Promise<ContractEmailResult> {
-  const subject = `[TATO] 电子合约已完成：${input.contractTitle}`;
+  const brand = input.brandName?.trim() || "TATO";
+  const subject = `[${brand}] 电子合约已完成：${input.contractTitle}`;
   const text = [
     `${input.recipientName}，您好：`,
     "",
@@ -92,14 +105,14 @@ export async function sendContractCompletedEmail(
     `合约：${input.contractTitle}`,
     `已签署 PDF：${input.signedPdfUrl}`,
     "",
-    "TATO",
+    brand,
   ].join("\n");
   const html = `<!doctype html>
 <html>
   <body style="margin:0;background:#f6f6f6;padding:24px;font-family:Arial,sans-serif;color:#111827;">
     <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
       <div style="padding:28px;border-bottom:1px solid #e5e7eb;">
-        <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#111827;">TATO eSignature</div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#111827;">${escapeHtml(brand)} eSignature</div>
         <h1 style="font-size:24px;line-height:1.25;margin:12px 0 0;">电子合约已完成</h1>
       </div>
       <div style="padding:28px;">
@@ -116,6 +129,7 @@ export async function sendContractCompletedEmail(
       subject,
       text,
       html,
+      from: input.from ?? undefined,
       attachments: input.signedPdfAttachment
         ? [
             {

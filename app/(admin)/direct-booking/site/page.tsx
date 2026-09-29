@@ -98,6 +98,8 @@ export default async function RentalSitePage({
         return copy.publishBlocked;
       case "ads_conversion_invalid":
         return copy.adsConversionInvalid;
+      case "sender_invalid":
+        return copy.senderInvalid;
       case "logo_too_large":
       case "logo_not_an_image":
         return copy.logoHint;
@@ -375,6 +377,18 @@ export default async function RentalSitePage({
                 maxLength={200}
                 className={FIELD_CLASS}
               />
+            </label>
+            <label className="block min-w-0 sm:col-span-2">
+              <span className={LABEL_CLASS}>{copy.senderEmailLabel}</span>
+              <input
+                name="senderEmail"
+                type="email"
+                defaultValue={site?.senderEmail ?? ""}
+                placeholder="booking@yourdomain.com"
+                maxLength={254}
+                className={FIELD_CLASS}
+              />
+              <span className={HINT_CLASS}>{copy.senderEmailHint}</span>
             </label>
             <label className="block min-w-0">
               <span className={LABEL_CLASS}>{copy.wechatIdLabel}</span>

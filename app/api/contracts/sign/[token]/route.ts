@@ -8,6 +8,7 @@ import {
   type ContractPdfFieldValue,
 } from "@/lib/contract-signing";
 import { prisma } from "@/lib/prisma";
+import { getWorkspaceMailIdentity } from "@/lib/site-sender";
 
 type Params = Promise<{ token: string }>;
 
@@ -166,11 +167,14 @@ export async function POST(
     if (nextRecipient) {
       const origin = req.headers.get("origin") || new URL(req.url).origin;
       const publicBase = (process.env.APP_URL || origin).replace(/\/$/, "");
+      const identity = await getWorkspaceMailIdentity(fresh.workspaceId);
       const result = await sendContractSigningEmail({
         to: nextRecipient.email,
         recipientName: nextRecipient.name,
         contractTitle: fresh.title,
-        senderName: "TATO",
+        senderName: identity.brandName ?? "TATO",
+        brandName: identity.brandName,
+        from: identity.from,
         signingUrl: `${publicBase}/sign/${nextRecipient.token}`,
         message: fresh.message,
       });
@@ -262,6 +266,7 @@ export async function POST(
     content: rendered.buffer,
     contentType: "application/pdf",
   };
+  const mailIdentity = await getWorkspaceMailIdentity(fresh.workspaceId);
   for (const item of fresh.recipients) {
     // The signed-PDF route requires either an admin session or a valid
     // recipient token (see that route's header comment). Signers have
@@ -276,6 +281,8 @@ export async function POST(
       contractTitle: fresh.title,
       signedPdfUrl: recipientPdfUrl,
       signedPdfAttachment,
+      brandName: mailIdentity.brandName,
+      from: mailIdentity.from,
     });
     if (!result.ok) {
       await writeContractAuditLog({
@@ -295,6 +302,7 @@ export async function POST(
       contractTitle: fresh.title,
       signedPdfUrl: blob.url,
       signedPdfAttachment,
+      from: mailIdentity.from,
     });
     if (!hostEmailResult.ok) {
       await writeContractAuditLog({

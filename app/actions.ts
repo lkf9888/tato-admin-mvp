@@ -73,6 +73,7 @@ import { roundCurrencyAmount } from "@/lib/utils";
 import { createWorkspaceForRegistration } from "@/lib/workspaces";
 import { parseAdsSendTo } from "@/lib/site-conversion";
 import { readSiteContentForm } from "@/lib/rental-site-content";
+import { readSenderEmail } from "@/lib/site-sender";
 
 // Brute-force protection. Limits are deliberately permissive enough
 // for typo-and-retry while shutting down credential stuffing: one
@@ -2007,6 +2008,11 @@ export async function saveRentalSiteAction(formData: FormData) {
     redirect("/direct-booking/site?error=no_bookable_vehicles");
   }
 
+  const senderEmail = readSenderEmail(formData.get("senderEmail")?.toString());
+  if (senderEmail === "invalid") {
+    redirect("/direct-booking/site?error=sender_invalid");
+  }
+
   const data = {
     slug,
     domain,
@@ -2017,6 +2023,7 @@ export async function saveRentalSiteAction(formData: FormData) {
     ...readSiteContentForm((name) => formData.get(name)?.toString() ?? null),
     accentColor,
     contactEmail: siteFieldOrNull(formData.get("contactEmail")),
+    senderEmail,
     contactPhone: siteFieldOrNull(formData.get("contactPhone")),
     contactAddress: siteFieldOrNull(formData.get("contactAddress")),
     wechatId: siteFieldOrNull(formData.get("wechatId"))?.slice(0, 60) ?? null,

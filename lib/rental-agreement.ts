@@ -19,6 +19,7 @@ import {
   RENTAL_AGREEMENT_TITLE,
 } from "@/lib/rental-agreement-text";
 import { sendContractSigningEmail } from "@/lib/contract-email";
+import { getWorkspaceSender } from "@/lib/site-sender";
 import { writeContractAuditLog } from "@/lib/contract-signing";
 import { makeContractTemplatePdfPath, resolveUploadPath } from "@/lib/uploads";
 import { formatCurrency } from "@/lib/utils";
@@ -328,6 +329,7 @@ export async function createRentalAgreementEnvelope(input: {
       contractTitle: envelope.title,
       senderName: brandName,
       brandName,
+      from: await getWorkspaceSender(input.workspaceId),
       signingUrl: `${input.appUrl.replace(/\/$/, "")}/sign/${recipient.token}`,
       message: null,
     });

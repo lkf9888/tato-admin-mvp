@@ -1834,6 +1834,11 @@ model RentalSite {
   /// unreadable.
   accentColor    String?
   contactEmail   String?
+  /// Sender for mail to this operator's renters -- booking confirmations
+  /// and agreements -- such as `booking@speedxrental.com`, shown under the
+  /// brand name. Its domain must be verified with the platform's email
+  /// provider (Resend). Null sends from the platform's own address.
+  senderEmail    String?
   contactPhone   String?
   contactAddress String?
   /// Footer prose: cancellation terms, insurance notes, licence

@@ -3,7 +3,11 @@ import Link from "next/link";
 
 import { PublicBookingPanel } from "@/components/public-booking-panel";
 import { VehiclePhotoCarousel } from "@/components/vehicle-photo-carousel";
-import { getBlockedBookingWindows, getDateOnlyBookingWindows } from "@/lib/direct-booking";
+import {
+  getBlockedBookingWindows,
+  getBookingBusyWindows,
+  getDateOnlyBookingWindows,
+} from "@/lib/direct-booking";
 import type { BookingPolicy } from "@/lib/booking-policy";
 import { siteHref } from "@/components/site-shell";
 import { buildVehicleSlug, getSiteOrigin, getSiteUrl } from "@/lib/rental-site";
@@ -197,6 +201,8 @@ export function SiteVehicleView({
             bookingTaxRate={policy.taxRate}
             taxLines={policy.taxLines}
             blockedDateWindows={blockedDateWindows}
+            busyWindows={getBookingBusyWindows(vehicle.orders)}
+            returnGraceMinutes={policy.returnGraceMinutes}
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}
             locations={locations}

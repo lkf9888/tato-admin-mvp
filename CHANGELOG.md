@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.10.0 - 2026-09-29
+
+### Renters choose pickup and return times, and trips are charged per 24 hours
+
+A booking was two dates: every direct booking was stored at midday
+UTC — 05:00 in Vancouver on the order list — and priced per calendar
+date. Renters now pick a time for each end, on the half hour around the
+clock (Vancouver time, 10:00 by default), and a trip is charged one day
+per started 24 hours, as Turo does: 10:00 to 10:00 the next day is one
+day. A return may run over by the fleet's new "return grace" (60
+minutes by default, in the pricing rules) before another day is added.
+A same-day trip is possible and is one day. `lib/booking-time.ts`
+converts between the operator's clock and UTC, twice-checked around
+daylight-saving changes.
+
+The chosen times are checked against when the car is actually out, to
+the minute, in the booking panel and again at checkout and in the
+payment webhook, so a trip can start the hour after another ends. The
+order stores the real moments; the Stripe line, the rental agreement's
+first page, the renter's booking page and the confirmation email
+(`{pickupTime}`, `{returnTime}`, in the default template) all show them.
+
+Fixed with it: the picker worked out a busy car's days in UTC, so a
+Turo trip ending in the evening in Vancouver also struck the next
+morning off the calendar (A230RN's 12 October). The confirmation email
+and the renter's page printed UTC dates too, a day late for an evening
+trip. All three now use Vancouver dates.
+
+Change requests from the renter's page still work in whole dates.
+
 ## v1.9.6 - 2026-09-29
 
 ### GST and PST are separate lines, and the confirmation says where to collect the car

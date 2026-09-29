@@ -8,8 +8,7 @@ import { z } from "zod";
 import {
   getDirectBookingInstalmentPlan,
   getDirectBookingQuote,
-  hasVehicleBookingConflict,
-  isDateOnlyRangeValid,
+  hasTimedBookingConflict,
 } from "@/lib/direct-booking";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
@@ -26,6 +25,7 @@ import {
 } from "@/lib/booking-locations";
 import { prisma } from "@/lib/prisma";
 import { getBookingReturnUrls } from "@/lib/rental-site";
+import { DEFAULT_BOOKING_TIME, zonedDateTimeToUtc } from "@/lib/booking-time";
 import { getStripeCheckoutLocale, isSiteLocale } from "@/lib/site-locale";
 import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
 import {
@@ -54,6 +54,10 @@ const checkoutSchema = z.object({
   vehicleId: z.string().min(1),
   pickupDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // A page from before times were asked for sends none; ten o'clock
+  // is what that page's renter would have been told at the counter.
+  pickupTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default(DEFAULT_BOOKING_TIME),
+  returnTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default(DEFAULT_BOOKING_TIME),
   renterName: z.string().trim().min(2),
   renterEmail: z.string().trim().email(),
   renterPhone: z.string().trim().max(50).optional().or(z.literal("")),
@@ -146,6 +150,8 @@ async function readCheckoutRequest(request: Request) {
     vehicleId: readFormString(formData, "vehicleId"),
     pickupDate: readFormString(formData, "pickupDate"),
     returnDate: readFormString(formData, "returnDate"),
+    pickupTime: readFormString(formData, "pickupTime") || undefined,
+    returnTime: readFormString(formData, "returnTime") || undefined,
     renterName: readFormString(formData, "renterName"),
     renterEmail: readFormString(formData, "renterEmail"),
     renterPhone: readFormString(formData, "renterPhone"),
@@ -169,8 +175,16 @@ export async function POST(request: Request) {
     }
 
     const { parsed, licenseFront, licenseBack, siteLocale } = await readCheckoutRequest(request);
-    if (!isDateOnlyRangeValid(parsed.pickupDate, parsed.returnDate)) {
-      return NextResponse.json({ error: "Choose a valid pickup and return date." }, { status: 400 });
+    // The trip as two moments on the operator's clock. Same-day trips
+    // are fine now that there are times; a return before the pickup is
+    // not.
+    const pickupAt = zonedDateTimeToUtc(parsed.pickupDate, parsed.pickupTime);
+    const returnAt = zonedDateTimeToUtc(parsed.returnDate, parsed.returnTime);
+    if (!pickupAt || !returnAt || returnAt <= pickupAt) {
+      return NextResponse.json({ error: "Choose a valid pickup and return time." }, { status: 400 });
+    }
+    if (pickupAt.getTime() < Date.now() - 15 * 60_000) {
+      return NextResponse.json({ error: "The pickup time has already passed." }, { status: 400 });
     }
 
     const vehicle = await prisma.vehicle.findUnique({
@@ -191,7 +205,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This vehicle is not bookable right now." }, { status: 400 });
     }
 
-    if (hasVehicleBookingConflict(vehicle.orders, parsed.pickupDate, parsed.returnDate)) {
+    if (hasTimedBookingConflict(vehicle.orders, pickupAt, returnAt)) {
       return NextResponse.json(
         { error: "Those dates overlap an existing booking." },
         { status: 400 },
@@ -270,6 +284,9 @@ export async function POST(request: Request) {
       bookingTaxRate: policy.taxRate,
       taxLines: policy.taxLines,
       weeklyDiscountPercent: policy.weeklyDiscountPercent,
+      pickupTime: parsed.pickupTime,
+      returnTime: parsed.returnTime,
+      graceMinutes: policy.returnGraceMinutes,
     });
 
     if (quote.days < 1 || quote.totalAmount <= 0) {
@@ -302,6 +319,9 @@ export async function POST(request: Request) {
       bookingTaxRate: policy.taxRate,
       taxLines: policy.taxLines,
       weeklyDiscountPercent: policy.weeklyDiscountPercent,
+      pickupTime: parsed.pickupTime,
+      returnTime: parsed.returnTime,
+      graceMinutes: policy.returnGraceMinutes,
     });
     const firstPeriod = plan.instalments[0] ?? null;
     const chargedDays = firstPeriod?.days ?? quote.days;
@@ -471,6 +491,8 @@ export async function POST(request: Request) {
         vehicleName: vehicle.nickname,
         pickupDate: parsed.pickupDate,
         returnDate: parsed.returnDate,
+        pickupTime: parsed.pickupTime,
+        returnTime: parsed.returnTime,
         renterName: parsed.renterName,
         renterEmail: parsed.renterEmail,
         renterPhone: parsed.renterPhone ?? "",

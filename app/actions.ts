@@ -2127,6 +2127,7 @@ export async function saveBookingPolicyAction(formData: FormData) {
     extraKmRate: read("extraKmRate", BOOKING_POLICY_DEFAULTS.extraKmRate),
     insuranceFee: read("insuranceFee", BOOKING_POLICY_DEFAULTS.insuranceFee),
     depositAmount: read("depositAmount", BOOKING_POLICY_DEFAULTS.depositAmount),
+    returnGraceMinutes: read("returnGraceMinutes", BOOKING_POLICY_DEFAULTS.returnGraceMinutes),
     // Up to three named taxes (GST, PST, …), each on the rent. Rows
     // left blank drop out; the single name and rate are derived.
     taxLines: [0, 1, 2].map((index) => ({

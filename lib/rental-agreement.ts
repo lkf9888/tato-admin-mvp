@@ -18,6 +18,7 @@ import {
   RENTAL_AGREEMENT_DEFAULT_OWNER_ADDRESS,
   RENTAL_AGREEMENT_TITLE,
 } from "@/lib/rental-agreement-text";
+import { utcToZonedDate, utcToZonedTime } from "@/lib/booking-time";
 import { sendContractSigningEmail } from "@/lib/contract-email";
 import { getWorkspaceSender } from "@/lib/site-sender";
 import { writeContractAuditLog } from "@/lib/contract-signing";
@@ -199,8 +200,9 @@ export async function ensureRentalAgreementTemplate(workspaceId: string) {
 /** What the contract states about one booking. Blank stays blank. */
 export type RentalAgreementValues = Partial<Record<RentalAgreementFieldKey, string>>;
 
+/** Date and time on the operator's clock, e.g. `2026/10/13 10:00`. */
 function toDisplayDate(value: Date) {
-  return value.toISOString().slice(0, 10).replace(/-/g, "/");
+  return `${utcToZonedDate(value).replace(/-/g, "/")} ${utcToZonedTime(value)}`;
 }
 
 export function buildRentalAgreementValues(input: {

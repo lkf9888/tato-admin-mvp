@@ -43,6 +43,8 @@ export type BookingPolicy = {
    * only needs the total.
    */
   taxLines: TaxLine[];
+  /** Minutes forgiven at the end before another day is charged. */
+  returnGraceMinutes: number;
 };
 
 export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
@@ -59,6 +61,7 @@ export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
   taxName: null,
   taxRate: 0,
   taxLines: [],
+  returnGraceMinutes: 60,
 };
 
 type NullablePolicy = {
@@ -73,6 +76,7 @@ type NullablePolicy = {
   taxRate?: number | null;
   /** JSON as stored, or already parsed. */
   taxLines?: string | TaxLine[] | null;
+  returnGraceMinutes?: number | null;
 };
 
 /**
@@ -121,6 +125,15 @@ export function normalizeBookingPolicy(policy?: NullablePolicy | null): BookingP
       Math.max(0, pick(policy?.depositAmount, BOOKING_POLICY_DEFAULTS.depositAmount)),
     ),
     ...resolveTaxes(policy),
+    // Capped at a day less a minute: a grace of a whole day would make
+    // every trip one day shorter than it is.
+    returnGraceMinutes: Math.min(
+      1439,
+      Math.max(
+        0,
+        Math.round(pick(policy?.returnGraceMinutes, BOOKING_POLICY_DEFAULTS.returnGraceMinutes)),
+      ),
+    ),
     // Clamped well clear of zero: a multiplier of 0 would suggest
     // every car be rented for nothing, and it is far likelier to be a
     // half-typed number than an intention.
@@ -160,8 +173,9 @@ export function resolveBookingPolicy(
           ],
         }
       : { taxLines: fleet.taxLines }),
-    // Not a per-car setting, so it is carried across untouched.
+    // Not per-car settings, so they are carried across untouched.
     suggestedRateMultiplier: fleet.suggestedRateMultiplier,
+    returnGraceMinutes: fleet.returnGraceMinutes,
   });
 }
 

@@ -14,16 +14,26 @@ import {
   expandBlockedBookingDates,
   getDirectBookingInstalmentPlan,
   getDirectBookingQuote,
+  hasBusyWindowConflict,
   hasDateOnlyBookingConflict,
+  type BusyWindow,
   type DateOnlyBookingWindow,
 } from "@/lib/direct-booking";
 import type { TaxLine } from "@/lib/booking-policy";
+import {
+  BOOKING_TIME_OPTIONS,
+  DEFAULT_BOOKING_TIME,
+  isBookingTime,
+  zonedDateTimeToUtc,
+} from "@/lib/booking-time";
 import { getLocaleTag, getMessages, type Locale } from "@/lib/i18n";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type CheckoutState = "idle" | "success" | "cancelled" | "error";
 
 type StoredBookingState = {
+  pickupTime?: string;
+  returnTime?: string;
   pickupDate: string;
   returnDate: string;
   renterName: string;
@@ -249,6 +259,8 @@ export function PublicBookingPanel({
   bookingTaxRate,
   taxLines,
   blockedDateWindows,
+  busyWindows = [],
+  returnGraceMinutes,
   dailyRateOverrides,
   seasonalRates,
   locations,
@@ -272,6 +284,9 @@ export function PublicBookingPanel({
   /** The taxes one by one; the summary shows a line for each. */
   taxLines?: TaxLine[];
   blockedDateWindows: DateOnlyBookingWindow[];
+  /** When the car is out, to the minute, for checking the chosen times. */
+  busyWindows?: BusyWindow[];
+  returnGraceMinutes?: number;
   /** `YYYY-MM-DD` → price, for days the operator priced by hand. */
   dailyRateOverrides: Record<string, number>;
   /** Model pricing per day, empty when a person set the rate. */
@@ -299,6 +314,8 @@ export function PublicBookingPanel({
 
   const [pickupDate, setPickupDate] = useState(defaultPickupDate);
   const [returnDate, setReturnDate] = useState(defaultReturnDate);
+  const [pickupTime, setPickupTime] = useState(DEFAULT_BOOKING_TIME);
+  const [returnTime, setReturnTime] = useState(DEFAULT_BOOKING_TIME);
   const [renterName, setRenterName] = useState("");
   const [renterEmail, setRenterEmail] = useState("");
   const [renterPhone, setRenterPhone] = useState("");
@@ -324,7 +341,8 @@ export function PublicBookingPanel({
   const isReturnDateDisabled = useCallback(
     (candidate: string) => {
       if (!pickupDate) return true;
-      if (candidate <= pickupDate) return true;
+      // Same day is fine now that there are times to tell them apart.
+      if (candidate < pickupDate) return true;
 
       return hasDateOnlyBookingConflict(blockedDateWindows, pickupDate, candidate);
     },
@@ -339,6 +357,8 @@ export function PublicBookingPanel({
       const parsed = JSON.parse(stored) as StoredBookingState;
       setPickupDate(parsed.pickupDate || defaultPickupDate);
       setReturnDate(parsed.returnDate || defaultReturnDate);
+      if (isBookingTime(parsed.pickupTime)) setPickupTime(parsed.pickupTime);
+      if (isBookingTime(parsed.returnTime)) setReturnTime(parsed.returnTime);
       setRenterName(parsed.renterName || "");
       setRenterEmail(parsed.renterEmail || "");
       setRenterPhone(parsed.renterPhone || "");
@@ -372,6 +392,8 @@ export function PublicBookingPanel({
     const payload: StoredBookingState = {
       pickupDate,
       returnDate,
+      pickupTime,
+      returnTime,
       renterName,
       renterEmail,
       renterPhone,
@@ -381,6 +403,8 @@ export function PublicBookingPanel({
     window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
   }, [
     agreementAccepted,
+    pickupTime,
+    returnTime,
     pickupDate,
     renterEmail,
     renterName,
@@ -415,6 +439,9 @@ export function PublicBookingPanel({
         bookingDepositAmount,
         bookingTaxRate,
         taxLines,
+        pickupTime,
+        returnTime,
+        graceMinutes: returnGraceMinutes,
       }),
     [
       bookingDailyRate,
@@ -422,6 +449,9 @@ export function PublicBookingPanel({
       bookingInsuranceFee,
       bookingTaxRate,
       taxLines,
+      pickupTime,
+      returnTime,
+      returnGraceMinutes,
       pickupDate,
       returnDate,
       weeklyDiscountPercent,
@@ -447,6 +477,9 @@ export function PublicBookingPanel({
         bookingDepositAmount,
         bookingTaxRate,
         taxLines,
+        pickupTime,
+        returnTime,
+        graceMinutes: returnGraceMinutes,
       }),
     [
       bookingDailyRate,
@@ -454,6 +487,9 @@ export function PublicBookingPanel({
       bookingInsuranceFee,
       bookingTaxRate,
       taxLines,
+      pickupTime,
+      returnTime,
+      returnGraceMinutes,
       pickupDate,
       returnDate,
       weeklyDiscountPercent,
@@ -464,6 +500,20 @@ export function PublicBookingPanel({
     ],
   );
 
+  // The chosen moments, checked against when the car is actually out.
+  // The date pickers only know whole days; this is what catches a
+  // pickup at nine on the morning another renter returns at noon.
+  const pickupAt = pickupDate ? zonedDateTimeToUtc(pickupDate, pickupTime) : null;
+  const returnAt = returnDate ? zonedDateTimeToUtc(returnDate, returnTime) : null;
+  const timeError =
+    pickupAt && returnAt
+      ? returnAt <= pickupAt
+        ? reserveMessages.timeOrderError
+        : hasBusyWindowConflict(busyWindows, pickupAt, returnAt)
+          ? reserveMessages.timeConflictError
+          : ""
+      : "";
+
   function handlePickupDateChange(nextValue: string) {
     setError("");
     setPickupDate(nextValue);
@@ -472,7 +522,7 @@ export function PublicBookingPanel({
     // next day, or leave it for the renter to pick when that clashes.
     if (
       returnDate &&
-      returnDate > nextValue &&
+      returnDate >= nextValue &&
       !hasDateOnlyBookingConflict(blockedDateWindows, nextValue, returnDate)
     ) {
       return;
@@ -504,6 +554,11 @@ export function PublicBookingPanel({
 
     if (hasDateOnlyBookingConflict(blockedDateWindows, pickupDate, returnDate)) {
       setError(reserveMessages.conflictError);
+      return;
+    }
+
+    if (timeError) {
+      setError(timeError);
       return;
     }
 
@@ -543,6 +598,8 @@ export function PublicBookingPanel({
       formData.set("locale", locale);
       formData.set("pickupDate", pickupDate);
       formData.set("returnDate", returnDate);
+      formData.set("pickupTime", pickupTime);
+      formData.set("returnTime", returnTime);
       formData.set("renterName", renterName);
       formData.set("renterEmail", renterEmail);
       formData.set("renterPhone", renterPhone);
@@ -615,6 +672,42 @@ export function PublicBookingPanel({
           disabled={!pickupDate}
         />
       </div>
+
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        {(
+          [
+            { label: reserveMessages.pickupTime, value: pickupTime, onChange: setPickupTime },
+            { label: reserveMessages.returnTime, value: returnTime, onChange: setReturnTime },
+          ] as const
+        ).map((field) => (
+          <label key={field.label} className="block">
+            <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{field.label}</span>
+            <select
+              value={field.value}
+              onChange={(event) => {
+                setError("");
+                field.onChange(event.target.value);
+              }}
+              className="w-full rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)]"
+            >
+              {BOOKING_TIME_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+      <p className="mt-2 text-xs leading-5 text-[var(--ink-soft)]">
+        {reserveMessages.timeZoneNote}
+        {quote.days > 0 && !timeError ? ` ${reserveMessages.chargedDaysNote(quote.days)}` : ""}
+      </p>
+      {timeError ? (
+        <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+          {timeError}
+        </p>
+      ) : null}
 
       <div className="mt-3 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3 text-xs leading-5 text-[var(--ink-soft)]">
         {reserveMessages.calendarHint}

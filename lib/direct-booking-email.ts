@@ -9,6 +9,7 @@ import {
   renderDirectBookingEmailTemplate,
   type DirectBookingEmailValues,
 } from "@/lib/direct-booking-email-template";
+import { utcToZonedDate, utcToZonedTime } from "@/lib/booking-time";
 import { getDirectBookingDays } from "@/lib/direct-booking";
 import { formatSiteSender } from "@/lib/site-sender";
 import { sendMail } from "@/lib/email";
@@ -22,13 +23,24 @@ function bookingReference(orderId: string) {
   return orderId.slice(-8).toUpperCase();
 }
 
+/** The operator's calendar day -- UTC would put an evening trip on the next one. */
 function toDateOnly(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return utcToZonedDate(value);
 }
 
 function formatDisplayDate(value: Date) {
   const iso = toDateOnly(value);
   return iso.replace(/-/g, "/");
+}
+
+/** Days as charged at checkout, which the webhook wrote on the order. */
+function readBookedDays(sourceMetadata: string | null | undefined) {
+  try {
+    const days = Number(JSON.parse(sourceMetadata ?? "{}")?.bookedDays);
+    return Number.isFinite(days) && days > 0 ? days : null;
+  } catch {
+    return null;
+  }
 }
 
 function escapeHtml(value: string) {
@@ -61,6 +73,7 @@ export function buildDirectBookingEmailValues(input: {
     | "depositAmount"
     | "pickupLocation"
     | "returnLocation"
+    | "sourceMetadata"
   >;
   vehicle: Pick<Vehicle, "nickname" | "brand" | "model" | "year" | "plateNumber">;
   brandName: string;
@@ -71,10 +84,12 @@ export function buildDirectBookingEmailValues(input: {
   balanceDue?: number | null;
   bookingUrl?: string | null;
 }): DirectBookingEmailValues {
-  const days = getDirectBookingDays(
-    toDateOnly(input.order.pickupDatetime),
-    toDateOnly(input.order.returnDatetime),
-  );
+  const days =
+    readBookedDays(input.order.sourceMetadata) ??
+    getDirectBookingDays(
+      toDateOnly(input.order.pickupDatetime),
+      toDateOnly(input.order.returnDatetime),
+    );
 
   return {
     renterName: input.order.renterName,
@@ -84,6 +99,8 @@ export function buildDirectBookingEmailValues(input: {
     plateNumber: input.vehicle.plateNumber,
     pickupDate: formatDisplayDate(input.order.pickupDatetime),
     returnDate: formatDisplayDate(input.order.returnDatetime),
+    pickupTime: utcToZonedTime(input.order.pickupDatetime),
+    returnTime: utcToZonedTime(input.order.returnDatetime),
     pickupLocation: input.order.pickupLocation?.trim() ?? "",
     returnLocation:
       input.order.returnLocation?.trim() &&
@@ -139,6 +156,7 @@ export async function sendDirectBookingConfirmationEmail(input: {
     | "renterToken"
     | "pickupLocation"
     | "returnLocation"
+    | "sourceMetadata"
   >;
   vehicle: Pick<Vehicle, "nickname" | "brand" | "model" | "year" | "plateNumber">;
   renterEmail: string | null;

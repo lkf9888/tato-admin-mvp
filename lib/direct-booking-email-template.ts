@@ -34,6 +34,9 @@ export type DirectBookingEmailValues = {
   plateNumber: string;
   pickupDate: string;
   returnDate: string;
+  /** `HH:MM`, Vancouver time. */
+  pickupTime: string;
+  returnTime: string;
   /** Where to collect the car: the location's name and address. */
   pickupLocation: string;
   /** Only when it differs from the pickup; blank drops its line. */
@@ -67,9 +70,9 @@ export const DIRECT_BOOKING_EMAIL_DEFAULT_TEMPLATE: DirectBookingEmailTemplate =
     "Your booking is confirmed and paid. Here are the details:",
     "",
     "Vehicle: {vehicleDetail} ({plateNumber})",
-    "Pick-up: {pickupDate}",
+    "Pick-up: {pickupDate} {pickupTime}",
     "Pick-up location: {pickupLocation}",
-    "Return: {returnDate}",
+    "Return: {returnDate} {returnTime}",
     "Return location: {returnLocation}",
     "Days: {days}",
     "Paid today: {totalAmount}",
@@ -99,6 +102,8 @@ export const DIRECT_BOOKING_EMAIL_VARIABLES = [
   "plateNumber",
   "pickupDate",
   "returnDate",
+  "pickupTime",
+  "returnTime",
   "pickupLocation",
   "returnLocation",
   "days",
@@ -121,6 +126,8 @@ export const DIRECT_BOOKING_EMAIL_SAMPLE_VALUES: DirectBookingEmailValues = {
   plateNumber: "TC22CC",
   pickupDate: "2026/10/02",
   returnDate: "2026/10/06",
+  pickupTime: "10:00",
+  returnTime: "10:00",
   pickupLocation: "Richmond shop · 2980 Number 3 Rd, Richmond, BC",
   returnLocation: "",
   days: "4",
@@ -140,6 +147,36 @@ export const DIRECT_BOOKING_EMAIL_SAMPLE_VALUES: DirectBookingEmailValues = {
  * this exact string, and should get the new default rather than be
  * frozen on the old one; any real edit is left alone.
  */
+/** v1.9.6: with the locations, before the times. */
+const LEGACY_DEFAULT_BODY_V2 = [
+  "Hi {renterName},",
+  "",
+  "Your booking is confirmed and paid. Here are the details:",
+  "",
+  "Vehicle: {vehicleDetail} ({plateNumber})",
+  "Pick-up: {pickupDate}",
+  "Pick-up location: {pickupLocation}",
+  "Return: {returnDate}",
+  "Return location: {returnLocation}",
+  "Days: {days}",
+  "Paid today: {totalAmount}",
+  "Booking total: {bookingTotal}",
+  "Still to pay: {balanceDue}",
+  "Security deposit: {depositAmount}",
+  "Reference: {bookingRef}",
+  "",
+  "The security deposit is refunded after the vehicle is returned and checked over.",
+  "",
+  "Please bring the driver's licence you uploaded. If anything about your trip changes, tell us as early as you can.",
+  "",
+  "Manage your booking: {bookingUrl}",
+  "",
+  "Questions: {contactPhone}",
+  "Email: {contactEmail}",
+  "",
+  "{brandName}",
+].join("\n");
+
 const LEGACY_DEFAULT_BODY_V1 = [
   "Hi {renterName},",
   "",
@@ -175,7 +212,10 @@ export function normalizeDirectBookingEmailTemplate(
       template?.subjectTemplate?.trim() ||
       DIRECT_BOOKING_EMAIL_DEFAULT_TEMPLATE.subjectTemplate,
     bodyTemplate:
-      !template?.bodyTemplate?.trim() || template.bodyTemplate.trim() === LEGACY_DEFAULT_BODY_V1.trim()
+      !template?.bodyTemplate?.trim() ||
+      [LEGACY_DEFAULT_BODY_V1, LEGACY_DEFAULT_BODY_V2].some(
+        (legacy) => template.bodyTemplate?.trim() === legacy.trim(),
+      )
         ? DIRECT_BOOKING_EMAIL_DEFAULT_TEMPLATE.bodyTemplate
         : template.bodyTemplate.trim(),
   };

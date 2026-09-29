@@ -1,6 +1,7 @@
 import { OrderStatus, type Order } from "@prisma/client";
 
 import { getEffectiveDailyRate, isWeeklyRateApplied, type TaxLine } from "@/lib/booking-policy";
+import { getChargedDays, utcToZonedDate } from "@/lib/booking-time";
 import { orderRangesOverlap } from "@/lib/orders";
 
 type BookingOrderLike = Pick<Order, "pickupDatetime" | "returnDatetime" | "status"> & {
@@ -73,8 +74,16 @@ export function getDailyRateSchedule(input: {
   dailyRateOverrides?: Record<string, number> | null;
   /** Model pricing, which varies by month and weekday. */
   seasonalRates?: Record<string, number> | null;
+  /** Charged days when the trip has times; counted from the pickup date. */
+  days?: number | null;
 }) {
-  return getRentedDayKeys(input.pickupDate, input.returnDate).map((key) => {
+  const keys =
+    input.days != null
+      ? Array.from({ length: Math.max(0, input.days) }, (_, index) =>
+          dateToDateOnly(new Date(dateOnlyToUtcMidday(input.pickupDate).getTime() + index * 86_400_000)),
+        )
+      : getRentedDayKeys(input.pickupDate, input.returnDate);
+  return keys.map((key) => {
     // Three layers, in order of who had the last word: a price set on
     // this day, then the model's price for this day, then the car's
     // flat rate.
@@ -109,8 +118,24 @@ export function getDirectBookingQuote(input: {
   pickupLocationFee?: number | null;
   /** Return, which may be a different place and a different fee. */
   returnLocationFee?: number | null;
+  /**
+   * `HH:MM` on the operator's clock. With both, the trip is charged
+   * per started 24 hours (see `getChargedDays`); without, per date.
+   */
+  pickupTime?: string | null;
+  returnTime?: string | null;
+  graceMinutes?: number | null;
 }) {
-  const days = getDirectBookingDays(input.pickupDate, input.returnDate);
+  const days =
+    input.pickupTime && input.returnTime
+      ? getChargedDays({
+          pickupDate: input.pickupDate,
+          pickupTime: input.pickupTime,
+          returnDate: input.returnDate,
+          returnTime: input.returnTime,
+          graceMinutes: input.graceMinutes,
+        })
+      : getDirectBookingDays(input.pickupDate, input.returnDate);
   const weeklyDiscountPercent = input.weeklyDiscountPercent ?? 0;
   const effectiveDailyRate = getEffectiveDailyRate(
     input.bookingDailyRate,
@@ -121,7 +146,7 @@ export function getDirectBookingQuote(input: {
   // Summed per day rather than multiplied out, because days can be
   // priced individually. With no overrides this is arithmetically the
   // same as days x rate.
-  const schedule = getDailyRateSchedule(input);
+  const schedule = getDailyRateSchedule({ ...input, days });
   const discountFactor =
     days > 0 && input.bookingDailyRate > 0 ? effectiveDailyRate / input.bookingDailyRate : 1;
   // `baseAmount` stays the rent actually owed, so every existing caller
@@ -219,10 +244,49 @@ export function getDateOnlyBookingWindows(orders: BookingOrderLike[]) {
         order.returnDatetime.getTime() > today.getTime(),
     )
     .sort((left, right) => left.pickupDatetime.getTime() - right.pickupDatetime.getTime())
+    // The operator's calendar day, not UTC's: a trip ending at 8 pm in
+    // Vancouver is already the next day in UTC, which struck the next
+    // morning off the picker although the car was back.
     .map((order) => ({
-      pickupDate: dateToDateOnly(order.pickupDatetime),
-      returnDate: dateToDateOnly(order.returnDatetime),
+      pickupDate: utcToZonedDate(order.pickupDatetime),
+      returnDate: utcToZonedDate(order.returnDatetime),
     }));
+}
+
+/** When a car is out, to the minute, for checking a timed trip against. */
+export type BusyWindow = { start: string; end: string };
+
+export function getBookingBusyWindows(orders: BookingOrderLike[]): BusyWindow[] {
+  const now = Date.now();
+  return orders
+    .filter(
+      (order) =>
+        !order.isArchived &&
+        order.status !== OrderStatus.cancelled &&
+        order.returnDatetime.getTime() > now,
+    )
+    .sort((left, right) => left.pickupDatetime.getTime() - right.pickupDatetime.getTime())
+    .map((order) => ({
+      start: order.pickupDatetime.toISOString(),
+      end: order.returnDatetime.toISOString(),
+    }));
+}
+
+/** Whether a trip from `start` to `end` overlaps any busy window. */
+export function hasBusyWindowConflict(windows: BusyWindow[], start: Date, end: Date) {
+  return windows.some((window) =>
+    orderRangesOverlap(start, end, new Date(window.start), new Date(window.end)),
+  );
+}
+
+/** The same, against orders as loaded on the server. */
+export function hasTimedBookingConflict(orders: BookingOrderLike[], start: Date, end: Date) {
+  return orders.some(
+    (order) =>
+      !order.isArchived &&
+      order.status !== OrderStatus.cancelled &&
+      orderRangesOverlap(start, end, order.pickupDatetime, order.returnDatetime),
+  );
 }
 
 export function expandBlockedBookingDates(windows: DateOnlyBookingWindow[]) {
@@ -323,6 +387,9 @@ export function getDirectBookingInstalmentPlan(input: {
   seasonalRates?: Record<string, number> | null;
   pickupLocationFee?: number | null;
   returnLocationFee?: number | null;
+  pickupTime?: string | null;
+  returnTime?: string | null;
+  graceMinutes?: number | null;
 }): BookingInstalmentPlan {
   const quote = getDirectBookingQuote(input);
   const days = quote.days;

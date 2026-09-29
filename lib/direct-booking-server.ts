@@ -6,9 +6,10 @@ import type Stripe from "stripe";
 import {
   dateOnlyToUtcMidday,
   getDirectBookingInstalmentPlan,
-  hasVehicleBookingConflict,
+  hasTimedBookingConflict,
 } from "@/lib/direct-booking";
 import { mintRenterToken } from "@/lib/booking-access";
+import { isBookingTime, zonedDateTimeToUtc } from "@/lib/booking-time";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import {
@@ -47,6 +48,9 @@ type DirectBookingMetadata = {
   taxAmount?: string;
   /** JSON `[{ name, rate, amount }]`, one entry per tax. */
   taxLines?: string;
+  /** `HH:MM` on the operator's clock; absent on sessions made before times. */
+  pickupTime?: string;
+  returnTime?: string;
   pickupLocation?: string;
   returnLocation?: string;
   locationFeeAmount?: string;
@@ -145,6 +149,8 @@ async function writeInstalmentSchedule(input: {
   };
   pickupDate: string;
   returnDate: string;
+  pickupTime: string | null;
+  returnTime: string | null;
   /** Charged once, with the first period. */
   locationFeeAmount: number;
   chargedAmount: number | null;
@@ -174,6 +180,9 @@ async function writeInstalmentSchedule(input: {
     bookingDepositAmount: policy.depositAmount,
     bookingTaxRate: policy.taxRate,
     taxLines: policy.taxLines,
+    pickupTime: input.pickupTime,
+    returnTime: input.returnTime,
+    graceMinutes: policy.returnGraceMinutes,
     // Split across the two legs only so the quote adds them back up;
     // the plan puts the whole thing on period one either way.
     pickupLocationFee: input.locationFeeAmount,
@@ -294,7 +303,16 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
     return;
   }
 
-  if (hasVehicleBookingConflict(vehicle.orders, pickupDate, returnDate)) {
+  // The trip's two moments: the renter's chosen times when the session
+  // has them, midday as before when it predates them.
+  const pickupTime = isBookingTime(metadata.pickupTime) ? metadata.pickupTime : null;
+  const returnTime = isBookingTime(metadata.returnTime) ? metadata.returnTime : null;
+  const pickupAt =
+    (pickupTime && zonedDateTimeToUtc(pickupDate, pickupTime)) || dateOnlyToUtcMidday(pickupDate);
+  const returnAt =
+    (returnTime && zonedDateTimeToUtc(returnDate, returnTime)) || dateOnlyToUtcMidday(returnDate);
+
+  if (hasTimedBookingConflict(vehicle.orders, pickupAt, returnAt)) {
     const refundId = await refundCheckoutSession(session, "booking_conflict");
     await logActivity({
       actor: "stripe-webhook",
@@ -337,8 +355,8 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       externalOrderId: session.id,
       renterName,
       renterPhone: metadata.renterPhone || null,
-      pickupDatetime: dateOnlyToUtcMidday(pickupDate),
-      returnDatetime: dateOnlyToUtcMidday(returnDate),
+      pickupDatetime: pickupAt,
+      returnDatetime: returnAt,
       totalPrice,
       depositAmount: roundCurrencyAmount(
         depositAmount && !Number.isNaN(depositAmount) ? depositAmount : null,
@@ -409,6 +427,8 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       vehicle,
       pickupDate,
       returnDate,
+      pickupTime,
+      returnTime,
       locationFeeAmount: metadata.locationFeeAmount ? Number(metadata.locationFeeAmount) : 0,
       chargedAmount,
     });

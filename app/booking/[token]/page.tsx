@@ -14,6 +14,7 @@ import {
 } from "@/lib/booking-access";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import { utcToZonedDate, utcToZonedTime } from "@/lib/booking-time";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 type Params = Promise<{ token: string }>;
@@ -99,8 +100,10 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
       <dl className="mt-6 grid gap-3 sm:grid-cols-2">
         {[
           [copy.referenceLabel, order.id.slice(-8).toUpperCase()],
-          [copy.pickupLabel, formatDate(order.pickupDatetime, locale)],
-          [copy.returnLabel, formatDate(order.returnDatetime, locale)],
+          // Date and time on the operator's clock; the server renders
+          // in UTC, where an evening pickup is already tomorrow.
+          [copy.pickupLabel, formatTripMoment(order.pickupDatetime)],
+          [copy.returnLabel, formatTripMoment(order.returnDatetime)],
           [copy.paidLabel, formatCurrency(amounts.paidAmount, locale)],
           ...(amounts.outstanding > 0
             ? [[copy.outstandingLabel, formatCurrency(amounts.outstanding, locale)]]
@@ -195,4 +198,8 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
   ) : (
     <div className="min-h-screen bg-[var(--page)]">{body}</div>
   );
+}
+
+function formatTripMoment(value: Date) {
+  return `${utcToZonedDate(value).replace(/-/g, "/")} ${utcToZonedTime(value)}`;
 }

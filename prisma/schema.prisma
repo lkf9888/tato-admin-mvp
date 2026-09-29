@@ -1991,6 +1991,9 @@ model BookingPricingPolicy {
   /// The taxes one by one, as JSON `[{ "name": "GST", "rate": 5 }, …]`.
   /// When set, `taxName` and `taxRate` are kept as their join and sum.
   taxLines                String?
+  /// Minutes a return may run past a whole number of days before
+  /// another day is charged. Trips are charged per started 24 hours.
+  returnGraceMinutes      Int     @default(60)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

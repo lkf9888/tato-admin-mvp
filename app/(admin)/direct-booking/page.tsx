@@ -235,6 +235,13 @@ export default async function DirectBookingPage({
               step: "0.01",
             },
             {
+              name: "returnGraceMinutes",
+              label: directMessages.policyGraceLabel,
+              hint: directMessages.policyGraceHint,
+              value: fleetPolicy.returnGraceMinutes,
+              step: "5",
+            },
+            {
               name: "suggestedRateMultiplier",
               label: directMessages.policyMultiplierLabel,
               hint: directMessages.policyMultiplierHint,

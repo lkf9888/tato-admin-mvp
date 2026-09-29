@@ -4,7 +4,11 @@ import { OrderAttachmentKind } from "@prisma/client";
 import { CompactLanguageSwitcher } from "@/components/language-switcher";
 import { PublicBookingPanel } from "@/components/public-booking-panel";
 import { VehiclePhotoCarousel } from "@/components/vehicle-photo-carousel";
-import { getBlockedBookingWindows, getDateOnlyBookingWindows } from "@/lib/direct-booking";
+import {
+  getBlockedBookingWindows,
+  getBookingBusyWindows,
+  getDateOnlyBookingWindows,
+} from "@/lib/direct-booking";
 import { getI18n } from "@/lib/i18n-server";
 import {
   buildVehicleSlug,
@@ -279,6 +283,8 @@ export default async function ReserveVehiclePage({
               bookingTaxRate={policy.taxRate}
               taxLines={policy.taxLines}
             blockedDateWindows={blockedDateWindows}
+            busyWindows={getBookingBusyWindows(vehicle.orders)}
+            returnGraceMinutes={policy.returnGraceMinutes}
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}
             locations={locations}

@@ -25,7 +25,13 @@ export function tabBadgeClass(selected: boolean) {
   }`;
 }
 
-export type DirectBookingSection = "vehicles" | "rules" | "locations" | "email" | "site";
+export type DirectBookingSection =
+  | "vehicles"
+  | "rules"
+  | "locations"
+  | "email"
+  | "agreement"
+  | "site";
 
 export function directBookingSectionHref(section: DirectBookingSection) {
   if (section === "vehicles") return "/direct-booking";

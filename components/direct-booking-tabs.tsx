@@ -52,7 +52,15 @@ export function DirectBookingTabs({
     else params.set("tab", active);
     // A save notice belongs to the visit that made the save; leaving the
     // tab should not bring it back on the next reload.
-    for (const key of ["policySaved", "locationsSaved", "emailSaved"]) params.delete(key);
+    for (const key of [
+      "policySaved",
+      "locationsSaved",
+      "emailSaved",
+      "agreementSaved",
+      "agreementError",
+    ]) {
+      params.delete(key);
+    }
     const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
     window.history.replaceState(window.history.state, "", next);
   }, [active, fallback]);

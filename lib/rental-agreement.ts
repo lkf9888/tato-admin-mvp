@@ -17,9 +17,11 @@ import {
   RENTAL_AGREEMENT_CLAUSES,
   RENTAL_AGREEMENT_DEFAULT_OWNER_ADDRESS,
   RENTAL_AGREEMENT_TITLE,
+  type RentalAgreementClause,
 } from "@/lib/rental-agreement-text";
 import { utcToZonedDate, utcToZonedTime } from "@/lib/booking-time";
 import { sendContractSigningEmail } from "@/lib/contract-email";
+import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { getWorkspaceSender } from "@/lib/site-sender";
 import { writeContractAuditLog } from "@/lib/contract-signing";
 import { makeContractTemplatePdfPath, resolveUploadPath } from "@/lib/uploads";
@@ -38,6 +40,9 @@ import { formatCurrency } from "@/lib/utils";
 
 export const RENTAL_AGREEMENT_TEMPLATE_NAME = "Car Sharing Agreement";
 
+/** Bump when the agreement's printed layout changes. 2: numbered clauses. */
+const AGREEMENT_LAYOUT_VERSION = 2;
+
 const GENERATED_DESCRIPTION = "Generated from the paper car sharing agreement.";
 
 /**
@@ -49,9 +54,13 @@ const GENERATED_DESCRIPTION = "Generated from the paper car sharing agreement.";
  * hand. With the fingerprint on it, a template generated from older
  * text is recognised as stale and replaced on the next booking.
  */
-export function getRentalAgreementTextVersion() {
+export function getRentalAgreementTextVersion(
+  clauses: RentalAgreementClause[] = RENTAL_AGREEMENT_CLAUSES,
+) {
   return createHash("sha256")
-    .update(JSON.stringify([RENTAL_AGREEMENT_TITLE, RENTAL_AGREEMENT_CLAUSES]))
+    // The layout version too: a change to how clauses print must also
+    // reach workspaces whose wording did not change.
+    .update(JSON.stringify([RENTAL_AGREEMENT_TITLE, AGREEMENT_LAYOUT_VERSION, clauses]))
     .digest("hex")
     .slice(0, 12);
 }
@@ -73,7 +82,10 @@ function randomToken() {
  * template back deletes it and lets this run again.
  */
 export async function ensureRentalAgreementTemplate(workspaceId: string) {
-  const version = getRentalAgreementTextVersion();
+  // The workspace's own wording when it has one; the fingerprint follows
+  // it, so an edited clause reaches the next booking's agreement.
+  const { clauses } = await getWorkspaceAgreementClauses(workspaceId);
+  const version = getRentalAgreementTextVersion(clauses);
   const existing = await prisma.contractTemplate.findFirst({
     where: { workspaceId, name: RENTAL_AGREEMENT_TEMPLATE_NAME, active: true },
     include: { fields: true },
@@ -132,7 +144,7 @@ export async function ensureRentalAgreementTemplate(workspaceId: string) {
   const ownerAddress =
     site?.contactAddress?.trim() || RENTAL_AGREEMENT_DEFAULT_OWNER_ADDRESS;
 
-  const rendered = await renderRentalAgreementTemplatePdf({ ownerName, ownerAddress });
+  const rendered = await renderRentalAgreementTemplatePdf({ ownerName, ownerAddress, clauses });
 
   const template = await prisma.contractTemplate.create({
     data: {

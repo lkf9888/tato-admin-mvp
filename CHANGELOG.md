@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.10.2 - 2026-09-29
+
+### The rental agreement's clauses are edited in the admin, for every car
+
+The agreement's clauses lived in code (`RENTAL_AGREEMENT_CLAUSES`), so
+changing a word meant a release. Direct booking gains a "Rental
+agreement" tab: every clause's heading and text can be edited,
+reordered, removed or added to, with the sticky save bar, and "restore
+built-in wording" puts the default back. One set per workspace
+(`RentalAgreementClauseSet`, keyed by workspace so the Workspace model
+is untouched) applies to all its cars; no row means the built-in
+wording. The template fingerprint now covers the workspace's clauses,
+so a saved edit reaches the next booking's agreement while agreements
+already sent keep what their renter saw.
+
+Before paying, a renter used to read a translated summary of the
+built-in clauses. Once the operator has edited them, the booking panel
+shows the operator's clauses themselves instead, since the summary
+would no longer describe what is being signed.
+
+The agreement PDF printed each heading run into its text ("Insurance
+Insurance is mandatory…"). Clauses are now numbered with the heading
+set off: "3. Insurance: Insurance is mandatory…". The fingerprint
+includes a layout version, so every workspace's next agreement is
+rebuilt in the new layout.
+
 ## v1.10.1 - 2026-09-29
 
 ### Insurance is priced by whether the renter holds a BC licence

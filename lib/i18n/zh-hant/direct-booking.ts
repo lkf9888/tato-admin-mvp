@@ -2,6 +2,31 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const directBookingMessages = {
+    directBookingAgreement: {
+      kicker: "租車協議",
+      title: "每位租客簽署的協議條款",
+      copy: "所有車共用一套。修改從下一筆預訂開始生效；已經發出的協議保持租客當時看到的內容。協議為英文。",
+      defaultState: "正在使用內建條款。",
+      customState: (when: string) => `已修改${when ? ` · 最後儲存於 ${when}` : ""}。`,
+      headingLabel: "條款標題",
+      headingPlaceholder: "標題，例如 Insurance",
+      bodyLabel: "條款內容",
+      addClause: "新增條款",
+      remove: "刪除",
+      moveUp: "上移",
+      moveDown: "下移",
+      restoreDefault: "恢復內建條款",
+      restoreConfirm: "用內建條款替換你的條款嗎？你的修改會丟失。",
+      savedNotice: "協議已儲存，從下一筆預訂開始生效。",
+      emptyError: "至少保留一條有內容的條款。",
+      save: "儲存協議",
+      saving: "儲存中…",
+      dirty: "協議有未儲存的修改",
+      clean: "協議已儲存",
+      tab: "租車協議",
+      tabCustom: "已修改",
+      tabDefault: "預設",
+    },
     directBookingOrderEmails: {
       title: "租車人郵件",
       copy: "付款後會自動傳送。租車人沒收到時，可以在這裡補發。",

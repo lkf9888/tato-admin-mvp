@@ -262,6 +262,7 @@ export function PublicBookingPanel({
   taxLines,
   blockedDateWindows,
   busyWindows = [],
+  agreementClauses = null,
   returnGraceMinutes,
   dailyRateOverrides,
   seasonalRates,
@@ -288,6 +289,8 @@ export function PublicBookingPanel({
   /** The taxes one by one; the summary shows a line for each. */
   taxLines?: TaxLine[];
   blockedDateWindows: DateOnlyBookingWindow[];
+  /** The operator's own clauses, shown verbatim when they have any. */
+  agreementClauses?: Array<{ heading: string; body: string }> | null;
   /** When the car is out, to the minute, for checking the chosen times. */
   busyWindows?: BusyWindow[];
   returnGraceMinutes?: number;
@@ -1029,8 +1032,14 @@ export function PublicBookingPanel({
         <p className="text-sm font-semibold text-[var(--ink)]">{reserveMessages.agreementTitle}</p>
         <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">{reserveMessages.agreementIntro}</p>
         <div className="mt-3 max-h-60 overflow-y-auto rounded-md border border-[var(--line)] bg-[var(--surface-muted)]">
-          {reserveMessages.agreementSections.map((section) => (
-            <div key={section.title} className="grid gap-2 border-b border-[var(--line)] px-3 py-3 last:border-b-0 sm:grid-cols-[8rem_1fr]">
+          {/* The operator's own wording when they have edited it -- a
+              translated summary of the built-in clauses would no longer
+              describe what they are about to sign. */}
+          {(agreementClauses
+            ? agreementClauses.map((clause) => ({ title: clause.heading, copy: clause.body }))
+            : reserveMessages.agreementSections
+          ).map((section, index) => (
+            <div key={`${index}-${section.title}`} className="grid gap-2 border-b border-[var(--line)] px-3 py-3 last:border-b-0 sm:grid-cols-[8rem_1fr]">
               <p className="text-xs font-semibold leading-5 text-[var(--ink)]">{section.title}</p>
               <p className="text-xs leading-5 text-[var(--ink-mid)]">{section.copy}</p>
             </div>

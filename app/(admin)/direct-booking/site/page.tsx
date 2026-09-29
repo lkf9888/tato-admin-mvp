@@ -130,6 +130,13 @@ export default async function RentalSitePage({
             badge: badges.emailEnabled ? directMessages.emailOn : directMessages.emailOff,
           },
           {
+            key: "agreement",
+            label: messages.directBookingAgreement.tab,
+            badge: badges.agreementCustom
+              ? messages.directBookingAgreement.tabCustom
+              : messages.directBookingAgreement.tabDefault,
+          },
+          {
             key: "site",
             label: directMessages.tabSite,
             badge: directMessages.siteStateLabels[badges.siteState],

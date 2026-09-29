@@ -25,6 +25,7 @@ import {
   getRateSeasonality,
 } from "@/lib/rental-estimate/rate-seasonality-server";
 import { listBookingLocations } from "@/lib/booking-locations";
+import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { SiteConversionReporter } from "@/components/site-conversion";
@@ -125,10 +126,11 @@ export async function renderSiteVehicle(
   // page quoting $0.
   const rate = resolveVehicleDailyRate(vehicle, policy);
   if (!isVehicleBookable(rate)) notFound();
-  const [dailyRateOverrides, locations, seasonality] = await Promise.all([
+  const [dailyRateOverrides, locations, seasonality, agreement] = await Promise.all([
     loadPriceOverridesForBooking(vehicle.id),
     listBookingLocations(site.workspaceId),
     getRateSeasonality(site.workspaceId),
+    getWorkspaceAgreementClauses(site.workspaceId),
   ]);
   const checkoutState = readCheckoutState(searchParams.checkout);
   const conversion =
@@ -162,6 +164,7 @@ export async function renderSiteVehicle(
         defaultPickupDate={defaultPickupDate}
         defaultReturnDate={defaultReturnDate}
         checkoutState={checkoutState}
+        agreementClauses={agreement.isCustom ? agreement.clauses : null}
       />
       {conversion ? (
         <SiteConversionReporter

@@ -44,6 +44,7 @@ export function SiteVehicleView({
   hostPayoutsReady,
   defaultPickupDate,
   defaultReturnDate,
+  agreementClauses = null,
   checkoutState,
 }: {
   site: LocalizedSite;
@@ -60,6 +61,8 @@ export function SiteVehicleView({
   hostPayoutsReady: boolean;
   defaultPickupDate: string;
   defaultReturnDate: string;
+  /** The operator's own clauses, when they have edited them. */
+  agreementClauses?: Array<{ heading: string; body: string }> | null;
   checkoutState: "idle" | "success" | "cancelled" | "error";
 }) {
   const reserveMessages = messages.reservePage;
@@ -220,6 +223,7 @@ export function SiteVehicleView({
             hostPayoutsReady={hostPayoutsReady}
             defaultPickupDate={defaultPickupDate}
             defaultReturnDate={defaultReturnDate}
+            agreementClauses={agreementClauses}
             checkoutState={checkoutState}
           />
         </div>

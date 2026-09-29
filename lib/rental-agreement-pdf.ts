@@ -8,6 +8,7 @@ import type { ContractPageSize } from "@/lib/contract-signing";
 import {
   RENTAL_AGREEMENT_CLAUSES,
   RENTAL_AGREEMENT_TITLE,
+  type RentalAgreementClause,
 } from "@/lib/rental-agreement-text";
 
 const LETTER_WIDTH = 612;
@@ -296,9 +297,26 @@ async function renderSignaturePage(pageNumber: number, ownerName: string) {
   return { buffer: Buffer.from(await pdf.save()), placements };
 }
 
+/**
+ * Clauses as the agreement prints them: numbered, the heading set off
+ * from its text. The renderer runs a heading and its body together on
+ * one line, which is how every clause used to read ("Insurance
+ * Insurance is mandatory…").
+ */
+export function formatAgreementClauses(clauses: RentalAgreementClause[]) {
+  return clauses
+    .map((clause, index) => {
+      const heading = clause.heading.trim();
+      return `${index + 1}. ${heading ? `${heading}: ` : ""}${clause.body.trim()}`;
+    })
+    .join("\n\n");
+}
+
 export async function renderRentalAgreementTemplatePdf(input: {
   ownerName: string;
   ownerAddress: string;
+  /** The workspace's wording; the built-in clauses when omitted. */
+  clauses?: RentalAgreementClause[];
 }): Promise<{
   buffer: Buffer;
   pageSizes: ContractPageSize[];
@@ -307,9 +325,7 @@ export async function renderRentalAgreementTemplatePdf(input: {
 }> {
   const details = await renderDetailsPage(input);
 
-  const clauseText = RENTAL_AGREEMENT_CLAUSES.map(
-    (clause) => `${clause.heading}\n${clause.body}`,
-  ).join("\n\n");
+  const clauseText = formatAgreementClauses(input.clauses ?? RENTAL_AGREEMENT_CLAUSES);
   const clauses = await renderEditableContractPdf({
     title: RENTAL_AGREEMENT_TITLE,
     content: clauseText,

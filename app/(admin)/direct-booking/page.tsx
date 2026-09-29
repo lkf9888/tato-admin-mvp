@@ -19,6 +19,8 @@ import {
   directBookingSectionHref,
 } from "@/components/direct-booking-nav";
 import { DirectBookingTabs } from "@/components/direct-booking-tabs";
+import { AgreementClausesEditor } from "@/components/agreement-clauses-editor";
+import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { StickySaveBar } from "@/components/sticky-save-bar";
 import { normalizeDirectBookingEmailTemplate } from "@/lib/direct-booking-email-template";
 import { isEmailConfigured } from "@/lib/email";
@@ -36,6 +38,8 @@ export default async function DirectBookingPage({
 }: {
   searchParams: Promise<{
     tab?: string;
+    agreementSaved?: string;
+    agreementError?: string;
     emailSaved?: string;
     policySaved?: string;
     locationsSaved?: string;
@@ -53,6 +57,7 @@ export default async function DirectBookingPage({
     bookingLocations,
     seasonality,
     rentalSite,
+    agreement,
     vehicles,
   ] = await Promise.all([
     searchParams,
@@ -66,6 +71,7 @@ export default async function DirectBookingPage({
       where: { workspaceId: workspace.id },
       select: { isPublished: true },
     }),
+    getWorkspaceAgreementClauses(workspace.id),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
       include: {
@@ -414,6 +420,17 @@ export default async function DirectBookingPage({
     />
   );
 
+  const agreementPanel = (
+    <AgreementClausesEditor
+      locale={locale}
+      clauses={agreement.clauses}
+      isCustom={agreement.isCustom}
+      updatedLabel={agreement.updatedAt ? formatDate(agreement.updatedAt, locale) : null}
+      saved={Boolean(query.agreementSaved)}
+      error={query.agreementError ?? null}
+    />
+  );
+
   const vehiclesPanel = (
     <>
       {vehicles.length === 0 ? (
@@ -456,6 +473,14 @@ export default async function DirectBookingPage({
             label: directMessages.tabEmail,
             badge: emailEnabled ? directMessages.emailOn : directMessages.emailOff,
             panel: emailPanel,
+          },
+          {
+            key: "agreement",
+            label: messages.directBookingAgreement.tab,
+            badge: agreement.isCustom
+              ? messages.directBookingAgreement.tabCustom
+              : messages.directBookingAgreement.tabDefault,
+            panel: agreementPanel,
           },
         ]}
         links={[

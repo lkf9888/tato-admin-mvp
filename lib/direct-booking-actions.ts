@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { normalizeAgreementClauses } from "@/lib/rental-agreement-clauses";
 
 /**
  * Edits to a car's direct-booking terms from the fleet table.
@@ -85,4 +87,61 @@ export async function updateVehicleBookingAction(
   revalidatePath("/reserve/[vehicleId]", "page");
   revalidatePath("/s/[slug]", "layout");
   return { ok: true, updated: result.count };
+}
+
+/**
+ * Save the rental agreement's clauses for every car in the workspace.
+ *
+ * The form posts headings and bodies as parallel lists in display
+ * order. Nothing is regenerated here: the next booking's agreement
+ * notices the text changed (its fingerprint) and is built from it, and
+ * agreements already sent keep the wording their renter saw.
+ */
+export async function saveAgreementClausesAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+  const headings = formData.getAll("clauseHeading").map(String);
+  const bodies = formData.getAll("clauseBody").map(String);
+  const clauses = normalizeAgreementClauses(
+    bodies.map((body, index) => ({ heading: headings[index] ?? "", body })),
+  );
+  if (clauses.length === 0) {
+    redirect("/direct-booking?tab=agreement&agreementError=empty");
+  }
+
+  await prisma.rentalAgreementClauseSet.upsert({
+    where: { workspaceId: workspace.id },
+    update: { clauses: JSON.stringify(clauses), updatedBy: user.name },
+    create: { workspaceId: workspace.id, clauses: JSON.stringify(clauses), updatedBy: user.name },
+  });
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "rental_agreement_clauses_updated",
+    entityType: "RentalAgreementClauseSet",
+    entityId: workspace.id,
+    metadata: { count: clauses.length, headings: clauses.map((clause) => clause.heading) },
+  });
+
+  revalidatePath("/direct-booking");
+  revalidatePath("/reserve/[vehicleId]", "page");
+  revalidatePath("/s/[slug]", "layout");
+  redirect("/direct-booking?tab=agreement&agreementSaved=1");
+}
+
+/** Back to the built-in wording: the workspace's own set is removed. */
+export async function resetAgreementClausesAction() {
+  const { workspace, user } = await requireCurrentAdminContext();
+  await prisma.rentalAgreementClauseSet.deleteMany({ where: { workspaceId: workspace.id } });
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "rental_agreement_clauses_reset",
+    entityType: "RentalAgreementClauseSet",
+    entityId: workspace.id,
+    metadata: {},
+  });
+  revalidatePath("/direct-booking");
+  revalidatePath("/reserve/[vehicleId]", "page");
+  revalidatePath("/s/[slug]", "layout");
+  redirect("/direct-booking?tab=agreement&agreementSaved=1");
 }

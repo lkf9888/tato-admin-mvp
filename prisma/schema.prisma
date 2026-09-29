@@ -741,6 +741,20 @@ model StaffTaskNotificationTemplate {
   workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
+/// The rental agreement's clauses as one workspace has edited them, for
+/// every car it rents. No row means the built-in wording
+/// (`RENTAL_AGREEMENT_CLAUSES`). Keyed by workspace without a relation,
+/// so the Workspace model need not change for it.
+model RentalAgreementClauseSet {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique
+  /// JSON `[{ "heading": "...", "body": "..." }, …]`, in order.
+  clauses     String
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model ContractTemplate {
   workspaceId       String?
   id                String                      @id @default(cuid())

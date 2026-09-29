@@ -18,6 +18,7 @@ import {
 } from "@/lib/rental-site";
 import { prisma } from "@/lib/prisma";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
+import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import {
   buildSeasonalRateMap,
@@ -153,10 +154,11 @@ export default async function ReserveVehiclePage({
   const stripeReady = Boolean(getStripeSecretKey());
   const policy = await getBookingPolicyForVehicle(vehicle);
   const dailyRate = rate.dailyRate ?? 0;
-  const [dailyRateOverrides, locations, seasonality] = await Promise.all([
+  const [dailyRateOverrides, locations, seasonality, agreement] = await Promise.all([
     loadPriceOverridesForBooking(vehicle.id),
     listBookingLocations(vehicle.workspaceId),
     getRateSeasonality(vehicle.workspaceId),
+    vehicle.workspaceId ? getWorkspaceAgreementClauses(vehicle.workspaceId) : null,
   ]);
   const seasonalRates =
     rate.source === "suggested"
@@ -304,6 +306,7 @@ export default async function ReserveVehiclePage({
               hostPayoutsReady={hostPayoutsReady}
               defaultPickupDate={defaultPickupDate}
               defaultReturnDate={defaultReturnDate}
+              agreementClauses={agreement?.isCustom ? agreement.clauses : null}
               checkoutState={checkoutState}
             />
           </div>

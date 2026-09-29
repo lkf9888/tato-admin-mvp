@@ -228,6 +228,13 @@ export default async function ReserveVehiclePage({
                   <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
                     {formatCurrency(policy.insuranceFee, locale)}
                   </p>
+                  {policy.insuranceFeeNonLocal !== policy.insuranceFee ? (
+                    <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                      {reserveMessages.insuranceNonLocalNote(
+                        formatCurrency(policy.insuranceFeeNonLocal, locale),
+                      )}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
@@ -278,6 +285,7 @@ export default async function ReserveVehiclePage({
               vehicleId={vehicle.id}
               bookingDailyRate={dailyRate}
               bookingInsuranceFee={policy.insuranceFee}
+              bookingInsuranceFeeNonLocal={policy.insuranceFeeNonLocal}
               bookingDepositAmount={policy.depositAmount}
               bookingTaxName={policy.taxName}
               bookingTaxRate={policy.taxRate}

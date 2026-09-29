@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.10.1 - 2026-09-29
+
+### Insurance is priced by whether the renter holds a BC licence
+
+The operator charges $29 a day for insurance with a BC driver's licence
+and $39 without one. The pricing rules gain "Insurance / day, non-BC
+licence" (`BookingPricingPolicy.insuranceFeeNonLocal`); left blank or
+equal to the BC rate, nothing changes and nobody is asked. When it
+differs, the booking panel asks "Do you hold a valid BC driver's
+licence?" before the licence upload, shows each answer's daily price,
+re-prices the quote on the answer, and will not go to checkout without
+one; checkout refuses a request that should have answered and did not.
+The car page's insurance tile adds the non-BC price.
+
+A car with its own insurance rate charges a non-BC renter that rate
+plus the fleet's difference ($0 becomes $10 with $29/$39), and a non-BC
+rate typed lower than the BC one is read as the BC rate. The answer and
+the daily rate actually charged go into the Stripe metadata and the
+order; the Stripe line says "non-BC licence", and the rental
+agreement's insurance line and any instalments use the rate charged
+rather than re-deriving it.
+
 ## v1.10.0 - 2026-09-29
 
 ### Renters choose pickup and return times, and trips are charged per 24 hours

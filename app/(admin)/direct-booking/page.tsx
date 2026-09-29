@@ -256,6 +256,13 @@ export default async function DirectBookingPage({
               step: "0.01",
             },
             {
+              name: "insuranceFeeNonLocal",
+              label: directMessages.policyInsuranceNonLocalLabel,
+              hint: directMessages.policyInsuranceNonLocalHint,
+              value: fleetPolicy.insuranceFeeNonLocal,
+              step: "0.01",
+            },
+            {
               name: "depositAmount",
               label: directMessages.policyDepositLabel,
               hint: directMessages.policyDepositHint,

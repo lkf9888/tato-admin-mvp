@@ -32,6 +32,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 type CheckoutState = "idle" | "success" | "cancelled" | "error";
 
 type StoredBookingState = {
+  hasLocalLicence?: "yes" | "no" | "";
   pickupTime?: string;
   returnTime?: string;
   pickupDate: string;
@@ -253,7 +254,8 @@ export function PublicBookingPanel({
   locale,
   vehicleId,
   bookingDailyRate,
-  bookingInsuranceFee,
+  bookingInsuranceFee: localInsuranceFee,
+  bookingInsuranceFeeNonLocal,
   bookingDepositAmount,
   bookingTaxName,
   bookingTaxRate,
@@ -278,6 +280,8 @@ export function PublicBookingPanel({
   vehicleId: string;
   bookingDailyRate: number;
   bookingInsuranceFee: number;
+  /** Per day without a BC licence; equal to the above when not different. */
+  bookingInsuranceFeeNonLocal?: number;
   bookingDepositAmount: number;
   bookingTaxName: string | null;
   bookingTaxRate: number;
@@ -319,6 +323,14 @@ export function PublicBookingPanel({
   const [renterName, setRenterName] = useState("");
   const [renterEmail, setRenterEmail] = useState("");
   const [renterPhone, setRenterPhone] = useState("");
+  // Only asked when the answer changes the price.
+  const asksLicenceRegion =
+    bookingInsuranceFeeNonLocal != null && bookingInsuranceFeeNonLocal !== localInsuranceFee;
+  const [hasLocalLicence, setHasLocalLicence] = useState<"yes" | "no" | "">("");
+  const bookingInsuranceFee =
+    asksLicenceRegion && hasLocalLicence === "no"
+      ? (bookingInsuranceFeeNonLocal ?? localInsuranceFee)
+      : localInsuranceFee;
   const [licenseFront, setLicenseFront] = useState<File | null>(null);
   const [licenseBack, setLicenseBack] = useState<File | null>(null);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
@@ -359,6 +371,9 @@ export function PublicBookingPanel({
       setReturnDate(parsed.returnDate || defaultReturnDate);
       if (isBookingTime(parsed.pickupTime)) setPickupTime(parsed.pickupTime);
       if (isBookingTime(parsed.returnTime)) setReturnTime(parsed.returnTime);
+      if (parsed.hasLocalLicence === "yes" || parsed.hasLocalLicence === "no") {
+        setHasLocalLicence(parsed.hasLocalLicence);
+      }
       setRenterName(parsed.renterName || "");
       setRenterEmail(parsed.renterEmail || "");
       setRenterPhone(parsed.renterPhone || "");
@@ -394,6 +409,7 @@ export function PublicBookingPanel({
       returnDate,
       pickupTime,
       returnTime,
+      hasLocalLicence,
       renterName,
       renterEmail,
       renterPhone,
@@ -403,6 +419,7 @@ export function PublicBookingPanel({
     window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
   }, [
     agreementAccepted,
+    hasLocalLicence,
     pickupTime,
     returnTime,
     pickupDate,
@@ -567,6 +584,11 @@ export function PublicBookingPanel({
       return;
     }
 
+    if (asksLicenceRegion && !hasLocalLicence) {
+      setError(reserveMessages.licenceRegionMissingError);
+      return;
+    }
+
     if (!licenseFront || !licenseBack) {
       setError(reserveMessages.licenseMissingError);
       return;
@@ -606,6 +628,7 @@ export function PublicBookingPanel({
       formData.set("pickupLocationId", pickupLocationId);
       formData.set("returnLocationId", returnLocationId);
       formData.set("agreementAccepted", agreementAccepted ? "true" : "false");
+      if (asksLicenceRegion) formData.set("hasLocalLicence", hasLocalLicence);
       formData.set("licenseFront", licenseFront);
       formData.set("licenseBack", licenseBack);
 
@@ -745,6 +768,57 @@ export function PublicBookingPanel({
       <div className="mt-5 rounded-lg border border-[var(--line)] bg-white p-4">
         <p className="text-sm font-semibold text-[var(--ink)]">{reserveMessages.licenseUploadTitle}</p>
         <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">{reserveMessages.licenseUploadCopy}</p>
+        {asksLicenceRegion ? (
+          <fieldset className="mt-4">
+            <legend className="text-sm font-medium text-[var(--ink)]">
+              {reserveMessages.licenceRegionQuestion}
+            </legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    value: "yes" as const,
+                    label: reserveMessages.licenceRegionYes,
+                    fee: localInsuranceFee,
+                  },
+                  {
+                    value: "no" as const,
+                    label: reserveMessages.licenceRegionNo,
+                    fee: bookingInsuranceFeeNonLocal ?? localInsuranceFee,
+                  },
+                ]
+              ).map((option) => (
+                <label
+                  key={option.value}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2.5 text-sm transition",
+                    hasLocalLicence === option.value
+                      ? "border-[var(--ink)] bg-[var(--surface-muted)]"
+                      : "border-[var(--line)] bg-white hover:border-[var(--line-strong)]",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="hasLocalLicence"
+                    value={option.value}
+                    checked={hasLocalLicence === option.value}
+                    onChange={() => {
+                      setError("");
+                      setHasLocalLicence(option.value);
+                    }}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="block font-medium text-[var(--ink)]">{option.label}</span>
+                    <span className="block text-xs text-[var(--ink-soft)]">
+                      {reserveMessages.licenceRegionInsurance(formatCurrency(option.fee, locale))}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-[var(--ink)]">

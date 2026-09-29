@@ -64,6 +64,8 @@ const checkoutSchema = z.object({
   pickupLocationId: z.string().trim().max(60).optional(),
   returnLocationId: z.string().trim().max(60).optional(),
   agreementAccepted: z.boolean().refine(Boolean, "Rental agreement must be accepted."),
+  // Asked only when the fleet charges a non-BC licence differently.
+  hasLocalLicence: z.enum(["yes", "no"]).optional(),
 });
 
 type LicenseDocumentKind = (typeof LICENSE_DOCUMENT_KINDS)[keyof typeof LICENSE_DOCUMENT_KINDS];
@@ -158,6 +160,7 @@ async function readCheckoutRequest(request: Request) {
     pickupLocationId: readFormString(formData, "pickupLocationId") || undefined,
     returnLocationId: readFormString(formData, "returnLocationId") || undefined,
     agreementAccepted: readFormBoolean(formData, "agreementAccepted"),
+    hasLocalLicence: readFormString(formData, "hasLocalLicence") || undefined,
   });
 
   // The language the renter was reading in, so Stripe's page and the
@@ -238,6 +241,20 @@ export async function POST(request: Request) {
     // browser prices with the same numbers, but a discount the client
     // chose for itself would be a discount anyone could choose.
     const policy = await getBookingPolicyForVehicle(vehicle);
+    // Insurance by licence: the non-BC rate for a renter who said they
+    // hold another licence, when the fleet charges one. A page that
+    // should have asked and did not is refused rather than guessed.
+    const asksLicenceRegion = policy.insuranceFeeNonLocal !== policy.insuranceFee;
+    if (asksLicenceRegion && !parsed.hasLocalLicence) {
+      return NextResponse.json(
+        { error: "Tell us whether you hold a BC driver's licence." },
+        { status: 400 },
+      );
+    }
+    const insuranceFee =
+      asksLicenceRegion && parsed.hasLocalLicence === "no"
+        ? policy.insuranceFeeNonLocal
+        : policy.insuranceFee;
     const rate = resolveVehicleDailyRate(vehicle, policy);
     if (!isVehicleBookable(rate)) {
       return NextResponse.json({ error: "This vehicle is not priced yet." }, { status: 400 });
@@ -279,7 +296,7 @@ export async function POST(request: Request) {
       seasonalRates,
       pickupLocationFee,
       returnLocationFee,
-      bookingInsuranceFee: policy.insuranceFee,
+      bookingInsuranceFee: insuranceFee,
       bookingDepositAmount: policy.depositAmount,
       bookingTaxRate: policy.taxRate,
       taxLines: policy.taxLines,
@@ -314,7 +331,7 @@ export async function POST(request: Request) {
       seasonalRates,
       pickupLocationFee,
       returnLocationFee,
-      bookingInsuranceFee: policy.insuranceFee,
+      bookingInsuranceFee: insuranceFee,
       bookingDepositAmount: policy.depositAmount,
       bookingTaxRate: policy.taxRate,
       taxLines: policy.taxLines,
@@ -383,16 +400,19 @@ export async function POST(request: Request) {
           },
         },
       },
-      ...(policy.insuranceFee > 0
+      ...(insuranceFee > 0
         ? [
             {
               quantity: chargedDays,
               price_data: {
                 currency: "cad",
-                unit_amount: Math.round(policy.insuranceFee * 100),
+                unit_amount: Math.round(insuranceFee * 100),
                 product_data: {
                   name: `${vehicle.nickname} insurance`,
-                  description: "Daily protection fee",
+                  description:
+                    parsed.hasLocalLicence === "no"
+                      ? "Daily protection fee (non-BC licence)"
+                      : "Daily protection fee",
                 },
               },
             },
@@ -498,7 +518,11 @@ export async function POST(request: Request) {
         renterPhone: parsed.renterPhone ?? "",
         // Insurance is part of the price whenever the car has a fee;
         // the webhook reads this to write the contract's insurance line.
-        includeInsurance: policy.insuranceFee > 0 ? "true" : "false",
+        includeInsurance: insuranceFee > 0 ? "true" : "false",
+        // The rate actually charged, which the contract prints and the
+        // instalment schedule re-prices from.
+        insuranceDailyRate: String(insuranceFee),
+        hasLocalLicence: parsed.hasLocalLicence ?? "",
         bookedDays: String(quote.days),
         isInstalmentPlan: plan.isInstalmentPlan ? "true" : "false",
         instalmentCount: String(plan.instalments.length),

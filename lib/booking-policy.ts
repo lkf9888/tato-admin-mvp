@@ -31,6 +31,11 @@ export type BookingPolicy = {
   extraKmRate: number;
   /** Per rented day. Charged on every booking when above zero. */
   insuranceFee: number;
+  /**
+   * Per rented day for a renter without a local (BC) licence. Equal to
+   * `insuranceFee` when the fleet does not charge them differently.
+   */
+  insuranceFeeNonLocal: number;
   depositAmount: number;
   /** Null prints as "Tax". */
   taxName: string | null;
@@ -57,6 +62,7 @@ export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
   // them, which is exactly what every car did before they were fleet
   // settings.
   insuranceFee: 0,
+  insuranceFeeNonLocal: 0,
   depositAmount: 0,
   taxName: null,
   taxRate: 0,
@@ -71,6 +77,7 @@ type NullablePolicy = {
   dailyKmAllowance?: number | null;
   extraKmRate?: number | null;
   insuranceFee?: number | null;
+  insuranceFeeNonLocal?: number | null;
   depositAmount?: number | null;
   taxName?: string | null;
   taxRate?: number | null;
@@ -121,6 +128,14 @@ export function normalizeBookingPolicy(policy?: NullablePolicy | null): BookingP
     insuranceFee: roundCents(
       Math.max(0, pick(policy?.insuranceFee, BOOKING_POLICY_DEFAULTS.insuranceFee)),
     ),
+    // Never below the local rate: a cheaper price for a licence that
+    // carries more risk is a typo, not a policy.
+    insuranceFeeNonLocal: roundCents(
+      Math.max(
+        Math.max(0, pick(policy?.insuranceFee, BOOKING_POLICY_DEFAULTS.insuranceFee)),
+        pick(policy?.insuranceFeeNonLocal, pick(policy?.insuranceFee, 0)),
+      ),
+    ),
     depositAmount: roundCents(
       Math.max(0, pick(policy?.depositAmount, BOOKING_POLICY_DEFAULTS.depositAmount)),
     ),
@@ -159,6 +174,12 @@ export function resolveBookingPolicy(
     dailyKmAllowance: pick(vehicle?.bookingDailyKmAllowance, fleet.dailyKmAllowance),
     extraKmRate: pick(vehicle?.bookingExtraKmRate, fleet.extraKmRate),
     insuranceFee: pick(vehicle?.bookingInsuranceFee, fleet.insuranceFee),
+    // A car with its own insurance rate charges a non-local renter that
+    // rate plus the fleet's difference ($29/$39 makes a $0 car $10).
+    insuranceFeeNonLocal:
+      vehicle?.bookingInsuranceFee != null && Number.isFinite(vehicle.bookingInsuranceFee)
+        ? vehicle.bookingInsuranceFee + (fleet.insuranceFeeNonLocal - fleet.insuranceFee)
+        : fleet.insuranceFeeNonLocal,
     depositAmount: pick(vehicle?.bookingDepositAmount, fleet.depositAmount),
     // A car that sets its own rate has one tax line, named as it says
     // or after the fleet's (almost always right). Otherwise the fleet's

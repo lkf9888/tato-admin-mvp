@@ -2126,6 +2126,10 @@ export async function saveBookingPolicyAction(formData: FormData) {
     dailyKmAllowance: read("dailyKmAllowance", BOOKING_POLICY_DEFAULTS.dailyKmAllowance),
     extraKmRate: read("extraKmRate", BOOKING_POLICY_DEFAULTS.extraKmRate),
     insuranceFee: read("insuranceFee", BOOKING_POLICY_DEFAULTS.insuranceFee),
+    // Blank means "same as local", which normalising turns into that rate.
+    insuranceFeeNonLocal: formData.get("insuranceFeeNonLocal")?.toString().trim()
+      ? read("insuranceFeeNonLocal", 0)
+      : null,
     depositAmount: read("depositAmount", BOOKING_POLICY_DEFAULTS.depositAmount),
     returnGraceMinutes: read("returnGraceMinutes", BOOKING_POLICY_DEFAULTS.returnGraceMinutes),
     // Up to three named taxes (GST, PST, …), each on the rent. Rows

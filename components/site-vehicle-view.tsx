@@ -154,6 +154,11 @@ export function SiteVehicleView({
                 <p className="mt-2 text-[1.6rem] font-bold tracking-[-0.02em] text-[var(--ink)]">
                   {formatCurrency(policy.insuranceFee, locale)}
                 </p>
+                {policy.insuranceFeeNonLocal !== policy.insuranceFee ? (
+                  <p className="mt-1 text-[12px] leading-4 text-[var(--ink-mid)]">
+                    {messages.reservePage.insuranceNonLocalNote(formatCurrency(policy.insuranceFeeNonLocal, locale))}
+                  </p>
+                ) : null}
               </div>
               <div className="rounded-[18px] bg-[var(--brand-tint)] p-4">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--brand-deep)]">
@@ -196,6 +201,7 @@ export function SiteVehicleView({
             vehicleId={vehicle.id}
             bookingDailyRate={dailyRate}
             bookingInsuranceFee={policy.insuranceFee}
+            bookingInsuranceFeeNonLocal={policy.insuranceFeeNonLocal}
             bookingDepositAmount={policy.depositAmount}
             bookingTaxName={policy.taxName}
             bookingTaxRate={policy.taxRate}

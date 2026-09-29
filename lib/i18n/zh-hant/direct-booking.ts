@@ -111,6 +111,8 @@ export const directBookingMessages = {
       policyTaxLinesHint: "每種稅在報價和收據上單獨列一行，例如 GST 5% 和 PST 7%。只對租金收。整行留空即不收。",
       policyGraceLabel: "還車寬限（分鐘）",
       policyGraceHint: "每滿 24 小時算 1 天；超出不到這個時長不多收一天。例如 60：10 點取、第二天 11 點前還仍算 1 天。",
+      policyInsuranceNonLocalLabel: "非 BC 駕照保險 / 天",
+      policyInsuranceNonLocalHint: "租客沒有 BC 本地駕照時按這個價收。單獨設了保險的車，按差額加收。",
       emailKicker: "確認郵件",
       emailTitle: "客人付款後收到的那封信",
       emailCopy:

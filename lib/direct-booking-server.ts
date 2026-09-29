@@ -48,6 +48,9 @@ type DirectBookingMetadata = {
   taxAmount?: string;
   /** JSON `[{ name, rate, amount }]`, one entry per tax. */
   taxLines?: string;
+  /** The insurance rate charged per day (BC or non-BC licence). */
+  insuranceDailyRate?: string;
+  hasLocalLicence?: string;
   /** `HH:MM` on the operator's clock; absent on sessions made before times. */
   pickupTime?: string;
   returnTime?: string;
@@ -151,6 +154,8 @@ async function writeInstalmentSchedule(input: {
   returnDate: string;
   pickupTime: string | null;
   returnTime: string | null;
+  /** Per day as charged; null re-derives from the policy. */
+  insuranceDailyRate: number | null;
   /** Charged once, with the first period. */
   locationFeeAmount: number;
   chargedAmount: number | null;
@@ -176,7 +181,7 @@ async function writeInstalmentSchedule(input: {
     bookingDailyRate: rate.dailyRate ?? 0,
     dailyRateOverrides,
     seasonalRates,
-    bookingInsuranceFee: policy.insuranceFee,
+    bookingInsuranceFee: input.insuranceDailyRate ?? policy.insuranceFee,
     bookingDepositAmount: policy.depositAmount,
     bookingTaxRate: policy.taxRate,
     taxLines: policy.taxLines,
@@ -305,6 +310,12 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
 
   // The trip's two moments: the renter's chosen times when the session
   // has them, midday as before when it predates them.
+  // The insurance rate the renter was charged -- BC or non-BC licence --
+  // for the contract and any instalments; absent on older sessions.
+  const chargedInsuranceRate =
+    metadata.insuranceDailyRate && Number.isFinite(Number(metadata.insuranceDailyRate))
+      ? Number(metadata.insuranceDailyRate)
+      : null;
   const pickupTime = isBookingTime(metadata.pickupTime) ? metadata.pickupTime : null;
   const returnTime = isBookingTime(metadata.returnTime) ? metadata.returnTime : null;
   const pickupAt =
@@ -379,6 +390,9 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
             : session.payment_intent?.id ?? null,
         renterEmail: renterEmail ?? null,
         includeInsurance: metadata.includeInsurance === "true",
+        hasLocalLicence:
+          metadata.hasLocalLicence === "yes" ? true : metadata.hasLocalLicence === "no" ? false : null,
+        insuranceDailyRate: chargedInsuranceRate,
         bookedDays: metadata.bookedDays ? Number(metadata.bookedDays) : null,
         taxName: metadata.taxName || null,
         taxRate: metadata.taxRate ? Number(metadata.taxRate) : null,
@@ -429,6 +443,7 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       returnDate,
       pickupTime,
       returnTime,
+      insuranceDailyRate: chargedInsuranceRate,
       locationFeeAmount: metadata.locationFeeAmount ? Number(metadata.locationFeeAmount) : 0,
       chargedAmount,
     });
@@ -472,9 +487,9 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       depositAmount: order.depositAmount,
       insuranceAmount:
         metadata.includeInsurance === "true" && metadata.bookedDays
-          ? vehiclePolicy.insuranceFee * Number(metadata.bookedDays)
+          ? (chargedInsuranceRate ?? vehiclePolicy.insuranceFee) * Number(metadata.bookedDays)
           : null,
-      insuranceDailyRate: vehiclePolicy.insuranceFee || null,
+      insuranceDailyRate: (chargedInsuranceRate ?? vehiclePolicy.insuranceFee) || null,
       insuranceDays: metadata.bookedDays ? Number(metadata.bookedDays) : null,
       // The card itself stays with Stripe. What the contract records
       // is that one is on file, which is what its payment clause

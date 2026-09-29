@@ -118,6 +118,8 @@ export const directBookingMessages = {
         "Each tax is its own line on the quote and the receipt, e.g. GST 5% and PST 7%. Charged on the rent only. Leave a row empty to drop it.",
       policyGraceLabel: "Return grace (minutes)",
       policyGraceHint: "Trips are charged per 24 hours; a return up to this late does not add a day. With 60, 10:00 to 11:00 next day is still one day.",
+      policyInsuranceNonLocalLabel: "Insurance / day, non-BC licence",
+      policyInsuranceNonLocalHint: "Charged when the renter has no BC licence. A car with its own insurance rate adds the difference.",
       emailKicker: "Confirmation email",
       emailTitle: "What the renter gets after paying",
       emailCopy:
@@ -323,6 +325,8 @@ export const directBookingMessages = {
       policyTaxLinesHint: "每种税在报价和收据上单独列一行，例如 GST 5% 和 PST 7%。只对租金收。整行留空即不收。",
       policyGraceLabel: "还车宽限（分钟）",
       policyGraceHint: "每满 24 小时算 1 天；超出不到这个时长不多收一天。例如 60：10 点取、第二天 11 点前还仍算 1 天。",
+      policyInsuranceNonLocalLabel: "非 BC 驾照保险 / 天",
+      policyInsuranceNonLocalHint: "租客没有 BC 本地驾照时按这个价收。单独设了保险的车，按差额加收。",
       emailKicker: "确认邮件",
       emailTitle: "客人付款后收到的那封信",
       emailCopy:

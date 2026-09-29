@@ -1985,6 +1985,9 @@ model BookingPricingPolicy {
   /// `booking*` column overrides one; null there follows these. Zero
   /// by default, which is what every car charged before these existed.
   insuranceFee            Float   @default(0)
+  /// Per day for a renter without a local (BC) licence. Null charges
+  /// them the same as everyone else.
+  insuranceFeeNonLocal    Float?
   depositAmount           Float   @default(0)
   taxName                 String?
   taxRate                 Float   @default(0)

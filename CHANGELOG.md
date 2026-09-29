@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.16.0 - 2026-09-29
+
+### An AI agent can import Turo's CSV export
+
+The agent API could read the account and write conversations, but not orders. A new **read-write token** (Turo reader page → API → 签发读写令牌) adds the `orders:write` scope, and with it `POST /api/agent/imports`: the agent downloads Turo's trip-earnings CSV and posts the text as-is.
+
+It is the CSV import page's own code, not a copy -- cars are matched by plate, amounts and fees recorded, owner ledgers updated, cancelled trips archived, and re-posting the same file changes nothing. It never creates a vehicle: a row for a plate the fleet does not have comes back as a failure with its reason. Each import is logged with the token that made it.
+
+The read-only token is unchanged and still the one to hand an agent that only reports. Tokens can now be revoked from the page; the page already said to revoke a lost one, but had no button for it.
+
+`GET /api/agent` lists the write endpoint, with its body and error codes, only to a token that can call it.
+
+
 ## v1.15.1 - 2026-09-29
 
 ### The extra-days bill sits next to the times that cause it

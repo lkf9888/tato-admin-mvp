@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type Token = {
@@ -28,6 +29,13 @@ const READ_ENDPOINTS: Array<[string, string]> = [
   ["GET /api/agent/message-templates", "消息模板"],
 ];
 
+/** What a read-write token adds. It feeds the same import code as the
+ *  CSV page, so a trip written here is matched and deduplicated exactly
+ *  as an uploaded one. */
+const WRITE_ENDPOINTS: Array<[string, string]> = [
+  ["POST /api/agent/imports", "上传 Turo 导出的 CSV 原文——带车牌和金额，和手动导入 CSV 同一套逻辑"],
+];
+
 export function AgentSetupPanel({
   appUrl,
   bookmarklet,
@@ -42,7 +50,9 @@ export function AgentSetupPanel({
   title: string;
 }) {
   const [minted, setMinted] = useState<string | null>(null);
-  const [mintedRead, setMintedRead] = useState<string | null>(null);
+  const router = useRouter();
+  const [mintedRead, setMintedRead] = useState<{ token: string; write: boolean } | null>(null);
+  const [revoking, setRevoking] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [busyRead, setBusyRead] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -85,19 +95,46 @@ export function AgentSetupPanel({
     }
   }
 
-  async function mintReadToken() {
+  /** Read-only by default; `write` adds `orders:write` for an agent
+   *  that imports trips. Two separate tokens rather than one upgraded
+   *  in place, so an automation that only reports can never be handed
+   *  a credential that edits the calendar. */
+  async function mintApiToken(write: boolean) {
     if (busyRead) return;
     setBusyRead(true);
     try {
       const response = await fetch("/api/agent/tokens", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "只读 API", scopes: ["read"] }),
+        body: JSON.stringify(
+          write
+            ? { name: "读写 API", scopes: ["read", "orders:write"] }
+            : { name: "只读 API", scopes: ["read"] },
+        ),
       });
       const data = (await response.json()) as { token?: string };
-      if (data.token) setMintedRead(data.token);
+      if (data.token) {
+        setMintedRead({ token: data.token, write });
+        router.refresh();
+      }
     } finally {
       setBusyRead(false);
+    }
+  }
+
+  async function revoke(id: string) {
+    if (revoking) return;
+    if (!window.confirm("吊销后，用这个令牌的书签或 Agent 立即失效，不能恢复。继续？")) return;
+    setRevoking(id);
+    try {
+      await fetch("/api/agent/tokens", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      router.refresh();
+    } finally {
+      setRevoking(null);
     }
   }
 
@@ -174,12 +211,22 @@ export function AgentSetupPanel({
                     {token.scopes}
                   </span>
                 </span>
-                <span className="text-[var(--ink-soft)]">
+                <span className="flex shrink-0 items-baseline gap-2 text-[var(--ink-soft)]">
                   {token.revokedAt
                     ? "已吊销"
                     : token.lastUsedAt
                       ? `最后使用 ${new Date(token.lastUsedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
                       : "未使用"}
+                  {token.revokedAt ? null : (
+                    <button
+                      type="button"
+                      onClick={() => revoke(token.id)}
+                      disabled={revoking === token.id}
+                      className="tap-press font-bold text-[var(--bad-fg)] disabled:opacity-50"
+                    >
+                      {revoking === token.id ? "吊销中…" : "吊销"}
+                    </button>
+                  )}
                 </span>
               </li>
             ))}
@@ -231,10 +278,11 @@ export function AgentSetupPanel({
         id="api"
         className="scroll-mt-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4"
       >
-        <h2 className="t-title text-[var(--ink)]">只读 API</h2>
+        <h2 className="t-title text-[var(--ink)]">API</h2>
         <p className="mt-1 text-[12px] leading-5 text-[var(--ink-soft)]">
-          给 AI Agent 或脚本读取账户数据用。这个令牌<strong>只能读</strong>——
-          订单、金额、分成规则、流水账都改不了，也删不掉任何东西。
+          给 AI Agent 或脚本用。<strong>只读令牌</strong>只能读——订单、金额、分成规则、流水账都改不了。
+          <strong>读写令牌</strong>另外能把 Turo 导出的 CSV 导进来，新建或更新订单；
+          不会新建车辆，改不了分成规则，也删不掉任何东西。只需要读的 Agent，就给它只读的。
         </p>
 
         <div className="mt-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] p-2.5">
@@ -246,20 +294,32 @@ export function AgentSetupPanel({
 
         {mintedRead ? (
           <div className="mt-2 rounded-md border border-[var(--brand)] bg-[var(--brand-soft)] p-3">
-            <p className="text-[11px] font-bold text-[var(--brand)]">现在复制，之后无法再看到</p>
+            <p className="text-[11px] font-bold text-[var(--brand)]">
+              {mintedRead.write ? "读写令牌" : "只读令牌"} · 现在复制，之后无法再看到
+            </p>
             <code className="mt-1 block select-all break-all text-[12px] text-[var(--ink)]">
-              {mintedRead}
+              {mintedRead.token}
             </code>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={mintReadToken}
-            disabled={busyRead}
-            className="tap-press mt-2 rounded-md bg-[var(--ink)] px-3 py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
-          >
-            {busyRead ? "签发中…" : "签发只读令牌"}
-          </button>
+          <div className="tap-row mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => mintApiToken(false)}
+              disabled={busyRead}
+              className="tap-press rounded-md bg-[var(--ink)] px-3 py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
+            >
+              {busyRead ? "签发中…" : "签发只读令牌"}
+            </button>
+            <button
+              type="button"
+              onClick={() => mintApiToken(true)}
+              disabled={busyRead}
+              className="tap-press rounded-md border border-[var(--line-strong)] bg-white px-3 py-2 text-[12.5px] font-bold text-[var(--ink-mid)] disabled:opacity-50"
+            >
+              签发读写令牌
+            </button>
+          </div>
         )}
 
         <div className="mt-3 border-t border-[var(--line)] pt-2">
@@ -282,6 +342,15 @@ export function AgentSetupPanel({
           <p className="t-eyebrow text-[var(--ink-soft)]">能读什么</p>
           <ul className="mt-1.5 space-y-1">
             {READ_ENDPOINTS.map(([path, description]) => (
+              <li key={path} className="text-[11.5px] leading-5">
+                <code className="text-[var(--ink)]">{path}</code>
+                <span className="text-[var(--ink-soft)]"> — {description}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="t-eyebrow mt-3 text-[var(--ink-soft)]">读写令牌还能写</p>
+          <ul className="mt-1.5 space-y-1">
+            {WRITE_ENDPOINTS.map(([path, description]) => (
               <li key={path} className="text-[11.5px] leading-5">
                 <code className="text-[var(--ink)]">{path}</code>
                 <span className="text-[var(--ink-soft)]"> — {description}</span>

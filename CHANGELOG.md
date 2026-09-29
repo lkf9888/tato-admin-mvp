@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.8.3 - 2026-09-28
+
+### The unassigned panel folds to one line
+
+The 待分配 panel sits at the top of the orders page, above the list
+people come for, and gave every booking a full card: guest, model,
+reservation, dates, phone, an explanation, a picker, two buttons. Fifteen
+of them ran to several screens before the first real order.
+
+It now opens folded: how many, which models (`Mitsubishi RVR 2026 ×6`),
+and when the soonest one needs a car. Unfolded, bookings are grouped by
+model and account — every booking in a group has the same candidates,
+so "3 cars in the fleet share this model" is said once per group rather
+than once per card — and each booking is one row with its picker,
+**Place** and **Dismiss** beside it. The pickup location moved into the
+row's hover text. Groups and rows run by pickup, soonest first. Folded or
+not is remembered per browser.
+
+The stored match count is part of the grouping key: under the
+deactivated-car rule two bookings for the same model can have different
+candidate counts, and one header stating one count for both would be
+wrong for some of them.
+
+Checked at desktop and phone width, folded and unfolded. On a phone the
+first version put Dismiss on a line of its own, and folded was taller
+than unfolded — the model tags shared a row with the toggle and each
+broke over two lines. The toggle now keeps its corner and the tags wrap
+whole beside it.
+
 ## v1.8.2 - 2026-09-28
 
 ### The vehicles page is a list

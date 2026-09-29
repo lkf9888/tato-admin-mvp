@@ -124,8 +124,105 @@ export async function createConnectLoginLink(input: {
   }
 
   const stripe = getStripeClient();
+  // A host who connected the Stripe account they already had keeps
+  // their own full dashboard; Express login links do not exist for it.
+  const account = await stripe.accounts.retrieve(billing.stripeConnectAccountId);
+  if (account.type === "standard") return "https://dashboard.stripe.com/";
   const link = await stripe.accounts.createLoginLink(billing.stripeConnectAccountId);
   return link.url;
+}
+
+/**
+ * Connecting a Stripe account the host already has.
+ *
+ * Express onboarding creates a new account; a host who already takes
+ * payments on Stripe (their own bank, branding, history) would rather
+ * link that one. Stripe's OAuth for Standard accounts does it: the host
+ * signs in on connect.stripe.com, approves, and comes back with a code
+ * the platform exchanges for their account id. Charges are unchanged --
+ * the same destination charge with `on_behalf_of` -- so refunds and
+ * deposit settlement need nothing new.
+ *
+ * Needs the platform's OAuth client id (`ca_...`, Connect settings →
+ * Onboarding options → OAuth) in `STRIPE_CONNECT_CLIENT_ID`, and each
+ * admin origin's callback registered there as a redirect URI.
+ */
+/** Holds `<state>.<workspaceId>` between leaving for Stripe and coming back. */
+export const CONNECT_OAUTH_COOKIE = "tato_connect_oauth";
+export const CONNECT_OAUTH_CALLBACK_PATH = "/api/stripe/connect/oauth";
+
+export function getConnectClientId() {
+  const id = process.env.STRIPE_CONNECT_CLIENT_ID?.trim() ?? "";
+  return id.startsWith("ca_") ? id : "";
+}
+
+export function isConnectExistingAvailable() {
+  return isStripeConnectConfigured() && Boolean(getConnectClientId());
+}
+
+export function buildConnectOAuthUrl(input: {
+  state: string;
+  redirectUri: string;
+  email?: string | null;
+}) {
+  const url = new URL("https://connect.stripe.com/oauth/authorize");
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", getConnectClientId());
+  url.searchParams.set("scope", "read_write");
+  url.searchParams.set("redirect_uri", input.redirectUri);
+  url.searchParams.set("state", input.state);
+  if (input.email) url.searchParams.set("stripe_user[email]", input.email);
+  return url.toString();
+}
+
+export class ConnectOAuthError extends Error {
+  constructor(
+    readonly code: "ALREADY_CONNECTED" | "ACCOUNT_IN_USE" | "EXCHANGE_FAILED",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/** Exchange the code from Stripe's redirect and record the account. */
+export async function completeConnectOAuth(input: { workspaceId: string; code: string }) {
+  const stripe = getStripeClient();
+  let accountId: string | undefined;
+  try {
+    const token = await stripe.oauth.token({ grant_type: "authorization_code", code: input.code });
+    accountId = token.stripe_user_id;
+  } catch (error) {
+    throw new ConnectOAuthError(
+      "EXCHANGE_FAILED",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+  if (!accountId) throw new ConnectOAuthError("EXCHANGE_FAILED", "Stripe returned no account.");
+
+  const billing = await prisma.workspaceBilling.upsert({
+    where: { workspaceId: input.workspaceId },
+    update: {},
+    create: { workspaceId: input.workspaceId },
+  });
+  if (billing.stripeConnectAccountId && billing.stripeConnectAccountId !== accountId) {
+    throw new ConnectOAuthError("ALREADY_CONNECTED", "This workspace already has a payout account.");
+  }
+  // One Stripe account pays out one workspace: the column is unique,
+  // and a second workspace claiming it would split the same money two
+  // ways in the books.
+  const claimed = await prisma.workspaceBilling.findFirst({
+    where: { stripeConnectAccountId: accountId, NOT: { id: billing.id } },
+    select: { id: true },
+  });
+  if (claimed) {
+    throw new ConnectOAuthError("ACCOUNT_IN_USE", "That Stripe account pays out another workspace.");
+  }
+
+  await prisma.workspaceBilling.update({
+    where: { id: billing.id },
+    data: { stripeConnectAccountId: accountId },
+  });
+  return refreshConnectAccountSnapshot({ workspaceId: input.workspaceId });
 }
 
 export async function refreshConnectAccountSnapshot(input: {

@@ -7,6 +7,7 @@ import {
   continueConnectOnboarding,
   openConnectDashboard,
   refreshConnectStatus,
+  startConnectExistingAccount,
   startConnectOnboarding,
 } from "@/lib/payouts-actions";
 
@@ -52,23 +53,35 @@ export function PayoutsPanel({
   snapshot,
   status,
   returnedFromStripe,
+  canConnectExisting,
+  linkedExisting,
+  linkError,
 }: {
   locale: Locale;
   configured: boolean;
   snapshot: PayoutsSnapshot;
   status: ConnectStatus;
   returnedFromStripe: boolean;
+  canConnectExisting: boolean;
+  linkedExisting: boolean;
+  /** Why the trip to Stripe to link an existing account did not finish. */
+  linkError: string | null;
 }) {
   const messages = getMessages(locale);
   const t = messages.payoutsPage;
 
   const [country, setCountry] = useState<"CA" | "US">(snapshot.country ?? "CA");
-  const [error, setError] = useState<{ code?: string; detail?: string } | null>(null);
-  const [notice, setNotice] = useState<string>(returnedFromStripe ? t.returnedNotice : "");
+  const [error, setError] = useState<{ code?: string; detail?: string } | null>(
+    linkError ? { code: "LINK_RETURN", detail: linkError } : null,
+  );
+  const [notice, setNotice] = useState<string>(
+    linkedExisting ? t.connectedNotice : returnedFromStripe ? t.returnedNotice : "",
+  );
   const [isStarting, startStart] = useTransition();
   const [isResuming, startResume] = useTransition();
   const [isDashboardOpening, startDashboard] = useTransition();
   const [isRefreshing, startRefresh] = useTransition();
+  const [isLinking, startLink] = useTransition();
 
   const statusTone = STATUS_TONE[status];
 
@@ -97,6 +110,20 @@ export function PayoutsPanel({
     formData.set("country", country);
     startStart(async () => {
       const result = await startConnectOnboarding(formData);
+      if (!result.ok) {
+        setError({ code: result.code, detail: result.error });
+        return;
+      }
+      window.location.href = result.url;
+    });
+  }
+
+  function handleConnectExisting() {
+    if (!configured) return;
+    setError(null);
+    setNotice("");
+    startLink(async () => {
+      const result = await startConnectExistingAccount();
       if (!result.ok) {
         setError({ code: result.code, detail: result.error });
         return;
@@ -278,6 +305,23 @@ export function PayoutsPanel({
             >
               {isStarting ? t.connectLoading : t.connectAction}
             </button>
+
+            {canConnectExisting ? (
+              <div className="border-t border-[var(--line)] pt-3">
+                <p className="text-[12px] font-medium text-[var(--ink)]">{t.existingTitle}</p>
+                <p className="mt-0.5 max-w-xl text-[12px] leading-5 text-[var(--ink-soft)]">
+                  {t.existingCopy}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleConnectExisting}
+                  disabled={!configured || isLinking}
+                  className="mt-2 inline-flex items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLinking ? t.connectLoading : t.existingAction}
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -321,7 +365,11 @@ export function PayoutsPanel({
                     ? t.errorNotConfigured
                     : error.code === "INVALID_COUNTRY"
                       ? t.errorInvalidCountry
-                      : t.genericError}
+                      : error.code === "ALREADY_CONNECTED"
+                        ? t.errorAlreadyConnected
+                        : error.code === "LINK_RETURN"
+                          ? (t.connectReturnErrors[error.detail ?? ""] ?? t.connectReturnErrors.failed)
+                          : t.genericError}
             </p>
             {error.code === "CONNECT_NOT_ENABLED" || error.code === "CONNECT_UNDER_REVIEW" ? (
               <a

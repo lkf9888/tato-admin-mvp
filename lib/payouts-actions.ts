@@ -1,15 +1,21 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import {
+  buildConnectOAuthUrl,
+  CONNECT_OAUTH_CALLBACK_PATH,
+  CONNECT_OAUTH_COOKIE,
   ConnectCountry,
   createConnectLoginLink,
   createConnectOnboardingLink,
   ensureWorkspaceConnectAccount,
+  isConnectExistingAvailable,
   isStripeConnectConfigured,
   refreshConnectAccountSnapshot,
 } from "@/lib/stripe-connect";
@@ -23,6 +29,7 @@ export type ConnectErrorCode =
   | "CONNECT_NOT_ENABLED"
   | "CONNECT_UNDER_REVIEW"
   | "INVALID_COUNTRY"
+  | "ALREADY_CONNECTED"
   | "UNKNOWN";
 
 /**
@@ -150,4 +157,50 @@ export async function refreshConnectStatus() {
   } catch (error) {
     return { ok: false, ...describeConnectError(error) } as const;
   }
+}
+
+/**
+ * Send the host to Stripe to link the account they already have.
+ *
+ * The state that comes back must match the one set here, in a cookie
+ * only this browser holds, so a link somebody else started cannot
+ * attach their Stripe account to this workspace.
+ */
+export async function startConnectExistingAccount() {
+  if (!isConnectExistingAvailable()) {
+    return NOT_CONFIGURED;
+  }
+
+  const { user, workspace } = await requireCurrentAdminContext();
+  const billing = await prisma.workspaceBilling.findUnique({
+    where: { workspaceId: workspace.id },
+    select: { stripeConnectAccountId: true },
+  });
+  if (billing?.stripeConnectAccountId) {
+    return {
+      ok: false,
+      code: "ALREADY_CONNECTED" as ConnectErrorCode,
+      error: "This workspace already has a payout account.",
+    } as const;
+  }
+
+  const origin = await resolveOrigin();
+  if (!origin) return { ok: false, code: "UNKNOWN" as ConnectErrorCode, error: "No origin." } as const;
+
+  const state = randomBytes(24).toString("hex");
+  const store = await cookies();
+  store.set(CONNECT_OAUTH_COOKIE, `${state}.${workspace.id}`, {
+    httpOnly: true,
+    secure: origin.startsWith("https://"),
+    sameSite: "lax",
+    path: "/",
+    maxAge: 15 * 60,
+  });
+
+  const url = buildConnectOAuthUrl({
+    state,
+    redirectUri: `${origin}${CONNECT_OAUTH_CALLBACK_PATH}`,
+    email: user.email,
+  });
+  return { ok: true, url } as const;
 }

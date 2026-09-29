@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.9.1 - 2026-09-28
+
+### A host can connect the Stripe account they already have
+
+/payouts only offered Stripe's Express onboarding, which creates a new
+account. A host already taking payments on Stripe — with their bank,
+branding and history there — can now link that account instead:
+"Connect an existing Stripe account" sends them through Stripe's OAuth
+for Standard accounts, and the account comes back as this workspace's
+payout account. Charges are unchanged (a destination charge with
+`on_behalf_of`), so refunds and deposit settlement need nothing new;
+the money lands in the host's existing Stripe balance and pays out on
+that account's own schedule. "Open Stripe dashboard" opens their full
+dashboard rather than an Express login link, which Standard accounts
+do not have.
+
+The return trip only completes in the browser that started it, signed
+in to the same workspace (a state value checked against an httpOnly
+cookie), and one Stripe account can pay out only one workspace. The
+option stays hidden until the platform's OAuth client id is set in
+`STRIPE_CONNECT_CLIENT_ID` and each admin origin's
+`/api/stripe/connect/oauth` is registered as a redirect URI in the
+platform's Connect settings.
+
 ## v1.9.0 - 2026-09-28
 
 ### The rental website is a tab of direct booking

@@ -3,6 +3,7 @@ import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import {
   getWorkspaceConnectSnapshot,
+  isConnectExistingAvailable,
   isStripeConnectConfigured,
   summarizeConnectStatus,
 } from "@/lib/stripe-connect";
@@ -14,6 +15,8 @@ export default async function PayoutsPage({
   searchParams: Promise<{
     return?: string;
     refresh?: string;
+    connected?: string;
+    connect?: string;
   }>;
 }) {
   const [{ locale }, workspace, params] = await Promise.all([
@@ -41,6 +44,9 @@ export default async function PayoutsPage({
       }}
       status={status}
       returnedFromStripe={params.return === "1" || params.refresh === "1"}
+      canConnectExisting={isConnectExistingAvailable()}
+      linkedExisting={params.connected === "1"}
+      linkError={params.connect ?? null}
     />
   );
 }

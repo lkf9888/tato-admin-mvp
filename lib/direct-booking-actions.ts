@@ -81,7 +81,7 @@ export async function updateVehicleBookingAction(
 
   // The public pages price from these, so they go stale with them.
   revalidatePath("/direct-booking");
-  revalidatePath("/rental-site");
+  revalidatePath("/direct-booking/site");
   revalidatePath("/reserve/[vehicleId]", "page");
   revalidatePath("/s/[slug]", "layout");
   return { ok: true, updated: result.count };

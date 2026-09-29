@@ -13,6 +13,11 @@ import {
   type FleetRow,
 } from "@/components/direct-booking-fleet-table";
 import { DirectBookingEmailEditor } from "@/components/direct-booking-email-editor";
+import {
+  buildDirectBookingStats,
+  DirectBookingHeader,
+  directBookingSectionHref,
+} from "@/components/direct-booking-nav";
 import { DirectBookingTabs } from "@/components/direct-booking-tabs";
 import { StickySaveBar } from "@/components/sticky-save-bar";
 import { normalizeDirectBookingEmailTemplate } from "@/lib/direct-booking-email-template";
@@ -21,7 +26,8 @@ import { requireCurrentWorkspace } from "@/lib/auth";
 import { getBlockedBookingWindows } from "@/lib/direct-booking";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
-import { getAppUrl, getStripeSecretKey } from "@/lib/stripe";
+import { siteState, summarizeDirectBooking } from "@/lib/direct-booking-summary";
+import { getAppUrl } from "@/lib/stripe";
 import { formatDate } from "@/lib/utils";
 import { isImageAttachment } from "@/lib/uploads";
 
@@ -46,6 +52,7 @@ export default async function DirectBookingPage({
     savedPolicy,
     bookingLocations,
     seasonality,
+    rentalSite,
     vehicles,
   ] = await Promise.all([
     searchParams,
@@ -55,6 +62,10 @@ export default async function DirectBookingPage({
     prisma.bookingPricingPolicy.findUnique({ where: { workspaceId: workspace.id } }),
     listBookingLocations(workspace.id),
     getRateSeasonality(workspace.id),
+    prisma.rentalSite.findUnique({
+      where: { workspaceId: workspace.id },
+      select: { isPublished: true },
+    }),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
       include: {
@@ -116,13 +127,9 @@ export default async function DirectBookingPage({
   const requestOrigin = forwardedHost ? `${protocol}://${forwardedHost}` : undefined;
   const appUrl = requestOrigin?.replace(/\/$/, "") ?? getAppUrl();
   const activeVehicles = vehicles.filter((vehicle) => !vehicle.isArchived);
-  const enabledCount = activeVehicles.filter((vehicle) => vehicle.directBookingEnabled).length;
   const rates = new Map(
     vehicles.map((vehicle) => [vehicle.id, resolveVehicleDailyRate(vehicle, fleetPolicy)]),
   );
-  const readyCount = activeVehicles.filter(
-    (vehicle) => vehicle.directBookingEnabled && (rates.get(vehicle.id)?.dailyRate ?? 0) > 0,
-  ).length;
 
   const fleetDefaults: FleetDefaults = {
     insurance: fleetPolicy.insuranceFee,
@@ -169,18 +176,8 @@ export default async function DirectBookingPage({
       shareUrl: `${appUrl}/reserve/${vehicle.id}`,
     };
   });
-  const stripeReady = Boolean(getStripeSecretKey());
-
   const emailEnabled = emailTemplate?.isEnabled ?? true;
-  const stats = [
-    { label: directMessages.enabledCount, value: enabledCount },
-    { label: directMessages.readyCount, value: readyCount },
-    {
-      label: directMessages.stripeStatus,
-      value: stripeReady ? directMessages.stripeReady : directMessages.stripeMissing,
-      tone: stripeReady ? "ok" : "bad",
-    },
-  ];
+  const stats = buildDirectBookingStats(directMessages, summarizeDirectBooking(vehicles, fleetPolicy));
 
   const rulesPanel = (
     <>
@@ -396,39 +393,11 @@ export default async function DirectBookingPage({
 
   return (
     <div className="space-y-3">
-      <section className="rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.94),rgba(255,240,231,0.97))] px-3 py-2.5 shadow-[0_20px_48px_-40px_rgba(17,19,24,0.45)] sm:px-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
-              {directMessages.kicker}
-            </p>
-            <h2 className="mt-0.5 font-serif text-[1.15rem] leading-tight text-[color:var(--ink)] sm:text-[1.25rem]">
-              {directMessages.title}
-            </h2>
-          </div>
-          <dl className="flex flex-wrap gap-1.5">
-            {stats.map((stat) => (
-              <div
-                key={stat.label}
-                className="flex items-baseline gap-1.5 rounded-full border border-[rgba(17,19,24,0.08)] bg-white/80 px-3 py-1 text-[11px]"
-              >
-                <dt className="text-[color:var(--ink-soft)]">{stat.label}</dt>
-                <dd
-                  className={`font-semibold tabular-nums ${
-                    stat.tone === "ok"
-                      ? "text-[color:var(--ok-fg)]"
-                      : stat.tone === "bad"
-                        ? "text-[color:var(--bad-fg)]"
-                        : "text-[color:var(--ink)]"
-                  }`}
-                >
-                  {stat.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </section>
+      <DirectBookingHeader
+        kicker={directMessages.kicker}
+        title={directMessages.title}
+        stats={stats}
+      />
 
       <DirectBookingTabs
         label={directMessages.tabsLabel}
@@ -452,6 +421,14 @@ export default async function DirectBookingPage({
             label: directMessages.tabEmail,
             badge: emailEnabled ? directMessages.emailOn : directMessages.emailOff,
             panel: emailPanel,
+          },
+        ]}
+        links={[
+          {
+            key: "site",
+            label: directMessages.tabSite,
+            href: directBookingSectionHref("site"),
+            badge: directMessages.siteStateLabels[siteState(rentalSite)],
           },
         ]}
       />

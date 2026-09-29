@@ -11,6 +11,8 @@ export const directBookingMessages = {
       tabEmail: "確認郵件",
       emailOn: "開",
       emailOff: "關",
+      tabSite: "租車網站",
+      siteStateLabels: { none: "未建立", draft: "草稿", live: "已釋出" },
       title: "為每台車生成可分享的預定頁面",
       copy:
         "把已上傳的車輛直接變成公開預定頁。後台可以設定空白日期日租、保險費，併為每台車生成一個可直接發給租車人的付款連結。",

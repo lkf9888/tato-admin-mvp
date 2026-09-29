@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.9.0 - 2026-09-28
+
+### The rental website is a tab of direct booking
+
+The rental website settings were their own page and their own entry
+in the sidebar, next to direct booking, though they configure the same
+thing from the renter's side. They are now the fifth tab of direct
+booking — Vehicles, Pricing rules, Pickup & return, Confirmation
+email, Rental website — at `/direct-booking/site`, with the same
+header and tab row on top so moving between them reads as one page.
+The tab shows whether the site is live, a draft, or not set up. The
+sidebar entry is gone; direct booking stays highlighted on the site
+tab. `/rental-site` redirects to the new address with its query, so
+bookmarks and the post-save notices keep working.
+
+The header numbers (listed cars, cars with a price, Stripe) are now
+counted in one place for both pages.
+
+Fixed: between 1024 and 1280 pixels wide, with the sidebar open, the
+fleet table's columns overlapped. The full table now starts at 1280;
+narrower windows get the compact rows.
+
 ## v1.8.3 - 2026-09-28
 
 ### The unassigned panel folds to one line

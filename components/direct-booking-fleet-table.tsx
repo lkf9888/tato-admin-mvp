@@ -307,7 +307,7 @@ export function DirectBookingFleetTable({
       </div>
 
       {/* Header row (desktop). */}
-      <div className="hidden grid-cols-[28px_minmax(0,2.2fr)_64px_minmax(0,1.3fr)_repeat(3,minmax(0,1fr))_56px_minmax(0,1.2fr)_96px] items-center gap-2 border-b border-[color:var(--line)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[color:var(--ink-soft)] lg:grid">
+      <div className="hidden grid-cols-[28px_minmax(0,2.2fr)_64px_minmax(0,1.3fr)_repeat(3,minmax(0,1fr))_56px_minmax(0,1.2fr)_96px] items-center gap-2 border-b border-[color:var(--line)] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[color:var(--ink-soft)] xl:grid">
         <input
           type="checkbox"
           aria-label={copy.selectAll}
@@ -491,7 +491,7 @@ function FleetTableRow({
 
   return (
     <li
-      className={`grid grid-cols-[28px_minmax(0,1fr)_52px_64px] items-center gap-2 border-b border-[color:var(--line)] px-3 py-2 last:border-b-0 lg:grid-cols-[28px_minmax(0,2.2fr)_64px_minmax(0,1.3fr)_repeat(3,minmax(0,1fr))_56px_minmax(0,1.2fr)_96px] ${
+      className={`grid grid-cols-[28px_minmax(0,1fr)_52px_64px] items-center gap-2 border-b border-[color:var(--line)] px-3 py-2 last:border-b-0 xl:grid-cols-[28px_minmax(0,2.2fr)_64px_minmax(0,1.3fr)_repeat(3,minmax(0,1fr))_56px_minmax(0,1.2fr)_96px] ${
         selected ? "bg-[var(--brand-soft)]" : "hover:bg-[var(--surface-muted)]"
       }`}
     >
@@ -523,7 +523,7 @@ function FleetTableRow({
         <span className="block truncate text-[12px] text-[color:var(--ink-soft)]">
           {row.title}
           {/* On a phone the price has no column of its own. */}
-          <span className="lg:hidden">{rate ? ` · ${money(rate)}` : ""}</span>
+          <span className="xl:hidden">{rate ? ` · ${money(rate)}` : ""}</span>
         </span>
         </span>
       </button>
@@ -543,7 +543,7 @@ function FleetTableRow({
         <span className="absolute left-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
       </label>
 
-      <div className="hidden min-w-0 items-center gap-1.5 lg:flex">
+      <div className="hidden min-w-0 items-center gap-1.5 xl:flex">
         <input
           value={rateDraft}
           onChange={(event) => setRateDraft(event.target.value)}
@@ -573,23 +573,23 @@ function FleetTableRow({
         </span>
       </div>
 
-      <div className="hidden min-w-0 lg:block">
+      <div className="hidden min-w-0 xl:block">
         <FeeCell own={row.insurance} fleet={fleet.insurance} format={money} />
       </div>
-      <div className="hidden min-w-0 lg:block">
+      <div className="hidden min-w-0 xl:block">
         <FeeCell own={row.deposit} fleet={fleet.deposit} format={money} />
       </div>
-      <div className="hidden min-w-0 lg:block">
+      <div className="hidden min-w-0 xl:block">
         <FeeCell own={row.taxRate} fleet={fleet.taxRate} format={(v) => `${Number(v.toFixed(3))}%`} />
       </div>
       <span
-        className={`hidden text-[12px] tabular-nums lg:block ${
+        className={`hidden text-[12px] tabular-nums xl:block ${
           row.photoCount === 0 ? "font-semibold text-[color:var(--warn-fg)]" : "text-[color:var(--ink-mid)]"
         }`}
       >
         {row.photoCount}
       </span>
-      <span className="hidden truncate text-[12px] tabular-nums text-[color:var(--ink-mid)] lg:block">
+      <span className="hidden truncate text-[12px] tabular-nums text-[color:var(--ink-mid)] xl:block">
         {row.busy[0] ?? <span className="text-[color:var(--ink-soft)]">{copy.noneBusy}</span>}
       </span>
 
@@ -598,7 +598,7 @@ function FleetTableRow({
           href={row.shareUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="hidden rounded-md px-2 py-1 text-[12px] text-[color:var(--ink-soft)] hover:bg-[var(--surface-muted)] hover:text-[color:var(--ink)] lg:inline"
+          className="hidden rounded-md px-2 py-1 text-[12px] text-[color:var(--ink-soft)] hover:bg-[var(--surface-muted)] hover:text-[color:var(--ink)] xl:inline"
         >
           {copy.preview}
         </a>

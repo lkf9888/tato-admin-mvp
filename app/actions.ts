@@ -206,7 +206,7 @@ function revalidateAdminPages() {
     "/photos",
     "/documents",
     "/direct-booking",
-    "/rental-site",
+    "/direct-booking/site",
     "/booking-requests",
     "/owners",
     "/orders",
@@ -1943,12 +1943,12 @@ export async function saveRentalSiteAction(formData: FormData) {
   const slug = requestedSlug || normalizeSiteSlug(workspace.slug) || `site-${workspace.id.slice(-8)}`;
 
   if (isReservedSiteSlug(slug)) {
-    redirect("/rental-site?error=slug_reserved");
+    redirect("/direct-booking/site?error=slug_reserved");
   }
 
   const slugOwner = await prisma.rentalSite.findUnique({ where: { slug } });
   if (slugOwner && slugOwner.workspaceId !== workspace.id) {
-    redirect("/rental-site?error=slug_taken");
+    redirect("/direct-booking/site?error=slug_taken");
   }
 
   const domain = normalizeSiteHost(formData.get("domain")?.toString() ?? "") || null;
@@ -1956,12 +1956,12 @@ export async function saveRentalSiteAction(formData: FormData) {
     // Binding the platform's own host would route the admin app's
     // front door to a customer site and lock everyone out of it.
     if (isPlatformHost(domain)) {
-      redirect("/rental-site?error=domain_reserved");
+      redirect("/direct-booking/site?error=domain_reserved");
     }
 
     const domainOwner = await prisma.rentalSite.findUnique({ where: { domain } });
     if (domainOwner && domainOwner.workspaceId !== workspace.id) {
-      redirect("/rental-site?error=domain_taken");
+      redirect("/direct-booking/site?error=domain_taken");
     }
   }
 
@@ -1979,7 +1979,7 @@ export async function saveRentalSiteAction(formData: FormData) {
   const rawAdsSendTo = siteFieldOrNull(formData.get("adsConversionSendTo"));
   const adsConversionSendTo = rawAdsSendTo ? parseAdsSendTo(rawAdsSendTo)?.sendTo ?? null : null;
   if (rawAdsSendTo && !adsConversionSendTo) {
-    redirect("/rental-site?error=ads_conversion_invalid");
+    redirect("/direct-booking/site?error=ads_conversion_invalid");
   }
 
   // Publishing is gated on the site having something to sell. A page
@@ -2004,7 +2004,7 @@ export async function saveRentalSiteAction(formData: FormData) {
   ).length;
   const wantsPublished = formData.get("isPublished")?.toString() === "on";
   if (wantsPublished && bookableCount === 0) {
-    redirect("/rental-site?error=no_bookable_vehicles");
+    redirect("/direct-booking/site?error=no_bookable_vehicles");
   }
 
   const data = {
@@ -2034,7 +2034,7 @@ export async function saveRentalSiteAction(formData: FormData) {
   } else if (logoFile instanceof File && logoFile.size > 0) {
     const saved = await saveRentalSiteLogo(site.id, logoFile);
     if ("error" in saved) {
-      redirect(`/rental-site?error=${saved.error}`);
+      redirect(`/direct-booking/site?error=${saved.error}`);
     }
     await prisma.rentalSite.update({
       where: { id: site.id },
@@ -2051,10 +2051,10 @@ export async function saveRentalSiteAction(formData: FormData) {
     metadata: { slug, domain, isPublished: data.isPublished },
   });
 
-  revalidatePath("/rental-site");
+  revalidatePath("/direct-booking/site");
   revalidatePath("/");
   revalidatePath(`/s/${slug}`);
-  redirect("/rental-site?saved=1");
+  redirect("/direct-booking/site?saved=1");
 }
 
 /**

@@ -15,6 +15,8 @@ export const directBookingMessages = {
       tabEmail: "Confirmation email",
       emailOn: "On",
       emailOff: "Off",
+      tabSite: "Rental website",
+      siteStateLabels: { none: "Not set up", draft: "Draft", live: "Live" },
       title: "Shareable booking pages for every vehicle",
       copy:
         "Turn uploaded fleet records into customer-facing booking pages. Set an open-date daily rate, optional insurance fee, and share one public payment link per vehicle.",
@@ -208,6 +210,8 @@ export const directBookingMessages = {
       tabEmail: "确认邮件",
       emailOn: "开",
       emailOff: "关",
+      tabSite: "租车网站",
+      siteStateLabels: { none: "未创建", draft: "草稿", live: "已发布" },
       title: "为每台车生成可分享的预定页面",
       copy:
         "把已上传的车辆直接变成公开预定页。后台可以设置空白日期日租、保险费，并为每台车生成一个可直接发给租车人的付款链接。",

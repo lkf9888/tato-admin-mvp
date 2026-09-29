@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+
+import { TAB_BAR_CLASS, tabBadgeClass, tabClass } from "@/components/direct-booking-nav";
 
 export type DirectBookingTab = {
   key: string;
@@ -8,6 +11,14 @@ export type DirectBookingTab = {
   /** A count or a short status, shown beside the label. */
   badge?: string | number | null;
   panel: ReactNode;
+};
+
+/** A tab that is another page rather than a panel here. */
+export type DirectBookingTabLink = {
+  key: string;
+  label: string;
+  href: string;
+  badge?: string | number | null;
 };
 
 /**
@@ -20,10 +31,12 @@ export type DirectBookingTab = {
  */
 export function DirectBookingTabs({
   tabs,
+  links = [],
   initialTab,
   label,
 }: {
   tabs: DirectBookingTab[];
+  links?: DirectBookingTabLink[];
   initialTab: string;
   label: string;
 }) {
@@ -61,7 +74,7 @@ export function DirectBookingTabs({
         role="tablist"
         aria-label={label}
         onKeyDown={onKeyDown}
-        className="flex gap-1 overflow-x-auto rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-1 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]"
+        className={TAB_BAR_CLASS}
       >
         {tabs.map((tab) => {
           const selected = tab.key === active;
@@ -79,25 +92,23 @@ export function DirectBookingTabs({
               aria-controls={`direct-booking-panel-${tab.key}`}
               tabIndex={selected ? 0 : -1}
               onClick={() => setActive(tab.key)}
-              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
-                selected
-                  ? "bg-[var(--ink)] text-white"
-                  : "text-[color:var(--ink-soft)] hover:bg-[var(--surface-muted)] hover:text-[color:var(--ink)]"
-              }`}
+              className={tabClass(selected)}
             >
               {tab.label}
               {tab.badge != null && tab.badge !== "" ? (
-                <span
-                  className={`rounded-full px-1.5 text-[10px] tabular-nums ${
-                    selected ? "bg-white/20 text-white" : "bg-[var(--surface-muted)] text-[color:var(--ink-soft)]"
-                  }`}
-                >
-                  {tab.badge}
-                </span>
+                <span className={tabBadgeClass(selected)}>{tab.badge}</span>
               ) : null}
             </button>
           );
         })}
+        {links.map((link) => (
+          <Link key={link.key} href={link.href} className={tabClass(false)}>
+            {link.label}
+            {link.badge != null && link.badge !== "" ? (
+              <span className={tabBadgeClass(false)}>{link.badge}</span>
+            ) : null}
+          </Link>
+        ))}
       </div>
 
       {tabs.map((tab) => (

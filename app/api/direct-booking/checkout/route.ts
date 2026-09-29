@@ -23,6 +23,12 @@ import {
   listBookingLocations,
   resolveBookingLocation,
 } from "@/lib/booking-locations";
+import {
+  encodeAddOnsMetadata,
+  MAX_ADD_ONS_PER_BOOKING,
+  resolveAddOns,
+} from "@/lib/booking-add-ons";
+import { listBookingAddOns } from "@/lib/booking-add-ons-server";
 import { prisma } from "@/lib/prisma";
 import { getBookingReturnUrls } from "@/lib/rental-site";
 import { DEFAULT_BOOKING_TIME, zonedDateTimeToUtc } from "@/lib/booking-time";
@@ -83,6 +89,7 @@ const checkoutSchema = z.object({
   // Asked only when the fleet charges a non-BC licence differently.
   hasLocalLicence: z.enum(["yes", "no"]).optional(),
   couponCode: z.string().trim().max(40).optional(),
+  addOnIds: z.array(z.string().trim().min(1).max(60)).max(MAX_ADD_ONS_PER_BOOKING).default([]),
 });
 
 type LicenseDocumentKind = (typeof LICENSE_DOCUMENT_KINDS)[keyof typeof LICENSE_DOCUMENT_KINDS];
@@ -179,6 +186,7 @@ async function readCheckoutRequest(request: Request) {
     agreementAccepted: readFormBoolean(formData, "agreementAccepted"),
     hasLocalLicence: readFormString(formData, "hasLocalLicence") || undefined,
     couponCode: readFormString(formData, "couponCode") || undefined,
+    addOnIds: formData.getAll("addOnId").filter((value): value is string => typeof value === "string"),
   });
 
   // The language the renter was reading in, so Stripe's page and the
@@ -316,6 +324,17 @@ export async function POST(request: Request) {
     const pickupLocationFee = pickupLocation?.fee ?? 0;
     const returnLocationFee = returnLocation?.fee ?? 0;
 
+    // Extras, likewise priced from the operator's list. One that has
+    // since been withdrawn is refused, not silently left off.
+    const addOnOptions = await listBookingAddOns(vehicle.workspaceId);
+    const { picked: addOns, unknown: unknownAddOn } = resolveAddOns(addOnOptions, parsed.addOnIds);
+    if (unknownAddOn) {
+      return NextResponse.json(
+        { error: "One of the extras you chose is no longer offered. Refresh the page and choose again." },
+        { status: 400 },
+      );
+    }
+
     const quote = getDirectBookingQuote({
       pickupDate: parsed.pickupDate,
       returnDate: parsed.returnDate,
@@ -333,6 +352,7 @@ export async function POST(request: Request) {
       returnTime: parsed.returnTime,
       graceMinutes: policy.returnGraceMinutes,
       coupon,
+      addOns,
     });
 
     if (quote.days < 1 || quote.totalAmount <= 0) {
@@ -369,6 +389,7 @@ export async function POST(request: Request) {
       returnTime: parsed.returnTime,
       graceMinutes: policy.returnGraceMinutes,
       coupon,
+      addOns,
     });
     const firstPeriod = plan.instalments[0] ?? null;
     const chargedDays = firstPeriod?.days ?? quote.days;
@@ -379,6 +400,16 @@ export async function POST(request: Request) {
     const chargedLocationFee = firstPeriod
       ? firstPeriod.locationFeeAmount
       : quote.locationFeeAmount;
+    // Each extra as charged now: per-day ones for the first period's
+    // days, one-off ones in full.
+    const chargedAddOns = quote.addOnLines.map((line) => ({
+      ...line,
+      quantity: line.unit === "day" ? chargedDays : 1,
+    }));
+    const chargedAddOnAmount = chargedAddOns.reduce(
+      (sum, line) => sum + line.price * line.quantity,
+      0,
+    );
 
     const stripe = getStripeClient();
     const { successUrl, cancelUrl } = await getBookingReturnUrls(
@@ -487,6 +518,19 @@ export async function POST(request: Request) {
             },
           ]
         : []),
+      ...chargedAddOns
+        .filter((line) => line.price > 0)
+        .map((line) => ({
+          quantity: line.quantity,
+          price_data: {
+            currency: "cad",
+            unit_amount: Math.round(line.price * 100),
+            product_data: {
+              name: line.name,
+              description: line.unit === "day" ? "Extra, per day" : "Extra, per booking",
+            },
+          },
+        })),
       ...(quote.depositAmount > 0
         ? [
             {
@@ -511,7 +555,9 @@ export async function POST(request: Request) {
     // whole charge, so the Stripe fee is the host's cost, not the
     // platform's. See `computePlatformFeeCents`.
     const platformFee = computePlatformFeeCents({
-      commissionBaseCents: Math.round((chargedRent + chargedInsurance + chargedLocationFee) * 100),
+      commissionBaseCents: Math.round(
+        (chargedRent + chargedInsurance + chargedLocationFee + chargedAddOnAmount) * 100,
+      ),
       chargeTotalCents,
     });
     const applicationFeeAmount = platformFee.total;
@@ -590,6 +636,9 @@ export async function POST(request: Request) {
         pickupLocation: describeBookingLocation(pickupLocation) ?? "",
         returnLocation: describeBookingLocation(returnLocation) ?? "",
         locationFeeAmount: String(quote.locationFeeAmount),
+        addOnAmount: String(quote.addOnAmount),
+        // What each extra was, at what price, for the order record.
+        ...encodeAddOnsMetadata(quote.addOnLines),
         licenseDraftId,
         agreementAccepted: "true",
         connectAccountId: connectSnapshot.accountId!,

@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.13.0 - 2026-09-29
+
+### Extras renters can add to a booking
+
+The pricing rules tab gains Extras: a short table of add-ons -- a child
+seat, a ski rack, an additional driver -- each with a price, charged
+per day or once per booking, and a flag for whether the rent's taxes
+(GST, PST) apply. They live in the new `BookingAddOn` table (keyed by
+workspace, like coupons); removing one hides it (`isActive`), so a
+booking that bought it still reads sensibly.
+
+On the booking panel the renter ticks the ones they want. The quote
+(`getDirectBookingQuote`) prices them from the charged days, adds the
+taxable ones to the tax base, and lists each line before the taxes.
+Checkout prices them again from the operator's list, never from the
+request, and refuses an id that is no longer offered rather than
+dropping it. Each is its own Stripe line, and the 5% commission base
+now includes them, like the collection fee. On an instalment plan
+per-day extras follow each period's days and one-off extras ride on
+the first period, so the periods still sum to the quote.
+
+The order keeps what was bought and at what price (`sourceMetadata.addOns`,
+carried through Stripe metadata as `addOns`/`addOns2`), and the extras
+are written into the order's notes so the operator sees what to have
+ready at handover.
+
 ## v1.12.1 - 2026-09-29
 
 ### The car page fits a phone

@@ -2,6 +2,29 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const directBookingMessages = {
+    directBookingAddOns: {
+      kicker: "額外服務",
+      title: "額外服務和配件",
+      copy: "租客下單時可以勾選的專案：兒童座椅、滑雪架、增加駕駛人等。每項按天或按單收費，並可設定是否收 GST/PST。勾選後計入報價和刷卡金額，並寫進訂單備註，方便你提前準備。",
+      nameHeader: "名稱",
+      namePlaceholder: "例如：兒童座椅",
+      descriptionHeader: "說明（可選）",
+      descriptionPlaceholder: "顯示在名稱下方",
+      priceHeader: "價格",
+      unitHeader: "計費",
+      unitDay: "按天",
+      unitBooking: "按單",
+      taxableHeader: "收稅",
+      remove: "刪除",
+      addRow: "+ 新增一項",
+      save: "儲存額外服務",
+      saving: "儲存中…",
+      dirty: "有未儲存的修改",
+      clean: "已全部儲存",
+      savedNotice: "額外服務已儲存。",
+      emptyHint: "還沒有額外服務。列表裡有專案時，租客才會看到這一欄。",
+      removeHint: "刪除後新訂單不再顯示；已經買過的訂單不受影響。",
+    },
     directBookingCoupons: {
       kicker: "優惠碼",
       title: "一次性折扣碼",

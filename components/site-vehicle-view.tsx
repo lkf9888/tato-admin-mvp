@@ -9,6 +9,7 @@ import {
   getDateOnlyBookingWindows,
 } from "@/lib/direct-booking";
 import type { BookingPolicy } from "@/lib/booking-policy";
+import type { BookingAddOnOption } from "@/lib/booking-add-ons";
 import { siteHref } from "@/components/site-shell";
 import { buildVehicleSlug, getSiteOrigin, getSiteUrl } from "@/lib/rental-site";
 import type { LocalizedSite } from "@/lib/rental-site-content";
@@ -40,6 +41,7 @@ export function SiteVehicleView({
   dailyRateOverrides,
   seasonalRates,
   locations,
+  addOns,
   stripeReady,
   hostPayoutsReady,
   defaultPickupDate,
@@ -57,6 +59,7 @@ export function SiteVehicleView({
   dailyRateOverrides: Record<string, number>;
   seasonalRates: Record<string, number>;
   locations: { id: string; label: string; fee: number; isDefault: boolean }[];
+  addOns: BookingAddOnOption[];
   stripeReady: boolean;
   hostPayoutsReady: boolean;
   defaultPickupDate: string;
@@ -204,6 +207,7 @@ export function SiteVehicleView({
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}
             locations={locations}
+            addOns={addOns}
             weeklyDiscountPercent={policy.weeklyDiscountPercent}
             minimumRentalDays={policy.minimumRentalDays}
             dailyKmAllowance={policy.dailyKmAllowance}

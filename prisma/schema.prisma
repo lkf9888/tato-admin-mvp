@@ -770,6 +770,29 @@ model BookingCoupon {
   @@index([workspaceId, createdAt])
 }
 
+/// Extras a renter can add to a booking: a child seat, a snow chain
+/// kit, a second driver. Priced per day or once per booking, and taxed
+/// with the rent or not, as the operator decides. Keyed by workspace
+/// without a relation, like `BookingCoupon`. Removing one hides it
+/// (`isActive`): bookings keep their own copy of what they bought.
+model BookingAddOn {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  price       Float
+  /// `day` (x the days charged) or `booking` (once).
+  unit        String   @default("booking")
+  /// Whether the rent's taxes (GST, PST, ...) apply to it.
+  taxable     Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId, isActive, sortOrder])
+}
+
 /// The rental agreement's clauses as one workspace has edited them, for
 /// every car it rents. No row means the built-in wording
 /// (`RENTAL_AGREEMENT_CLAUSES`). Keyed by workspace without a relation,

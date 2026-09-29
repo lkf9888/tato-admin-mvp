@@ -11,6 +11,7 @@ import {
 import { mintRenterToken } from "@/lib/booking-access";
 import { isBookingTime, zonedDateTimeToUtc } from "@/lib/booking-time";
 import { isCouponKind, type CouponDiscount } from "@/lib/booking-coupons";
+import { decodeAddOnsMetadata, type AddOnRecord } from "@/lib/booking-add-ons";
 import { redeemCoupon } from "@/lib/booking-coupons-server";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
@@ -29,7 +30,7 @@ import { getAppUrl } from "@/lib/stripe";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { refundDirectBookingCharge } from "@/lib/stripe-refunds";
-import { roundCurrencyAmount } from "@/lib/utils";
+import { formatCurrency, roundCurrencyAmount } from "@/lib/utils";
 
 type DirectBookingMetadata = {
   vehicleId?: string;
@@ -63,6 +64,10 @@ type DirectBookingMetadata = {
   pickupLocation?: string;
   returnLocation?: string;
   locationFeeAmount?: string;
+  /** Extras, as `encodeAddOnsMetadata` wrote them across two keys. */
+  addOns?: string;
+  addOns2?: string;
+  addOnAmount?: string;
   licenseDraftId?: string;
   agreementAccepted?: string;
 };
@@ -166,6 +171,8 @@ async function writeInstalmentSchedule(input: {
   coupon: CouponDiscount | null;
   /** Charged once, with the first period. */
   locationFeeAmount: number;
+  /** The extras bought, at the prices paid. */
+  addOns: AddOnRecord[];
   chargedAmount: number | null;
 }) {
   const existing = await prisma.orderPayment.count({ where: { orderId: input.order.id } });
@@ -201,6 +208,14 @@ async function writeInstalmentSchedule(input: {
     // the plan puts the whole thing on period one either way.
     pickupLocationFee: input.locationFeeAmount,
     returnLocationFee: 0,
+    addOns: input.addOns.map((addOn, index) => ({
+      id: String(index),
+      name: addOn.name,
+      description: null,
+      price: addOn.price,
+      unit: addOn.unit,
+      taxable: addOn.taxable,
+    })),
   });
   if (!plan.isInstalmentPlan) return;
 
@@ -329,6 +344,7 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
     metadata.couponCode && isCouponKind(metadata.couponKind) && Number(metadata.couponValue) > 0
       ? { code: metadata.couponCode, kind: metadata.couponKind, value: Number(metadata.couponValue) }
       : null;
+  const addOns = decodeAddOnsMetadata(metadata.addOns, metadata.addOns2);
   const pickupTime = isBookingTime(metadata.pickupTime) ? metadata.pickupTime : null;
   const returnTime = isBookingTime(metadata.returnTime) ? metadata.returnTime : null;
   const pickupAt =
@@ -390,6 +406,14 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       // nickname the operator has to look up.
       pickupLocation: metadata.pickupLocation || null,
       returnLocation: metadata.returnLocation || null,
+      // The extras to have ready at handover, where the operator reads
+      // the order: a child seat bought online must not be a surprise.
+      notes:
+        addOns.length > 0
+          ? `Extras: ${addOns
+              .map((addOn) => `${addOn.name} (${formatCurrency(addOn.amount)})`)
+              .join("; ")}`
+          : null,
       createdBy: "direct-booking",
       // The renter's own link. Minted here rather than on demand so
       // it can go into the confirmation that is about to be sent.
@@ -416,6 +440,8 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
         locationFeeAmount: metadata.locationFeeAmount
           ? Number(metadata.locationFeeAmount)
           : null,
+        addOns: addOns.length > 0 ? addOns : null,
+        addOnAmount: metadata.addOnAmount ? Number(metadata.addOnAmount) : null,
         licenseDraftId: metadata.licenseDraftId || null,
         agreementAccepted: metadata.agreementAccepted === "true",
       }),
@@ -461,6 +487,7 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       insuranceDailyRate: chargedInsuranceRate,
       coupon: usedCoupon,
       locationFeeAmount: metadata.locationFeeAmount ? Number(metadata.locationFeeAmount) : 0,
+      addOns,
       chargedAmount,
     });
   }

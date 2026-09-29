@@ -11,6 +11,7 @@ import { normalizeAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { createCoupon } from "@/lib/booking-coupons-server";
 import { zonedDateTimeToUtc } from "@/lib/booking-time";
 import { VEHICLE_FEATURES } from "@/lib/vehicle-features";
+import { ADD_ON_NAME_MAX, isAddOnUnit } from "@/lib/booking-add-ons";
 
 /**
  * Edits to a car's direct-booking terms from the fleet table.
@@ -237,4 +238,67 @@ export async function voidCouponAction(formData: FormData) {
   }
   revalidatePath("/direct-booking");
   redirect("/direct-booking?tab=rules#coupons");
+}
+
+/**
+ * Save the extras renters can add. The form posts parallel lists in
+ * display order, like the locations editor; a row with no name is an
+ * empty line. Rows that disappeared are hidden, not deleted, so a
+ * booking that bought one still reads sensibly.
+ */
+export async function saveBookingAddOnsAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+  const list = (key: string) => formData.getAll(key).map((value) => value.toString().trim());
+  const ids = list("addOnId");
+  const names = list("addOnName");
+  const descriptions = list("addOnDescription");
+  const prices = list("addOnPrice");
+  const units = list("addOnUnit");
+  const taxables = list("addOnTaxable");
+
+  const rows = names
+    .map((name, index) => ({
+      id: ids[index] || null,
+      name: name.slice(0, ADD_ON_NAME_MAX),
+      description: descriptions[index]?.slice(0, 160) || null,
+      price: Math.min(100000, Math.max(0, Math.round(Number(prices[index] || 0) * 100) / 100)) || 0,
+      unit: isAddOnUnit(units[index]) ? units[index] : "booking",
+      taxable: taxables[index] === "1",
+      sortOrder: index,
+    }))
+    .filter((row) => row.name.length > 0);
+
+  const existing = await prisma.bookingAddOn.findMany({
+    where: { workspaceId: workspace.id },
+    select: { id: true },
+  });
+  const existingIds = new Set(existing.map((row) => row.id));
+  const keptIds = new Set(rows.map((row) => row.id).filter((id): id is string => Boolean(id)));
+
+  await prisma.$transaction([
+    prisma.bookingAddOn.updateMany({
+      where: { workspaceId: workspace.id, id: { notIn: [...keptIds] } },
+      data: { isActive: false },
+    }),
+    ...rows.map(({ id, ...data }) =>
+      // An id from elsewhere is treated as new rather than trusted.
+      id && existingIds.has(id)
+        ? prisma.bookingAddOn.update({ where: { id }, data: { ...data, isActive: true } })
+        : prisma.bookingAddOn.create({ data: { ...data, workspaceId: workspace.id } }),
+    ),
+  ]);
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "booking_add_ons_updated",
+    entityType: "Workspace",
+    entityId: workspace.id,
+    metadata: { count: rows.length, names: rows.map((row) => row.name) },
+  });
+
+  revalidatePath("/direct-booking");
+  revalidatePath("/reserve/[vehicleId]", "page");
+  revalidatePath("/s/[slug]", "layout");
+  redirect("/direct-booking?tab=rules&addOnsSaved=1#add-ons");
 }

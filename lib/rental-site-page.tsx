@@ -25,6 +25,7 @@ import {
   getRateSeasonality,
 } from "@/lib/rental-estimate/rate-seasonality-server";
 import { listBookingLocations } from "@/lib/booking-locations";
+import { listBookingAddOns } from "@/lib/booking-add-ons-server";
 import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import { getStripeSecretKey } from "@/lib/stripe";
@@ -126,11 +127,12 @@ export async function renderSiteVehicle(
   // page quoting $0.
   const rate = resolveVehicleDailyRate(vehicle, policy);
   if (!isVehicleBookable(rate)) notFound();
-  const [dailyRateOverrides, locations, seasonality, agreement] = await Promise.all([
+  const [dailyRateOverrides, locations, seasonality, agreement, addOns] = await Promise.all([
     loadPriceOverridesForBooking(vehicle.id),
     listBookingLocations(site.workspaceId),
     getRateSeasonality(site.workspaceId),
     getWorkspaceAgreementClauses(site.workspaceId),
+    listBookingAddOns(site.workspaceId),
   ]);
   const checkoutState = readCheckoutState(searchParams.checkout);
   const conversion =
@@ -159,6 +161,7 @@ export async function renderSiteVehicle(
         dailyRateOverrides={dailyRateOverrides}
         seasonalRates={seasonalRates}
         locations={locations}
+        addOns={addOns}
         stripeReady={Boolean(getStripeSecretKey())}
         hostPayoutsReady={Boolean(connectSnapshot.accountId && connectSnapshot.chargesEnabled)}
         defaultPickupDate={defaultPickupDate}

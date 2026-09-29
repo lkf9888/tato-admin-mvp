@@ -25,6 +25,7 @@ import {
   getRateSeasonality,
 } from "@/lib/rental-estimate/rate-seasonality-server";
 import { listBookingLocations } from "@/lib/booking-locations";
+import { listBookingAddOns } from "@/lib/booking-add-ons-server";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
@@ -152,11 +153,12 @@ export default async function ReserveVehiclePage({
   const stripeReady = Boolean(getStripeSecretKey());
   const policy = await getBookingPolicyForVehicle(vehicle);
   const dailyRate = rate.dailyRate ?? 0;
-  const [dailyRateOverrides, locations, seasonality, agreement] = await Promise.all([
+  const [dailyRateOverrides, locations, seasonality, agreement, addOns] = await Promise.all([
     loadPriceOverridesForBooking(vehicle.id),
     listBookingLocations(vehicle.workspaceId),
     getRateSeasonality(vehicle.workspaceId),
     vehicle.workspaceId ? getWorkspaceAgreementClauses(vehicle.workspaceId) : null,
+    listBookingAddOns(vehicle.workspaceId),
   ]);
   const seasonalRates =
     rate.source === "suggested"
@@ -274,6 +276,7 @@ export default async function ReserveVehiclePage({
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}
             locations={locations}
+            addOns={addOns}
             weeklyDiscountPercent={policy.weeklyDiscountPercent}
             minimumRentalDays={policy.minimumRentalDays}
             dailyKmAllowance={policy.dailyKmAllowance}

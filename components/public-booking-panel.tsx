@@ -21,6 +21,7 @@ import {
 } from "@/lib/direct-booking";
 import type { TaxLine } from "@/lib/booking-policy";
 import { normalizeCouponCode, type CouponDiscount } from "@/lib/booking-coupons";
+import type { BookingAddOnOption } from "@/lib/booking-add-ons";
 import {
   BOOKING_TIME_OPTIONS,
   DEFAULT_BOOKING_TIME,
@@ -42,6 +43,7 @@ type StoredBookingState = {
   renterEmail: string;
   renterPhone: string;
   agreementAccepted: boolean;
+  addOnIds?: string[];
 };
 
 type BookingDatePickerProps = {
@@ -273,6 +275,7 @@ export function PublicBookingPanel({
   dailyRateOverrides,
   seasonalRates,
   locations,
+  addOns = [],
   weeklyDiscountPercent,
   minimumRentalDays,
   dailyKmAllowance,
@@ -306,6 +309,8 @@ export function PublicBookingPanel({
   seasonalRates: Record<string, number>;
   /** Places the car may be collected from and returned to. */
   locations: { id: string; label: string; fee: number; isDefault: boolean }[];
+  /** Extras the operator offers; the renter ticks the ones they want. */
+  addOns?: BookingAddOnOption[];
   weeklyDiscountPercent: number;
   minimumRentalDays: number;
   dailyKmAllowance: number;
@@ -340,6 +345,12 @@ export function PublicBookingPanel({
     asksLicenceRegion && hasLocalLicence === "no"
       ? (bookingInsuranceFeeNonLocal ?? localInsuranceFee)
       : localInsuranceFee;
+  const [addOnIds, setAddOnIds] = useState<string[]>([]);
+  // In the operator's order, and only ones still on offer.
+  const selectedAddOns = useMemo(
+    () => addOns.filter((addOn) => addOnIds.includes(addOn.id)),
+    [addOns, addOnIds],
+  );
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<CouponDiscount | null>(null);
   const [couponError, setCouponError] = useState("");
@@ -424,6 +435,7 @@ export function PublicBookingPanel({
       setRenterEmail(parsed.renterEmail || "");
       setRenterPhone(parsed.renterPhone || "");
       setAgreementAccepted(Boolean(parsed.agreementAccepted));
+      if (Array.isArray(parsed.addOnIds)) setAddOnIds(parsed.addOnIds);
     } catch {
       window.sessionStorage.removeItem(storageKey);
     }
@@ -460,10 +472,12 @@ export function PublicBookingPanel({
       renterEmail,
       renterPhone,
       agreementAccepted,
+      addOnIds,
     };
 
     window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
   }, [
+    addOnIds,
     agreementAccepted,
     hasLocalLicence,
     pickupTime,
@@ -506,8 +520,10 @@ export function PublicBookingPanel({
         returnTime,
         graceMinutes: returnGraceMinutes,
         coupon: appliedCoupon,
+        addOns: selectedAddOns,
       }),
     [
+      selectedAddOns,
       bookingDailyRate,
       bookingDepositAmount,
       bookingInsuranceFee,
@@ -546,8 +562,10 @@ export function PublicBookingPanel({
         returnTime,
         graceMinutes: returnGraceMinutes,
         coupon: appliedCoupon,
+        addOns: selectedAddOns,
       }),
     [
+      selectedAddOns,
       bookingDailyRate,
       bookingDepositAmount,
       bookingInsuranceFee,
@@ -680,6 +698,7 @@ export function PublicBookingPanel({
       formData.set("agreementAccepted", agreementAccepted ? "true" : "false");
       if (asksLicenceRegion) formData.set("hasLocalLicence", hasLocalLicence);
       if (appliedCoupon) formData.set("couponCode", appliedCoupon.code);
+      for (const addOn of selectedAddOns) formData.append("addOnId", addOn.id);
       formData.set("licenseFront", licenseFront);
       formData.set("licenseBack", licenseBack);
 
@@ -962,6 +981,57 @@ export function PublicBookingPanel({
         </div>
       ) : null}
 
+      {addOns.length > 0 ? (
+        <fieldset className="mt-3 sm:mt-5">
+          <legend className="mb-1 text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">
+            {reserveMessages.addOnsTitle}
+          </legend>
+          <div className="grid grid-cols-2 gap-2">
+            {addOns.map((addOn) => {
+              const checked = addOnIds.includes(addOn.id);
+              return (
+                <label
+                  key={addOn.id}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-2 text-xs transition sm:px-3 sm:py-2.5 sm:text-sm",
+                    checked
+                      ? "border-[var(--ink)] bg-[var(--surface-muted)]"
+                      : "border-[var(--line)] bg-white hover:border-[var(--line-strong)]",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(event) => {
+                      setError("");
+                      setAddOnIds((current) =>
+                        event.target.checked
+                          ? [...current, addOn.id]
+                          : current.filter((id) => id !== addOn.id),
+                      );
+                    }}
+                    className="mt-0.5"
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-[var(--ink)]">{addOn.name}</span>
+                    <span className="block text-[11px] text-[var(--ink-soft)] sm:text-xs">
+                      {addOn.unit === "day"
+                        ? reserveMessages.addOnPerDay(formatCurrency(addOn.price, locale))
+                        : reserveMessages.addOnPerBooking(formatCurrency(addOn.price, locale))}
+                    </span>
+                    {addOn.description ? (
+                      <span className="mt-0.5 block text-[11px] leading-4 text-[var(--ink-soft)]">
+                        {addOn.description}
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      ) : null}
+
       <div className="mt-3 sm:mt-5">
         <span className="mb-2 hidden text-sm font-medium text-[var(--ink)] sm:block">{reserveMessages.couponLabel}</span>
         {appliedCoupon ? (
@@ -1040,6 +1110,15 @@ export function PublicBookingPanel({
               <span>{formatCurrency(quote.insuranceAmount, locale)}</span>
             </div>
           ) : null}
+          {quote.addOnLines.map((line) => (
+            <div key={line.id} className="flex items-center justify-between gap-3">
+              <span className="min-w-0 truncate">
+                {line.name}
+                {line.unit === "day" && quote.days > 0 ? ` × ${quote.days}` : ""}
+              </span>
+              <span>{formatCurrency(line.amount, locale)}</span>
+            </div>
+          ))}
           {/* One line per tax (GST, PST, …), as the receipt will show. */}
           {quote.taxes
             .filter((tax) => tax.amount > 0)

@@ -20,7 +20,9 @@ import {
 } from "@/components/direct-booking-nav";
 import { DirectBookingTabs } from "@/components/direct-booking-tabs";
 import { AgreementClausesEditor } from "@/components/agreement-clauses-editor";
+import { BookingAddOnsEditor } from "@/components/booking-add-ons-editor";
 import { BookingCouponsPanel } from "@/components/booking-coupons-panel";
+import { listBookingAddOns } from "@/lib/booking-add-ons-server";
 import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { parseVehicleFeatures } from "@/lib/vehicle-features";
 import { StickySaveBar } from "@/components/sticky-save-bar";
@@ -47,6 +49,7 @@ export default async function DirectBookingPage({
     emailSaved?: string;
     policySaved?: string;
     locationsSaved?: string;
+    addOnsSaved?: string;
   }>;
 }) {
   const workspace = await requireCurrentWorkspace();
@@ -64,6 +67,7 @@ export default async function DirectBookingPage({
     agreement,
     pendingRequests,
     coupons,
+    addOns,
     vehicles,
   ] = await Promise.all([
     searchParams,
@@ -84,6 +88,7 @@ export default async function DirectBookingPage({
       orderBy: { createdAt: "desc" },
       take: 50,
     }),
+    listBookingAddOns(workspace.id),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
       include: {
@@ -401,6 +406,19 @@ export default async function DirectBookingPage({
           </div>
         ) : null}
       </section>
+
+      <BookingAddOnsEditor
+        locale={locale}
+        initialRows={addOns.map((addOn) => ({
+          id: addOn.id,
+          name: addOn.name,
+          description: addOn.description ?? "",
+          price: String(addOn.price),
+          unit: addOn.unit,
+          taxable: addOn.taxable,
+        }))}
+        saved={Boolean(query.addOnsSaved)}
+      />
 
       <BookingCouponsPanel
         locale={locale}

@@ -2,6 +2,7 @@ import { OrderStatus, type Order } from "@prisma/client";
 
 import { getEffectiveDailyRate, isWeeklyRateApplied, type TaxLine } from "@/lib/booking-policy";
 import { computeCouponAmount, type CouponDiscount } from "@/lib/booking-coupons";
+import { priceAddOn, priceAddOns, type BookingAddOnOption } from "@/lib/booking-add-ons";
 import { getChargedDays, utcToZonedDate } from "@/lib/booking-time";
 import { orderRangesOverlap } from "@/lib/orders";
 
@@ -128,6 +129,8 @@ export function getDirectBookingQuote(input: {
   graceMinutes?: number | null;
   /** A single-use code the renter applied; comes off the rent. */
   coupon?: CouponDiscount | null;
+  /** Extras the renter ticked; never discounted, taxed when marked so. */
+  addOns?: BookingAddOnOption[] | null;
 }) {
   const days =
     input.pickupTime && input.returnTime
@@ -170,10 +173,15 @@ export function getDirectBookingQuote(input: {
   const locationFeeAmount = roundMoney(
     Math.max(0, input.pickupLocationFee ?? 0) + Math.max(0, input.returnLocationFee ?? 0),
   );
-  // Tax is charged on the rent only -- the operator's rule, and the one
-  // their GST/PST filings follow. Insurance, collection fees and the
-  // deposit sit outside the base.
-  const taxes = computeTaxes(baseAmount, input);
+  const addOnLines = priceAddOns(input.addOns, days);
+  const addOnAmount = roundMoney(addOnLines.reduce((sum, line) => sum + line.amount, 0));
+  const taxableAddOnAmount = roundMoney(
+    addOnLines.filter((line) => line.taxable).reduce((sum, line) => sum + line.amount, 0),
+  );
+  // Tax is charged on the rent -- the operator's rule, and the one
+  // their GST/PST filings follow -- plus any extra marked taxable.
+  // Insurance, collection fees and the deposit sit outside the base.
+  const taxes = computeTaxes(roundMoney(baseAmount + taxableAddOnAmount), input);
   const taxAmount = sumTaxes(taxes);
   const depositAmount = input.bookingDepositAmount ?? 0;
 
@@ -189,11 +197,13 @@ export function getDirectBookingQuote(input: {
     isWeeklyRateApplied: isWeeklyRateApplied(days, weeklyDiscountPercent),
     insuranceAmount,
     locationFeeAmount,
+    addOnLines,
+    addOnAmount,
     taxAmount,
     taxes,
     depositAmount,
     totalAmount: roundMoney(
-      baseAmount + insuranceAmount + locationFeeAmount + taxAmount + depositAmount,
+      baseAmount + insuranceAmount + locationFeeAmount + addOnAmount + taxAmount + depositAmount,
     ),
   };
 }
@@ -363,6 +373,8 @@ export type BookingInstalment = {
   depositAmount: number;
   /** As does the collection and return fee. */
   locationFeeAmount: number;
+  /** Per-day extras for this period's days; per-booking ones on period one. */
+  addOnAmount: number;
   total: number;
 };
 
@@ -399,6 +411,7 @@ export function getDirectBookingInstalmentPlan(input: {
   returnTime?: string | null;
   graceMinutes?: number | null;
   coupon?: CouponDiscount | null;
+  addOns?: BookingAddOnOption[] | null;
 }): BookingInstalmentPlan {
   const quote = getDirectBookingQuote(input);
   const days = quote.days;
@@ -455,8 +468,18 @@ export function getDirectBookingInstalmentPlan(input: {
     // splitting a one-off across instalments would mean still owing
     // part of the airport drive in month three.
     const locationFee = index === 1 ? quote.locationFeeAmount : 0;
-    // Rent only, as in the quote, so the periods still sum to it.
-    const taxes = computeTaxes(rentAmount, input);
+    // Per-day extras follow the period's days; one-off extras ride on
+    // the first period, as the collection fee does.
+    const periodAddOns = (input.addOns ?? []).map((addOn) => ({
+      taxable: addOn.taxable,
+      amount: addOn.unit === "day" || index === 1 ? priceAddOn(addOn, periodDays) : 0,
+    }));
+    const addOnAmount = roundMoney(periodAddOns.reduce((sum, line) => sum + line.amount, 0));
+    const taxableAddOns = roundMoney(
+      periodAddOns.filter((line) => line.taxable).reduce((sum, line) => sum + line.amount, 0),
+    );
+    // Rent and taxable extras, as in the quote, so the periods sum to it.
+    const taxes = computeTaxes(roundMoney(rentAmount + taxableAddOns), input);
     const taxAmount = sumTaxes(taxes);
     const deposit = index === 1 ? depositAmount : 0;
 
@@ -471,7 +494,10 @@ export function getDirectBookingInstalmentPlan(input: {
       taxes,
       depositAmount: deposit,
       locationFeeAmount: locationFee,
-      total: roundMoney(rentAmount + insuranceAmount + locationFee + taxAmount + deposit),
+      addOnAmount,
+      total: roundMoney(
+        rentAmount + insuranceAmount + locationFee + addOnAmount + taxAmount + deposit,
+      ),
     });
 
     remaining -= periodDays;

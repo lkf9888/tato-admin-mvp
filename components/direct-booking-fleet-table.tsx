@@ -5,6 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 
 import { updateVehicleBookingAction, type VehicleBookingPatch } from "@/lib/direct-booking-actions";
 import { getMessages, type Locale } from "@/lib/i18n";
+import {
+  VEHICLE_FEATURE_LABELS,
+  VEHICLE_FEATURES,
+  type VehicleFeature,
+} from "@/lib/vehicle-features";
 import { formatCurrency } from "@/lib/utils";
 
 export type FleetRow = {
@@ -28,6 +33,7 @@ export type FleetRow = {
   km: number | null;
   extraKm: number | null;
   intro: string | null;
+  features: VehicleFeature[];
   photoCount: number;
   /** The first photo, which is also the rental site's cover. */
   thumbUrl: string | null;
@@ -705,6 +711,7 @@ type DrawerFields = {
   km: string;
   extraKm: string;
   intro: string;
+  features: VehicleFeature[];
 };
 
 const show = (value: number | string | null) => (value == null ? "" : String(value));
@@ -726,6 +733,7 @@ function EditDrawer({
 }) {
   const copy = getMessages(locale).directBookingFleet;
   const page = getMessages(locale).directBookingPage;
+  const turo = getMessages(locale).directBookingTuroImport;
   const money = (value: number) => formatCurrency(value, locale);
   const [fields, setFields] = useState<DrawerFields>({
     enabled: row.enabled,
@@ -739,6 +747,7 @@ function EditDrawer({
     km: show(row.km),
     extraKm: show(row.extraKm),
     intro: show(row.intro),
+    features: row.features,
   });
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(false);
@@ -790,6 +799,10 @@ function EditDrawer({
     if (intro !== row.intro) {
       patch.bookingIntro = intro;
       local.intro = intro;
+    }
+    if ([...fields.features].sort().join() !== [...row.features].sort().join()) {
+      patch.bookingFeatures = fields.features;
+      local.features = fields.features;
     }
     if (fields.enabled !== row.enabled) {
       patch.directBookingEnabled = fields.enabled;
@@ -941,6 +954,42 @@ function EditDrawer({
             />
           </label>
 
+          <fieldset className="space-y-1.5">
+            <legend className="text-[12px] font-medium text-[color:var(--ink)]">{copy.featuresLabel}</legend>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {VEHICLE_FEATURES.map((feature) => {
+                const checked = fields.features.includes(feature);
+                return (
+                  <label
+                    key={feature}
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px] ${
+                      checked
+                        ? "border-[var(--ink)] bg-[var(--surface-muted)] text-[color:var(--ink)]"
+                        : "border-[color:var(--line)] text-[color:var(--ink-mid)]"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setFields((current) => ({
+                          ...current,
+                          features: checked
+                            ? current.features.filter((item) => item !== feature)
+                            : VEHICLE_FEATURES.filter(
+                                (item) => item === feature || current.features.includes(item),
+                              ),
+                        }))
+                      }
+                    />
+                    {VEHICLE_FEATURE_LABELS[locale][feature]}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="text-[11px] leading-4 text-[color:var(--ink-soft)]">{copy.featuresHint}</p>
+          </fieldset>
+
           <div className="space-y-2 text-[12px]">
             <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">{page.blockedDates}</p>
             {row.busy.length > 0 ? (
@@ -957,6 +1006,30 @@ function EditDrawer({
             ) : (
               <p className="text-[color:var(--ink-soft)]">{page.blockedDatesEmpty}</p>
             )}
+          </div>
+
+          <div className="space-y-1.5 rounded-md border border-[color:var(--line)] px-3 py-2.5 text-[12px]">
+            <p className="font-medium text-[color:var(--ink)]">{turo.drawerTitle}</p>
+            <div className="flex flex-wrap gap-2">
+              {row.turoCode ? (
+                <a
+                  // Turo redirects any slug to the listing, so the number is enough.
+                  href={`https://turo.com/ca/en/car-rental/canada/x/x/x/${encodeURIComponent(row.turoCode)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-[color:var(--line)] px-2.5 py-1.5 text-[color:var(--ink)] hover:bg-[var(--surface-muted)]"
+                >
+                  {turo.drawerOpenListing} ↗
+                </a>
+              ) : null}
+              <Link
+                href="/direct-booking/turo-photos"
+                className="rounded-md border border-[color:var(--line)] px-2.5 py-1.5 text-[color:var(--ink)] hover:bg-[var(--surface-muted)]"
+              >
+                {turo.drawerHowTo}
+              </Link>
+            </div>
+            <p className="leading-4 text-[color:var(--ink-soft)]">{turo.steps[2]}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-[12px]">

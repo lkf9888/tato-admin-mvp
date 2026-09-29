@@ -8,6 +8,7 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { normalizeAgreementClauses } from "@/lib/rental-agreement-clauses";
+import { VEHICLE_FEATURES } from "@/lib/vehicle-features";
 
 /**
  * Edits to a car's direct-booking terms from the fleet table.
@@ -35,6 +36,7 @@ const patchSchema = z
     bookingDailyKmAllowance: z.number().int().min(0).max(5000).nullable(),
     bookingExtraKmRate: z.number().finite().min(0).max(100).nullable(),
     bookingIntro: z.string().trim().max(2000).nullable(),
+    bookingFeatures: z.array(z.enum(VEHICLE_FEATURES)).max(VEHICLE_FEATURES.length).nullable(),
   })
   .partial()
   .strict();
@@ -62,13 +64,25 @@ export async function updateVehicleBookingAction(
   // An empty name is no name, which prints as the fleet's.
   if (data.bookingTaxName === "") data.bookingTaxName = null;
   if (data.bookingIntro === "") data.bookingIntro = null;
+  // Stored as JSON in list order; none selected is null.
   if (data.bookingTaxRate != null) data.bookingTaxRate = +data.bookingTaxRate.toFixed(3);
 
   // Scoped in the write itself, not checked beforehand: an id from
   // another workspace simply matches nothing.
+  const { bookingFeatures, ...columns } = data;
   const result = await prisma.vehicle.updateMany({
     where: { id: { in: ids }, workspaceId: workspace.id },
-    data,
+    data: {
+      ...columns,
+      ...(bookingFeatures !== undefined
+        ? {
+            bookingFeatures:
+              bookingFeatures && bookingFeatures.length > 0
+                ? JSON.stringify(VEHICLE_FEATURES.filter((item) => bookingFeatures.includes(item)))
+                : null,
+          }
+        : {}),
+    },
   });
   if (result.count === 0) return { ok: false, error: "NOT_FOUND" };
 

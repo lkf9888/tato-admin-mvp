@@ -6,6 +6,32 @@
  */
 export const directBookingMessages = {
   en: {
+    directBookingTuroImport: {
+      title: "Import photos from Turo",
+      steps: [
+        "Drag the \"Import to TATO\" button below to your browser's bookmarks bar (once).",
+        "Open the car's listing on turo.com, signed in as usual.",
+        "Click the bookmark. This page opens with that listing's photos; pick the car and import.",
+      ],
+      installTitle: "The bookmark",
+      installCopy:
+        "Drag this button to your bookmarks bar. It reads the listing in your own browser (Turo blocks servers from doing so) and brings its photos here.",
+      bookmarkletName: "Import to TATO",
+      listing: (listing: string, count: number) => `Turo listing #${listing} · ${count} photo(s) found`,
+      targetLabel: "Put them on",
+      targetPlaceholder: "Choose a car…",
+      matched: "matches this listing",
+      existingPhotos: (count: number) => `${count} photo(s) on this car already. New ones are added after them; ones already imported are skipped.`,
+      importAction: (count: number) => `Import ${count} photo(s)`,
+      importing: "Importing…",
+      result: (imported: number, skipped: number, failed: number) =>
+        `Imported ${imported}` + (skipped ? `, ${skipped} already there` : "") + (failed ? `, ${failed} failed` : "") + ".",
+      failed: (reason: string) => `Import failed: ${reason}`,
+      orderNote: "Click a photo to leave it out. The first photo on a car is its cover on the rental site.",
+      drawerTitle: "Photos from Turo",
+      drawerOpenListing: "Open Turo listing",
+      drawerHowTo: "How it works",
+    },
     directBookingAgreement: {
       kicker: "Rental agreement",
       title: "The clauses every renter signs",
@@ -49,6 +75,7 @@ export const directBookingMessages = {
       tabEmail: "Confirmation email",
       emailOn: "On",
       emailOff: "Off",
+      tabRequests: "Change requests",
       tabSite: "Rental website",
       siteStateLabels: { none: "Not set up", draft: "Draft", live: "Live" },
       title: "Shareable booking pages for every vehicle",
@@ -166,6 +193,8 @@ export const directBookingMessages = {
         `${daily} daily · ${insurance} insurance · ${deposit} deposit`,
     },
     directBookingFleet: {
+      featuresLabel: "Features",
+      featuresHint: "Ticked features show on the car's page on your rental site.",
       searchPlaceholder: "Search plate, model or Turo ID",
       filters: {
         all: "All",
@@ -242,6 +271,31 @@ export const directBookingMessages = {
     },
   },
   zh: {
+    directBookingTuroImport: {
+      title: "从 Turo 导入图片",
+      steps: [
+        "把下面的「导入到 TATO」按钮拖到浏览器书签栏（只需一次）。",
+        "照常登录，打开这台车在 turo.com 上的页面。",
+        "点一下这个书签，会打开本页并带上这台车的图片，选好车辆后导入。",
+      ],
+      installTitle: "书签工具",
+      installCopy: "把这个按钮拖到书签栏。它在你自己的浏览器里读取 Turo 页面（Turo 不让服务器直接读），再把图片带到这里。",
+      bookmarkletName: "导入到 TATO",
+      listing: (listing: string, count: number) => `Turo 车辆 #${listing} · 找到 ${count} 张图片`,
+      targetLabel: "导入到",
+      targetPlaceholder: "选择车辆…",
+      matched: "与此 Turo 车辆匹配",
+      existingPhotos: (count: number) => `这台车已有 ${count} 张图片。新图片排在后面，已导入过的会跳过。`,
+      importAction: (count: number) => `导入 ${count} 张`,
+      importing: "导入中…",
+      result: (imported: number, skipped: number, failed: number) =>
+        `已导入 ${imported} 张` + (skipped ? `，${skipped} 张已存在` : "") + (failed ? `，${failed} 张失败` : "") + "。",
+      failed: (reason: string) => `导入失败：${reason}`,
+      orderNote: "点图片可以不导入它。车辆的第一张图片是租车网站上的封面。",
+      drawerTitle: "Turo 图片",
+      drawerOpenListing: "打开 Turo 页面",
+      drawerHowTo: "使用说明",
+    },
     directBookingAgreement: {
       kicker: "租车协议",
       title: "每位租客签署的协议条款",
@@ -284,6 +338,7 @@ export const directBookingMessages = {
       tabEmail: "确认邮件",
       emailOn: "开",
       emailOff: "关",
+      tabRequests: "变更申请",
       tabSite: "租车网站",
       siteStateLabels: { none: "未创建", draft: "草稿", live: "已发布" },
       title: "为每台车生成可分享的预定页面",
@@ -398,6 +453,8 @@ export const directBookingMessages = {
         `${daily} / 天 · 保险 ${insurance} · 押金 ${deposit}`,
     },
     directBookingFleet: {
+      featuresLabel: "车辆配置",
+      featuresHint: "勾选的配置会显示在租车网站的车辆页上。",
       searchPlaceholder: "搜索车牌、车型或 Turo 编号",
       filters: {
         all: "全部",

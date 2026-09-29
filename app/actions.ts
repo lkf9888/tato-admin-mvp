@@ -208,7 +208,7 @@ function revalidateAdminPages() {
     "/documents",
     "/direct-booking",
     "/direct-booking/site",
-    "/booking-requests",
+    "/direct-booking/requests",
     "/owners",
     "/orders",
     "/calendar",

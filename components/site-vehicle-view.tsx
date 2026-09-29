@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { PublicBookingPanel } from "@/components/public-booking-panel";
 import { VehiclePhotoCarousel } from "@/components/vehicle-photo-carousel";
+import { parseVehicleFeatures, VEHICLE_FEATURE_LABELS } from "@/lib/vehicle-features";
 import {
   getBlockedBookingWindows,
   getBookingBusyWindows,
@@ -140,6 +141,18 @@ export function SiteVehicleView({
                   to read. */}
               {(locale === "en" ? vehicle.bookingIntro?.trim() : "") || copy.vehicleIntroFallback}
             </p>
+            {parseVehicleFeatures(vehicle.bookingFeatures).length > 0 ? (
+              <ul className="mt-4 flex flex-wrap gap-2">
+                {parseVehicleFeatures(vehicle.bookingFeatures).map((feature) => (
+                  <li
+                    key={feature}
+                    className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-[13px] text-[var(--ink-mid)]"
+                  >
+                    {VEHICLE_FEATURE_LABELS[locale][feature]}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <div className="rounded-[18px] bg-[var(--brand-tint)] p-4">

@@ -4,11 +4,7 @@ import { VehicleStatus } from "@prisma/client";
 import { saveRentalSiteAction } from "@/app/actions";
 import { CopyUrlRow } from "@/components/copy-url-row";
 import { SiteContentEditor } from "@/components/site-content-editor";
-import {
-  buildDirectBookingStats,
-  DirectBookingHeader,
-  DirectBookingLinkTabs,
-} from "@/components/direct-booking-nav";
+import { DirectBookingSubpageFrame } from "@/components/direct-booking-subpage-frame";
 import { SiteHealthPanel } from "@/components/site-health-panel";
 import { StickySaveBar } from "@/components/sticky-save-bar";
 import { parseHighlights, parseSiteTranslations } from "@/lib/rental-site-content";
@@ -17,7 +13,6 @@ import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
 import { prisma } from "@/lib/prisma";
-import { getDirectBookingSummary, getDirectBookingTabBadges } from "@/lib/direct-booking-summary";
 import { getRentalSiteHealth } from "@/lib/rental-site-health";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import {
@@ -47,8 +42,6 @@ export default async function RentalSitePage({
     site,
     fleetPolicy,
     bookableVehicles,
-    summary,
-    badges,
   ] = await Promise.all([
     searchParams,
     getI18n(),
@@ -64,8 +57,6 @@ export default async function RentalSitePage({
       },
       select: { brand: true, model: true, year: true, bookingDailyRate: true },
     }),
-    getDirectBookingSummary(workspace.id),
-    getDirectBookingTabBadges(workspace.id),
   ]);
 
   // A price can now come from the income model, which no `count()`
@@ -112,37 +103,7 @@ export default async function RentalSitePage({
 
   return (
     <div className="space-y-3">
-      <DirectBookingHeader
-        kicker={directMessages.kicker}
-        title={directMessages.title}
-        stats={buildDirectBookingStats(directMessages, summary)}
-      />
-      <DirectBookingLinkTabs
-        label={directMessages.tabsLabel}
-        active="site"
-        items={[
-          { key: "vehicles", label: directMessages.tabVehicles, badge: badges.vehicleCount },
-          { key: "rules", label: directMessages.tabRules },
-          { key: "locations", label: directMessages.tabLocations, badge: badges.locationCount },
-          {
-            key: "email",
-            label: directMessages.tabEmail,
-            badge: badges.emailEnabled ? directMessages.emailOn : directMessages.emailOff,
-          },
-          {
-            key: "agreement",
-            label: messages.directBookingAgreement.tab,
-            badge: badges.agreementCustom
-              ? messages.directBookingAgreement.tabCustom
-              : messages.directBookingAgreement.tabDefault,
-          },
-          {
-            key: "site",
-            label: directMessages.tabSite,
-            badge: directMessages.siteStateLabels[badges.siteState],
-          },
-        ]}
-      />
+      <DirectBookingSubpageFrame workspaceId={workspace.id} locale={locale} active="site" />
 
       <section className={SECTION_CLASS}>
         <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">

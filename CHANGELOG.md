@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.11.0 - 2026-09-29
+
+### Change requests join direct booking, cars list their features, and Turo photos import by bookmark
+
+**Change requests are a tab of direct booking.** `/booking-requests`
+moves to `/direct-booking/requests`, with the same header and tab row
+(the tab shows how many are pending); the old path redirects and the
+sidebar entry is gone (agreed with the 底座 session). The header and
+tab row for sub-pages are now one component,
+`DirectBookingSubpageFrame`, shared with the rental website tab.
+
+**Vehicle features.** The direct-booking drawer gains checkboxes for
+5/6/7 seats, snow tires, AWD/4WD, Apple CarPlay, Android Auto, backup
+camera and adaptive cruise (`lib/vehicle-features.ts`), shown as chips
+on the car's rental-site page in all three languages. Stored in the new
+`Vehicle.bookingFeatures` (nullable JSON, no default): the column is on
+operations' model but belongs to online booking, which is the only
+writer.
+
+**Turo photos, by bookmarklet.** Turo's Cloudflare refuses our server
+(403 on both the listing and its data API), so the import runs in the
+operator's own browser. `/direct-booking/turo-photos` offers an
+"Import to TATO" bookmarklet; clicked on a turo.com listing, it reads
+that listing's photo ids (from Turo's own vehicle API, in listing
+order) and opens TATO with them. There the operator sees the photos,
+the car whose Turo id matches is preselected, photos can be left out,
+and the import reuses the existing server-side fetch from Turo's image
+CDN, skipping photos already imported. The drawer links to the car's
+Turo listing and to the instructions. No token is involved: the
+bookmarklet only opens a TATO page, where the operator is signed in.
+
 ## v1.10.2 - 2026-09-29
 
 ### The rental agreement's clauses are edited in the admin, for every car

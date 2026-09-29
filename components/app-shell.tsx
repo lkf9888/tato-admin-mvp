@@ -81,11 +81,6 @@ export function AppShell({
       label: messages.shell.nav.groupBookings,
       items: [
         { href: "/direct-booking", label: messages.shell.nav.directBooking, icon: "directBooking" },
-        {
-          href: "/booking-requests",
-          label: messages.shell.nav.bookingRequests,
-          icon: "bookingRequests",
-        },
       ],
     },
     {

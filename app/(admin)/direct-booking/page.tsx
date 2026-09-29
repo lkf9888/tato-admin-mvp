@@ -21,6 +21,7 @@ import {
 import { DirectBookingTabs } from "@/components/direct-booking-tabs";
 import { AgreementClausesEditor } from "@/components/agreement-clauses-editor";
 import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
+import { parseVehicleFeatures } from "@/lib/vehicle-features";
 import { StickySaveBar } from "@/components/sticky-save-bar";
 import { normalizeDirectBookingEmailTemplate } from "@/lib/direct-booking-email-template";
 import { isEmailConfigured } from "@/lib/email";
@@ -58,6 +59,7 @@ export default async function DirectBookingPage({
     seasonality,
     rentalSite,
     agreement,
+    pendingRequests,
     vehicles,
   ] = await Promise.all([
     searchParams,
@@ -72,6 +74,7 @@ export default async function DirectBookingPage({
       select: { isPublished: true },
     }),
     getWorkspaceAgreementClauses(workspace.id),
+    prisma.bookingChangeRequest.count({ where: { workspaceId: workspace.id, status: "PENDING" } }),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
       include: {
@@ -169,6 +172,7 @@ export default async function DirectBookingPage({
       km: vehicle.bookingDailyKmAllowance,
       extraKm: vehicle.bookingExtraKmRate,
       intro: vehicle.bookingIntro,
+      features: parseVehicleFeatures(vehicle.bookingFeatures),
       photoCount: photoCounts.get(vehicle.id) ?? 0,
       // The admin route, not the public one: that serves only listed
       // cars, and the table shows unlisted ones too.
@@ -484,6 +488,12 @@ export default async function DirectBookingPage({
           },
         ]}
         links={[
+          {
+            key: "requests",
+            label: directMessages.tabRequests,
+            href: directBookingSectionHref("requests"),
+            badge: pendingRequests || null,
+          },
           {
             key: "site",
             label: directMessages.tabSite,

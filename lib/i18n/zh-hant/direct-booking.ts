@@ -2,6 +2,31 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const directBookingMessages = {
+    directBookingTuroImport: {
+      title: "從 Turo 匯入圖片",
+      steps: [
+        "把下面的「匯入到 TATO」按鈕拖到瀏覽器書籤欄（只需一次）。",
+        "照常登入，開啟這台車在 turo.com 上的頁面。",
+        "點一下這個書籤，會開啟本頁並帶上這台車的圖片，選好車輛後匯入。",
+      ],
+      installTitle: "書籤工具",
+      installCopy: "把這個按鈕拖到書籤欄。它在你自己的瀏覽器裡讀取 Turo 頁面（Turo 不讓伺服器直接讀），再把圖片帶到這裡。",
+      bookmarkletName: "匯入到 TATO",
+      listing: (listing: string, count: number) => `Turo 車輛 #${listing} · 找到 ${count} 張圖片`,
+      targetLabel: "匯入到",
+      targetPlaceholder: "選擇車輛…",
+      matched: "與此 Turo 車輛匹配",
+      existingPhotos: (count: number) => `這台車已有 ${count} 張圖片。新圖片排在後面，已匯入過的會跳過。`,
+      importAction: (count: number) => `匯入 ${count} 張`,
+      importing: "匯入中…",
+      result: (imported: number, skipped: number, failed: number) =>
+        `已匯入 ${imported} 張` + (skipped ? `，${skipped} 張已存在` : "") + (failed ? `，${failed} 張失敗` : "") + "。",
+      failed: (reason: string) => `匯入失敗：${reason}`,
+      orderNote: "點圖片可以不匯入它。車輛的第一張圖片是租車網站上的封面。",
+      drawerTitle: "Turo 圖片",
+      drawerOpenListing: "開啟 Turo 頁面",
+      drawerHowTo: "使用說明",
+    },
     directBookingAgreement: {
       kicker: "租車協議",
       title: "每位租客簽署的協議條款",
@@ -44,6 +69,7 @@ export const directBookingMessages = {
       tabEmail: "確認郵件",
       emailOn: "開",
       emailOff: "關",
+      tabRequests: "變更申請",
       tabSite: "租車網站",
       siteStateLabels: { none: "未建立", draft: "草稿", live: "已釋出" },
       title: "為每台車生成可分享的預定頁面",
@@ -158,6 +184,8 @@ export const directBookingMessages = {
         `${daily} / 天 · 保險 ${insurance} · 押金 ${deposit}`,
     },
     directBookingFleet: {
+      featuresLabel: "車輛配置",
+      featuresHint: "勾選的配置會顯示在租車網站的車輛頁上。",
       searchPlaceholder: "搜尋車牌、車型或 Turo 編號",
       filters: {
         all: "全部",

@@ -297,6 +297,9 @@ model Vehicle {
   bookingDailyKmAllowance      Int?
   bookingExtraKmRate           Float?
   bookingIntro                 String?
+  /// JSON array of feature keys from `lib/vehicle-features.ts` (seats,
+  /// snow tires, AWD, CarPlay…), shown on the rental site.
+  bookingFeatures              String?
   notes                        String?
   createdAt                    DateTime                 @default(now())
   updatedAt                    DateTime                 @updatedAt

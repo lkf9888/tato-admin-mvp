@@ -64,7 +64,8 @@ export async function getDirectBookingSummary(workspaceId: string) {
  * confirmation email is on, and whether the site is published.
  */
 export async function getDirectBookingTabBadges(workspaceId: string) {
-  const [vehicleCount, locations, emailTemplate, site, agreementSets] = await Promise.all([
+  const [vehicleCount, locations, emailTemplate, site, agreementSets, pendingRequests] =
+    await Promise.all([
     prisma.vehicle.count({ where: { workspaceId, isArchived: false } }),
     listBookingLocations(workspaceId),
     prisma.directBookingEmailTemplate.findUnique({
@@ -73,6 +74,7 @@ export async function getDirectBookingTabBadges(workspaceId: string) {
     }),
     prisma.rentalSite.findUnique({ where: { workspaceId }, select: { isPublished: true } }),
     prisma.rentalAgreementClauseSet.count({ where: { workspaceId } }),
+    prisma.bookingChangeRequest.count({ where: { workspaceId, status: "PENDING" } }),
   ]);
   return {
     vehicleCount,
@@ -80,6 +82,7 @@ export async function getDirectBookingTabBadges(workspaceId: string) {
     emailEnabled: emailTemplate?.isEnabled ?? true,
     siteState: siteState(site),
     agreementCustom: agreementSets > 0,
+    pendingRequests,
   };
 }
 

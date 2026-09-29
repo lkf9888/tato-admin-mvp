@@ -31,11 +31,13 @@ export type DirectBookingSection =
   | "locations"
   | "email"
   | "agreement"
+  | "requests"
   | "site";
 
 export function directBookingSectionHref(section: DirectBookingSection) {
   if (section === "vehicles") return "/direct-booking";
   if (section === "site") return "/direct-booking/site";
+  if (section === "requests") return "/direct-booking/requests";
   return `/direct-booking?tab=${section}`;
 }
 

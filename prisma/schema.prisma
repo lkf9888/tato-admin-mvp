@@ -744,6 +744,32 @@ model StaffTaskNotificationTemplate {
   workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
+/// A single-use discount code for direct bookings. Keyed by workspace
+/// without a relation, so the Workspace model need not change for it.
+model BookingCoupon {
+  id                String    @id @default(cuid())
+  workspaceId       String
+  /// What the renter types, upper-case, e.g. `SPX-7K2Q9M`.
+  code              String
+  /// `percent` (of the rent) or `amount` (dollars off the rent).
+  kind              String
+  value             Float
+  note              String?
+  expiresAt         DateTime?
+  createdBy         String?
+  createdAt         DateTime  @default(now())
+  /// Held by a checkout in progress, so two renters cannot both use it.
+  reservedSessionId String?
+  reservedUntil     DateTime?
+  /// Used: set when the booking it was used on is paid.
+  redeemedAt        DateTime?
+  redeemedOrderId   String?
+  voidedAt          DateTime?
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId, createdAt])
+}
+
 /// The rental agreement's clauses as one workspace has edited them, for
 /// every car it rents. No row means the built-in wording
 /// (`RENTAL_AGREEMENT_CLAUSES`). Keyed by workspace without a relation,

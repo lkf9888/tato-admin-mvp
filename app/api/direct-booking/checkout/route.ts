@@ -26,6 +26,14 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getBookingReturnUrls } from "@/lib/rental-site";
 import { DEFAULT_BOOKING_TIME, zonedDateTimeToUtc } from "@/lib/booking-time";
+import type { CouponDiscount } from "@/lib/booking-coupons";
+import {
+  attachCouponToSession,
+  checkCoupon,
+  COUPON_HOLD_MINUTES,
+  releaseCoupon,
+  reserveCoupon,
+} from "@/lib/booking-coupons-server";
 import { getStripeCheckoutLocale, isSiteLocale } from "@/lib/site-locale";
 import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
 import {
@@ -50,6 +58,14 @@ const LICENSE_DOCUMENT_KINDS = {
   back: "driver_license_back",
 } as const;
 
+const COUPON_ERRORS = {
+  not_found: "That coupon code is not valid.",
+  redeemed: "That coupon code has already been used.",
+  expired: "That coupon code has expired.",
+  voided: "That coupon code is no longer valid.",
+  reserved: "That coupon code is being used in another checkout. Try again in a few minutes.",
+} as const;
+
 const checkoutSchema = z.object({
   vehicleId: z.string().min(1),
   pickupDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -66,6 +82,7 @@ const checkoutSchema = z.object({
   agreementAccepted: z.boolean().refine(Boolean, "Rental agreement must be accepted."),
   // Asked only when the fleet charges a non-BC licence differently.
   hasLocalLicence: z.enum(["yes", "no"]).optional(),
+  couponCode: z.string().trim().max(40).optional(),
 });
 
 type LicenseDocumentKind = (typeof LICENSE_DOCUMENT_KINDS)[keyof typeof LICENSE_DOCUMENT_KINDS];
@@ -161,6 +178,7 @@ async function readCheckoutRequest(request: Request) {
     returnLocationId: readFormString(formData, "returnLocationId") || undefined,
     agreementAccepted: readFormBoolean(formData, "agreementAccepted"),
     hasLocalLicence: readFormString(formData, "hasLocalLicence") || undefined,
+    couponCode: readFormString(formData, "couponCode") || undefined,
   });
 
   // The language the renter was reading in, so Stripe's page and the
@@ -255,6 +273,16 @@ export async function POST(request: Request) {
       asksLicenceRegion && parsed.hasLocalLicence === "no"
         ? policy.insuranceFeeNonLocal
         : policy.insuranceFee;
+    // A coupon is checked here and held just before the Stripe session
+    // is made (below), so a code that fails never reaches payment.
+    let coupon: (CouponDiscount & { id: string }) | null = null;
+    if (parsed.couponCode) {
+      const check = await checkCoupon(vehicle.workspaceId, parsed.couponCode);
+      if (!check.ok) {
+        return NextResponse.json({ error: COUPON_ERRORS[check.reason] }, { status: 400 });
+      }
+      coupon = check.coupon;
+    }
     const rate = resolveVehicleDailyRate(vehicle, policy);
     if (!isVehicleBookable(rate)) {
       return NextResponse.json({ error: "This vehicle is not priced yet." }, { status: 400 });
@@ -304,6 +332,7 @@ export async function POST(request: Request) {
       pickupTime: parsed.pickupTime,
       returnTime: parsed.returnTime,
       graceMinutes: policy.returnGraceMinutes,
+      coupon,
     });
 
     if (quote.days < 1 || quote.totalAmount <= 0) {
@@ -339,6 +368,7 @@ export async function POST(request: Request) {
       pickupTime: parsed.pickupTime,
       returnTime: parsed.returnTime,
       graceMinutes: policy.returnGraceMinutes,
+      coupon,
     });
     const firstPeriod = plan.instalments[0] ?? null;
     const chargedDays = firstPeriod?.days ?? quote.days;
@@ -396,7 +426,11 @@ export async function POST(request: Request) {
           unit_amount: Math.round(chargedRent * 100),
           product_data: {
             name: `${vehicle.nickname} booking`,
-            description: `${vehicle.plateNumber} · ${parsed.pickupDate} to ${parsed.returnDate} · ${chargedDays} day(s)`,
+            description:
+              `${vehicle.plateNumber} · ${parsed.pickupDate} ${parsed.pickupTime} to ${parsed.returnDate} ${parsed.returnTime} · ${chargedDays} day(s)` +
+              (coupon && quote.couponAmount > 0
+                ? ` · coupon ${coupon.code} −$${quote.couponAmount.toFixed(2)}`
+                : ""),
           },
         },
       },
@@ -482,8 +516,20 @@ export async function POST(request: Request) {
     });
     const applicationFeeAmount = platformFee.total;
 
-    const session = await stripe.checkout.sessions.create({
+    // Held for this checkout only; another renter's Apply now fails.
+    const couponHoldKey = randomUUID();
+    if (coupon && !(await reserveCoupon(coupon.id, couponHoldKey))) {
+      return NextResponse.json({ error: COUPON_ERRORS.reserved }, { status: 400 });
+    }
+
+    const session = await stripe.checkout.sessions
+      .create({
       mode: "payment",
+      // With a code held, the payment page lasts as long as the hold
+      // (Stripe's shortest), so it cannot outlive it.
+      ...(coupon
+        ? { expires_at: Math.floor(Date.now() / 1000) + COUPON_HOLD_MINUTES * 60 }
+        : {}),
       locale: getStripeCheckoutLocale(siteLocale),
       success_url: successUrl,
       cancel_url: cancelUrl,
@@ -523,6 +569,10 @@ export async function POST(request: Request) {
         // instalment schedule re-prices from.
         insuranceDailyRate: String(insuranceFee),
         hasLocalLicence: parsed.hasLocalLicence ?? "",
+        couponCode: coupon?.code ?? "",
+        couponKind: coupon?.kind ?? "",
+        couponValue: coupon ? String(coupon.value) : "",
+        couponAmount: String(quote.couponAmount),
         bookedDays: String(quote.days),
         isInstalmentPlan: plan.isInstalmentPlan ? "true" : "false",
         instalmentCount: String(plan.instalments.length),
@@ -546,7 +596,12 @@ export async function POST(request: Request) {
         applicationFeeAmount: String(applicationFeeAmount),
       },
       line_items: lineItems,
-    });
+      })
+      .catch(async (error) => {
+        if (coupon) await releaseCoupon(coupon.id, couponHoldKey);
+        throw error;
+      });
+    if (coupon) await attachCouponToSession(coupon.id, couponHoldKey, session.id);
 
     if (!session.url) {
       return NextResponse.json({ error: "Stripe did not return a checkout URL." }, { status: 400 });

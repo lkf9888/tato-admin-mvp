@@ -20,6 +20,7 @@ import {
   type DateOnlyBookingWindow,
 } from "@/lib/direct-booking";
 import type { TaxLine } from "@/lib/booking-policy";
+import { normalizeCouponCode, type CouponDiscount } from "@/lib/booking-coupons";
 import {
   BOOKING_TIME_OPTIONS,
   DEFAULT_BOOKING_TIME,
@@ -334,6 +335,41 @@ export function PublicBookingPanel({
     asksLicenceRegion && hasLocalLicence === "no"
       ? (bookingInsuranceFeeNonLocal ?? localInsuranceFee)
       : localInsuranceFee;
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponDiscount | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponChecking, setCouponChecking] = useState(false);
+
+  // Checked with the server before it prices anything, so a mistyped
+  // code says so here rather than at the payment step.
+  async function applyCoupon() {
+    setCouponError("");
+    setCouponChecking(true);
+    try {
+      const response = await fetch("/api/direct-booking/coupons/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vehicleId, code: normalizeCouponCode(couponInput) }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        reason?: keyof typeof reserveMessages.couponErrors;
+        coupon?: CouponDiscount;
+      };
+      if (data.ok && data.coupon) {
+        setAppliedCoupon(data.coupon);
+      } else {
+        setCouponError(
+          reserveMessages.couponErrors[data.reason ?? "not_found"] ?? reserveMessages.couponErrors.not_found,
+        );
+      }
+    } catch {
+      setCouponError(reserveMessages.couponErrors.not_found);
+    } finally {
+      setCouponChecking(false);
+    }
+  }
+
   const [licenseFront, setLicenseFront] = useState<File | null>(null);
   const [licenseBack, setLicenseBack] = useState<File | null>(null);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
@@ -462,6 +498,7 @@ export function PublicBookingPanel({
         pickupTime,
         returnTime,
         graceMinutes: returnGraceMinutes,
+        coupon: appliedCoupon,
       }),
     [
       bookingDailyRate,
@@ -472,6 +509,7 @@ export function PublicBookingPanel({
       pickupTime,
       returnTime,
       returnGraceMinutes,
+      appliedCoupon,
       pickupDate,
       returnDate,
       weeklyDiscountPercent,
@@ -500,6 +538,7 @@ export function PublicBookingPanel({
         pickupTime,
         returnTime,
         graceMinutes: returnGraceMinutes,
+        coupon: appliedCoupon,
       }),
     [
       bookingDailyRate,
@@ -510,6 +549,7 @@ export function PublicBookingPanel({
       pickupTime,
       returnTime,
       returnGraceMinutes,
+      appliedCoupon,
       pickupDate,
       returnDate,
       weeklyDiscountPercent,
@@ -632,6 +672,7 @@ export function PublicBookingPanel({
       formData.set("returnLocationId", returnLocationId);
       formData.set("agreementAccepted", agreementAccepted ? "true" : "false");
       if (asksLicenceRegion) formData.set("hasLocalLicence", hasLocalLicence);
+      if (appliedCoupon) formData.set("couponCode", appliedCoupon.code);
       formData.set("licenseFront", licenseFront);
       formData.set("licenseBack", licenseBack);
 
@@ -919,6 +960,49 @@ export function PublicBookingPanel({
         </div>
       ) : null}
 
+      <div className="mt-5">
+        <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{reserveMessages.couponLabel}</span>
+        {appliedCoupon ? (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm">
+            <span className="font-medium text-[var(--ok-fg)]">
+              {reserveMessages.couponApplied(appliedCoupon.code)}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setAppliedCoupon(null);
+                setCouponInput("");
+              }}
+              className="text-xs text-[var(--ink-soft)] underline"
+            >
+              {reserveMessages.couponRemove}
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              value={couponInput}
+              onChange={(event) => {
+                setCouponInput(event.target.value);
+                setCouponError("");
+              }}
+              placeholder={reserveMessages.couponPlaceholder}
+              autoCapitalize="characters"
+              className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm uppercase text-[var(--ink)]"
+            />
+            <button
+              type="button"
+              onClick={applyCoupon}
+              disabled={!couponInput.trim() || couponChecking}
+              className="shrink-0 rounded-md border border-[var(--line-strong)] bg-white px-4 py-3 text-sm font-medium text-[var(--ink)] disabled:opacity-50"
+            >
+              {couponChecking ? reserveMessages.couponChecking : reserveMessages.couponApply}
+            </button>
+          </div>
+        )}
+        {couponError ? <p className="mt-1 text-xs text-rose-700">{couponError}</p> : null}
+      </div>
+
       <div className="mt-5 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
         <div className="flex items-center justify-between text-sm text-[var(--ink-mid)]">
           <span>{reserveMessages.quoteDays(quote.days)}</span>
@@ -933,13 +1017,19 @@ export function PublicBookingPanel({
                   {formatCurrency(quote.listBaseAmount, locale)}
                 </span>
               ) : null}
-              {formatCurrency(quote.baseAmount, locale)}
+              {formatCurrency(Math.round((quote.baseAmount + quote.couponAmount) * 100) / 100, locale)}
             </span>
           </div>
           {quote.isWeeklyRateApplied ? (
             <div className="flex items-center justify-between text-[var(--ok-fg)]">
               <span>{reserveMessages.quoteWeeklyDiscount(weeklyDiscountPercent)}</span>
               <span>-{formatCurrency(quote.discountAmount, locale)}</span>
+            </div>
+          ) : null}
+          {appliedCoupon && quote.couponAmount > 0 ? (
+            <div className="flex items-center justify-between text-[var(--ok-fg)]">
+              <span>{reserveMessages.couponLine(appliedCoupon.code)}</span>
+              <span>-{formatCurrency(quote.couponAmount, locale)}</span>
             </div>
           ) : null}
           {quote.insuranceAmount > 0 ? (

@@ -58,6 +58,8 @@ export function DirectBookingTabs({
       "emailSaved",
       "agreementSaved",
       "agreementError",
+      "couponCreated",
+      "couponError",
     ]) {
       params.delete(key);
     }

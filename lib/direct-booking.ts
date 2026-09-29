@@ -1,6 +1,7 @@
 import { OrderStatus, type Order } from "@prisma/client";
 
 import { getEffectiveDailyRate, isWeeklyRateApplied, type TaxLine } from "@/lib/booking-policy";
+import { computeCouponAmount, type CouponDiscount } from "@/lib/booking-coupons";
 import { getChargedDays, utcToZonedDate } from "@/lib/booking-time";
 import { orderRangesOverlap } from "@/lib/orders";
 
@@ -125,6 +126,8 @@ export function getDirectBookingQuote(input: {
   pickupTime?: string | null;
   returnTime?: string | null;
   graceMinutes?: number | null;
+  /** A single-use code the renter applied; comes off the rent. */
+  coupon?: CouponDiscount | null;
 }) {
   const days =
     input.pickupTime && input.returnTime
@@ -153,8 +156,12 @@ export function getDirectBookingQuote(input: {
   // that adds it into a total keeps working. What the discount adds is
   // the two figures a renter needs to see it happened.
   const listBaseAmount = roundMoney(schedule.reduce((sum, day) => sum + day.rate, 0));
-  const baseAmount = roundMoney(listBaseAmount * discountFactor);
-  const discountAmount = roundMoney(listBaseAmount - baseAmount);
+  const rentAfterWeekly = roundMoney(listBaseAmount * discountFactor);
+  const discountAmount = roundMoney(listBaseAmount - rentAfterWeekly);
+  // The coupon after the weekly rate, on the rent alone; tax below is
+  // charged on what remains.
+  const couponAmount = computeCouponAmount(rentAfterWeekly, input.coupon);
+  const baseAmount = roundMoney(rentAfterWeekly - couponAmount);
   // Not an add-on. A car with an insurance fee is not rentable without
   // it, so the fee is part of the price whenever it is set -- there is
   // no flag a renter, or an edited form, can use to leave it off.
@@ -175,6 +182,7 @@ export function getDirectBookingQuote(input: {
     baseAmount,
     listBaseAmount,
     discountAmount,
+    couponAmount,
     effectiveDailyRate,
     schedule,
     hasOverriddenDays: schedule.some((day) => day.isOverridden),
@@ -390,11 +398,17 @@ export function getDirectBookingInstalmentPlan(input: {
   pickupTime?: string | null;
   returnTime?: string | null;
   graceMinutes?: number | null;
+  coupon?: CouponDiscount | null;
 }): BookingInstalmentPlan {
   const quote = getDirectBookingQuote(input);
   const days = quote.days;
+  // The weekly rate spreads over every period; the coupon, being one
+  // amount, comes off the first period's rent (and is capped by it).
   const discountFactor =
-    quote.listBaseAmount > 0 ? quote.baseAmount / quote.listBaseAmount : 1;
+    quote.listBaseAmount > 0
+      ? (quote.baseAmount + quote.couponAmount) / quote.listBaseAmount
+      : 1;
+  let couponLeft = quote.couponAmount;
   let dayOffset = 0;
 
   const single: BookingInstalmentPlan = {
@@ -431,7 +445,10 @@ export function getDirectBookingInstalmentPlan(input: {
     // The discount follows the whole booking's length, not the
     // period's -- otherwise a 5-day tail period would quietly lose the
     // weekly rate the renter was quoted.
-    const rentAmount = roundMoney(periodList * discountFactor);
+    const periodRent = roundMoney(periodList * discountFactor);
+    const periodCoupon = Math.min(couponLeft, periodRent);
+    couponLeft = roundMoney(couponLeft - periodCoupon);
+    const rentAmount = roundMoney(periodRent - periodCoupon);
     const insuranceAmount = roundMoney(periodDays * insurancePerDay);
     // Collection and return happen once, at the start and the end, so
     // the fee is charged with the first period rather than spread --

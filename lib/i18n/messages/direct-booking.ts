@@ -6,6 +6,39 @@
  */
 export const directBookingMessages = {
   en: {
+    directBookingCoupons: {
+      kicker: "Coupons",
+      title: "Single-use discount codes",
+      copy:
+        "Generate a code and give it to a renter. It takes a percentage or a fixed amount off the rent (tax is then charged on the discounted rent; insurance and the deposit are not discounted) and stops working once a booking with it is paid.",
+      kindLabel: "Discount",
+      kindPercent: "% off the rent",
+      kindAmount: "$ off the rent",
+      valueLabel: "Amount",
+      expiresLabel: "Expires (optional)",
+      noteLabel: "Note (optional)",
+      notePlaceholder: "e.g. for returning guest Wang",
+      generate: "Generate code",
+      hint: "A code in checkout is held for 30 minutes so two renters cannot use it at once; an unpaid checkout lets it go.",
+      created: "New code:",
+      copy_: "Copy",
+      copied: "Copied",
+      invalid: "Enter a discount above zero (a percentage at most 100).",
+      colCode: "Code",
+      colDiscount: "Discount",
+      colState: "Status",
+      colExpires: "Expires",
+      colNote: "Note",
+      states: {
+        available: "Unused",
+        reserved: "In a checkout",
+        redeemed: "Used",
+        expired: "Expired",
+        voided: "Withdrawn",
+      },
+      viewOrder: "order",
+      void: "Withdraw",
+    },
     directBookingTuroImport: {
       title: "Import photos from Turo",
       steps: [
@@ -271,6 +304,38 @@ export const directBookingMessages = {
     },
   },
   zh: {
+    directBookingCoupons: {
+      kicker: "优惠码",
+      title: "一次性折扣码",
+      copy: "生成一个码发给租客。按百分比或固定金额扣租金（税按折后租金计算，保险和押金不打折），用这个码的订单付款成功后，码即作废。",
+      kindLabel: "折扣方式",
+      kindPercent: "租金打折 %",
+      kindAmount: "租金减 $",
+      valueLabel: "数值",
+      expiresLabel: "过期日期（可选）",
+      noteLabel: "备注（可选）",
+      notePlaceholder: "例如：给老客户王先生",
+      generate: "生成优惠码",
+      hint: "结账中的码会锁定 30 分钟，防止两位租客同时使用；没付款就会自动放开。",
+      created: "新优惠码：",
+      copy_: "复制",
+      copied: "已复制",
+      invalid: "请输入大于 0 的折扣（百分比不超过 100）。",
+      colCode: "优惠码",
+      colDiscount: "折扣",
+      colState: "状态",
+      colExpires: "过期",
+      colNote: "备注",
+      states: {
+        available: "未使用",
+        reserved: "结账中",
+        redeemed: "已使用",
+        expired: "已过期",
+        voided: "已作废",
+      },
+      viewOrder: "订单",
+      void: "作废",
+    },
     directBookingTuroImport: {
       title: "从 Turo 导入图片",
       steps: [

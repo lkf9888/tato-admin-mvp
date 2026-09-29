@@ -2,6 +2,38 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const directBookingMessages = {
+    directBookingCoupons: {
+      kicker: "優惠碼",
+      title: "一次性折扣碼",
+      copy: "生成一個碼發給租客。按百分比或固定金額扣租金（稅按折後租金計算，保險和押金不打折），用這個碼的訂單付款成功後，碼即作廢。",
+      kindLabel: "折扣方式",
+      kindPercent: "租金打折 %",
+      kindAmount: "租金減 $",
+      valueLabel: "數值",
+      expiresLabel: "過期日期（可選）",
+      noteLabel: "備註（可選）",
+      notePlaceholder: "例如：給老客戶王先生",
+      generate: "生成優惠碼",
+      hint: "結帳中的碼會鎖定 30 分鐘，防止兩位租客同時使用；沒付款就會自動放開。",
+      created: "新優惠碼：",
+      copy_: "複製",
+      copied: "已複製",
+      invalid: "請輸入大於 0 的折扣（百分比不超過 100）。",
+      colCode: "優惠碼",
+      colDiscount: "折扣",
+      colState: "狀態",
+      colExpires: "過期",
+      colNote: "備註",
+      states: {
+        available: "未使用",
+        reserved: "結帳中",
+        redeemed: "已使用",
+        expired: "已過期",
+        voided: "已作廢",
+      },
+      viewOrder: "訂單",
+      void: "作廢",
+    },
     directBookingTuroImport: {
       title: "從 Turo 匯入圖片",
       steps: [

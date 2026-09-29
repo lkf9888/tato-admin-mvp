@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.12.0 - 2026-09-29
+
+### Single-use coupon codes
+
+The pricing rules tab gains Coupons: choose a percentage or a fixed
+amount off the rent, optionally an expiry date and a note, and TATO
+generates a random code (`SPE-7K2Q9M`, prefixed with the workspace's
+first letters, no 0/O/1/I/L). The list shows each code as unused, in a
+checkout, used (linking to the order), expired or withdrawn; unused
+codes can be withdrawn. Codes live in `BookingCoupon`, keyed by
+workspace without a relation.
+
+A renter applies a code on the booking panel (case and spaces are
+forgiven); it is checked first (`/api/direct-booking/coupons/check`,
+wrong guesses rate-limited per IP) and then priced in. The coupon comes
+off the rent after the weekly rate; tax is charged on what is left, and
+insurance, fees and the deposit are never discounted. On an instalment
+plan it comes off the first period. Checkout checks again and holds the
+code for 30 minutes — a conditional write, so two renters cannot hold
+it at once — and a Stripe session with a code expires in the same 30
+minutes; if creating the session fails the hold is released. The
+payment webhook marks the code used on the order it paid for, and
+re-prices instalments with it. The Stripe rent line names the code and
+the amount taken off; the platform's commission is on the discounted
+rent.
+
+Fixed: the Stripe rent line was meant to carry the pickup and return
+times from v1.10.0 but still showed dates only.
+
 ## v1.11.0 - 2026-09-29
 
 ### Change requests join direct booking, cars list their features, and Turo photos import by bookmark

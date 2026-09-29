@@ -10,6 +10,8 @@ import {
 } from "@/lib/direct-booking";
 import { mintRenterToken } from "@/lib/booking-access";
 import { isBookingTime, zonedDateTimeToUtc } from "@/lib/booking-time";
+import { isCouponKind, type CouponDiscount } from "@/lib/booking-coupons";
+import { redeemCoupon } from "@/lib/booking-coupons-server";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import {
@@ -48,6 +50,10 @@ type DirectBookingMetadata = {
   taxAmount?: string;
   /** JSON `[{ name, rate, amount }]`, one entry per tax. */
   taxLines?: string;
+  couponCode?: string;
+  couponKind?: string;
+  couponValue?: string;
+  couponAmount?: string;
   /** The insurance rate charged per day (BC or non-BC licence). */
   insuranceDailyRate?: string;
   hasLocalLicence?: string;
@@ -156,6 +162,8 @@ async function writeInstalmentSchedule(input: {
   returnTime: string | null;
   /** Per day as charged; null re-derives from the policy. */
   insuranceDailyRate: number | null;
+  /** The code the renter used, so the schedule prices as checkout did. */
+  coupon: CouponDiscount | null;
   /** Charged once, with the first period. */
   locationFeeAmount: number;
   chargedAmount: number | null;
@@ -188,6 +196,7 @@ async function writeInstalmentSchedule(input: {
     pickupTime: input.pickupTime,
     returnTime: input.returnTime,
     graceMinutes: policy.returnGraceMinutes,
+    coupon: input.coupon,
     // Split across the two legs only so the quote adds them back up;
     // the plan puts the whole thing on period one either way.
     pickupLocationFee: input.locationFeeAmount,
@@ -316,6 +325,10 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
     metadata.insuranceDailyRate && Number.isFinite(Number(metadata.insuranceDailyRate))
       ? Number(metadata.insuranceDailyRate)
       : null;
+  const usedCoupon: CouponDiscount | null =
+    metadata.couponCode && isCouponKind(metadata.couponKind) && Number(metadata.couponValue) > 0
+      ? { code: metadata.couponCode, kind: metadata.couponKind, value: Number(metadata.couponValue) }
+      : null;
   const pickupTime = isBookingTime(metadata.pickupTime) ? metadata.pickupTime : null;
   const returnTime = isBookingTime(metadata.returnTime) ? metadata.returnTime : null;
   const pickupAt =
@@ -393,6 +406,8 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
         hasLocalLicence:
           metadata.hasLocalLicence === "yes" ? true : metadata.hasLocalLicence === "no" ? false : null,
         insuranceDailyRate: chargedInsuranceRate,
+        couponCode: usedCoupon?.code ?? null,
+        couponAmount: metadata.couponAmount ? Number(metadata.couponAmount) : null,
         bookedDays: metadata.bookedDays ? Number(metadata.bookedDays) : null,
         taxName: metadata.taxName || null,
         taxRate: metadata.taxRate ? Number(metadata.taxRate) : null,
@@ -444,8 +459,19 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       pickupTime,
       returnTime,
       insuranceDailyRate: chargedInsuranceRate,
+      coupon: usedCoupon,
       locationFeeAmount: metadata.locationFeeAmount ? Number(metadata.locationFeeAmount) : 0,
       chargedAmount,
+    });
+  }
+
+  // The code is spent the moment the booking it discounted is paid.
+  if (usedCoupon) {
+    await redeemCoupon({
+      workspaceId: vehicle.workspaceId,
+      code: usedCoupon.code,
+      sessionId: session.id,
+      orderId: order.id,
     });
   }
 

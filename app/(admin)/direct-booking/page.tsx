@@ -20,6 +20,7 @@ import {
 } from "@/components/direct-booking-nav";
 import { DirectBookingTabs } from "@/components/direct-booking-tabs";
 import { AgreementClausesEditor } from "@/components/agreement-clauses-editor";
+import { BookingCouponsPanel } from "@/components/booking-coupons-panel";
 import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { parseVehicleFeatures } from "@/lib/vehicle-features";
 import { StickySaveBar } from "@/components/sticky-save-bar";
@@ -41,6 +42,8 @@ export default async function DirectBookingPage({
     tab?: string;
     agreementSaved?: string;
     agreementError?: string;
+    couponCreated?: string;
+    couponError?: string;
     emailSaved?: string;
     policySaved?: string;
     locationsSaved?: string;
@@ -60,6 +63,7 @@ export default async function DirectBookingPage({
     rentalSite,
     agreement,
     pendingRequests,
+    coupons,
     vehicles,
   ] = await Promise.all([
     searchParams,
@@ -75,6 +79,11 @@ export default async function DirectBookingPage({
     }),
     getWorkspaceAgreementClauses(workspace.id),
     prisma.bookingChangeRequest.count({ where: { workspaceId: workspace.id, status: "PENDING" } }),
+    prisma.bookingCoupon.findMany({
+      where: { workspaceId: workspace.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
       include: {
@@ -393,6 +402,12 @@ export default async function DirectBookingPage({
         ) : null}
       </section>
 
+      <BookingCouponsPanel
+        locale={locale}
+        coupons={coupons}
+        createdCode={query.couponCreated ?? null}
+        error={query.couponError ?? null}
+      />
     </>
   );
 

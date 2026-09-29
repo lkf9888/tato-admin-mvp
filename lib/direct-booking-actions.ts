@@ -8,6 +8,8 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { normalizeAgreementClauses } from "@/lib/rental-agreement-clauses";
+import { createCoupon } from "@/lib/booking-coupons-server";
+import { zonedDateTimeToUtc } from "@/lib/booking-time";
 import { VEHICLE_FEATURES } from "@/lib/vehicle-features";
 
 /**
@@ -158,4 +160,81 @@ export async function resetAgreementClausesAction() {
   revalidatePath("/reserve/[vehicleId]", "page");
   revalidatePath("/s/[slug]", "layout");
   redirect("/direct-booking?tab=agreement&agreementSaved=1");
+}
+
+const couponFormSchema = z.object({
+  kind: z.enum(["percent", "amount"]),
+  value: z.coerce.number().finite().positive(),
+  expiresOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .or(z.literal("")),
+  note: z.string().trim().max(120).optional(),
+});
+
+/**
+ * Generate a single-use coupon. The code is random, so an operator
+ * never has to invent one, and prefixed with the workspace's first
+ * letters so a renter can tell whose it is.
+ */
+export async function createCouponAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+  const parsed = couponFormSchema.safeParse({
+    kind: formData.get("kind"),
+    value: formData.get("value"),
+    expiresOn: formData.get("expiresOn")?.toString() ?? "",
+    note: formData.get("note")?.toString() ?? "",
+  });
+  if (!parsed.success || (parsed.data.kind === "percent" && parsed.data.value > 100)) {
+    redirect("/direct-booking?tab=rules&couponError=invalid#coupons");
+  }
+  const { kind, value, expiresOn, note } = parsed.data;
+  // The end of the chosen day in Vancouver, so "expires on the 31st"
+  // still works on the 31st.
+  const expiresAt = expiresOn ? zonedDateTimeToUtc(expiresOn, "23:59") : null;
+  const prefix =
+    (workspace.name ?? "").replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "TATO";
+
+  const coupon = await createCoupon({
+    workspaceId: workspace.id,
+    kind,
+    value: Math.round(value * 100) / 100,
+    expiresAt,
+    note: note || null,
+    createdBy: user.name,
+    prefix,
+  });
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "booking_coupon_created",
+    entityType: "BookingCoupon",
+    entityId: coupon.id,
+    metadata: { code: coupon.code, kind, value: coupon.value, expiresAt },
+  });
+  revalidatePath("/direct-booking");
+  redirect(`/direct-booking?tab=rules&couponCreated=${encodeURIComponent(coupon.code)}#coupons`);
+}
+
+/** Withdraw an unused code; a used one is history and stays as it is. */
+export async function voidCouponAction(formData: FormData) {
+  const { workspace, user } = await requireCurrentAdminContext();
+  const id = formData.get("id")?.toString() ?? "";
+  const result = await prisma.bookingCoupon.updateMany({
+    where: { id, workspaceId: workspace.id, redeemedAt: null, voidedAt: null },
+    data: { voidedAt: new Date(), reservedSessionId: null, reservedUntil: null },
+  });
+  if (result.count > 0) {
+    await logActivity({
+      workspaceId: workspace.id,
+      actor: user.name,
+      action: "booking_coupon_voided",
+      entityType: "BookingCoupon",
+      entityId: id,
+      metadata: {},
+    });
+  }
+  revalidatePath("/direct-booking");
+  redirect("/direct-booking?tab=rules#coupons");
 }

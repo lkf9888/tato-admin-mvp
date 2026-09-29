@@ -344,4 +344,94 @@ export async function sendDepositSettlementEmail(input: {
   }
 }
 
+/**
+ * The bill for a trip that ran longer than was paid for -- a late
+ * return, an early pickup. Either a receipt (the saved card was
+ * charged) or a request with a payment link (no saved card, or the
+ * bank asked the renter to confirm). Fixed wording, like the deposit
+ * email: it is a statement of money, and every line of it is arithmetic.
+ *
+ * Never throws: when this runs the charge has already been made or the
+ * link already exists.
+ */
+export async function sendExtraChargeEmail(input: {
+  workspaceId: string;
+  order: Pick<Order, "id" | "renterName" | "pickupDatetime" | "returnDatetime">;
+  vehicle: Pick<Vehicle, "brand" | "model" | "year">;
+  renterEmail: string | null;
+  extraDays: number;
+  lines: Array<{ label: string; amount: number }>;
+  total: number;
+  status: "charged" | "pay_link";
+  payUrl?: string | null;
+}): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const to = input.renterEmail?.trim();
+    if (!to) return { ok: false, reason: "NO_RENTER_EMAIL" };
+
+    const [site, workspace] = await Promise.all([
+      prisma.rentalSite.findUnique({ where: { workspaceId: input.workspaceId } }),
+      prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
+    ]);
+    const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
+    const money = (value: number) => formatCurrency(value, "en");
+    const car = `${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`;
+    const when = (value: Date) => `${utcToZonedDate(value)} ${utcToZonedTime(value)}`;
+
+    const text = [
+      `Hi ${input.order.renterName},`,
+      "",
+      `Your trip in the ${car} now runs from ${when(input.order.pickupDatetime)} to ${when(input.order.returnDatetime)} (Vancouver time), ${input.extraDays} day(s) longer than the booking you paid for.`,
+      "",
+      ...input.lines.map((line) => `${line.label}: ${money(line.amount)}`),
+      `Total: ${money(input.total)}`,
+      "",
+      input.status === "charged"
+        ? "This amount has been charged to the card you booked with, as the rental agreement provides."
+        : `Please pay this amount here: ${input.payUrl ?? ""}`,
+      "",
+      `Booking reference: ${bookingReference(input.order.id)}`,
+      site?.contactPhone || site?.contactEmail
+        ? `Questions? ${[site?.contactPhone, site?.contactEmail].filter(Boolean).join(" · ")}`
+        : null,
+      "",
+      brandName,
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n");
+
+    const result = await sendMail({
+      to,
+      subject:
+        input.status === "charged"
+          ? `${brandName} — receipt for your extended trip (${bookingReference(input.order.id)})`
+          : `${brandName} — payment due for your extended trip (${bookingReference(input.order.id)})`,
+      text,
+      html: toHtmlBody(text),
+      replyTo: site?.contactEmail?.trim() || undefined,
+      from: formatSiteSender(site),
+    });
+
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: result.ok ? "extra_charge_email_sent" : "extra_charge_email_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { to, status: input.status, total: input.total, reason: result.reason ?? null },
+    });
+    return result;
+  } catch (error) {
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "extra_charge_email_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => undefined);
+    return { ok: false, reason: "SEND_FAILED" };
+  }
+}
+
 export { DIRECT_BOOKING_EMAIL_VARIABLES };

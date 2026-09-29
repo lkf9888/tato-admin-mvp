@@ -1,5 +1,44 @@
 # Changelog
 
+## v1.15.0 - 2026-09-29
+
+### Extra days are billed after a trip's times move
+
+A late return or an early pickup is still recorded by moving the
+order's times. `lib/booking-extra-charge.ts` then compares the charged
+days the order now spans (with the return grace) against what was paid
+(`bookedDays` plus earlier extra charges, pending links included, so
+the same days are never billed twice). It prices the difference at the
+car's own rates, taken as the trip's last days with the trip's weekly
+rate, plus the booking's insurance rate, per-day extras and GST/PST
+(`computeTaxes`, now exported). Per-booking extras are not repeated.
+
+`BookingExtraChargePanel` (self-contained, for any order view) shows
+the bill, and the operator confirms it. Nothing is charged by moving a
+bar. With a saved card it charges off-session, as a destination charge
+with the usual 5% commission + Stripe fee, and emails a receipt. If the
+card is missing, declined or needs the renter's confirmation, it
+creates a Stripe payment link and emails that instead. A paid charge
+adds an `OrderPayment`, raises `totalPrice` and resyncs the owner
+ledger. The webhook routes `kind: booking_extra_charge` sessions to
+the extra charge rather than reading them as new bookings.
+
+Checkout now creates a Stripe customer and saves the card for later
+charges (`setup_future_usage: off_session`), which the rental
+agreement's payment clause authorises. The webhook records
+`stripeCustomerId` and `stripePaymentMethodId` on the order. Bookings
+made before this have no saved card and are billed by link.
+
+Mounting the panel in the calendar order popup and on the order page
+is 运营's, and has been requested.
+
+### Direct booking: cars on sale first, archived cars gone
+
+The fleet table lists cars that are on sale first, whatever the chosen
+sort. Archived cars are no longer listed at all, and the "Archived"
+filter is gone. The public booking page, checkout and the coupon check
+now refuse an archived car even if its booking switch was left on.
+
 ## v1.14.0 - 2026-09-29
 
 ### Prices across many cars and days, from the calendar

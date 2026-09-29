@@ -26,7 +26,7 @@ import {
   buildRentalAgreementValues,
   createRentalAgreementEnvelope,
 } from "@/lib/rental-agreement";
-import { getAppUrl } from "@/lib/stripe";
+import { getAppUrl, getStripeClient } from "@/lib/stripe";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { refundDirectBookingCharge } from "@/lib/stripe-refunds";
@@ -387,6 +387,28 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       : chargedAmount;
   const depositAmount = metadata.depositAmount ? Number(metadata.depositAmount) : null;
 
+  // The saved card, for a later charge (a late return, an early
+  // pickup). Looked up rather than required: an older session saved
+  // none, and a lookup failure must not lose a paid booking.
+  const paymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id ?? null;
+  const stripeCustomerId =
+    typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
+  let stripePaymentMethodId: string | null = null;
+  if (paymentIntentId && stripeCustomerId) {
+    try {
+      const intent = await getStripeClient().paymentIntents.retrieve(paymentIntentId);
+      stripePaymentMethodId =
+        typeof intent.payment_method === "string"
+          ? intent.payment_method
+          : intent.payment_method?.id ?? null;
+    } catch {
+      stripePaymentMethodId = null;
+    }
+  }
+
   const order = await prisma.order.create({
     data: {
       workspaceId: vehicle.workspaceId,
@@ -421,10 +443,9 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       sourceMetadata: JSON.stringify({
         channel: "direct-booking",
         stripeCheckoutSessionId: session.id,
-        stripePaymentIntent:
-          typeof session.payment_intent === "string"
-            ? session.payment_intent
-            : session.payment_intent?.id ?? null,
+        stripePaymentIntent: paymentIntentId,
+        stripeCustomerId,
+        stripePaymentMethodId,
         renterEmail: renterEmail ?? null,
         includeInsurance: metadata.includeInsurance === "true",
         hasLocalLicence:

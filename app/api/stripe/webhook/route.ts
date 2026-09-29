@@ -6,9 +6,24 @@ import {
   syncWorkspaceBillingFromStripeSubscription,
   syncWorkspaceBillingFromSubscriptionId,
 } from "@/lib/billing";
+import type Stripe from "stripe";
+
+import { completeExtraChargeFromSession } from "@/lib/booking-extra-charge";
 import { persistDirectBookingFromCheckoutSession } from "@/lib/direct-booking-server";
 import { getStripeClient, getStripeWebhookSecret } from "@/lib/stripe";
 import { detachConnectAccountById, syncWorkspaceConnectFromAccount } from "@/lib/stripe-connect";
+
+/**
+ * A paid one-off checkout: a new booking, or a payment link for extra
+ * days on one that exists -- which must never be read as a new order.
+ */
+async function handlePaidCheckoutSession(session: Stripe.Checkout.Session) {
+  if (session.metadata?.kind === "booking_extra_charge") {
+    await completeExtraChargeFromSession(session);
+    return;
+  }
+  await persistDirectBookingFromCheckoutSession(session);
+}
 
 export async function POST(request: Request) {
   const webhookSecret = getStripeWebhookSecret();
@@ -37,14 +52,14 @@ export async function POST(request: Request) {
               : session.subscription.id;
           await syncWorkspaceBillingFromSubscriptionId(subscriptionId);
         } else if (session.mode === "payment") {
-          await persistDirectBookingFromCheckoutSession(session);
+          await handlePaidCheckoutSession(session);
         }
         break;
       }
       case "checkout.session.async_payment_succeeded": {
         const session = event.data.object;
         if (session.mode === "payment") {
-          await persistDirectBookingFromCheckoutSession(session);
+          await handlePaidCheckoutSession(session);
         }
         break;
       }

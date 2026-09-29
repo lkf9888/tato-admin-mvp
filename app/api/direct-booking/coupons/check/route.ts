@@ -32,9 +32,9 @@ export async function POST(request: Request) {
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: parsed.data.vehicleId },
-    select: { workspaceId: true, directBookingEnabled: true },
+    select: { workspaceId: true, directBookingEnabled: true, isArchived: true },
   });
-  if (!vehicle?.workspaceId || !vehicle.directBookingEnabled) {
+  if (!vehicle?.workspaceId || vehicle.isArchived || !vehicle.directBookingEnabled) {
     return NextResponse.json({ ok: false, reason: "not_found" }, { status: 404 });
   }
 

@@ -164,7 +164,8 @@ export default async function DirectBookingPage({
     km: fleetPolicy.dailyKmAllowance,
     extraKm: fleetPolicy.extraKmRate,
   };
-  const fleetRows: FleetRow[] = vehicles.map((vehicle) => {
+  // Archived cars are off the fleet: not listed here, not bookable.
+  const fleetRows: FleetRow[] = activeVehicles.map((vehicle) => {
     const rate = rates.get(vehicle.id);
     const windows = getBlockedBookingWindows(vehicle.orders, 4);
     return {

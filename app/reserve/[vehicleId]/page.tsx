@@ -124,7 +124,14 @@ export default async function ReserveVehiclePage({
     ? resolveVehicleDailyRate(vehicle, await getBookingPolicyForVehicle(vehicle))
     : null;
 
-  if (!vehicle || !vehicle.directBookingEnabled || !rate || !isVehicleBookable(rate)) {
+  // An archived car is off the fleet, whatever its booking switch says.
+  if (
+    !vehicle ||
+    vehicle.isArchived ||
+    !vehicle.directBookingEnabled ||
+    !rate ||
+    !isVehicleBookable(rate)
+  ) {
     return (
       <main className="min-h-screen bg-[var(--page)] px-4 py-8 sm:px-6">
         <div className="mx-auto max-w-4xl rounded-lg border border-[var(--line)] bg-[rgba(255,255,255,0.92)] p-10 shadow-[0_30px_90px_rgba(17,19,24,0.08)]">

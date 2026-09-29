@@ -525,7 +525,7 @@ export type TaxAmount = TaxLine & { amount: number };
  * Each tax on the rent, rounded on its own -- the way each is filed --
  * so the lines a renter sees add up to the total they are charged.
  */
-function computeTaxes(
+export function computeTaxes(
   rent: number,
   input: { taxLines?: TaxLine[] | null; bookingTaxRate?: number | null },
 ): TaxAmount[] {
@@ -540,7 +540,7 @@ function computeTaxes(
     .map((line) => ({ ...line, amount: roundMoney(rent * (line.rate / 100)) }));
 }
 
-function sumTaxes(taxes: TaxAmount[]) {
+export function sumTaxes(taxes: TaxAmount[]) {
   return roundMoney(taxes.reduce((sum, tax) => sum + tax.amount, 0));
 }
 

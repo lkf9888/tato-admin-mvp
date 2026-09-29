@@ -230,7 +230,7 @@ export async function POST(request: Request) {
       },
     });
 
-    if (!vehicle || !vehicle.directBookingEnabled) {
+    if (!vehicle || vehicle.isArchived || !vehicle.directBookingEnabled) {
       return NextResponse.json({ error: "This vehicle is not bookable right now." }, { status: 400 });
     }
 
@@ -580,6 +580,11 @@ export async function POST(request: Request) {
       success_url: successUrl,
       cancel_url: cancelUrl,
       customer_email: parsed.renterEmail,
+      // A customer holding the card, so a late return or an early
+      // pickup can be charged afterwards -- the rental agreement's
+      // payment clause authorises it, and Checkout tells the renter
+      // the card is kept for that.
+      customer_creation: "always",
       // Destination charge with on_behalf_of:
       //   - Funds settle on the host's Connect account.
       //   - Renter's card statement shows the host's business name (because
@@ -590,6 +595,7 @@ export async function POST(request: Request) {
         on_behalf_of: connectSnapshot.accountId!,
         transfer_data: { destination: connectSnapshot.accountId! },
         application_fee_amount: applicationFeeAmount > 0 ? applicationFeeAmount : undefined,
+        setup_future_usage: "off_session",
         // Read back by refunds, which return the commission share only.
         metadata: {
           tato_platform_commission_cents: String(platformFee.commission),

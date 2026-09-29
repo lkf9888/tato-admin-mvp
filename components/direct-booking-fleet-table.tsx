@@ -54,11 +54,11 @@ export type FleetDefaults = {
   extraKm: number;
 };
 
-type Filter = "all" | "live" | "draft" | "manual" | "ai" | "noPhotos" | "overrides" | "archived";
+type Filter = "all" | "live" | "draft" | "manual" | "ai" | "noPhotos" | "overrides";
 type Sort = "plate" | "model" | "priceAsc" | "priceDesc" | "nextBusy";
 type BulkField = "bookingDepositAmount" | "bookingInsuranceFee" | "bookingTaxRate" | "bookingDailyRate";
 
-const FILTERS: Filter[] = ["all", "live", "draft", "manual", "ai", "noPhotos", "overrides", "archived"];
+const FILTERS: Filter[] = ["all", "live", "draft", "manual", "ai", "noPhotos", "overrides"];
 const SORTS: Sort[] = ["plate", "model", "priceAsc", "priceDesc", "nextBusy"];
 
 function effectiveRate(row: FleetRow) {
@@ -172,14 +172,13 @@ export function DirectBookingFleetTable({
       ai: active.filter((row) => row.dailyRate == null && row.aiRate != null).length,
       noPhotos: active.filter((row) => row.photoCount === 0).length,
       overrides: active.filter(hasOverrides).length,
-      archived: rows.length - active.length,
     } satisfies Record<Filter, number>;
   }, [rows]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const matches = rows.filter((row) => {
-      if (filter === "archived" ? !row.isArchived : row.isArchived) return false;
+      if (row.isArchived) return false;
       if (filter === "live" && !isLive(row)) return false;
       if (filter === "draft" && isLive(row)) return false;
       if (filter === "manual" && row.dailyRate == null) return false;
@@ -192,7 +191,11 @@ export function DirectBookingFleetTable({
       );
     });
     const price = (row: FleetRow) => effectiveRate(row) ?? -1;
+    // Cars on sale first, whatever the chosen order; that order then
+    // applies within each group.
     return [...matches].sort((left, right) => {
+      const liveFirst = Number(isLive(right)) - Number(isLive(left));
+      if (liveFirst !== 0) return liveFirst;
       switch (sort) {
         case "model":
           return left.title.localeCompare(right.title) || left.plate.localeCompare(right.plate);
@@ -294,7 +297,7 @@ export function DirectBookingFleetTable({
           </span>
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-          {FILTERS.filter((value) => value !== "archived" || counts.archived > 0).map((value) => (
+          {FILTERS.map((value) => (
             <button
               key={value}
               type="button"

@@ -72,3 +72,20 @@ export function guessCsvField(header: string) {
 export function buildCsvHeaderMapping(headers: string[]) {
   return Object.fromEntries(headers.map((header) => [header, guessCsvField(header)]));
 }
+
+/**
+ * The Turo host account a CSV export belongs to, in the form the rest of
+ * the system keys on. Null is the main account.
+ *
+ * Normalised so "Kevin's vehicle", "Kevin" and "kevin" all land on the
+ * account the email parser derives from the same prefix -- if the two
+ * disagree, a co-hosted car stops matching its own mail and nothing says
+ * why. One copy, shared by the upload route and `importTuroCsvText`.
+ */
+export function normalizeTuroAccount(value: string | null | undefined) {
+  const cleaned = (value ?? "")
+    .replace(/'s\s+vehicles?$/i, "")
+    .trim()
+    .toLowerCase();
+  return cleaned || null;
+}

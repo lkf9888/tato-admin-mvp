@@ -4,7 +4,7 @@ import { basename } from "path";
 import { WorkspaceBillingStatus } from "@prisma/client";
 import Papa from "papaparse";
 
-import { buildCsvHeaderMapping } from "@/lib/csv-mapping";
+import { buildCsvHeaderMapping, normalizeTuroAccount } from "@/lib/csv-mapping";
 import {
   estimateImportVehicleImpact,
   importTuroOrders,
@@ -42,9 +42,13 @@ type WorkspaceTuroSyncConfig = {
   archiveMissingOrders: boolean;
 } | null;
 
-export type TuroCsvSyncResult = Awaited<ReturnType<typeof importTuroOrders>> & {
+/** What importing one CSV produced, whoever supplied the text. */
+export type TuroCsvImportResult = Awaited<ReturnType<typeof importTuroOrders>> & {
   fileName: string;
   totalRows: number;
+};
+
+export type TuroCsvSyncResult = TuroCsvImportResult & {
   sourceType: LoadedCsvSource["sourceType"];
   sourceLabel: string;
   archiveStaleMissingOrders: boolean;
@@ -418,6 +422,84 @@ export async function resolveTuroSyncWorkspace(slug = process.env.TURO_SYNC_WORK
   );
 }
 
+/**
+ * Parse, map, check the vehicle limit and import -- the one path every
+ * Turo CSV takes, whether the scheduled sync fetched it or a caller
+ * handed over the text. Mapping follows the workspace's configured
+ * mapping when there is one, exactly as the scheduled sync always has,
+ * so a file cannot import differently depending on how it arrived.
+ */
+async function importCsvContent(input: {
+  workspaceId: string;
+  actor: string;
+  fileName: string;
+  content: string;
+  turoAccount: string | null;
+  createMissingVehicles: boolean;
+  billingBypassActive?: boolean;
+  syncConfig: WorkspaceTuroSyncConfig;
+}): Promise<TuroCsvImportResult> {
+  const { rows, headers } = parseCsvRows(input.content);
+  const mapping = getConfiguredMapping(headers, input.syncConfig);
+
+  await assertTuroSyncWithinBillingLimit({
+    workspaceId: input.workspaceId,
+    mapping,
+    rows,
+    createMissingVehicles: input.createMissingVehicles,
+    billingBypassActive: input.billingBypassActive,
+  });
+
+  const result = await importTuroOrders({
+    workspaceId: input.workspaceId,
+    fileName: input.fileName,
+    rows,
+    mapping,
+    actor: input.actor,
+    createMissingVehicles: input.createMissingVehicles,
+    turoAccount: input.turoAccount,
+  });
+
+  return { ...result, fileName: input.fileName, totalRows: rows.length };
+}
+
+/**
+ * Import a Turo CSV export handed over as text -- by the agent API, or
+ * anything else that already has the file.
+ *
+ * `turoAccount` is taken raw and normalised here (see
+ * `normalizeTuroAccount`), so a caller cannot store a spelling the email
+ * matcher will not recognise.
+ *
+ * `createMissingVehicles` defaults to FALSE, unlike the scheduled sync:
+ * a caller that forgets it should find unknown plates reported as
+ * failed rows, not new cars in the fleet -- a car is a billing slot and
+ * an owner relationship, and should come from a person.
+ *
+ * Throws `TuroSyncError` (`code`, `status`) as the scheduled sync does:
+ * TURO_SYNC_PARSE_FAILED / TURO_SYNC_EMPTY_CSV (400),
+ * BILLING_LIMIT_EXCEEDED (402).
+ */
+export async function importTuroCsvText(input: {
+  workspaceId: string;
+  actor: string;
+  fileName: string;
+  content: string;
+  turoAccount?: string | null;
+  createMissingVehicles?: boolean;
+}): Promise<TuroCsvImportResult> {
+  const syncConfig = await getWorkspaceTuroSyncConfig(input.workspaceId);
+  return importCsvContent({
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    fileName: input.fileName,
+    content: input.content,
+    turoAccount: normalizeTuroAccount(input.turoAccount),
+    createMissingVehicles: input.createMissingVehicles ?? false,
+    syncConfig,
+  });
+}
+
 export async function runTuroCsvSync(input: {
   workspaceId: string;
   actor: string;
@@ -425,34 +507,26 @@ export async function runTuroCsvSync(input: {
 }) {
   const syncConfig = await getWorkspaceTuroSyncConfig(input.workspaceId);
   const source = await loadConfiguredCsvSource(syncConfig);
-  const { rows, headers } = parseCsvRows(source.content);
-  const mapping = getConfiguredMapping(headers, syncConfig);
   const createMissingVehicles =
     syncConfig?.createMissingVehicles ??
     parseBooleanEnv(process.env.TURO_SYNC_CREATE_MISSING_VEHICLES, true);
   const archiveStaleMissingOrders = false;
 
-  await assertTuroSyncWithinBillingLimit({
+  const result = await importCsvContent({
     workspaceId: input.workspaceId,
-    mapping,
-    rows,
+    actor: input.actor,
+    fileName: source.fileName,
+    content: source.content,
+    // The configured export is the main account's; co-hosted accounts
+    // arrive by upload, where the operator names the account.
+    turoAccount: null,
     createMissingVehicles,
     billingBypassActive: input.billingBypassActive,
-  });
-
-  const result = await importTuroOrders({
-    workspaceId: input.workspaceId,
-    fileName: source.fileName,
-    rows,
-    mapping,
-    actor: input.actor,
-    createMissingVehicles,
+    syncConfig,
   });
 
   return {
     ...result,
-    fileName: source.fileName,
-    totalRows: rows.length,
     sourceType: source.sourceType,
     sourceLabel: source.sourceLabel,
     archiveStaleMissingOrders,

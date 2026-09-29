@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { assertImportWithinBillingLimit } from "@/lib/billing";
+import { normalizeTuroAccount } from "@/lib/csv-mapping";
 import { importTuroOrders } from "@/lib/orders";
 
 const importSchema = z.object({
@@ -18,14 +19,6 @@ const importSchema = z.object({
    *  its own mail and nothing says why. */
   turoAccount: z.string().trim().max(80).nullish(),
 });
-
-function normalizeTuroAccount(value: string | null | undefined) {
-  const cleaned = (value ?? "")
-    .replace(/'s\s+vehicles?$/i, "")
-    .trim()
-    .toLowerCase();
-  return cleaned || null;
-}
 
 export async function POST(request: Request) {
   let context;

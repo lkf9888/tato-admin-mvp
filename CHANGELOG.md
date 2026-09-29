@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.9.3 - 2026-09-29
+
+### A renter can move their pickup later than the dates already chosen
+
+The booking date picker opens with a one-night trip filled in, and the
+pickup calendar struck through every day on or after that trip's
+return date — so a renter wanting any later trip found the whole
+calendar disabled, with no way to clear the return date first. A
+pickup day is now disabled only when the car is booked that day or it
+is in the past. Choosing a pickup after the current return (or one
+that would run a trip through a booking) moves the return to the next
+day, or clears it when that day is taken too.
+
+Fixed with it: "today" was the UTC date, which in Vancouver becomes
+tomorrow at 5 pm, so a same-day booking could not be made in the
+evening. It is now the renter's local date.
+
 ## v1.9.2 - 2026-09-28
 
 ### Hosts pay the Stripe card fee, and can disconnect their payout account

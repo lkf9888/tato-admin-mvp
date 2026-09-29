@@ -65,6 +65,14 @@ function formatDateOnlyValue(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
+/** Today on the renter's own calendar. `toISOString` is UTC, which in
+ *  Vancouver turns into tomorrow at 5 pm and made today unbookable. */
+function localTodayValue() {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 function addUtcDays(value: Date, amount: number) {
   return new Date(value.getTime() + amount * DAY_MS);
 }
@@ -114,7 +122,7 @@ function BookingDatePicker({
 }: BookingDatePickerProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const initialMonth = useMemo(() => {
-    const seededValue = value || minDate || formatDateOnlyValue(new Date());
+    const seededValue = value || minDate || localTodayValue();
     return startOfUtcMonth(parseDateOnly(seededValue) ?? new Date());
   }, [minDate, value]);
 
@@ -279,7 +287,7 @@ export function PublicBookingPanel({
   const messages = getMessages(locale);
   const reserveMessages = messages.reservePage;
   const storageKey = `${STORAGE_PREFIX}${vehicleId}`;
-  const todayDate = useMemo(() => formatDateOnlyValue(new Date()), []);
+  const todayDate = useMemo(() => localTodayValue(), []);
   const blockedDateSet = useMemo(
     () => expandBlockedBookingDates(blockedDateWindows),
     [blockedDateWindows],
@@ -298,16 +306,15 @@ export function PublicBookingPanel({
 
   const isPickupDateDisabled = useCallback(
     (candidate: string) => {
+      // Only the day itself decides. The return date used to fence the
+      // pickup in too -- nothing after it, nothing that clashes with it
+      // -- so with the default one-night trip on screen every later day
+      // was struck through, and a renter could not move their trip
+      // forward at all. Picking a pickup now moves the return instead.
       if (candidate < todayDate) return true;
-      if (blockedDateSet.has(candidate)) return true;
-      if (returnDate && candidate >= returnDate) return true;
-      if (returnDate && hasDateOnlyBookingConflict(blockedDateWindows, candidate, returnDate)) {
-        return true;
-      }
-
-      return false;
+      return blockedDateSet.has(candidate);
     },
-    [blockedDateSet, blockedDateWindows, returnDate, todayDate],
+    [blockedDateSet, todayDate],
   );
 
   const isReturnDateDisabled = useCallback(
@@ -453,9 +460,20 @@ export function PublicBookingPanel({
     setError("");
     setPickupDate(nextValue);
 
-    if (returnDate && hasDateOnlyBookingConflict(blockedDateWindows, nextValue, returnDate)) {
-      setReturnDate("");
+    // Keep the return if it still makes a trip; otherwise offer the
+    // next day, or leave it for the renter to pick when that clashes.
+    if (
+      returnDate &&
+      returnDate > nextValue &&
+      !hasDateOnlyBookingConflict(blockedDateWindows, nextValue, returnDate)
+    ) {
+      return;
     }
+    const picked = parseDateOnly(nextValue);
+    const nextDay = picked ? formatDateOnlyValue(addUtcDays(picked, 1)) : "";
+    setReturnDate(
+      !nextDay || hasDateOnlyBookingConflict(blockedDateWindows, nextValue, nextDay) ? "" : nextDay,
+    );
   }
 
   function handleReturnDateChange(nextValue: string) {

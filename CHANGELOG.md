@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.14.0 - 2026-09-29
+
+### Prices across many cars and days, from the calendar
+
+The calendar now draws prices by default, and only where they mean
+something: on cars open for direct booking (`pricing.rates[id].bookable`),
+on days the car is free at noon. Hand-set days stay bold.
+
+"Adjust prices…" (in the toolbar, and on the bar after picking days on
+a row) opens a side panel in the style of Hostex's and Airbnb's price
+calendars: choose a date range (or keep the scattered days picked on
+the grid), narrow it to weekends (Fri/Sat), weekdays or any weekdays,
+tick any number of cars, and choose a fixed price, up or down by a
+percentage or an amount, or back to the car's own rate. Adjustments
+start from what each day costs now and round to whole dollars. A
+preview lists every car with its day count and old and new price
+range before anything is saved.
+
+Saving sends the exact list the preview shows to the new
+`POST /api/direct-booking/price-overrides` (up to 20,000 changes,
+workspace-checked, written in chunks); the grid patches in place. The
+results are the same `VehiclePriceOverride` rows the booking pages and
+checkout already price from. The bar's inline price box is replaced by
+the panel; the single-car route stays for anything that still uses it.
+
 ## v1.13.0 - 2026-09-29
 
 ### Extras renters can add to a booking

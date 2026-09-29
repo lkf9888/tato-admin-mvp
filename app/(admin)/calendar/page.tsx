@@ -133,7 +133,12 @@ export default async function CalendarPage() {
         rates: Object.fromEntries(
           [...vehicleRates].map(([id, rate]) => [
             id,
-            { baseRate: rate.dailyRate ?? 0, source: rate.source ?? "suggested" },
+            {
+              baseRate: rate.dailyRate ?? 0,
+              source: rate.source ?? "suggested",
+              // Only cars renters can book have a price worth showing.
+              bookable: Boolean(vehicles.find((vehicle) => vehicle.id === id)?.directBookingEnabled),
+            },
           ]),
         ),
       }}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CalendarPricePanel } from "@/components/calendar-price-panel";
 import { type EditableOrder, OrderDetailModal } from "@/components/order-detail-modal";
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
@@ -603,7 +604,7 @@ export function CalendarView({
   pricing?: {
     seasonality: RateSeasonality;
     overrides: Record<string, Record<string, number>>;
-    rates: Record<string, { baseRate: number; source: "manual" | "suggested" }>;
+    rates: Record<string, { baseRate: number; source: "manual" | "suggested"; bookable?: boolean }>;
   };
   readOnly?: boolean;
   maskSensitive?: boolean;
@@ -735,10 +736,12 @@ export function CalendarView({
   } | null>(null);
   // Prices ride on the same gesture as everything else here: pick a
   // stretch of a car's row, then act on it. The toggle only decides
-  // whether the numbers are drawn.
-  const [showPrices, setShowPrices] = useState(false);
-  const [priceDraft, setPriceDraft] = useState("");
-  const [isSavingPrice, setIsSavingPrice] = useState(false);
+  // whether the numbers are drawn; they are on by default, and only
+  // for cars open for direct booking, on the days they are free.
+  const [showPrices, setShowPrices] = useState(true);
+  const [pricePanel, setPricePanel] = useState<{ vehicleIds: string[]; days: string[] } | null>(
+    null,
+  );
   const [priceOverrides, setPriceOverrides] = useState(pricing?.overrides ?? {});
   useEffect(() => {
     setPriceOverrides(pricing?.overrides ?? {});
@@ -776,65 +779,6 @@ export function CalendarView({
   const [bulkSelection, setBulkSelection] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkNotice, setBulkNotice] = useState<string | null>(null);
-  /**
-   * Write the picked days.
-   *
-   * One request per unbroken run, because the selection is a set and
-   * may have holes: picking the 12th, 13th and the 20th must price
-   * three days, not nine. `clear` deletes the rows instead of storing
-   * the inherited number, so a day handed back keeps following the
-   * rate it falls through to.
-   */
-  async function savePickedDayPrices(clear: boolean) {
-    if (!daySelection || daySelection.days.length === 0) return;
-    const value = Number(priceDraft);
-    if (!clear && (!Number.isFinite(value) || value <= 0)) return;
-
-    const sorted = [...daySelection.days].sort();
-    const runs: Array<[string, string]> = [];
-    for (const key of sorted) {
-      const last = runs[runs.length - 1];
-      const dayAfterLast = last
-        ? new Date(new Date(`${last[1]}T12:00:00.000Z`).getTime() + DAY_IN_MS)
-            .toISOString()
-            .slice(0, 10)
-        : null;
-      if (last && dayAfterLast === key) last[1] = key;
-      else runs.push([key, key]);
-    }
-
-    setIsSavingPrice(true);
-    try {
-      for (const [fromDate, toDate] of runs) {
-        const response = await fetch(
-          `/api/vehicles/${daySelection.vehicleId}/price-overrides`,
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ fromDate, toDate, price: clear ? null : value }),
-          },
-        );
-        if (!response.ok) return;
-      }
-
-      // Patched in place rather than reloaded: the grid's scroll
-      // position and loaded chunks are the expensive part of this
-      // page, and a price change has no bearing on either.
-      setPriceOverrides((current) => {
-        const forVehicle = { ...(current[daySelection.vehicleId] ?? {}) };
-        for (const key of daySelection.days) {
-          if (clear) delete forVehicle[key];
-          else forVehicle[key] = value;
-        }
-        return { ...current, [daySelection.vehicleId]: forVehicle };
-      });
-      setPriceDraft("");
-      setShowPrices(true);
-    } finally {
-      setIsSavingPrice(false);
-    }
-  }
-
   const [noteDraft, setNoteDraft] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [notes, setNotes] = useState<CalendarNote[]>([]);
@@ -2127,6 +2071,15 @@ export function CalendarView({
                 {calendarMessages.pricesToggle}
               </button>
             ) : null}
+            {pricing && !readOnly ? (
+              <button
+                type="button"
+                onClick={() => setPricePanel({ vehicleIds: [], days: [] })}
+                className={secondaryActionClass}
+              >
+                {messages.calendarPricePanel.openAction}
+              </button>
+            ) : null}
             {!readOnly ? (
               <button
                 type="button"
@@ -2557,6 +2510,41 @@ export function CalendarView({
         />
       ) : null}
 
+      {pricePanel && pricing ? (
+        <CalendarPricePanel
+          locale={locale}
+          cars={vehicleOptions
+            .filter((vehicle) => pricing.rates[vehicle.id]?.bookable)
+            .map((vehicle) => ({
+              id: vehicle.id,
+              label: vehicle.secondaryLabel || vehicle.label,
+              plateNumber: vehicle.plateNumber || vehicle.label,
+            }))}
+          initialVehicleIds={pricePanel.vehicleIds}
+          initialDays={pricePanel.days}
+          resolveDayPrice={resolveDayPrice}
+          onClose={() => setPricePanel(null)}
+          onSaved={(changes) => {
+            // Patched in place rather than reloaded: the grid's scroll
+            // position and loaded chunks are the expensive part of this
+            // page, and a price change has no bearing on either.
+            setPriceOverrides((current) => {
+              const next = { ...current };
+              for (const change of changes) {
+                const forVehicle = { ...(next[change.vehicleId] ?? {}) };
+                if (change.price == null) delete forVehicle[change.date];
+                else forVehicle[change.date] = change.price;
+                next[change.vehicleId] = forVehicle;
+              }
+              return next;
+            });
+            setShowPrices(true);
+            setPricePanel(null);
+            setDaySelection(null);
+          }}
+        />
+      ) : null}
+
       {/* One bar, two selections. It is fixed rather than in flow so it
           cannot shove the grid down under the cursor mid-gesture. */}
       {!readOnly && (daySelection || (bulkMode && bulkSelection.size > 0) || bulkNotice) ? (
@@ -2587,50 +2575,18 @@ export function CalendarView({
                 </button>
 
                 {pricing ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className="whitespace-nowrap text-[color:var(--ink-soft)]">
-                      {calendarMessages.priceLabel}
-                    </span>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      inputMode="decimal"
-                      value={priceDraft}
-                      onChange={(event) => setPriceDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          void savePickedDayPrices(false);
-                        }
-                      }}
-                      placeholder={String(
-                        Math.round(
-                          resolveDayPrice(daySelection.vehicleId, sortedSelectedDays[0] ?? "")
-                            ?.price ?? 0,
-                        ) || "",
-                      )}
-                      className="h-8 w-20 rounded-md border border-[var(--line)] bg-white px-2 text-[12px] tabular-nums text-[color:var(--ink)] outline-none focus:border-[var(--accent)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void savePickedDayPrices(false)}
-                      disabled={isSavingPrice || !priceDraft.trim()}
-                      className={cn(secondaryActionClass, "h-8")}
-                    >
-                      {isSavingPrice
-                        ? calendarMessages.priceSavingAction
-                        : calendarMessages.priceSetAction}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void savePickedDayPrices(true)}
-                      disabled={isSavingPrice}
-                      className={cn(secondaryActionClass, "h-8")}
-                    >
-                      {calendarMessages.priceClearAction}
-                    </button>
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPricePanel({
+                        vehicleIds: [daySelection.vehicleId],
+                        days: sortedSelectedDays,
+                      })
+                    }
+                    className={cn(secondaryActionClass, "h-8")}
+                  >
+                    {messages.calendarPricePanel.openAction}
+                  </button>
                 ) : null}
 
                 <label className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -2960,11 +2916,23 @@ export function CalendarView({
                           the canvas -- 580 columns times a fleet is the
                           count this grid was rebuilt to avoid. The
                           window is the same one the headers use. */}
-                      {showPrices && pricing
+                      {showPrices && pricing?.rates[vehicle.id]?.bookable
                         ? visibleDays.map(({ date, index }) => {
                             const key = toDayParam(date);
                             const resolved = resolveDayPrice(vehicle.id, key);
                             if (!resolved) return null;
+                            // A price only means something on a day a
+                            // renter could still book: the car is out
+                            // at noon, so the day is taken.
+                            const noon = date.getTime() + 12 * 60 * 60 * 1000;
+                            const taken = orders.some(
+                              (order) =>
+                                order.vehicleId === vehicle.id &&
+                                order.status !== "cancelled" &&
+                                new Date(order.pickupDatetime).getTime() <= noon &&
+                                new Date(order.returnDatetime).getTime() >= noon,
+                            );
+                            if (taken) return null;
                             return (
                               <span
                                 key={`price-${key}`}

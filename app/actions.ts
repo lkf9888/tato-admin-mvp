@@ -2127,14 +2127,22 @@ export async function saveBookingPolicyAction(formData: FormData) {
     extraKmRate: read("extraKmRate", BOOKING_POLICY_DEFAULTS.extraKmRate),
     insuranceFee: read("insuranceFee", BOOKING_POLICY_DEFAULTS.insuranceFee),
     depositAmount: read("depositAmount", BOOKING_POLICY_DEFAULTS.depositAmount),
-    taxName: formData.get("taxName")?.toString() ?? null,
-    taxRate: read("taxRate", BOOKING_POLICY_DEFAULTS.taxRate),
+    // Up to three named taxes (GST, PST, …), each on the rent. Rows
+    // left blank drop out; the single name and rate are derived.
+    taxLines: [0, 1, 2].map((index) => ({
+      name: formData.get(`taxLineName_${index}`)?.toString() ?? "",
+      rate: Number(formData.get(`taxLineRate_${index}`)?.toString() || 0),
+    })),
   });
 
+  const stored = {
+    ...data,
+    taxLines: data.taxLines.length > 0 ? JSON.stringify(data.taxLines) : null,
+  };
   const saved = await prisma.bookingPricingPolicy.upsert({
     where: { workspaceId: workspace.id },
-    update: data,
-    create: { workspaceId: workspace.id, ...data },
+    update: stored,
+    create: { workspaceId: workspace.id, ...stored },
   });
 
   await logActivity({

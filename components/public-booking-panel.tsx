@@ -17,6 +17,7 @@ import {
   hasDateOnlyBookingConflict,
   type DateOnlyBookingWindow,
 } from "@/lib/direct-booking";
+import type { TaxLine } from "@/lib/booking-policy";
 import { getLocaleTag, getMessages, type Locale } from "@/lib/i18n";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -246,6 +247,7 @@ export function PublicBookingPanel({
   bookingDepositAmount,
   bookingTaxName,
   bookingTaxRate,
+  taxLines,
   blockedDateWindows,
   dailyRateOverrides,
   seasonalRates,
@@ -267,6 +269,8 @@ export function PublicBookingPanel({
   bookingDepositAmount: number;
   bookingTaxName: string | null;
   bookingTaxRate: number;
+  /** The taxes one by one; the summary shows a line for each. */
+  taxLines?: TaxLine[];
   blockedDateWindows: DateOnlyBookingWindow[];
   /** `YYYY-MM-DD` → price, for days the operator priced by hand. */
   dailyRateOverrides: Record<string, number>;
@@ -410,12 +414,14 @@ export function PublicBookingPanel({
         bookingInsuranceFee,
         bookingDepositAmount,
         bookingTaxRate,
+        taxLines,
       }),
     [
       bookingDailyRate,
       bookingDepositAmount,
       bookingInsuranceFee,
       bookingTaxRate,
+      taxLines,
       pickupDate,
       returnDate,
       weeklyDiscountPercent,
@@ -440,12 +446,14 @@ export function PublicBookingPanel({
         bookingInsuranceFee,
         bookingDepositAmount,
         bookingTaxRate,
+        taxLines,
       }),
     [
       bookingDailyRate,
       bookingDepositAmount,
       bookingInsuranceFee,
       bookingTaxRate,
+      taxLines,
       pickupDate,
       returnDate,
       weeklyDiscountPercent,
@@ -770,14 +778,19 @@ export function PublicBookingPanel({
               <span>{formatCurrency(quote.insuranceAmount, locale)}</span>
             </div>
           ) : null}
-          {quote.taxAmount > 0 ? (
-            <div className="flex items-center justify-between">
-              <span>
-                {bookingTaxName?.trim() || reserveMessages.quoteTax} ({Number(bookingTaxRate.toFixed(3))}%)
-              </span>
-              <span>{formatCurrency(quote.taxAmount, locale)}</span>
-            </div>
-          ) : null}
+          {/* One line per tax (GST, PST, …), as the receipt will show. */}
+          {quote.taxes
+            .filter((tax) => tax.amount > 0)
+            .map((tax) => (
+              <div key={tax.name} className="flex items-center justify-between">
+                <span>
+                  {(quote.taxes.length === 1 ? bookingTaxName?.trim() || tax.name : tax.name) ||
+                    reserveMessages.quoteTax}{" "}
+                  ({Number(tax.rate.toFixed(3))}%)
+                </span>
+                <span>{formatCurrency(tax.amount, locale)}</span>
+              </div>
+            ))}
           {quote.locationFeeAmount > 0 ? (
             <div className="flex items-center justify-between">
               <span>{reserveMessages.locationFeeLabel}</span>

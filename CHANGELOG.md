@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.9.6 - 2026-09-29
+
+### GST and PST are separate lines, and the confirmation says where to collect the car
+
+**Taxes, one by one.** The fleet's tax was a single name and rate
+("GST + PST", 12%), so the quote, the Stripe checkout and the
+renter's receipt showed one combined line, while the operator files
+GST and PST separately. The pricing rules now take up to three named
+taxes (`BookingPricingPolicy.taxLines`, e.g. GST 5% and PST 7%); each
+is computed and rounded on its own and listed on its own line in the
+quote, as its own Stripe line item, and in the order's metadata. The
+single name and rate are kept as their join and sum for everything
+that only needs the total, and a policy saved before this reads as a
+list of one until re-saved. A car with its own tax rate keeps one
+line. Tax is still charged on the rent only; the Stripe line used to
+say "Tax on rental and insurance", which was never true, and now says
+"Tax on the rental".
+
+**Pickup location in the confirmation email.** New variables
+`{pickupLocation}` and `{returnLocation}` (the latter only when it
+differs), both in the default template. A saved template identical to
+the old default is read as the new one; edited templates are left
+alone.
+
 ## v1.9.5 - 2026-09-29
 
 ### A failed renter email can be sent again

@@ -277,6 +277,7 @@ export default async function ReserveVehiclePage({
               bookingDepositAmount={policy.depositAmount}
               bookingTaxName={policy.taxName}
               bookingTaxRate={policy.taxRate}
+              taxLines={policy.taxLines}
             blockedDateWindows={blockedDateWindows}
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}

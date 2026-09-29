@@ -1,6 +1,6 @@
 import { OrderStatus, type Order } from "@prisma/client";
 
-import { getEffectiveDailyRate, isWeeklyRateApplied } from "@/lib/booking-policy";
+import { getEffectiveDailyRate, isWeeklyRateApplied, type TaxLine } from "@/lib/booking-policy";
 import { orderRangesOverlap } from "@/lib/orders";
 
 type BookingOrderLike = Pick<Order, "pickupDatetime" | "returnDatetime" | "status"> & {
@@ -98,6 +98,8 @@ export function getDirectBookingQuote(input: {
   bookingInsuranceFee?: number | null;
   bookingDepositAmount?: number | null;
   bookingTaxRate?: number | null;
+  /** The taxes one by one; wins over `bookingTaxRate` when given. */
+  taxLines?: TaxLine[] | null;
   /** Off the rent once the booking reaches a week. */
   weeklyDiscountPercent?: number | null;
   /** `YYYY-MM-DD` → price, for days priced by hand. */
@@ -139,8 +141,8 @@ export function getDirectBookingQuote(input: {
   // Tax is charged on the rent only -- the operator's rule, and the one
   // their GST/PST filings follow. Insurance, collection fees and the
   // deposit sit outside the base.
-  const taxRate = Math.max(0, input.bookingTaxRate ?? 0);
-  const taxAmount = roundMoney(baseAmount * (taxRate / 100));
+  const taxes = computeTaxes(baseAmount, input);
+  const taxAmount = sumTaxes(taxes);
   const depositAmount = input.bookingDepositAmount ?? 0;
 
   return {
@@ -155,6 +157,7 @@ export function getDirectBookingQuote(input: {
     insuranceAmount,
     locationFeeAmount,
     taxAmount,
+    taxes,
     depositAmount,
     totalAmount: roundMoney(
       baseAmount + insuranceAmount + locationFeeAmount + taxAmount + depositAmount,
@@ -282,6 +285,8 @@ export type BookingInstalment = {
   rentAmount: number;
   insuranceAmount: number;
   taxAmount: number;
+  /** `taxAmount` line by line. */
+  taxes: TaxAmount[];
   /** Deposit rides on the first period only. */
   depositAmount: number;
   /** As does the collection and return fee. */
@@ -312,6 +317,7 @@ export function getDirectBookingInstalmentPlan(input: {
   bookingInsuranceFee?: number | null;
   bookingDepositAmount?: number | null;
   bookingTaxRate?: number | null;
+  taxLines?: TaxLine[] | null;
   weeklyDiscountPercent?: number | null;
   dailyRateOverrides?: Record<string, number> | null;
   seasonalRates?: Record<string, number> | null;
@@ -338,7 +344,6 @@ export function getDirectBookingInstalmentPlan(input: {
   if (days <= INSTALMENT_PERIOD_DAYS) return single;
 
   const insurancePerDay = Math.max(0, input.bookingInsuranceFee ?? 0);
-  const taxRate = Math.max(0, input.bookingTaxRate ?? 0);
   const depositAmount = input.bookingDepositAmount ?? 0;
 
   const instalments: BookingInstalment[] = [];
@@ -367,7 +372,8 @@ export function getDirectBookingInstalmentPlan(input: {
     // part of the airport drive in month three.
     const locationFee = index === 1 ? quote.locationFeeAmount : 0;
     // Rent only, as in the quote, so the periods still sum to it.
-    const taxAmount = roundMoney(rentAmount * (taxRate / 100));
+    const taxes = computeTaxes(rentAmount, input);
+    const taxAmount = sumTaxes(taxes);
     const deposit = index === 1 ? depositAmount : 0;
 
     instalments.push({
@@ -378,6 +384,7 @@ export function getDirectBookingInstalmentPlan(input: {
       rentAmount,
       insuranceAmount,
       taxAmount,
+      taxes,
       depositAmount: deposit,
       locationFeeAmount: locationFee,
       total: roundMoney(rentAmount + insuranceAmount + locationFee + taxAmount + deposit),
@@ -400,6 +407,31 @@ export function getDirectBookingInstalmentPlan(input: {
     dueLater,
     totalAmount: roundMoney(dueNow + dueLater),
   };
+}
+
+export type TaxAmount = TaxLine & { amount: number };
+
+/**
+ * Each tax on the rent, rounded on its own -- the way each is filed --
+ * so the lines a renter sees add up to the total they are charged.
+ */
+function computeTaxes(
+  rent: number,
+  input: { taxLines?: TaxLine[] | null; bookingTaxRate?: number | null },
+): TaxAmount[] {
+  const lines =
+    input.taxLines && input.taxLines.length > 0
+      ? input.taxLines
+      : (input.bookingTaxRate ?? 0) > 0
+        ? [{ name: "Tax", rate: input.bookingTaxRate ?? 0 }]
+        : [];
+  return lines
+    .filter((line) => line.rate > 0)
+    .map((line) => ({ ...line, amount: roundMoney(rent * (line.rate / 100)) }));
+}
+
+function sumTaxes(taxes: TaxAmount[]) {
+  return roundMoney(taxes.reduce((sum, tax) => sum + tax.amount, 0));
 }
 
 function roundMoney(value: number) {

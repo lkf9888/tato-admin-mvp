@@ -268,6 +268,7 @@ export async function POST(request: Request) {
       bookingInsuranceFee: policy.insuranceFee,
       bookingDepositAmount: policy.depositAmount,
       bookingTaxRate: policy.taxRate,
+      taxLines: policy.taxLines,
       weeklyDiscountPercent: policy.weeklyDiscountPercent,
     });
 
@@ -299,13 +300,14 @@ export async function POST(request: Request) {
       bookingInsuranceFee: policy.insuranceFee,
       bookingDepositAmount: policy.depositAmount,
       bookingTaxRate: policy.taxRate,
+      taxLines: policy.taxLines,
       weeklyDiscountPercent: policy.weeklyDiscountPercent,
     });
     const firstPeriod = plan.instalments[0] ?? null;
     const chargedDays = firstPeriod?.days ?? quote.days;
     const chargedRent = firstPeriod ? firstPeriod.rentAmount : quote.baseAmount;
     const chargedInsurance = firstPeriod ? firstPeriod.insuranceAmount : quote.insuranceAmount;
-    const chargedTax = firstPeriod ? firstPeriod.taxAmount : quote.taxAmount;
+    const chargedTaxes = firstPeriod ? firstPeriod.taxes : quote.taxes;
     // A one-off, so it is charged in full with the first period.
     const chargedLocationFee = firstPeriod
       ? firstPeriod.locationFeeAmount
@@ -376,21 +378,21 @@ export async function POST(request: Request) {
             },
           ]
         : []),
-      ...(chargedTax > 0
-        ? [
-            {
-              quantity: 1,
-              price_data: {
-                currency: "cad",
-                unit_amount: Math.round(chargedTax * 100),
-                product_data: {
-                  name: `${policy.taxName || "Tax"} (${Number(policy.taxRate.toFixed(3))}%)`,
-                  description: "Tax on rental and insurance",
-                },
-              },
+      // One line per tax, as each is filed: GST and PST are separate
+      // on the receipt the renter keeps. Rent only, so says the note.
+      ...chargedTaxes
+        .filter((tax) => tax.amount > 0)
+        .map((tax) => ({
+          quantity: 1,
+          price_data: {
+            currency: "cad",
+            unit_amount: Math.round(tax.amount * 100),
+            product_data: {
+              name: `${tax.name} (${Number(tax.rate.toFixed(3))}%)`,
+              description: "Tax on the rental",
             },
-          ]
-        : []),
+          },
+        })),
       ...(chargedLocationFee > 0
         ? [
             {
@@ -485,6 +487,10 @@ export async function POST(request: Request) {
         taxName: policy.taxName ?? "",
         taxRate: String(policy.taxRate),
         taxAmount: String(quote.taxAmount),
+        // Name, rate and amount per tax, for the order and the contract.
+        taxLines: JSON.stringify(
+          quote.taxes.map((tax) => ({ name: tax.name, rate: tax.rate, amount: tax.amount })),
+        ).slice(0, 500),
         pickupLocation: describeBookingLocation(pickupLocation) ?? "",
         returnLocation: describeBookingLocation(returnLocation) ?? "",
         locationFeeAmount: String(quote.locationFeeAmount),

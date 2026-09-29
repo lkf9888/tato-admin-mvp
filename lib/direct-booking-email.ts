@@ -51,7 +51,17 @@ function toHtmlBody(text: string) {
 }
 
 export function buildDirectBookingEmailValues(input: {
-  order: Pick<Order, "id" | "renterName" | "pickupDatetime" | "returnDatetime" | "totalPrice" | "depositAmount">;
+  order: Pick<
+    Order,
+    | "id"
+    | "renterName"
+    | "pickupDatetime"
+    | "returnDatetime"
+    | "totalPrice"
+    | "depositAmount"
+    | "pickupLocation"
+    | "returnLocation"
+  >;
   vehicle: Pick<Vehicle, "nickname" | "brand" | "model" | "year" | "plateNumber">;
   brandName: string;
   contactPhone?: string | null;
@@ -74,6 +84,12 @@ export function buildDirectBookingEmailValues(input: {
     plateNumber: input.vehicle.plateNumber,
     pickupDate: formatDisplayDate(input.order.pickupDatetime),
     returnDate: formatDisplayDate(input.order.returnDatetime),
+    pickupLocation: input.order.pickupLocation?.trim() ?? "",
+    returnLocation:
+      input.order.returnLocation?.trim() &&
+      input.order.returnLocation.trim() !== input.order.pickupLocation?.trim()
+        ? input.order.returnLocation.trim()
+        : "",
     days: days > 0 ? String(days) : "",
     // Paid today, not the contract value: the default wording puts
     // this next to "Paid today", and a renter on an instalment plan
@@ -114,7 +130,15 @@ export async function sendDirectBookingConfirmationEmail(input: {
   workspaceId: string;
   order: Pick<
     Order,
-    "id" | "renterName" | "pickupDatetime" | "returnDatetime" | "totalPrice" | "depositAmount" | "renterToken"
+    | "id"
+    | "renterName"
+    | "pickupDatetime"
+    | "returnDatetime"
+    | "totalPrice"
+    | "depositAmount"
+    | "renterToken"
+    | "pickupLocation"
+    | "returnLocation"
   >;
   vehicle: Pick<Vehicle, "nickname" | "brand" | "model" | "year" | "plateNumber">;
   renterEmail: string | null;

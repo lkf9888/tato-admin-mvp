@@ -107,6 +107,8 @@ export const directBookingMessages = {
       policyTaxNameHint: "顯示在報價和收據上，比如 GST + PST。",
       policyTaxRateLabel: "稅率 %",
       policyTaxRateHint: "只按租金計稅。",
+      policyTaxLinesLabel: "租金上的稅",
+      policyTaxLinesHint: "每種稅在報價和收據上單獨列一行，例如 GST 5% 和 PST 7%。只對租金收。整行留空即不收。",
       emailKicker: "確認郵件",
       emailTitle: "客人付款後收到的那封信",
       emailCopy:

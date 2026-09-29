@@ -255,13 +255,6 @@ export default async function DirectBookingPage({
               value: fleetPolicy.depositAmount,
               step: "1",
             },
-            {
-              name: "taxRate",
-              label: directMessages.policyTaxRateLabel,
-              hint: directMessages.policyTaxRateHint,
-              value: fleetPolicy.taxRate,
-              step: "0.001",
-            },
           ].map((field) => (
             <label key={field.name} className="block min-w-0">
               <span className="mb-1 block text-[11px] font-medium text-[color:var(--ink)]">
@@ -281,20 +274,48 @@ export default async function DirectBookingPage({
               </span>
             </label>
           ))}
-          <label className="block min-w-0">
+          <div className="min-w-0 sm:col-span-2">
             <span className="mb-1 block text-[11px] font-medium text-[color:var(--ink)]">
-              {directMessages.policyTaxNameLabel}
+              {directMessages.policyTaxLinesLabel}
             </span>
-            <input
-              name="taxName"
-              defaultValue={fleetPolicy.taxName ?? ""}
-              maxLength={40}
-              className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px] font-medium text-[color:var(--ink)]"
-            />
+            <div className="space-y-1.5">
+              {[0, 1, 2].map((index) => {
+                const line = fleetPolicy.taxLines[index];
+                return (
+                  <div key={index} className="flex gap-1.5">
+                    <input
+                      name={`taxLineName_${index}`}
+                      defaultValue={line?.name ?? ""}
+                      placeholder={index === 0 ? "GST" : index === 1 ? "PST" : ""}
+                      maxLength={40}
+                      aria-label={directMessages.policyTaxNameLabel}
+                      className="min-w-0 flex-1 rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px] font-medium text-[color:var(--ink)]"
+                    />
+                    <div className="relative w-24 shrink-0">
+                      <input
+                        name={`taxLineRate_${index}`}
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.001"
+                        inputMode="decimal"
+                        defaultValue={line?.rate ?? ""}
+                        placeholder={index === 0 ? "5" : index === 1 ? "7" : ""}
+                        aria-label={directMessages.policyTaxRateLabel}
+                        className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] py-2 pl-3 pr-6 text-[13px] font-medium tabular-nums text-[color:var(--ink)]"
+                      />
+                      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[12px] text-[color:var(--ink-soft)]">
+                        %
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
             <span className="mt-1 block text-[11px] leading-4 text-[color:var(--ink-soft)]">
-              {directMessages.policyTaxNameHint}
+              {directMessages.policyTaxLinesHint}
             </span>
-          </label>
+          </div>
         </div>
 
         <StickySaveBar

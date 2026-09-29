@@ -20,6 +20,9 @@
 /** The number of days at which the weekly rate starts applying. */
 export const WEEKLY_DISCOUNT_MIN_DAYS = 7;
 
+/** One tax on the rent, such as GST at 5 or PST at 7. */
+export type TaxLine = { name: string; rate: number };
+
 export type BookingPolicy = {
   weeklyDiscountPercent: number;
   suggestedRateMultiplier: number;
@@ -31,8 +34,15 @@ export type BookingPolicy = {
   depositAmount: number;
   /** Null prints as "Tax". */
   taxName: string | null;
-  /** Percent, applied to rent only. */
+  /** Percent, applied to rent only. The sum of `taxLines`. */
   taxRate: number;
+  /**
+   * The taxes one by one, so a receipt can show GST and PST as the
+   * separate lines they are filed as. `taxName` and `taxRate` are
+   * derived from these (joined names, summed rate) for everything that
+   * only needs the total.
+   */
+  taxLines: TaxLine[];
 };
 
 export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
@@ -48,6 +58,7 @@ export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
   depositAmount: 0,
   taxName: null,
   taxRate: 0,
+  taxLines: [],
 };
 
 type NullablePolicy = {
@@ -60,6 +71,8 @@ type NullablePolicy = {
   depositAmount?: number | null;
   taxName?: string | null;
   taxRate?: number | null;
+  /** JSON as stored, or already parsed. */
+  taxLines?: string | TaxLine[] | null;
 };
 
 /**
@@ -107,8 +120,7 @@ export function normalizeBookingPolicy(policy?: NullablePolicy | null): BookingP
     depositAmount: roundCents(
       Math.max(0, pick(policy?.depositAmount, BOOKING_POLICY_DEFAULTS.depositAmount)),
     ),
-    taxName: policy?.taxName?.trim() || null,
-    taxRate: Math.min(100, Math.max(0, pick(policy?.taxRate, BOOKING_POLICY_DEFAULTS.taxRate))),
+    ...resolveTaxes(policy),
     // Clamped well clear of zero: a multiplier of 0 would suggest
     // every car be rented for nothing, and it is far likelier to be a
     // half-typed number than an intention.
@@ -135,10 +147,19 @@ export function resolveBookingPolicy(
     extraKmRate: pick(vehicle?.bookingExtraKmRate, fleet.extraKmRate),
     insuranceFee: pick(vehicle?.bookingInsuranceFee, fleet.insuranceFee),
     depositAmount: pick(vehicle?.bookingDepositAmount, fleet.depositAmount),
-    // The name follows the rate: a car that overrides the rate without
-    // naming it keeps the fleet's name, which is almost always right.
-    taxName: vehicle?.bookingTaxName?.trim() || fleet.taxName,
-    taxRate: pick(vehicle?.bookingTaxRate, fleet.taxRate),
+    // A car that sets its own rate has one tax line, named as it says
+    // or after the fleet's (almost always right). Otherwise the fleet's
+    // lines come across as they are.
+    ...(vehicle?.bookingTaxRate != null && Number.isFinite(vehicle.bookingTaxRate)
+      ? {
+          taxLines: [
+            {
+              name: vehicle.bookingTaxName?.trim() || fleet.taxName || "Tax",
+              rate: vehicle.bookingTaxRate,
+            },
+          ],
+        }
+      : { taxLines: fleet.taxLines }),
     // Not a per-car setting, so it is carried across untouched.
     suggestedRateMultiplier: fleet.suggestedRateMultiplier,
   });
@@ -165,6 +186,47 @@ export function getEffectiveDailyRate(
 
 export function isWeeklyRateApplied(days: number, weeklyDiscountPercent: number) {
   return days >= WEEKLY_DISCOUNT_MIN_DAYS && clampPercent(weeklyDiscountPercent) > 0;
+}
+
+/** Parse and tidy a list of taxes; unusable rows are dropped. */
+export function parseTaxLines(raw: string | TaxLine[] | null | undefined): TaxLine[] {
+  let value: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row) => ({
+      name: typeof row?.name === "string" ? row.name.trim().slice(0, 40) : "",
+      rate: Number(row?.rate),
+    }))
+    .filter((row) => row.name && Number.isFinite(row.rate) && row.rate > 0)
+    .map((row) => ({ name: row.name, rate: Math.min(100, Math.round(row.rate * 1000) / 1000) }))
+    .slice(0, 4);
+}
+
+/**
+ * The tax fields, kept consistent: a list wins when there is one, and
+ * the single name and rate are derived from it; a policy from before
+ * the list existed becomes a list of one.
+ */
+function resolveTaxes(policy: NullablePolicy | null | undefined) {
+  const lines = parseTaxLines(policy?.taxLines);
+  if (lines.length > 0) {
+    const total = lines.reduce((sum, line) => sum + line.rate, 0);
+    return {
+      taxLines: lines,
+      taxName: lines.map((line) => line.name).join(" + "),
+      taxRate: Math.min(100, Math.round(total * 1000) / 1000),
+    };
+  }
+  const rate = Math.min(100, Math.max(0, pick(policy?.taxRate, BOOKING_POLICY_DEFAULTS.taxRate)));
+  const name = policy?.taxName?.trim() || null;
+  return { taxLines: rate > 0 ? [{ name: name || "Tax", rate }] : [], taxName: name, taxRate: rate };
 }
 
 function roundCents(value: number) {

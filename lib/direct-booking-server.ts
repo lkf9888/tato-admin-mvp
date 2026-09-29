@@ -45,6 +45,8 @@ type DirectBookingMetadata = {
   taxName?: string;
   taxRate?: string;
   taxAmount?: string;
+  /** JSON `[{ name, rate, amount }]`, one entry per tax. */
+  taxLines?: string;
   pickupLocation?: string;
   returnLocation?: string;
   locationFeeAmount?: string;
@@ -171,6 +173,7 @@ async function writeInstalmentSchedule(input: {
     bookingInsuranceFee: policy.insuranceFee,
     bookingDepositAmount: policy.depositAmount,
     bookingTaxRate: policy.taxRate,
+    taxLines: policy.taxLines,
     // Split across the two legs only so the quote adds them back up;
     // the plan puts the whole thing on period one either way.
     pickupLocationFee: input.locationFeeAmount,
@@ -362,6 +365,7 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
         taxName: metadata.taxName || null,
         taxRate: metadata.taxRate ? Number(metadata.taxRate) : null,
         taxAmount: metadata.taxAmount ? Number(metadata.taxAmount) : null,
+        taxLines: readTaxLinesMetadata(metadata.taxLines),
         locationFeeAmount: metadata.locationFeeAmount
           ? Number(metadata.locationFeeAmount)
           : null,
@@ -475,4 +479,14 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       totalPrice,
     },
   });
+}
+
+function readTaxLinesMetadata(raw: string | undefined) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 }

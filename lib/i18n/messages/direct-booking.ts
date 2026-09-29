@@ -113,6 +113,9 @@ export const directBookingMessages = {
       policyTaxNameHint: "Shown on quotes and receipts, e.g. GST + PST.",
       policyTaxRateLabel: "Tax %",
       policyTaxRateHint: "Applied to the rent only.",
+      policyTaxLinesLabel: "Taxes on the rent",
+      policyTaxLinesHint:
+        "Each tax is its own line on the quote and the receipt, e.g. GST 5% and PST 7%. Charged on the rent only. Leave a row empty to drop it.",
       emailKicker: "Confirmation email",
       emailTitle: "What the renter gets after paying",
       emailCopy:
@@ -314,6 +317,8 @@ export const directBookingMessages = {
       policyTaxNameHint: "显示在报价和收据上，比如 GST + PST。",
       policyTaxRateLabel: "税率 %",
       policyTaxRateHint: "只按租金计税。",
+      policyTaxLinesLabel: "租金上的税",
+      policyTaxLinesHint: "每种税在报价和收据上单独列一行，例如 GST 5% 和 PST 7%。只对租金收。整行留空即不收。",
       emailKicker: "确认邮件",
       emailTitle: "客人付款后收到的那封信",
       emailCopy:

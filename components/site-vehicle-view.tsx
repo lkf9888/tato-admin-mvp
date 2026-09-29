@@ -195,6 +195,7 @@ export function SiteVehicleView({
             bookingDepositAmount={policy.depositAmount}
             bookingTaxName={policy.taxName}
             bookingTaxRate={policy.taxRate}
+            taxLines={policy.taxLines}
             blockedDateWindows={blockedDateWindows}
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}

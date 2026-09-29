@@ -1988,6 +1988,9 @@ model BookingPricingPolicy {
   depositAmount           Float   @default(0)
   taxName                 String?
   taxRate                 Float   @default(0)
+  /// The taxes one by one, as JSON `[{ "name": "GST", "rate": 5 }, …]`.
+  /// When set, `taxName` and `taxRate` are kept as their join and sum.
+  taxLines                String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

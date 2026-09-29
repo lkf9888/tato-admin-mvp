@@ -2,6 +2,14 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const directBookingMessages = {
+    directBookingOrderEmails: {
+      title: "租車人郵件",
+      copy: "付款後會自動傳送。租車人沒收到時，可以在這裡補發。",
+      resendConfirmation: "補發確認郵件",
+      sending: "傳送中…",
+      sent: (to: string) => `確認郵件已傳送到 ${to}。`,
+      failed: (reason: string) => `傳送失敗：${reason}`,
+    },
     directBookingPage: {
       kicker: "線上預訂",
       tabsLabel: "線上預訂分割槽",

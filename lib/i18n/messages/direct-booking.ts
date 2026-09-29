@@ -6,6 +6,14 @@
  */
 export const directBookingMessages = {
   en: {
+    directBookingOrderEmails: {
+      title: "Renter emails",
+      copy: "Sent automatically after payment. Send again if the renter did not get it.",
+      resendConfirmation: "Resend confirmation email",
+      sending: "Sending…",
+      sent: (to: string) => `Confirmation sent to ${to}.`,
+      failed: (reason: string) => `Could not send: ${reason}`,
+    },
     directBookingPage: {
       kicker: "Direct booking",
       tabsLabel: "Direct booking sections",
@@ -201,6 +209,14 @@ export const directBookingMessages = {
     },
   },
   zh: {
+    directBookingOrderEmails: {
+      title: "租车人邮件",
+      copy: "付款后会自动发送。租车人没收到时，可以在这里补发。",
+      resendConfirmation: "补发确认邮件",
+      sending: "发送中…",
+      sent: (to: string) => `确认邮件已发送到 ${to}。`,
+      failed: (reason: string) => `发送失败：${reason}`,
+    },
     directBookingPage: {
       kicker: "在线预定",
       tabsLabel: "在线预定分区",

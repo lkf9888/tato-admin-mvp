@@ -889,6 +889,26 @@ export default function ContractsClient({
     }
   }
 
+  async function resendEnvelopeInvitation(envelope: Envelope) {
+    setBusy(`resend-envelope-${envelope.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/contracts/envelopes/${envelope.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resend" }),
+      });
+      const data = await readJsonResponse<{ error?: string; to?: string }>(res);
+      if (!res.ok) throw new Error(data.error || "重新发送失败。");
+      setNotice(`签署邀请已重新发送到 ${data.to}。`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function fillFromBooking(value: string) {
     setSendBookingId(value);
     const booking = bookings.find((item) => item.id === value);
@@ -1070,6 +1090,15 @@ export default function ContractsClient({
                             {busy === `delete-envelope-${envelope.id}` ? "删除中…" : "删除"}
                           </button>
                         </div>
+                      ) : envelope.status === "SENT" || envelope.status === "PARTIALLY_SIGNED" ? (
+                        <button
+                          type="button"
+                          className="text-blue-600 hover:underline disabled:opacity-50"
+                          disabled={busy === `resend-envelope-${envelope.id}`}
+                          onClick={() => resendEnvelopeInvitation(envelope)}
+                        >
+                          {busy === `resend-envelope-${envelope.id}` ? "发送中…" : "重新发送签署邀请"}
+                        </button>
                       ) : (
                         <span className="text-[var(--ink-soft)]">未完成</span>
                       )}

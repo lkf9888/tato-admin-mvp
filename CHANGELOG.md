@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.9.5 - 2026-09-29
+
+### A failed renter email can be sent again
+
+The confirmation email and the rental agreement invitation are each
+sent once, by the payment webhook. When that send failed (as every one
+did until v1.9.4, the platform's sending domain being unverified),
+the renter had no confirmation, no link to sign, and the operator had
+no way to give them either short of voiding the agreement and starting
+over.
+
+- The contracts list shows "Resend signing invitation" on an agreement
+  still awaiting a signature. It mails the existing link to whoever's
+  turn it is, from the operator's sender, and records the attempt in
+  the envelope's audit log whether it succeeds or not.
+- A direct booking's order page gains a "Renter emails" panel with
+  "Resend confirmation email", which rebuilds the confirmation from
+  the same template and sends it to the address the renter paid with.
+
 ## v1.9.4 - 2026-09-29
 
 ### Renter emails can come from the operator's own domain

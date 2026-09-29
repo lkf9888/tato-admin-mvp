@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DepositSettlementPanel } from "@/components/deposit-settlement-panel";
+import { DirectBookingOrderEmails } from "@/components/direct-booking-order-emails";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
@@ -195,6 +196,9 @@ export default async function OrderDetailPage({
                   : null
               }
             />
+          ) : null}
+          {directPayment.isDirectBooking ? (
+            <DirectBookingOrderEmails locale={locale} orderId={order.id} />
           ) : null}
           <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
             <p className="t-eyebrow text-[var(--ink-soft)]">{t.guest}</p>

@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.15.1 - 2026-09-29
+
+### The extra-days bill sits next to the times that cause it
+
+v1.15.0 added billing for days a direct booking had not paid for. It now appears where those days are made: in the calendar's order popup, directly under the pickup and return times, and on the order's own page. Move the return, save, and the panel re-prices from the saved times and offers the charge; nothing is billed by the save itself.
+
+It shows for direct bookings only. Turo trips are billed by Turo, so the popup does not even ask.
+
+
 ## v1.15.0 - 2026-09-29
 
 ### Extra days are billed after a trip's times move

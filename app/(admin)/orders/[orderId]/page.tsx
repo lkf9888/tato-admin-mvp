@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BookingExtraChargePanel } from "@/components/booking-extra-charge-panel";
 import { DepositSettlementPanel } from "@/components/deposit-settlement-panel";
 import { DirectBookingOrderEmails } from "@/components/direct-booking-order-emails";
 import { requireCurrentAdminContext } from "@/lib/auth";
@@ -199,6 +200,13 @@ export default async function OrderDetailPage({
           ) : null}
           {directPayment.isDirectBooking ? (
             <DirectBookingOrderEmails locale={locale} orderId={order.id} />
+          ) : null}
+          {directPayment.isDirectBooking ? (
+            <BookingExtraChargePanel
+              key={`${order.pickupDatetime.toISOString()}:${order.returnDatetime.toISOString()}`}
+              locale={locale}
+              orderId={order.id}
+            />
           ) : null}
           <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
             <p className="t-eyebrow text-[var(--ink-soft)]">{t.guest}</p>

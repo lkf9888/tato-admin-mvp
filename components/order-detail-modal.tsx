@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Pencil, Save, Share2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { BookingExtraChargePanel } from "@/components/booking-extra-charge-panel";
 import { OrderAttachments } from "@/components/order-attachments";
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
@@ -1067,6 +1068,23 @@ export function OrderDetailModal({
                 </span>
               )}
             </EditableField>
+
+            {/* Billing for days the booking did not pay for, right under
+                the times that decide them: move the return, see what is
+                owed, charge it. Direct bookings only -- the panel renders
+                nothing for any other order, and Turo trips are billed by
+                Turo, so they skip the fetch. Keyed on the saved times, not
+                the draft, so it re-prices once a new time is saved and
+                never while one is half typed. */}
+            {currentOrder.source !== "turo" ? (
+              <div className="empty:hidden sm:col-span-2 lg:col-span-4">
+                <BookingExtraChargePanel
+                  key={`${currentOrder.id}:${currentOrder.pickupDatetime}:${currentOrder.returnDatetime}`}
+                  locale={locale}
+                  orderId={currentOrder.id}
+                />
+              </div>
+            ) : null}
 
             <EditableField labelText={t.pickupLocation} {...fieldChrome("pickupLocation")}>
               <input

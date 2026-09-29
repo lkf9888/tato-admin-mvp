@@ -47,7 +47,9 @@ export default async function VehiclesPage({
     getI18n(),
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id },
-      include: { owner: true, orders: true },
+      // A count, not the orders themselves. Loading every order of every
+      // car to print one number per row was thousands of rows per visit.
+      include: { owner: true, _count: { select: { orders: true } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.owner.findMany({
@@ -307,122 +309,123 @@ export default async function VehiclesPage({
         </p>
       </section>
 
-      <section className="grid gap-2.5 sm:gap-3 xl:grid-cols-3">
-        {filteredVehicles.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[var(--line)] bg-[var(--surface)] p-4 text-[12px] text-[var(--ink-soft)] xl:col-span-3">
-            {vehicleMessages.noSearchResults}
-          </div>
-        ) : null}
-        {filteredVehicles.map((vehicle) => (
-          <article key={vehicle.id} className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-3.5">
-            {/* Turo's hierarchy: one bold name, one grey identity
-                line, then facts as labelled pairs. The previous card
-                stacked up to seven grey lines of equal weight, which
-                is a paragraph to read rather than a card to scan --
-                and on a phone it was most of a screen per vehicle. */}
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="t-title truncate text-[var(--ink)]">{vehicle.nickname}</h3>
-                <p className="t-meta mt-1 truncate text-[var(--ink-soft)]">
-                  {vehicle.brand} {vehicle.model} · {vehicle.year} · {vehicle.plateNumber}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                <StatusBadge value={vehicle.status} locale={locale} />
-                <span className="chip chip-neutral">
-                  {vehicleMessages.orderCount(vehicle.orders.length)}
-                </span>
-              </div>
-            </div>
-
-            <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-[var(--line)] pt-2.5">
-              <div className="min-w-0">
-                <dt className="t-eyebrow text-[var(--ink-soft)]">{vehicleMessages.ownerPrefix}</dt>
-                <dd className="mt-0.5 truncate text-[12.5px] font-bold text-[var(--ink)]">
-                  {vehicle.owner?.name ?? vehicleMessages.placeholders.unassignedOwner}
-                </dd>
-              </div>
-              {vehicle.ownerCommissionRate != null ? (
-                <div className="min-w-0">
-                  <dt className="t-eyebrow text-[var(--ink-soft)]">
-                    {vehicleMessages.commissionPrefix}
-                  </dt>
-                  <dd className="mt-0.5 text-[12.5px] font-bold tabular-nums text-[var(--ink)]">
-                    {(vehicle.ownerCommissionRate * 100).toFixed(2)}%
-                  </dd>
-                </div>
-              ) : null}
-              {vehicle.purchasePrice != null ? (
-                <div className="min-w-0">
-                  <dt className="t-eyebrow text-[var(--ink-soft)]">
-                    {vehicleMessages.placeholders.purchasePrice}
-                  </dt>
-                  <dd className="mt-0.5 text-[12.5px] font-bold tabular-nums text-[var(--ink)]">
-                    CA${vehicle.purchasePrice.toFixed(2)}
-                  </dd>
-                </div>
-              ) : null}
-              {vehicle.cleaningFee != null && vehicle.cleaningFee > 0 ? (
-                <div className="min-w-0">
-                  <dt className="t-eyebrow text-[var(--ink-soft)]">
-                    {vehicleMessages.placeholders.cleaningFee}
-                  </dt>
-                  <dd className="mt-0.5 text-[12.5px] font-bold tabular-nums text-[var(--ink)]">
-                    CA${vehicle.cleaningFee.toFixed(2)}
-                  </dd>
-                </div>
-              ) : null}
-              {vehicle.bookingTaxRate != null && vehicle.bookingTaxRate > 0 ? (
-                <div className="min-w-0">
-                  <dt className="t-eyebrow truncate text-[var(--ink-soft)]">
-                    {vehicle.bookingTaxName?.trim() || vehicleMessages.placeholders.bookingTaxName}
-                  </dt>
-                  <dd className="mt-0.5 text-[12.5px] font-bold tabular-nums text-[var(--ink)]">
-                    {vehicle.bookingTaxRate.toFixed(3)}%
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <VehicleEditDialog
-                locale={locale}
-                owners={owners.map((owner) => ({ id: owner.id, label: owner.name }))}
-                vehicle={{
-                  id: vehicle.id,
-                  ownerId: vehicle.ownerId,
-                  plateNumber: vehicle.plateNumber,
-                  nickname: vehicle.nickname,
-                  brand: vehicle.brand,
-                  model: vehicle.model,
-                  year: vehicle.year,
-                  vin: vehicle.vin,
-                  status: vehicle.status,
-                  isArchived: vehicle.isArchived,
-                  turoListingName: vehicle.turoListingName,
-                  turoAccount: vehicle.turoAccount,
-                  turoVehicleCode: vehicle.turoVehicleCode,
-                  purchasePrice: vehicle.purchasePrice,
-                  ownerCommissionRate: vehicle.ownerCommissionRate,
-                  cleaningFee: vehicle.cleaningFee,
-                  pickupPassword: vehicle.pickupPassword,
-                  bookingTaxName: vehicle.bookingTaxName,
-                  bookingTaxRate: vehicle.bookingTaxRate,
-                  notes: vehicle.notes,
-                }}
-                trigger={vehicleMessages.editVehicle}
-                triggerClassName="inline-flex min-h-9 items-center justify-center rounded-md border border-[var(--line-strong)] bg-white px-3 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[var(--line-strong)] hover:bg-[var(--surface-muted)]"
-              />
-              <form action={deleteVehicleAction}>
-              <input type="hidden" name="id" value={vehicle.id} />
-              <button className="inline-flex min-h-9 items-center justify-center rounded-md border border-rose-200 bg-rose-50 px-3 text-[12px] font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100">
-                {vehicleMessages.deleteVehicle}
-              </button>
-              </form>
-            </div>
-          </article>
-        ))}
-      </section>
+      {/* One row per car. The fleet is past 130 cars, and three cards
+          across meant scrolling several screens to find one -- a list
+          is what a fleet this size is read as. Secondary columns drop
+          away on narrow screens; the car, plate, status and actions
+          stay. */}
+      {filteredVehicles.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-[var(--line)] bg-[var(--surface)] p-4 text-[12px] text-[var(--ink-soft)]">
+          {vehicleMessages.noSearchResults}
+        </div>
+      ) : (
+        <section className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+          <table className="w-full min-w-[20rem] border-collapse text-left text-[12px]">
+            <thead className="sticky top-0 z-10 bg-[var(--surface-muted)] text-[10.5px] uppercase tracking-[0.08em] text-[var(--ink-soft)]">
+              <tr>
+                <th className="px-3 py-2 font-semibold">{vehicleMessages.listVehicle}</th>
+                <th className="hidden px-3 py-2 font-semibold sm:table-cell">{vehicleMessages.placeholders.plateNumber}</th>
+                <th className="hidden px-3 py-2 font-semibold md:table-cell">{vehicleMessages.ownerPrefix}</th>
+                <th className="px-3 py-2 font-semibold">{statusLabel}</th>
+                <th className="hidden px-3 py-2 text-right font-semibold sm:table-cell">{vehicleMessages.listOrders}</th>
+                <th className="hidden px-3 py-2 text-right font-semibold lg:table-cell">{vehicleMessages.commissionPrefix}</th>
+                <th className="hidden px-3 py-2 text-right font-semibold lg:table-cell">{vehicleMessages.placeholders.cleaningFee}</th>
+                <th className="px-3 py-2 text-right font-semibold">{vehicleMessages.listActions}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredVehicles.map((vehicle) => (
+                <tr
+                  key={vehicle.id}
+                  className="border-t border-[var(--line)] transition hover:bg-[var(--surface-muted)]"
+                >
+                  <td className="max-w-[11rem] px-3 py-2 sm:max-w-[16rem]">
+                    <p className="truncate font-semibold text-[var(--ink)]">{vehicle.nickname}</p>
+                    <p className="truncate text-[11px] text-[var(--ink-soft)]">
+                      {/* On a phone the plate rides here instead of taking
+                          a column of its own, so the row fits the screen
+                          and the actions are not scrolled off to the right. */}
+                      <span className="font-medium text-[var(--ink)] sm:hidden">{vehicle.plateNumber} · </span>
+                      {vehicle.brand} {vehicle.model} · {vehicle.year}
+                    </p>
+                  </td>
+                  <td className="hidden whitespace-nowrap px-3 py-2 font-medium tabular-nums text-[var(--ink)] sm:table-cell">
+                    {vehicle.plateNumber}
+                  </td>
+                  <td className="hidden max-w-[12rem] truncate px-3 py-2 text-[var(--ink)] md:table-cell">
+                    {vehicle.owner?.name ?? (
+                      <span className="text-[var(--ink-soft)]">
+                        {vehicleMessages.placeholders.unassignedOwner}
+                      </span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <StatusBadge value={vehicle.status} locale={locale} />
+                  </td>
+                  <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-[var(--ink)] sm:table-cell">
+                    {vehicle._count.orders}
+                  </td>
+                  <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-[var(--ink)] lg:table-cell">
+                    {vehicle.ownerCommissionRate != null
+                      ? `${(vehicle.ownerCommissionRate * 100).toFixed(2)}%`
+                      : "—"}
+                  </td>
+                  <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-[var(--ink)] lg:table-cell">
+                    {vehicle.cleaningFee != null && vehicle.cleaningFee > 0
+                      ? `CA$${vehicle.cleaningFee.toFixed(2)}`
+                      : "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <VehicleEditDialog
+                        locale={locale}
+                        owners={owners.map((owner) => ({ id: owner.id, label: owner.name }))}
+                        vehicle={{
+                          id: vehicle.id,
+                          ownerId: vehicle.ownerId,
+                          plateNumber: vehicle.plateNumber,
+                          nickname: vehicle.nickname,
+                          brand: vehicle.brand,
+                          model: vehicle.model,
+                          year: vehicle.year,
+                          vin: vehicle.vin,
+                          status: vehicle.status,
+                          isArchived: vehicle.isArchived,
+                          turoListingName: vehicle.turoListingName,
+                          turoAccount: vehicle.turoAccount,
+                          turoVehicleCode: vehicle.turoVehicleCode,
+                          purchasePrice: vehicle.purchasePrice,
+                          ownerCommissionRate: vehicle.ownerCommissionRate,
+                          cleaningFee: vehicle.cleaningFee,
+                          pickupPassword: vehicle.pickupPassword,
+                          bookingTaxName: vehicle.bookingTaxName,
+                          bookingTaxRate: vehicle.bookingTaxRate,
+                          notes: vehicle.notes,
+                        }}
+                        trigger={
+                          <>
+                            <span className="sm:hidden">{vehicleMessages.listEdit}</span>
+                            <span className="hidden sm:inline">{vehicleMessages.editVehicle}</span>
+                          </>
+                        }
+                        triggerClassName="inline-flex h-8 items-center justify-center rounded-md border border-[var(--line-strong)] bg-white px-2.5 text-[11.5px] font-semibold text-[var(--ink)] transition hover:bg-[var(--surface-muted)]"
+                      />
+                      {/* Hidden on a phone: the edit dialog sets the same
+                          status, and two buttons per row did not fit. */}
+                      <form action={deleteVehicleAction} className="hidden sm:block">
+                        <input type="hidden" name="id" value={vehicle.id} />
+                        <button className="inline-flex h-8 items-center justify-center rounded-md border border-rose-200 bg-white px-2.5 text-[11.5px] font-semibold text-rose-700 transition hover:bg-rose-50">
+                          {vehicleMessages.deleteVehicle}
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
     </div>
   );
 }

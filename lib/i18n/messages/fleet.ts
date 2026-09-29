@@ -46,6 +46,10 @@ export const fleetMessages = {
       saveChanges: "Save changes",
       deleteVehicle: "Deactivate vehicle",
       orderCount: (count: number) => `${count} order(s)`,
+      listVehicle: "Vehicle",
+      listOrders: "Orders",
+      listActions: "Actions",
+      listEdit: "Edit",
     },
     vehicleRoiPage: {
       kicker: "Vehicle investment return",
@@ -152,6 +156,10 @@ export const fleetMessages = {
       saveChanges: "保存修改",
       deleteVehicle: "停用车辆",
       orderCount: (count: number) => `${count} 个订单`,
+      listVehicle: "车辆",
+      listOrders: "订单",
+      listActions: "操作",
+      listEdit: "编辑",
     },
     vehicleRoiPage: {
       kicker: "车辆投资回报",

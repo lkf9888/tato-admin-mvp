@@ -43,6 +43,10 @@ export const fleetMessages = {
       saveChanges: "儲存修改",
       deleteVehicle: "停用車輛",
       orderCount: (count: number) => `${count} 個訂單`,
+      listVehicle: "車輛",
+      listOrders: "訂單",
+      listActions: "操作",
+      listEdit: "編輯",
     },
     vehicleRoiPage: {
       kicker: "車輛投資回報",

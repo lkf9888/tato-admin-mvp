@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.8.2 - 2026-09-28
+
+### The vehicles page is a list
+
+The fleet used to be a grid of cards, one screen per handful of cars. It is now a table, one row per car: name, plate, owner, status, how many orders it has taken, commission and cleaning fee, and the edit and deactivate actions at the end of the row.
+
+On a phone the table keeps what is needed to find a car and act on it: the plate moves under the car's name, the less-used columns hide, and the edit button shortens to **Edit** / **编辑** so the row fits at 375px without scrolling sideways. Deactivating a car is left to wider screens.
+
+
 ## v1.8.1 - 2026-09-28
 
 ### The unassigned panel and the API know which cars are deactivated

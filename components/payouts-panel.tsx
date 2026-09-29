@@ -6,6 +6,7 @@ import { getMessages, type Locale } from "@/lib/i18n";
 import {
   continueConnectOnboarding,
   openConnectDashboard,
+  disconnectConnectAccount,
   refreshConnectStatus,
   startConnectExistingAccount,
   startConnectOnboarding,
@@ -82,6 +83,7 @@ export function PayoutsPanel({
   const [isDashboardOpening, startDashboard] = useTransition();
   const [isRefreshing, startRefresh] = useTransition();
   const [isLinking, startLink] = useTransition();
+  const [isDisconnecting, startDisconnect] = useTransition();
 
   const statusTone = STATUS_TONE[status];
 
@@ -129,6 +131,21 @@ export function PayoutsPanel({
         return;
       }
       window.location.href = result.url;
+    });
+  }
+
+  function handleDisconnect() {
+    if (!configured || !snapshot.accountId) return;
+    if (!window.confirm(t.disconnectConfirm(snapshot.accountId))) return;
+    setError(null);
+    setNotice("");
+    startDisconnect(async () => {
+      const result = await disconnectConnectAccount();
+      if (!result.ok) {
+        setError({ code: result.code, detail: result.error });
+        return;
+      }
+      setNotice(t.disconnectedNotice);
     });
   }
 
@@ -350,6 +367,14 @@ export function PayoutsPanel({
               className="inline-flex items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isRefreshing ? t.refreshing : t.refreshAction}
+            </button>
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              disabled={!configured || isDisconnecting}
+              className="inline-flex items-center justify-center rounded-md px-3 py-2 text-[12px] font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:ml-auto"
+            >
+              {isDisconnecting ? t.connectLoading : t.disconnectAction}
             </button>
           </div>
         )}

@@ -23,8 +23,10 @@ import { getStripeClient } from "@/lib/stripe";
  * refund exactly -- a $300 deposit refund reverses $300, not $291.
  *
  * `refundPlatformFee` decides whether the platform also gives back a
- * proportional share of its 5%. Yes when the booking is being undone;
- * no for a deposit, which was never in the fee base to begin with.
+ * proportional share of its 5% commission. Yes when the booking is
+ * being undone; no for a deposit, which was never in the fee base to
+ * begin with. The Stripe-fee part of the application fee is never
+ * given back -- Stripe does not give it back either.
  *
  * Charges with no transfer on them -- paid before Connect was wired
  * in, or a payment Stripe skipped the transfer for -- fall back to a
@@ -50,8 +52,19 @@ export async function refundDirectBookingCharge(input: {
       ? intent.latest_charge
       : null;
   const hasTransfer = Boolean(charge?.transfer);
+  const feeId =
+    typeof charge?.application_fee === "string"
+      ? charge.application_fee
+      : charge?.application_fee?.id ?? null;
+  // Since v1.9.2 the fee carries the Stripe fee as well as the 5%, and
+  // only the 5% is the platform's to give back: Stripe keeps its fee on
+  // a refunded payment. Charges from before carry no split and refund
+  // their whole fee pro rata, as they always did.
+  const commissionCents = Number(intent.metadata?.tato_platform_commission_cents);
+  const splitFee =
+    input.refundPlatformFee && hasTransfer && feeId && Number.isFinite(commissionCents);
 
-  return stripe.refunds.create(
+  const refund = await stripe.refunds.create(
     {
       payment_intent: input.paymentIntentId,
       amount: input.amount == null ? undefined : Math.round(input.amount * 100),
@@ -60,11 +73,26 @@ export async function refundDirectBookingCharge(input: {
       // Stripe refuses a fee refund on a destination charge unless the
       // transfer is reversed too, so the two travel together.
       refund_application_fee:
-        hasTransfer && charge?.application_fee ? input.refundPlatformFee : undefined,
+        hasTransfer && feeId && !splitFee ? input.refundPlatformFee : undefined,
       metadata: input.metadata,
     },
     input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
   );
+
+  if (splitFee && feeId && charge && charge.amount > 0) {
+    const share = Math.round((commissionCents * refund.amount) / charge.amount);
+    const fee = await stripe.applicationFees.retrieve(feeId);
+    const amount = Math.min(share, fee.amount - fee.amount_refunded);
+    if (amount > 0) {
+      await stripe.applicationFees.createRefund(
+        feeId,
+        { amount, metadata: { tato_refund_id: refund.id } },
+        { idempotencyKey: `fee-refund:${refund.id}` },
+      );
+    }
+  }
+
+  return refund;
 }
 
 /**

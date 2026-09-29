@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
+import type Stripe from "stripe";
 import { z } from "zod";
 
 import {
@@ -28,7 +29,7 @@ import { getBookingReturnUrls } from "@/lib/rental-site";
 import { getStripeCheckoutLocale, isSiteLocale } from "@/lib/site-locale";
 import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
 import {
-  PLATFORM_APPLICATION_FEE_PERCENT,
+  computePlatformFeeCents,
   getWorkspaceConnectSnapshot,
 } from "@/lib/stripe-connect";
 import {
@@ -38,6 +39,10 @@ import {
 } from "@/lib/uploads";
 
 export const runtime = "nodejs";
+
+type CheckoutLineItem = NonNullable<
+  NonNullable<Parameters<Stripe["checkout"]["sessions"]["create"]>[0]>["line_items"]
+>[number];
 
 const MAX_LICENSE_FILE_BYTES = 10 * 1024 * 1024;
 const LICENSE_DOCUMENT_KINDS = {
@@ -313,12 +318,6 @@ export async function POST(request: Request) {
       siteLocale,
     );
 
-    // Platform fee = 5% of rental + insurance (NOT the refundable deposit).
-    // Deposit is a hold the host needs to release, not earned revenue.
-    const feeBaseCents = Math.round((chargedRent + chargedInsurance) * 100);
-    const applicationFeeAmount = Math.round(
-      feeBaseCents * (PLATFORM_APPLICATION_FEE_PERCENT / 100),
-    );
     const licenseDraftId = randomUUID();
     const licenseDocuments = await Promise.all([
       saveLicenseDocument({
@@ -346,6 +345,101 @@ export async function POST(request: Request) {
       })),
     });
 
+    const lineItems: CheckoutLineItem[] = [
+      {
+        // One line, not `quantity x unit_amount`: days can be priced
+        // individually, so there is no single unit price that
+        // multiplies out to the right number. The day count moves
+        // into the description instead.
+        quantity: 1,
+        price_data: {
+          currency: "cad",
+          unit_amount: Math.round(chargedRent * 100),
+          product_data: {
+            name: `${vehicle.nickname} booking`,
+            description: `${vehicle.plateNumber} · ${parsed.pickupDate} to ${parsed.returnDate} · ${chargedDays} day(s)`,
+          },
+        },
+      },
+      ...(policy.insuranceFee > 0
+        ? [
+            {
+              quantity: chargedDays,
+              price_data: {
+                currency: "cad",
+                unit_amount: Math.round(policy.insuranceFee * 100),
+                product_data: {
+                  name: `${vehicle.nickname} insurance`,
+                  description: "Daily protection fee",
+                },
+              },
+            },
+          ]
+        : []),
+      ...(chargedTax > 0
+        ? [
+            {
+              quantity: 1,
+              price_data: {
+                currency: "cad",
+                unit_amount: Math.round(chargedTax * 100),
+                product_data: {
+                  name: `${policy.taxName || "Tax"} (${Number(policy.taxRate.toFixed(3))}%)`,
+                  description: "Tax on rental and insurance",
+                },
+              },
+            },
+          ]
+        : []),
+      ...(chargedLocationFee > 0
+        ? [
+            {
+              quantity: 1,
+              price_data: {
+                currency: "cad",
+                unit_amount: Math.round(chargedLocationFee * 100),
+                product_data: {
+                  name: `${vehicle.nickname} collection & return`,
+                  description: [
+                    describeBookingLocation(pickupLocation),
+                    describeBookingLocation(returnLocation),
+                  ]
+                    .filter(Boolean)
+                    .join(" → ") || "Collection and return",
+                },
+              },
+            },
+          ]
+        : []),
+      ...(quote.depositAmount > 0
+        ? [
+            {
+              quantity: 1,
+              price_data: {
+                currency: "cad",
+                unit_amount: Math.round(quote.depositAmount * 100),
+                product_data: {
+                  name: `${vehicle.nickname} deposit`,
+                  description: "Refundable security deposit",
+                },
+              },
+            },
+          ]
+        : []),
+    ];
+    const chargeTotalCents = lineItems.reduce(
+      (sum, item) => sum + (item.price_data?.unit_amount ?? 0) * (item.quantity ?? 1),
+      0,
+    );
+    // TATO's cut: 5% of what the host earns plus the Stripe fee on the
+    // whole charge, so the Stripe fee is the host's cost, not the
+    // platform's. See `computePlatformFeeCents`.
+    const platformFee = computePlatformFeeCents({
+      commissionBaseCents: Math.round((chargedRent + chargedInsurance + chargedLocationFee) * 100),
+      chargeTotalCents,
+    });
+    const applicationFeeAmount = platformFee.total;
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       locale: getStripeCheckoutLocale(siteLocale),
@@ -356,12 +450,17 @@ export async function POST(request: Request) {
       //   - Funds settle on the host's Connect account.
       //   - Renter's card statement shows the host's business name (because
       //     `on_behalf_of` makes the connected account the merchant of record).
-      //   - Platform takes a 5% application fee out of the rental + insurance
-      //     portion before the rest is transferred.
+      //   - Platform takes its application fee (5% commission plus the
+      //     Stripe fee estimate) before the rest is transferred.
       payment_intent_data: {
         on_behalf_of: connectSnapshot.accountId!,
         transfer_data: { destination: connectSnapshot.accountId! },
         application_fee_amount: applicationFeeAmount > 0 ? applicationFeeAmount : undefined,
+        // Read back by refunds, which return the commission share only.
+        metadata: {
+          tato_platform_commission_cents: String(platformFee.commission),
+          tato_stripe_fee_estimate_cents: String(platformFee.processing),
+        },
       },
       metadata: {
         vehicleId: vehicle.id,
@@ -394,88 +493,7 @@ export async function POST(request: Request) {
         connectAccountId: connectSnapshot.accountId!,
         applicationFeeAmount: String(applicationFeeAmount),
       },
-      line_items: [
-        {
-          // One line, not `quantity x unit_amount`: days can be priced
-          // individually, so there is no single unit price that
-          // multiplies out to the right number. The day count moves
-          // into the description instead.
-          quantity: 1,
-          price_data: {
-            currency: "cad",
-            unit_amount: Math.round(chargedRent * 100),
-            product_data: {
-              name: `${vehicle.nickname} booking`,
-              description: `${vehicle.plateNumber} · ${parsed.pickupDate} to ${parsed.returnDate} · ${chargedDays} day(s)`,
-            },
-          },
-        },
-        ...(policy.insuranceFee > 0
-          ? [
-              {
-                quantity: chargedDays,
-                price_data: {
-                  currency: "cad",
-                  unit_amount: Math.round(policy.insuranceFee * 100),
-                  product_data: {
-                    name: `${vehicle.nickname} insurance`,
-                    description: "Daily protection fee",
-                  },
-                },
-              },
-            ]
-          : []),
-        ...(chargedTax > 0
-          ? [
-              {
-                quantity: 1,
-                price_data: {
-                  currency: "cad",
-                  unit_amount: Math.round(chargedTax * 100),
-                  product_data: {
-                    name: `${policy.taxName || "Tax"} (${Number(policy.taxRate.toFixed(3))}%)`,
-                    description: "Tax on rental and insurance",
-                  },
-                },
-              },
-            ]
-          : []),
-        ...(chargedLocationFee > 0
-          ? [
-              {
-                quantity: 1,
-                price_data: {
-                  currency: "cad",
-                  unit_amount: Math.round(chargedLocationFee * 100),
-                  product_data: {
-                    name: `${vehicle.nickname} collection & return`,
-                    description: [
-                      describeBookingLocation(pickupLocation),
-                      describeBookingLocation(returnLocation),
-                    ]
-                      .filter(Boolean)
-                      .join(" → ") || "Collection and return",
-                  },
-                },
-              },
-            ]
-          : []),
-        ...(quote.depositAmount > 0
-          ? [
-              {
-                quantity: 1,
-                price_data: {
-                  currency: "cad",
-                  unit_amount: Math.round(quote.depositAmount * 100),
-                  product_data: {
-                    name: `${vehicle.nickname} deposit`,
-                    description: "Refundable security deposit",
-                  },
-                },
-              },
-            ]
-          : []),
-      ],
+      line_items: lineItems,
     });
 
     if (!session.url) {

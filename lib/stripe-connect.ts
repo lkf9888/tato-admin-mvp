@@ -10,6 +10,42 @@ import { getAppUrl, getStripeClient, getStripeSecretKey } from "@/lib/stripe";
 // statement shows the host's business name, not the TATO platform name.
 export const PLATFORM_APPLICATION_FEE_PERCENT = 5;
 
+// Stripe's standard rate for Canadian cards. On a destination charge
+// Stripe takes its fee from the platform, so without passing it on the
+// platform's 5% would mostly go to Stripe. It is an estimate -- an
+// international card costs more -- charged to the host with the fee.
+export const STRIPE_CARD_FEE_PERCENT = 2.9;
+export const STRIPE_CARD_FEE_FIXED_CENTS = 30;
+
+/**
+ * The application fee on a direct booking, in cents: the platform's
+ * commission on what the host earns (rent, insurance, location fee --
+ * not tax, which is collected for the government, nor the deposit,
+ * which goes back) plus the Stripe fee on everything charged. The two
+ * are kept apart because a refund gives back only the commission:
+ * Stripe keeps its fee on a refunded payment, so returning that part
+ * would make the platform pay it after all.
+ */
+export function computePlatformFeeCents(input: {
+  commissionBaseCents: number;
+  chargeTotalCents: number;
+}) {
+  const commission = Math.max(
+    0,
+    Math.round(input.commissionBaseCents * (PLATFORM_APPLICATION_FEE_PERCENT / 100)),
+  );
+  const processing =
+    input.chargeTotalCents > 0
+      ? Math.round(input.chargeTotalCents * (STRIPE_CARD_FEE_PERCENT / 100)) +
+        STRIPE_CARD_FEE_FIXED_CENTS
+      : 0;
+  return {
+    commission,
+    processing,
+    total: Math.min(commission + processing, Math.max(0, input.chargeTotalCents)),
+  };
+}
+
 export type ConnectCountry = "CA" | "US";
 
 const SUPPORTED_CONNECT_COUNTRIES: ConnectCountry[] = ["CA", "US"];
@@ -363,4 +399,64 @@ export async function getWorkspaceConnectSnapshotByVehicleId(
 
   const snapshot = await getWorkspaceConnectSnapshot(vehicle.workspaceId);
   return { workspaceId: vehicle.workspaceId, ...snapshot };
+}
+
+const DETACHED_CONNECT_FIELDS = {
+  stripeConnectAccountId: null,
+  stripeConnectCountry: null,
+  stripeConnectChargesEnabled: false,
+  stripeConnectPayoutsEnabled: false,
+  stripeConnectDetailsSubmitted: false,
+  stripeConnectOnboardedAt: null,
+} as const;
+
+/**
+ * Stop paying this workspace out to its Stripe account, so another can
+ * be set up in its place.
+ *
+ * Nothing is deleted on Stripe's side. A linked existing account is
+ * de-authorised, which is the host's own account leaving the platform
+ * and is what they would expect; an Express account the platform made
+ * stays where it is, with whatever balance it holds, and can be closed
+ * from the platform dashboard by hand. Bookings already paid keep their
+ * charge and transfer, so their refunds and deposit settlement still
+ * reach the old account -- only new bookings wait for the next one.
+ */
+export async function disconnectWorkspaceConnectAccount(input: { workspaceId: string }) {
+  const billing = await prisma.workspaceBilling.findUnique({
+    where: { workspaceId: input.workspaceId },
+  });
+  if (!billing?.stripeConnectAccountId) return null;
+
+  const accountId = billing.stripeConnectAccountId;
+  const stripe = getStripeClient();
+  let accountType: string | null = null;
+  try {
+    accountType = (await stripe.accounts.retrieve(accountId)).type ?? null;
+  } catch {
+    // Already gone or no longer reachable: detaching is all that is left.
+  }
+  if (accountType === "standard" && getConnectClientId()) {
+    try {
+      await stripe.oauth.deauthorize({ client_id: getConnectClientId(), stripe_user_id: accountId });
+    } catch {
+      // The host may have disconnected from their side first.
+    }
+  }
+
+  await prisma.workspaceBilling.update({
+    where: { id: billing.id },
+    data: DETACHED_CONNECT_FIELDS,
+  });
+  return { accountId, accountType };
+}
+
+/** Webhook: a host disconnected the platform from their own dashboard. */
+export async function detachConnectAccountById(accountId: string) {
+  const billing = await prisma.workspaceBilling.findFirst({
+    where: { stripeConnectAccountId: accountId },
+    select: { id: true },
+  });
+  if (!billing) return null;
+  return prisma.workspaceBilling.update({ where: { id: billing.id }, data: DETACHED_CONNECT_FIELDS });
 }

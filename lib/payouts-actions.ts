@@ -6,6 +6,7 @@ import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
+import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import {
   buildConnectOAuthUrl,
@@ -14,6 +15,7 @@ import {
   ConnectCountry,
   createConnectLoginLink,
   createConnectOnboardingLink,
+  disconnectWorkspaceConnectAccount,
   ensureWorkspaceConnectAccount,
   isConnectExistingAvailable,
   isStripeConnectConfigured,
@@ -203,4 +205,31 @@ export async function startConnectExistingAccount() {
     email: user.email,
   });
   return { ok: true, url } as const;
+}
+
+export async function disconnectConnectAccount() {
+  if (!isStripeConnectConfigured()) {
+    return NOT_CONFIGURED;
+  }
+
+  const { user, workspace } = await requireCurrentAdminContext();
+
+  try {
+    const detached = await disconnectWorkspaceConnectAccount({ workspaceId: workspace.id });
+    if (detached) {
+      await logActivity({
+        workspaceId: workspace.id,
+        actor: user.name,
+        action: "stripe_connect_disconnected",
+        entityType: "WorkspaceBilling",
+        entityId: workspace.id,
+        metadata: detached,
+      });
+    }
+    revalidatePath("/payouts");
+    revalidatePath("/direct-booking/site");
+    return { ok: true } as const;
+  } catch (error) {
+    return { ok: false, ...describeConnectError(error) } as const;
+  }
 }

@@ -56,7 +56,7 @@ export const billingMessages = {
     payoutsPage: {
       kicker: "車主收款",
       title: "讓租客直接把錢打給你",
-      copy: "為當前 workspace 開通一個 Stripe Express 收款帳戶，租客在預訂頁付款時會直接打到你的銀行帳戶。TATO 每筆訂單抽取 5% 平台服務費，其餘全部歸你所有。",
+      copy: "為當前 workspace 開通一個 Stripe Express 收款帳戶，租客在預訂頁付款時會直接打到你的銀行帳戶。TATO 抽取租金、保險和取車地點費的 5% 作為平台服務費，另外轉收 Stripe 的刷卡手續費（每筆約 2.9% + 30¢），其餘全部歸你所有。",
       howItWorks: "開通流程",
       howSteps: [
         "選擇你的報稅國家（加拿大或美國），點選開始開通。",
@@ -103,6 +103,10 @@ export const billingMessages = {
         failed: "連線沒有完成，請再試一次。",
       } as Record<string, string>,
       errorAlreadyConnected: "這個工作區已經有收款帳戶了。",
+      disconnectAction: "解綁收款帳戶",
+      disconnectConfirm: (accountId: string) =>
+        `確定把 ${accountId} 從這個工作區解綁嗎？\n\n解綁後，新預訂無法付款，直到連線新的收款帳戶。已經付過款的預訂，退款和押金結算仍然走這個帳戶。Stripe 上不會刪除任何東西。`,
+      disconnectedNotice: "收款帳戶已解綁。重新開戶或連線已有帳戶後，才能再收款。",
       returnedNotice: "已從 Stripe 返回。如果狀態沒有立即重新整理，請點選『同步狀態』。",
       refreshedNotice: "已從 Stripe 同步最新狀態。",
       refreshedPendingNotice: "Stripe 還需要補充一些資訊才能把帳戶置為可用。",
@@ -114,6 +118,6 @@ export const billingMessages = {
       payoutsLabel: "到帳轉帳",
       enabled: "已啟用",
       disabled: "未啟用",
-      platformFeeNote: "平台服務費：每筆訂單 5%",
+      platformFeeNote: "平台服務費：5% + Stripe 刷卡手續費（約 2.9% + 30¢）",
     },
   } as const;

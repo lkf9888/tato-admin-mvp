@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.9.2 - 2026-09-28
+
+### Hosts pay the Stripe card fee, and can disconnect their payout account
+
+**The platform fee now covers Stripe's fee.** Direct bookings are
+destination charges, on which Stripe takes its card fee from the
+platform. TATO's 5% was therefore mostly Stripe's: on a typical
+booking the platform kept about 2% after Stripe. The application fee
+is now the 5% commission plus Stripe's standard Canadian card rate
+(2.9% + 30¢) on everything charged, so the platform nets its 5% and
+the host bears the card fee, as with any card terminal. The commission
+base also gains the pickup/return location fee; tax (collected for the
+government) and the deposit (given back) stay out of it. The fee's
+two parts are written on the PaymentIntent, and a cancellation refund
+returns only the commission share: Stripe keeps its fee on a refunded
+payment, so returning that part would make the platform pay it after
+all. Charges made before this refund their whole fee pro rata, as
+before. The card-fee part is an estimate; an international card
+costs Stripe more than the standard rate.
+
+**Disconnect payout account.** /payouts can detach the workspace's
+Stripe account so another can be set up. A linked existing account is
+de-authorised; an Express account the platform created is left on
+Stripe, with any balance, to be closed from the platform dashboard.
+Bookings already paid keep settling refunds and deposits with the old
+account. A host who removes TATO from their own Stripe dashboard is
+detached automatically (`account.application.deauthorized`, delivered
+to a Connect webhook endpoint).
+
 ## v1.9.1 - 2026-09-28
 
 ### A host can connect the Stripe account they already have

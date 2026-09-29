@@ -8,7 +8,7 @@ import {
 } from "@/lib/billing";
 import { persistDirectBookingFromCheckoutSession } from "@/lib/direct-booking-server";
 import { getStripeClient, getStripeWebhookSecret } from "@/lib/stripe";
-import { syncWorkspaceConnectFromAccount } from "@/lib/stripe-connect";
+import { detachConnectAccountById, syncWorkspaceConnectFromAccount } from "@/lib/stripe-connect";
 
 export async function POST(request: Request) {
   const webhookSecret = getStripeWebhookSecret();
@@ -74,6 +74,12 @@ export async function POST(request: Request) {
         // admin /payouts page and the public booking gate stay in sync
         // without the host clicking "refresh status".
         await syncWorkspaceConnectFromAccount(event.data.object);
+        break;
+      }
+      case "account.application.deauthorized": {
+        // A host who linked their own Stripe account removed TATO from
+        // it. Only delivered to a Connect webhook endpoint.
+        if (event.account) await detachConnectAccountById(event.account);
         break;
       }
       default:

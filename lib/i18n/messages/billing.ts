@@ -63,7 +63,7 @@ export const billingMessages = {
     payoutsPage: {
       kicker: "Host payouts",
       title: "Get paid by renters directly",
-      copy: "Connect a Stripe Express account for this workspace so renters booking your cars pay you directly. TATO keeps a 5% platform fee per booking; the rest lands in your bank account.",
+      copy: "Connect a Stripe Express account for this workspace so renters booking your cars pay you directly. TATO keeps 5% of the rent, insurance and location fees, and passes on Stripe's card fee (about 2.9% + 30¢ of each payment); the rest lands in your bank account.",
       howItWorks: "How it works",
       howSteps: [
         "Pick the country where you pay tax (Canada or United States) and start onboarding.",
@@ -111,6 +111,10 @@ export const billingMessages = {
         failed: "Linking did not finish. Please try again.",
       } as Record<string, string>,
       errorAlreadyConnected: "This workspace already has a payout account.",
+      disconnectAction: "Disconnect payout account",
+      disconnectConfirm: (accountId: string) =>
+        `Disconnect ${accountId} from this workspace?\n\nNew bookings stop taking payment until another account is connected. Bookings already paid keep settling refunds and deposits with this account. Nothing is deleted on Stripe.`,
+      disconnectedNotice: "Payout account disconnected. Start onboarding or connect an existing account to take payments again.",
       returnedNotice: "Welcome back from Stripe. Click Refresh status if your badge hasn't updated yet.",
       refreshedNotice: "Latest status synced from Stripe.",
       refreshedPendingNotice: "Stripe still needs a few more details before your account is fully active.",
@@ -122,7 +126,7 @@ export const billingMessages = {
       payoutsLabel: "Bank payouts",
       enabled: "Enabled",
       disabled: "Disabled",
-      platformFeeNote: "Platform fee per booking: 5%",
+      platformFeeNote: "Platform fee: 5% + Stripe card fee (~2.9% + 30¢)",
     },
   },
   zh: {
@@ -180,7 +184,7 @@ export const billingMessages = {
     payoutsPage: {
       kicker: "车主收款",
       title: "让租客直接把钱打给你",
-      copy: "为当前 workspace 开通一个 Stripe Express 收款账户，租客在预订页付款时会直接打到你的银行账户。TATO 每笔订单抽取 5% 平台服务费，其余全部归你所有。",
+      copy: "为当前 workspace 开通一个 Stripe Express 收款账户，租客在预订页付款时会直接打到你的银行账户。TATO 抽取租金、保险和取车地点费的 5% 作为平台服务费，另外转收 Stripe 的刷卡手续费（每笔约 2.9% + 30¢），其余全部归你所有。",
       howItWorks: "开通流程",
       howSteps: [
         "选择你的报税国家（加拿大或美国），点击开始开通。",
@@ -227,6 +231,10 @@ export const billingMessages = {
         failed: "连接没有完成，请再试一次。",
       } as Record<string, string>,
       errorAlreadyConnected: "这个工作区已经有收款账户了。",
+      disconnectAction: "解绑收款账户",
+      disconnectConfirm: (accountId: string) =>
+        `确定把 ${accountId} 从这个工作区解绑吗？\n\n解绑后，新预订无法付款，直到连接新的收款账户。已经付过款的预订，退款和押金结算仍然走这个账户。Stripe 上不会删除任何东西。`,
+      disconnectedNotice: "收款账户已解绑。重新开户或连接已有账户后，才能再收款。",
       returnedNotice: "已从 Stripe 返回。如果状态没有立即刷新，请点击『同步状态』。",
       refreshedNotice: "已从 Stripe 同步最新状态。",
       refreshedPendingNotice: "Stripe 还需要补充一些信息才能把账户置为可用。",
@@ -238,7 +246,7 @@ export const billingMessages = {
       payoutsLabel: "到账转账",
       enabled: "已启用",
       disabled: "未启用",
-      platformFeeNote: "平台服务费：每笔订单 5%",
+      platformFeeNote: "平台服务费：5% + Stripe 刷卡手续费（约 2.9% + 30¢）",
     },
   },
 } as const;

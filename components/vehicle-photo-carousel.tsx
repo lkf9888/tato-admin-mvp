@@ -72,7 +72,7 @@ export function VehiclePhotoCarousel({
   return (
     <div
       className={cn(
-        "relative w-full aspect-[16/10] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] sm:min-h-[20rem]",
+        "relative w-full aspect-[16/9] overflow-hidden sm:aspect-[16/10] rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] sm:min-h-[20rem]",
         className,
       )}
     >

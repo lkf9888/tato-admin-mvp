@@ -5,7 +5,6 @@ import { CompactLanguageSwitcher } from "@/components/language-switcher";
 import { PublicBookingPanel } from "@/components/public-booking-panel";
 import { VehiclePhotoCarousel } from "@/components/vehicle-photo-carousel";
 import {
-  getBlockedBookingWindows,
   getBookingBusyWindows,
   getDateOnlyBookingWindows,
 } from "@/lib/direct-booking";
@@ -30,7 +29,7 @@ import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
 import { isImageAttachment } from "@/lib/uploads";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 
 function addDays(value: Date, amount: number) {
   const next = new Date(value);
@@ -142,7 +141,6 @@ export default async function ReserveVehiclePage({
     );
   }
 
-  const blockedWindows = getBlockedBookingWindows(vehicle.orders, 6);
   const blockedDateWindows = getDateOnlyBookingWindows(vehicle.orders);
   const vehiclePhotos = vehicle.attachments
     .filter((attachment) => isImageAttachment(attachment.contentType, attachment.filename))
@@ -256,28 +254,6 @@ export default async function ReserveVehiclePage({
                 </div>
               </div>
 
-              <div className="mt-6 border-t border-[var(--line)] pt-5">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
-                  {reserveMessages.blockedDates}
-                </p>
-                {blockedWindows.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {blockedWindows.map((window) => (
-                      <span
-                        key={`${window.pickupDatetime.toISOString()}-${window.returnDatetime.toISOString()}`}
-                        className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs text-[var(--ink-mid)]"
-                      >
-                        {formatDate(window.pickupDatetime, locale)} -{" "}
-                        {formatDate(window.returnDatetime, locale)}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-sm text-[var(--ink-soft)]">
-                    {reserveMessages.blockedDatesEmpty}
-                  </p>
-                )}
-              </div>
             </section>
           </div>
 

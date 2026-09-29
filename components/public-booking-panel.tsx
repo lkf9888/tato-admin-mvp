@@ -47,7 +47,8 @@ type StoredBookingState = {
 type BookingDatePickerProps = {
   locale: Locale;
   label: string;
-  hint: string;
+  /** Which edge the month popup hangs from; the right-hand picker opens leftward so it stays on screen. */
+  align?: "left" | "right";
   value: string;
   placeholder: string;
   onChange: (value: string) => void;
@@ -125,7 +126,7 @@ function formatMonthLabel(value: Date, locale: Locale) {
 function BookingDatePicker({
   locale,
   label,
-  hint,
+  align = "left",
   value,
   placeholder,
   onChange,
@@ -169,13 +170,13 @@ function BookingDatePicker({
 
   return (
     <div className="relative" ref={rootRef}>
-      <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{label}</span>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen((current) => !current)}
         className={cn(
-          "flex w-full items-center justify-between rounded-md border border-[var(--line)] bg-white px-4 py-3 text-left text-sm text-[var(--ink)] transition",
+          "flex w-full items-center justify-between rounded-md border border-[var(--line)] bg-white px-3 py-2 text-left text-sm text-[var(--ink)] transition sm:px-4 sm:py-3",
           disabled ? "cursor-not-allowed opacity-50" : "hover:border-[var(--line-strong)]",
         )}
       >
@@ -184,10 +185,14 @@ function BookingDatePicker({
         </span>
         <CalendarDays className="h-4 w-4 text-[var(--ink-soft)]" />
       </button>
-      <p className="mt-2 text-xs leading-5 text-[var(--ink-soft)]">{hint}</p>
 
       {isOpen ? (
-        <div className="absolute left-0 z-30 mt-3 w-[19rem] rounded-lg border border-[var(--line)] bg-white p-4 shadow-[0_30px_70px_-40px_rgba(15,23,42,0.55)]">
+        <div
+          className={cn(
+            "absolute z-30 mt-2 w-[19rem] max-w-[calc(100vw-2rem)] rounded-lg border border-[var(--line)] bg-white p-4 shadow-[0_30px_70px_-40px_rgba(15,23,42,0.55)]",
+            align === "right" ? "right-0" : "left-0",
+          )}
+        >
           <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
@@ -373,6 +378,8 @@ export function PublicBookingPanel({
   const [licenseFront, setLicenseFront] = useState<File | null>(null);
   const [licenseBack, setLicenseBack] = useState<File | null>(null);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
+  // Phones only: the clauses fold behind a toggle so the page stays short.
+  const [showClauses, setShowClauses] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -692,11 +699,11 @@ export function PublicBookingPanel({
   }
 
   return (
-    <div className="rounded-lg border border-[var(--line)] bg-white p-5 text-[var(--ink)] shadow-[0_30px_80px_-55px_rgba(15,23,42,0.65)] sm:p-6">
+    <div className="rounded-lg border border-[var(--line)] bg-white p-3.5 text-[var(--ink)] shadow-[0_30px_80px_-55px_rgba(15,23,42,0.65)] sm:p-6">
       <p className="text-[11px] uppercase tracking-[0.32em] text-[var(--ink-soft)]">
         {reserveMessages.bookingPanelTitle}
       </p>
-      <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--ink-mid)]">{reserveMessages.bookingPanelCopy}</p>
+      <p className="mt-1 hidden max-w-lg text-xs leading-5 text-[var(--ink-mid)] sm:mt-3 sm:block sm:text-sm sm:leading-6">{reserveMessages.bookingPanelCopy}</p>
 
       {checkoutState === "success" ? (
         <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -716,11 +723,10 @@ export function PublicBookingPanel({
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-6 sm:gap-4">
         <BookingDatePicker
           locale={locale}
           label={reserveMessages.pickupDate}
-          hint={reserveMessages.pickupDateHint}
           value={pickupDate}
           placeholder={reserveMessages.selectDatePlaceholder}
           onChange={handlePickupDateChange}
@@ -730,7 +736,7 @@ export function PublicBookingPanel({
         <BookingDatePicker
           locale={locale}
           label={reserveMessages.returnDate}
-          hint={reserveMessages.returnDateHint}
+          align="right"
           value={returnDate}
           placeholder={reserveMessages.selectDatePlaceholder}
           onChange={handleReturnDateChange}
@@ -740,7 +746,7 @@ export function PublicBookingPanel({
         />
       </div>
 
-      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-4">
         {(
           [
             { label: reserveMessages.pickupTime, value: pickupTime, onChange: setPickupTime },
@@ -748,14 +754,14 @@ export function PublicBookingPanel({
           ] as const
         ).map((field) => (
           <label key={field.label} className="block">
-            <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{field.label}</span>
+            <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{field.label}</span>
             <select
               value={field.value}
               onChange={(event) => {
                 setError("");
                 field.onChange(event.target.value);
               }}
-              className="w-full rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)]"
+              className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] sm:px-4 sm:py-3"
             >
               {BOOKING_TIME_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -766,7 +772,7 @@ export function PublicBookingPanel({
           </label>
         ))}
       </div>
-      <p className="mt-2 text-xs leading-5 text-[var(--ink-soft)]">
+      <p className="mt-1.5 text-[11px] leading-4 text-[var(--ink-soft)] sm:mt-2 sm:text-xs sm:leading-5">
         {reserveMessages.timeZoneNote}
         {quote.days > 0 && !timeError ? ` ${reserveMessages.chargedDaysNote(quote.days)}` : ""}
       </p>
@@ -776,48 +782,44 @@ export function PublicBookingPanel({
         </p>
       ) : null}
 
-      <div className="mt-3 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3 text-xs leading-5 text-[var(--ink-soft)]">
-        {reserveMessages.calendarHint}
-      </div>
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-4">
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{reserveMessages.renterName}</span>
+          <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{reserveMessages.renterName}</span>
           <input
             value={renterName}
             onChange={(event) => setRenterName(event.target.value)}
-            className="w-full rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
+            className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none sm:px-4 sm:py-3 transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
           />
         </label>
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{reserveMessages.renterEmail}</span>
+          <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{reserveMessages.renterEmail}</span>
           <input
             type="email"
             value={renterEmail}
             onChange={(event) => setRenterEmail(event.target.value)}
-            className="w-full rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
+            className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none sm:px-4 sm:py-3 transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
           />
         </label>
       </div>
 
-      <label className="mt-4 block">
-        <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{reserveMessages.renterPhone}</span>
+      <label className="mt-2 block sm:mt-4">
+        <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{reserveMessages.renterPhone}</span>
         <input
           value={renterPhone}
           onChange={(event) => setRenterPhone(event.target.value)}
-          className="w-full rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
+          className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none sm:px-4 sm:py-3 transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
         />
       </label>
 
-      <div className="mt-5 rounded-lg border border-[var(--line)] bg-white p-4">
+      <div className="mt-3 rounded-lg border border-[var(--line)] bg-white p-3 sm:mt-5 sm:p-4">
         <p className="text-sm font-semibold text-[var(--ink)]">{reserveMessages.licenseUploadTitle}</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">{reserveMessages.licenseUploadCopy}</p>
+        <p className="mt-0.5 text-[11px] leading-4 text-[var(--ink-soft)] sm:mt-1 sm:text-xs sm:leading-5">{reserveMessages.licenseUploadCopy}</p>
         {asksLicenceRegion ? (
-          <fieldset className="mt-4">
-            <legend className="text-sm font-medium text-[var(--ink)]">
+          <fieldset className="mt-2.5 sm:mt-4">
+            <legend className="text-xs font-medium sm:text-sm text-[var(--ink)]">
               {reserveMessages.licenceRegionQuestion}
             </legend>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="mt-1.5 grid grid-cols-2 gap-2 sm:mt-2">
               {(
                 [
                   {
@@ -835,7 +837,7 @@ export function PublicBookingPanel({
                 <label
                   key={option.value}
                   className={cn(
-                    "flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2.5 text-sm transition",
+                    "flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-2 text-xs transition sm:px-3 sm:py-2.5 sm:text-sm",
                     hasLocalLicence === option.value
                       ? "border-[var(--ink)] bg-[var(--surface-muted)]"
                       : "border-[var(--line)] bg-white hover:border-[var(--line-strong)]",
@@ -863,9 +865,9 @@ export function PublicBookingPanel({
             </div>
           </fieldset>
         ) : null}
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-[var(--ink)]">
+        <div className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
+          <label className="block min-w-0">
+            <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">
               {reserveMessages.licenseFrontLabel}
             </span>
             <input
@@ -875,7 +877,7 @@ export function PublicBookingPanel({
                 setError("");
                 setLicenseFront(event.target.files?.[0] ?? null);
               }}
-              className="w-full rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-mid)] file:mr-3 file:rounded-md file:border-0 file:bg-[var(--ink)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+              className="w-full rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-mid)] file:mr-2 file:rounded-md file:border-0 file:bg-[var(--ink)] file:px-2.5 file:py-1.5 sm:file:mr-3 sm:file:px-3 sm:file:py-2 file:text-xs file:font-semibold file:text-white"
             />
             {licenseFront ? (
               <span className="mt-1 block truncate text-xs text-[var(--ink-soft)]">
@@ -883,8 +885,8 @@ export function PublicBookingPanel({
               </span>
             ) : null}
           </label>
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-[var(--ink)]">
+          <label className="block min-w-0">
+            <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">
               {reserveMessages.licenseBackLabel}
             </span>
             <input
@@ -894,7 +896,7 @@ export function PublicBookingPanel({
                 setError("");
                 setLicenseBack(event.target.files?.[0] ?? null);
               }}
-              className="w-full rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-mid)] file:mr-3 file:rounded-md file:border-0 file:bg-[var(--ink)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+              className="w-full rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-mid)] file:mr-2 file:rounded-md file:border-0 file:bg-[var(--ink)] file:px-2.5 file:py-1.5 sm:file:mr-3 sm:file:px-3 sm:file:py-2 file:text-xs file:font-semibold file:text-white"
             />
             {licenseBack ? (
               <span className="mt-1 block truncate text-xs text-[var(--ink-soft)]">
@@ -903,22 +905,22 @@ export function PublicBookingPanel({
             ) : null}
           </label>
         </div>
-        <p className="mt-3 text-xs leading-5 text-[var(--ink-soft)]">{reserveMessages.licenseUploadHint}</p>
+        <p className="mt-3 hidden text-xs leading-5 text-[var(--ink-soft)] sm:block">{reserveMessages.licenseUploadHint}</p>
       </div>
 
       {/* A statement, not a choice: the fee is part of every booking of
           a car that has one, and the server charges it regardless. */}
       {bookingInsuranceFee > 0 ? (
-        <div className="mt-5 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-4">
+        <div className="mt-3 hidden rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 sm:mt-5 sm:block sm:px-4 sm:py-4">
           <p className="text-sm font-medium text-[var(--ink)]">{reserveMessages.insuranceToggle}</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">
+          <p className="mt-0.5 text-[11px] leading-4 sm:mt-1 sm:text-xs sm:leading-5 text-[var(--ink-soft)]">
             {reserveMessages.insuranceToggleHint(formatCurrency(bookingInsuranceFee, locale))}
           </p>
         </div>
       ) : null}
 
       {locations.length > 1 ? (
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
           {(
             [
               {
@@ -942,7 +944,7 @@ export function PublicBookingPanel({
               <select
                 value={field.value}
                 onChange={(event) => field.onChange(event.target.value)}
-                className="h-11 w-full rounded-[var(--control-radius)] border border-[var(--line-strong)] bg-white px-3 text-sm text-[var(--ink)]"
+                className="h-9 w-full rounded-[var(--control-radius)] sm:h-11 border border-[var(--line-strong)] bg-white px-3 text-sm text-[var(--ink)]"
               >
                 {locations.map((location) => (
                   <option key={location.id} value={location.id}>
@@ -960,10 +962,10 @@ export function PublicBookingPanel({
         </div>
       ) : null}
 
-      <div className="mt-5">
-        <span className="mb-2 block text-sm font-medium text-[var(--ink)]">{reserveMessages.couponLabel}</span>
+      <div className="mt-3 sm:mt-5">
+        <span className="mb-2 hidden text-sm font-medium text-[var(--ink)] sm:block">{reserveMessages.couponLabel}</span>
         {appliedCoupon ? (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm">
+          <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm sm:px-4 sm:py-3">
             <span className="font-medium text-[var(--ok-fg)]">
               {reserveMessages.couponApplied(appliedCoupon.code)}
             </span>
@@ -988,13 +990,13 @@ export function PublicBookingPanel({
               }}
               placeholder={reserveMessages.couponPlaceholder}
               autoCapitalize="characters"
-              className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-white px-4 py-3 text-sm uppercase text-[var(--ink)]"
+              className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm uppercase text-[var(--ink)] sm:px-4 sm:py-3"
             />
             <button
               type="button"
               onClick={applyCoupon}
               disabled={!couponInput.trim() || couponChecking}
-              className="shrink-0 rounded-md border border-[var(--line-strong)] bg-white px-4 py-3 text-sm font-medium text-[var(--ink)] disabled:opacity-50"
+              className="shrink-0 rounded-md border border-[var(--line-strong)] bg-white px-3 py-2 text-sm font-medium text-[var(--ink)] disabled:opacity-50 sm:px-4 sm:py-3"
             >
               {couponChecking ? reserveMessages.couponChecking : reserveMessages.couponApply}
             </button>
@@ -1003,12 +1005,12 @@ export function PublicBookingPanel({
         {couponError ? <p className="mt-1 text-xs text-rose-700">{couponError}</p> : null}
       </div>
 
-      <div className="mt-5 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
+      <div className="mt-3 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3 sm:mt-5 sm:p-4">
         <div className="flex items-center justify-between text-sm text-[var(--ink-mid)]">
           <span>{reserveMessages.quoteDays(quote.days)}</span>
           <span>{formatCurrency(bookingDailyRate, locale)}</span>
         </div>
-        <div className="mt-4 space-y-3 text-sm text-[var(--ink-mid)]">
+        <div className="mt-2 space-y-1 text-[13px] text-[var(--ink-mid)] sm:mt-4 sm:space-y-3 sm:text-sm">
           <div className="flex items-center justify-between">
             <span>{reserveMessages.quoteBase}</span>
             <span>
@@ -1071,13 +1073,13 @@ export function PublicBookingPanel({
           </p>
         ) : null}
 
-        <div className="mt-4 flex items-center justify-between border-t border-[var(--line)] pt-4">
+        <div className="mt-2.5 flex items-center justify-between border-t border-[var(--line)] pt-2.5 sm:mt-4 sm:pt-4">
           <span className="text-sm font-medium text-[var(--ink)]">{reserveMessages.quoteTotal}</span>
           <span
             className={
               plan.isInstalmentPlan
                 ? "text-lg font-semibold text-[var(--ink-mid)]"
-                : "text-[1.6rem] font-semibold text-[var(--ink)]"
+                : "text-[1.25rem] font-semibold text-[var(--ink)] sm:text-[1.6rem]"
             }
           >
             {formatCurrency(plan.totalAmount, locale)}
@@ -1110,7 +1112,7 @@ export function PublicBookingPanel({
               <span className="text-sm font-medium text-[var(--ink)]">
                 {reserveMessages.instalmentDueNow}
               </span>
-              <span className="text-[1.6rem] font-semibold text-[var(--ink)]">
+              <span className="text-[1.25rem] font-semibold text-[var(--ink)] sm:text-[1.6rem]">
                 {formatCurrency(plan.dueNow, locale)}
               </span>
             </div>
@@ -1118,10 +1120,19 @@ export function PublicBookingPanel({
         ) : null}
       </div>
 
-      <div className="mt-5 rounded-lg border border-[var(--line)] bg-white p-4">
-        <p className="text-sm font-semibold text-[var(--ink)]">{reserveMessages.agreementTitle}</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">{reserveMessages.agreementIntro}</p>
-        <div className="mt-3 max-h-60 overflow-y-auto rounded-md border border-[var(--line)] bg-[var(--surface-muted)]">
+      <div className="mt-3 rounded-lg border border-[var(--line)] bg-white p-3 sm:mt-5 sm:p-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-[var(--ink)]">{reserveMessages.agreementTitle}</p>
+          <button
+            type="button"
+            onClick={() => setShowClauses((current) => !current)}
+            className="shrink-0 text-xs text-[var(--ink-mid)] underline sm:hidden"
+          >
+            {showClauses ? reserveMessages.agreementHide : reserveMessages.agreementShow}
+          </button>
+        </div>
+        <p className="mt-1 hidden text-xs leading-5 text-[var(--ink-soft)] sm:block">{reserveMessages.agreementIntro}</p>
+        <div className={cn(showClauses ? "block" : "hidden", "mt-2 max-h-48 sm:mt-3 sm:block sm:max-h-60 overflow-y-auto rounded-md border border-[var(--line)] bg-[var(--surface-muted)]")}>
           {/* The operator's own wording when they have edited it -- a
               translated summary of the built-in clauses would no longer
               describe what they are about to sign. */}
@@ -1129,13 +1140,13 @@ export function PublicBookingPanel({
             ? agreementClauses.map((clause) => ({ title: clause.heading, copy: clause.body }))
             : reserveMessages.agreementSections
           ).map((section, index) => (
-            <div key={`${index}-${section.title}`} className="grid gap-2 border-b border-[var(--line)] px-3 py-3 last:border-b-0 sm:grid-cols-[8rem_1fr]">
+            <div key={`${index}-${section.title}`} className="grid gap-1 border-b border-[var(--line)] px-2.5 py-2 last:border-b-0 sm:grid-cols-[8rem_1fr] sm:gap-2 sm:px-3 sm:py-3">
               <p className="text-xs font-semibold leading-5 text-[var(--ink)]">{section.title}</p>
               <p className="text-xs leading-5 text-[var(--ink-mid)]">{section.copy}</p>
             </div>
           ))}
         </div>
-        <label className="mt-3 flex items-start gap-3 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-3">
+        <label className="mt-2 flex items-start gap-2.5 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 sm:mt-3 sm:gap-3 sm:py-3">
           <input
             type="checkbox"
             checked={agreementAccepted}
@@ -1145,22 +1156,27 @@ export function PublicBookingPanel({
             }}
             className="mt-1 h-4 w-4 rounded border-[var(--line-strong)]"
           />
-          <span className="text-sm leading-6 text-[var(--ink-mid)]">
+          <span className="text-[13px] leading-5 text-[var(--ink-mid)] sm:text-sm sm:leading-6">
             {reserveMessages.agreementCheckbox}
           </span>
         </label>
       </div>
 
-      <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--line)] bg-white px-4 py-3">
+      <div
+        className={cn(
+          "mt-3 items-center justify-between rounded-md border border-[var(--line)] bg-white px-3 py-2 sm:mt-4 sm:flex sm:px-4 sm:py-3",
+          stripeReady && hostPayoutsReady ? "hidden" : "flex",
+        )}
+      >
         <div>
-          <p className="text-sm font-medium text-[var(--ink)]">
+          <p className="text-[13px] font-medium text-[var(--ink)] sm:text-sm">
             {!stripeReady
               ? reserveMessages.stripeMissing
               : !hostPayoutsReady
                 ? reserveMessages.hostPayoutsMissing
                 : reserveMessages.stripeReady}
           </p>
-          <p className="mt-1 text-xs text-[var(--ink-soft)]">
+          <p className="mt-0.5 text-[11px] text-[var(--ink-soft)] sm:mt-1 sm:text-xs">
             {!hostPayoutsReady && stripeReady
               ? reserveMessages.hostPayoutsHint
               : reserveMessages.checkoutHelp}
@@ -1177,7 +1193,7 @@ export function PublicBookingPanel({
       <button
         onClick={startCheckout}
         disabled={!stripeReady || !hostPayoutsReady || isPending}
-        className="mt-5 w-full rounded-md bg-[var(--ink)] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-24px_rgba(15,23,42,0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-3 w-full rounded-md bg-[var(--ink)] px-4 py-3 text-sm sm:mt-5 sm:py-3.5 font-semibold text-white shadow-[0_18px_40px_-24px_rgba(15,23,42,0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isPending ? reserveMessages.checkoutLoading : reserveMessages.checkoutAction}
       </button>

@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.12.1 - 2026-09-29
+
+### The car page fits a phone
+
+On a 375px phone a car's page on the rental site ran to 5.3 screens;
+the booking information now ends at about two. Below the `sm`
+breakpoint only: a smaller title and intro, the three price tiles side
+by side, a shorter photo (16:9), dates, times, name and email in two
+columns, tighter inputs, a smaller total, and a shorter footer. The
+agreement clauses fold behind "Read the terms" (the checkbox stays in
+view), and notices that repeat what is already on screen -- the
+insurance statement, the file-format hint, "payment by Stripe" when
+payment is ready -- are hidden. Larger screens are unchanged.
+
+The occupied-dates list is gone from the car page and `/reserve`, and so
+are the hints about booked dates: the date picker already refuses them.
+The right-hand date picker now opens leftward so it stays on screen.
+
 ## v1.12.0 - 2026-09-29
 
 ### Single-use coupon codes

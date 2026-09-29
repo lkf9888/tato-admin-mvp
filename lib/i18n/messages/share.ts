@@ -135,6 +135,8 @@ export const shareMessages = {
       agreementTitle: "Rental agreement terms",
       agreementIntro: "Read the terms below before continuing to card checkout.",
       agreementCheckbox: "I have read and agree to the rental agreement terms.",
+      agreementShow: "Read the terms",
+      agreementHide: "Hide the terms",
       agreementSections: [
         {
           title: "Use of Vehicle",
@@ -312,6 +314,8 @@ export const shareMessages = {
       agreementTitle: "租车协议条款",
       agreementIntro: "继续支付前，请先阅读以下租车协议条款。",
       agreementCheckbox: "我已阅读并同意以上租车协议条款。",
+      agreementShow: "查看协议条款",
+      agreementHide: "收起协议条款",
       agreementSections: [
         {
           title: "车辆使用",

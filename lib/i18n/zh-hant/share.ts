@@ -120,6 +120,8 @@ export const shareMessages = {
       agreementTitle: "租車協議條款",
       agreementIntro: "繼續支付前，請先閱讀以下租車協議條款。",
       agreementCheckbox: "我已閱讀並同意以上租車協議條款。",
+      agreementShow: "檢視協議條款",
+      agreementHide: "收起協議條款",
       agreementSections: [
         {
           title: "車輛使用",

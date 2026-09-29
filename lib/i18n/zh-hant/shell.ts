@@ -22,7 +22,6 @@ export const shellMessages = {
         investmentRanking: "投資回報排名",
         ownerStatements: "車主分成",
         directBooking: "線上預訂",
-        rentalSite: "租車網站",
         bookingRequests: "變更申請",
         owners: "車主分成",
         orders: "訂單",

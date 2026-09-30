@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import type { OrderStatus } from "@prisma/client";
+
 import { assignPendingOrderAction, dismissPendingOrderAction } from "@/app/actions";
 import { InfoHint } from "@/components/info-hint";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -21,6 +23,9 @@ export type PendingOrderRow = {
   matchCount: number;
   /** Cars that answer to `vehicleText`, offered first in the picker. */
   candidateVehicleIds: string[];
+  /** As Turo's mail last put it. Optional so the panel reads the same
+   *  without it; with it, a cancelled trip is never counted as under way. */
+  status?: OrderStatus;
 };
 
 export type PendingVehicleOption = {
@@ -60,6 +65,9 @@ function copy(locale: Locale) {
         collapse: "收起",
         countInGroup: (count: number) => `${count} 笔`,
         nextPickup: (when: string) => `最近取车 ${when}`,
+        underway: (count: number) => `${count} 笔已经在进行中`,
+        underwayTag: "进行中",
+        underwayHint: "已经取车、还没还车:车在客人手上,日历上却没有这笔订单,这段时间它看起来是空的。先挂这几笔。",
         dismiss: "忽略",
         dismissHint: "只从这个列表里移除,不会建订单。下次同步如果邮件还在,它会再次出现。",
       }
@@ -87,6 +95,10 @@ function copy(locale: Locale) {
         collapse: "Hide",
         countInGroup: (count: number) => `${count} booking${count === 1 ? "" : "s"}`,
         nextPickup: (when: string) => `next pickup ${when}`,
+        underway: (count: number) => `${count} already under way`,
+        underwayTag: "under way",
+        underwayHint:
+          "Picked up and not yet returned: the car is with a guest, but the calendar has no booking for it and shows it as free. Place these first.",
         dismiss: "Dismiss",
         dismissHint:
           "Removes it from this list without creating an order. It reappears on the next sync if the mail is still there.",
@@ -107,6 +119,19 @@ type Group = {
 };
 
 const EXPANDED_KEY = "tato.pendingOrders.expanded";
+
+/**
+ * Picked up and not yet returned. These are the urgent ones: the car is
+ * already out, and until it is placed the calendar shows that car free
+ * for dates it is not -- the "next pickup" line, which looks only
+ * forward, never mentions them.
+ */
+function isUnderway(row: PendingOrderRow, now: number) {
+  if (row.status === "cancelled") return false;
+  return (
+    new Date(row.pickupDatetime).getTime() <= now && new Date(row.returnDatetime).getTime() > now
+  );
+}
 
 /**
  * The picker for one group. Active cars that match the model go to the
@@ -148,10 +173,17 @@ function buildOptions(candidateIds: string[], vehicles: PendingVehicleOption[], 
  * out for some trip dates and not others, and a header that states one
  * count for rows that have another would be wrong for some of them.
  *
- * Groups run by their earliest pickup, and rows within a group by
- * pickup, so the booking that needs a car soonest is always at the top.
+ * Groups holding a trip already under way come first -- that car is out
+ * with a guest and the calendar calls it free. Then groups run by their
+ * earliest pickup, and rows within a group by pickup, so the booking
+ * that needs a car soonest is at the top.
  */
-function buildGroups(rows: PendingOrderRow[], vehicles: PendingVehicleOption[], t: Copy): Group[] {
+function buildGroups(
+  rows: PendingOrderRow[],
+  vehicles: PendingVehicleOption[],
+  t: Copy,
+  underway: Set<string>,
+): Group[] {
   const byKey = new Map<string, PendingOrderRow[]>();
   for (const row of rows) {
     const key = `${row.vehicleText}\u0000${row.turoAccount ?? ""}\u0000${row.matchCount}`;
@@ -181,7 +213,11 @@ function buildGroups(rows: PendingOrderRow[], vehicles: PendingVehicleOption[], 
         reason,
       };
     })
-    .sort((a, b) => pickup(a.rows[0]) - pickup(b.rows[0]));
+    .sort((a, b) => {
+      const urgent = (group: { rows: PendingOrderRow[] }) =>
+        group.rows.some((row) => underway.has(row.id)) ? 0 : 1;
+      return urgent(a) - urgent(b) || pickup(a.rows[0]) - pickup(b.rows[0]);
+    });
 }
 
 /**
@@ -219,7 +255,15 @@ export function PendingOrdersPanel({
     }
   }, []);
 
-  const groups = useMemo(() => buildGroups(rows, vehicles, t), [rows, vehicles, t]);
+  const underway = useMemo(() => {
+    const now = Date.now();
+    return new Set(rows.filter((row) => isUnderway(row, now)).map((row) => row.id));
+  }, [rows]);
+
+  const groups = useMemo(
+    () => buildGroups(rows, vehicles, t, underway),
+    [rows, vehicles, t, underway],
+  );
 
   const summary = useMemo(() => {
     const byModel = new Map<string, number>();
@@ -263,6 +307,14 @@ export function PendingOrdersPanel({
             {t.title(rows.length)}
             <InfoHint text={`${t.intro}\n\n${t.resolveHint}`} />
           </h3>
+          {underway.size > 0 ? (
+            <span
+              title={t.underwayHint}
+              className="whitespace-nowrap rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-rose-700"
+            >
+              {t.underway(underway.size)}
+            </span>
+          ) : null}
           {nextPickup ? (
             <span className="text-[11px] tabular-nums text-amber-800">{t.nextPickup(nextPickup)}</span>
           ) : null}
@@ -322,6 +374,14 @@ export function PendingOrdersPanel({
                       className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-2.5 py-1.5 text-[12px] leading-5"
                     >
                       <div className="min-w-0 flex-1 basis-[16rem] truncate" title={detail}>
+                        {underway.has(row.id) ? (
+                          <span
+                            title={t.underwayHint}
+                            className="mr-2 rounded-full border border-rose-200 bg-rose-50 px-1.5 py-px text-[10px] font-semibold text-rose-700"
+                          >
+                            {t.underwayTag}
+                          </span>
+                        ) : null}
                         <span className="font-semibold text-[var(--ink)]">{row.renterName}</span>
                         <span className="ml-2 tabular-nums text-[var(--ink-mid)]">{dates}</span>
                         <span className="ml-2 tabular-nums text-[var(--ink-soft)]">#{row.externalOrderId}</span>

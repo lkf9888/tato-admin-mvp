@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.21.2 - 2026-09-30
+
+### The unassigned basket says which trips are already under way
+
+The basket at the top of the orders page listed Turo trips it could not match to a car, along with the next upcoming pickup. It never pointed out the trips whose car had already been picked up and not yet returned. Those are the urgent ones: a guest has the car, but the calendar has no booking on it and shows that car as free.
+
+The folded bar now says **N 笔已经在进行中** when any exist. Each of those trips is tagged 进行中 when the basket is unfolded, and the group that contains them is listed first. A trip that mail marks cancelled is never counted as under way.
+
+
 ## v1.21.1 - 2026-09-30
 
 ### A car's order count is its real trips

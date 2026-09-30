@@ -17,9 +17,7 @@ export const shellMessages = {
       nav: {
         dashboard: "儀表盤",
         vehicles: "車輛",
-        vehicleRoi: "車輛投資回報分析",
-        rentalEstimate: "車輛租金預估",
-        investmentRanking: "投資回報排名",
+        vehicleRoi: "車輛投資回報",
         ownerStatements: "車主分成",
         directBooking: "線上預訂",
         owners: "車主分成",

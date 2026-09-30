@@ -23,9 +23,7 @@ export const shellMessages = {
       nav: {
         dashboard: "Dashboard",
         vehicles: "Vehicles",
-        vehicleRoi: "Vehicle ROI",
-        rentalEstimate: "Rental Estimate",
-        investmentRanking: "Which Car to Buy",
+        vehicleRoi: "Vehicle returns",
         ownerStatements: "Owner Statements",
         directBooking: "Direct Booking",
         owners: "Owner revenue share",
@@ -93,9 +91,7 @@ export const shellMessages = {
       nav: {
         dashboard: "仪表盘",
         vehicles: "车辆",
-        vehicleRoi: "车辆投资回报分析",
-        rentalEstimate: "车辆租金预估",
-        investmentRanking: "投资回报排名",
+        vehicleRoi: "车辆投资回报",
         ownerStatements: "车主分成",
         directBooking: "在线预定",
         owners: "车主分成",

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticateAgent } from "@/lib/agent-auth";
 import { corsPreflight, withCors } from "@/lib/agent-cors";
+import { zonedDateTimeToUtc } from "@/lib/booking-time";
 import { normalizeTuroAccount } from "@/lib/csv-mapping";
 import { logActivity } from "@/lib/orders";
 import { ingestTuroTripSnapshots, type TuroTripObservation } from "@/lib/turo-email-apply";
@@ -22,6 +23,32 @@ export const runtime = "nodejs";
  * to be recorded, or the next Gmail sync re-derives the trip from mail
  * alone and moves a page-only extension straight back.
  */
+const LOCAL_DATETIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::00(?:\.0+)?)?$/;
+
+/**
+ * A trip time as the agent sends it, as the instant it is.
+ *
+ * Preferably without an offset -- "2026-10-15T10:00:00" -- read on the
+ * fleet's clock. That is what the page shows, and leaving the offset to
+ * us is the point: an agent that appends one has to know Vancouver is
+ * -07:00 until November and -08:00 after, and an agent that appends "Z"
+ * to a time it never converted puts every trip seven hours early. With
+ * an explicit offset or Z, the string is taken at its word.
+ */
+function parseTripTime(value: string): Date | null {
+  const local = LOCAL_DATETIME.exec(value);
+  if (local) return zonedDateTimeToUtc(local[1], local[2]);
+  if (!z.string().datetime({ offset: true }).safeParse(value).success) return null;
+  return new Date(value);
+}
+
+const tripTime = z
+  .string()
+  .trim()
+  .refine((value) => parseTripTime(value) !== null, {
+    message: "Use 2026-10-15T10:00:00 (Vancouver local time), or ISO 8601 with an offset",
+  });
+
 const tripSchema = z.object({
   reservationId: z.string().trim().regex(/^\d{5,}$/, "Turo reservation ids are digits"),
   status: z.enum(["booked", "ongoing", "changed", "cancelled", "completed"]),
@@ -30,8 +57,8 @@ const tripSchema = z.object({
   plate: z.string().trim().max(20).nullish(),
   guestName: z.string().trim().max(120).nullish(),
   guestPhone: z.string().trim().max(40).nullish(),
-  tripStart: z.string().datetime({ offset: true }),
-  tripEnd: z.string().datetime({ offset: true }),
+  tripStart: tripTime,
+  tripEnd: tripTime,
   pickupLocation: z.string().trim().max(300).nullish(),
 });
 
@@ -72,7 +99,17 @@ export async function POST(request: Request) {
   }
 
   const { trips, dryRun } = parsed.data;
-  const invalid = trips.find((trip) => new Date(trip.tripEnd) <= new Date(trip.tripStart));
+  // Validated above, so neither is null here.
+  const times = new Map(
+    trips.map((trip) => [
+      trip.reservationId,
+      { start: parseTripTime(trip.tripStart)!, end: parseTripTime(trip.tripEnd)! },
+    ]),
+  );
+  const invalid = trips.find((trip) => {
+    const time = times.get(trip.reservationId)!;
+    return time.end <= time.start;
+  });
   if (invalid) {
     return withCors(
       {
@@ -92,8 +129,8 @@ export async function POST(request: Request) {
     vehicleYear: null,
     guestName: trip.guestName ?? null,
     guestPhone: trip.guestPhone ?? null,
-    tripStart: new Date(trip.tripStart),
-    tripEnd: new Date(trip.tripEnd),
+    tripStart: parseTripTime(trip.tripStart)!,
+    tripEnd: parseTripTime(trip.tripEnd)!,
     earnings: null,
     mileageIncludedKm: null,
     location: trip.pickupLocation ?? null,
@@ -148,6 +185,10 @@ export async function POST(request: Request) {
     })),
     /** Plates that match no car in the fleet; those trips were parked. */
     unknownPlates: outcome.unresolvedPlateHints,
+    /** Refused, not stored: both times sat exactly one Vancouver offset
+     *  off what TATO already knows, the signature of a local time sent
+     *  with "Z". Resend them without an offset. */
+    suspectedTimezoneShift: outcome.suspectedTimezoneShift ?? [],
   });
 }
 

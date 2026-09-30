@@ -164,8 +164,9 @@ const WRITE_ENDPOINTS = [
           plate: "optional. If the page shows the licence plate, send it as shown: it decides the car",
           guestName: "optional",
           guestPhone: "optional",
-          tripStart: "ISO 8601 with offset, e.g. 2026-11-10T10:00:00-08:00",
-          tripEnd: "ISO 8601 with offset",
+          tripStart:
+            "the time as the page shows it, WITHOUT an offset: 2026-10-15T10:00:00 is read as Vancouver local time. Do not append Z unless you actually converted to UTC.",
+          tripEnd: "same format as tripStart",
           pickupLocation: "optional",
         },
       ],
@@ -173,7 +174,7 @@ const WRITE_ENDPOINTS = [
     notes: [
       "At most 200 trips per request. Idempotent on reservationId.",
       "A finished trip keeps its recorded dates: completed trips are settled by the CSV, not moved by a page read.",
-      "Returns created / updated / unchanged / pending counts, notPlaced (each trip that could not be put on one car, with how many cars matched), and unknownPlates.",
+      "Returns created / updated / unchanged / pending counts, notPlaced (each trip that could not be put on one car, with how many cars matched), unknownPlates, and suspectedTimezoneShift -- trips refused because their times look like local times sent as UTC; resend those without an offset.",
     ],
   },
 ];

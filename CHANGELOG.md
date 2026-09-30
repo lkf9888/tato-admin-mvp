@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.19.1 - 2026-09-29
+
+### One sidebar entry for vehicle returns
+
+v1.18.0 merged Vehicle ROI, Rental Estimate and Which Car to Buy into one page with tabs. The sidebar still listed all three; it now lists one, **车辆投资回报 / Vehicle returns**, named like the page, and it stays highlighted on the Rental estimate and Which car to buy tabs. The old addresses keep redirecting, so bookmarks still work. The labels, icons and page text the old entries used are removed.
+
+### The agent sends trip times as the page shows them
+
+`POST /api/agent/trips` now takes `tripStart` / `tripEnd` without an offset -- `2026-10-15T10:00:00` -- and reads them on Vancouver's clock, daylight saving included. An agent that works out the offset itself has to know Vancouver is -07:00 until November and -08:00 after, and one that appends `Z` to a time it never converted moves every trip seven hours. Explicit offsets still work; anything else is refused with the expected format.
+
+Trips v1.19.0 refused as a likely time-zone slip come back in `suspectedTimezoneShift`, so the agent can resend them. `POST /api/agent/imports` reports `newerObservationsApplied`: upcoming trips whose dates the booking mail or a trip-page read overrode after the CSV was applied.
+
+
 ## v1.19.0 - 2026-09-29
 
 ### Mail, the CSV and the agent agree on every Turo trip

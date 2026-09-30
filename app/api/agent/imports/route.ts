@@ -80,6 +80,10 @@ export async function POST(request: Request) {
       archivedRows: result.archivedRows,
       cancelledArchived: result.deletedCancelledRows,
       updatedVehicles: result.updatedVehicles,
+      /** Unfinished trips whose dates came back from newer booking mail
+       *  or trip-page reads after the export was applied: the CSV is
+       *  settled history, not the latest word on a trip still ahead. */
+      newerObservationsApplied: result.newerObservationsApplied,
       // Row numbers and reasons only: the rows themselves carry guest
       // names and phones, and the caller already has the file.
       failures: result.failures

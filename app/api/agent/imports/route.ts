@@ -14,7 +14,7 @@ export const runtime = "nodejs";
  * only authenticates and hands over the text. That is deliberate: the
  * CSV is the one source that names the plate and settles the money, so
  * everything that makes it trustworthy (plate-first matching, the
- * identifier reclaim, the owner ledger, cancelled trips archived) has
+ * identifier reclaim, the owner ledger, cancellations recorded) has
  * to be the code a person's upload goes through, not a second copy of it.
  *
  * Never creates vehicles. A car is a billing slot and an owner
@@ -78,7 +78,9 @@ export async function POST(request: Request) {
       failed: result.failedRows,
       /** Rows skipped because their car is archived. */
       archivedRows: result.archivedRows,
-      cancelledArchived: result.deletedCancelledRows,
+      /** Rows Turo marked cancelled. Recorded as cancelled -- they stay
+       *  on the calendar as a thin bar -- not deleted. */
+      cancelled: result.deletedCancelledRows,
       updatedVehicles: result.updatedVehicles,
       /** Unfinished trips whose dates came back from newer booking mail
        *  or trip-page reads after the export was applied: the CSV is

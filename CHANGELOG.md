@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.21.1 - 2026-09-30
+
+### A car's order count is its real trips
+
+The **Orders** column on the vehicles list counted every order the car had ever had, including ones in the trash and ones cancelled. Since v1.20.0 keeps Turo's cancellations on the calendar, that would have added hundreds of trips that never happened. It now counts only trips that are not deleted and not cancelled.
+
+### The agent API says what happens to a cancellation
+
+`GET /api/agent` and `POST /api/agent/imports` still said a CSV import archives cancelled trips. Since v1.20.0 they are recorded as cancelled and stay on the calendar. The import's `cancelledArchived` count is renamed `cancelled`; the number is unchanged -- the rows Turo marked cancelled.
+
+
 ## v1.21.0 - 2026-09-30
 
 ### The purchase ranking can be searched

@@ -135,7 +135,7 @@ const WRITE_ENDPOINTS = [
     path: "/api/agent/imports",
     method: "POST",
     summary:
-      "Import Turo's trip-earnings CSV export, as downloaded. Same code as the CSV import page: cars matched by plate, amounts and fees recorded, the owner ledger updated, cancelled trips archived. Re-importing the same file is safe -- trips are keyed on the reservation id.",
+      "Import Turo's trip-earnings CSV export, as downloaded. Same code as the CSV import page: cars matched by plate, amounts and fees recorded, the owner ledger updated, cancelled trips recorded as cancelled (kept on the calendar, not deleted). Re-importing the same file is safe -- trips are keyed on the reservation id.",
     body: {
       fileName: "string, e.g. the downloaded file's name (for the import history)",
       csv: "string, the CSV file's text exactly as Turo exported it",

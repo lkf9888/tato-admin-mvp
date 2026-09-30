@@ -49,7 +49,15 @@ export default async function VehiclesPage({
       where: { workspaceId: workspace.id },
       // A count, not the orders themselves. Loading every order of every
       // car to print one number per row was thousands of rows per visit.
-      include: { owner: true, _count: { select: { orders: true } } },
+      include: {
+        owner: true,
+        // Trips the car took or will take. Deleted orders are in the
+        // trash, and cancelled ones -- which stay on the calendar as a
+        // thin bar since v1.20.0 -- never put the car on the road.
+        _count: {
+          select: { orders: { where: { isArchived: false, status: { not: "cancelled" } } } },
+        },
+      },
       orderBy: { createdAt: "desc" },
     }),
     prisma.owner.findMany({

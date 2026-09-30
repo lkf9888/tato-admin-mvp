@@ -194,19 +194,13 @@ export function PayoutsPanel({
 
   return (
     <div className="space-y-3">
-      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-3 sm:px-4">
-        <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
-          {t.kicker}
-        </p>
-        <h1 className="mt-1 font-serif text-[1.25rem] font-semibold leading-tight text-[var(--ink)]">
-          {t.title}
-        </h1>
-        <p className="mt-2 max-w-2xl text-[12px] leading-5 text-[var(--ink-soft)]">{t.copy}</p>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/60 px-2.5 py-0.5 text-[11px] text-[var(--ink-soft)]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-          {t.platformFeeNote}
-        </div>
-      </header>
+      <h1 className="sr-only">{t.kicker}</h1>
+      {/* What the platform keeps is a fact about money, not decoration,
+          so it stays when the page's hero card went. */}
+      <p className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/60 px-2.5 py-0.5 text-[11px] text-[var(--ink-soft)]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+        {t.platformFeeNote}
+      </p>
 
       {!configured && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-800">

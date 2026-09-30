@@ -1,5 +1,4 @@
 import {
-  buildDirectBookingStats,
   DirectBookingHeader,
   DirectBookingLinkTabs,
   type DirectBookingSection,
@@ -8,7 +7,7 @@ import { getDirectBookingSummary, getDirectBookingTabBadges } from "@/lib/direct
 import { getMessages, type Locale } from "@/lib/i18n";
 
 /**
- * The header and tab row on the direct-booking pages that are not
+ * The page name and tab row on the direct-booking pages that are not
  * /direct-booking itself (the rental website, change requests), so each
  * looks like one more tab of the same page.
  */
@@ -31,9 +30,9 @@ export async function DirectBookingSubpageFrame({
   return (
     <>
       <DirectBookingHeader
-        kicker={directMessages.kicker}
-        title={directMessages.title}
-        stats={buildDirectBookingStats(directMessages, summary)}
+        pageName={directMessages.kicker}
+        stripeReady={summary.stripeReady}
+        stripeMissingLabel={directMessages.stripeMissing}
       />
       <DirectBookingLinkTabs
         label={directMessages.tabsLabel}

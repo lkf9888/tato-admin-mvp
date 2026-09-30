@@ -14,7 +14,6 @@ import {
 } from "@/components/direct-booking-fleet-table";
 import { DirectBookingEmailEditor } from "@/components/direct-booking-email-editor";
 import {
-  buildDirectBookingStats,
   DirectBookingHeader,
   directBookingSectionHref,
 } from "@/components/direct-booking-nav";
@@ -202,7 +201,7 @@ export default async function DirectBookingPage({
     };
   });
   const emailEnabled = emailTemplate?.isEnabled ?? true;
-  const stats = buildDirectBookingStats(directMessages, summarizeDirectBooking(vehicles, fleetPolicy));
+  const summary = summarizeDirectBooking(vehicles, fleetPolicy);
 
   const rulesPanel = (
     <>
@@ -484,9 +483,9 @@ export default async function DirectBookingPage({
   return (
     <div className="space-y-3">
       <DirectBookingHeader
-        kicker={directMessages.kicker}
-        title={directMessages.title}
-        stats={stats}
+        pageName={directMessages.kicker}
+        stripeReady={summary.stripeReady}
+        stripeMissingLabel={directMessages.stripeMissing}
       />
 
       <DirectBookingTabs

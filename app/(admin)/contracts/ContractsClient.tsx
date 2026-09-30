@@ -935,13 +935,8 @@ export default function ContractsClient({
   if (mode === "manage") {
     return (
       <div className="max-w-7xl space-y-5 p-3 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">电子合约签约</h1>
-            <p className="text-sm text-[var(--ink-soft)] dark:text-[var(--ink-soft)]">
-              管理合约模板，发送给一个或多个租客在线签署。
-            </p>
-          </div>
+        <h1 className="sr-only">电子合约签约</h1>
+        <div className="flex justify-end">
           <Link href="/contracts/templates/new" className="btn-primary text-center">
             + 创建合约模板
           </Link>
@@ -1165,13 +1160,8 @@ export default function ContractsClient({
 
   return (
     <div className={`${isEditMode ? "w-full max-w-none" : "max-w-7xl"} space-y-5 p-3 sm:p-6`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{isEditMode ? "编辑合约模板" : "创建合约模板"}</h1>
-          <p className="text-sm text-[var(--ink-soft)] dark:text-[var(--ink-soft)]">
-            按 DocuSign 式流程：上传 PDF，设置签署人顺序，再把字段放到对应签署人的位置。
-          </p>
-        </div>
+      <h1 className="sr-only">{isEditMode ? "编辑合约模板" : "创建合约模板"}</h1>
+      <div className="flex justify-end">
         <Link href="/contracts" className="btn-secondary text-center">
           返回电子合约
         </Link>

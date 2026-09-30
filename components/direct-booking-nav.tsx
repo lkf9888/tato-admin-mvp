@@ -41,70 +41,33 @@ export function directBookingSectionHref(section: DirectBookingSection) {
   return `/direct-booking?tab=${section}`;
 }
 
-export type DirectBookingStat = { label: string; value: string | number; tone?: "ok" | "bad" };
-
-export function buildDirectBookingStats(
-  copy: {
-    enabledCount: string;
-    readyCount: string;
-    stripeStatus: string;
-    stripeReady: string;
-    stripeMissing: string;
-  },
-  summary: { enabledCount: number; readyCount: number; stripeReady: boolean },
-): DirectBookingStat[] {
-  return [
-    { label: copy.enabledCount, value: summary.enabledCount },
-    { label: copy.readyCount, value: summary.readyCount },
-    {
-      label: copy.stripeStatus,
-      value: summary.stripeReady ? copy.stripeReady : copy.stripeMissing,
-      tone: summary.stripeReady ? "ok" : "bad",
-    },
-  ];
-}
-
+/**
+ * The top of every direct-booking page: no hero card (the tabs say
+ * where you are), a page name for screen readers, and one line only
+ * when something needs doing -- renters cannot pay while Stripe is not
+ * connected.
+ */
 export function DirectBookingHeader({
-  kicker,
-  title,
-  stats,
+  pageName,
+  stripeReady,
+  stripeMissingLabel,
 }: {
-  kicker: string;
-  title: string;
-  stats: DirectBookingStat[];
+  pageName: string;
+  stripeReady: boolean;
+  stripeMissingLabel: string;
 }) {
   return (
-    <section className="rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.94),rgba(255,240,231,0.97))] px-3 py-2.5 shadow-[0_20px_48px_-40px_rgba(17,19,24,0.45)] sm:px-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">{kicker}</p>
-          <h2 className="mt-0.5 font-serif text-[1.15rem] leading-tight text-[color:var(--ink)] sm:text-[1.25rem]">
-            {title}
-          </h2>
-        </div>
-        <dl className="flex flex-wrap gap-1.5">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="flex items-baseline gap-1.5 rounded-full border border-[rgba(17,19,24,0.08)] bg-white/80 px-3 py-1 text-[11px]"
-            >
-              <dt className="text-[color:var(--ink-soft)]">{stat.label}</dt>
-              <dd
-                className={`font-semibold tabular-nums ${
-                  stat.tone === "ok"
-                    ? "text-[color:var(--ok-fg)]"
-                    : stat.tone === "bad"
-                      ? "text-[color:var(--bad-fg)]"
-                      : "text-[color:var(--ink)]"
-                }`}
-              >
-                {stat.value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </section>
+    <>
+      <h1 className="sr-only">{pageName}</h1>
+      {!stripeReady ? (
+        <Link
+          href="/payouts"
+          className="block rounded-md border border-[color:var(--bad-fg)]/25 bg-[var(--bad-bg)] px-3 py-2 text-[12px] font-medium text-[color:var(--bad-fg)]"
+        >
+          {stripeMissingLabel} →
+        </Link>
+      ) : null}
+    </>
   );
 }
 

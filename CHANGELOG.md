@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.24.1 - 2026-09-30
+
+### Direct booking, payouts and contracts lose their hero cards
+
+As on the other admin pages: the kicker, big title and description
+card at the top of 在线预订 (and its 网站 / 变更申请 sub-pages), 收款
+and 电子合同 are gone, with an `sr-only` h1 left for screen readers.
+The direct-booking tab bar now sits at the top; its three header stats
+are gone too, except that a one-line warning linking to payouts
+appears when Stripe is not connected (renters cannot pay then). The
+payouts page keeps its platform-fee line, which is a fact about money.
+The contract pages keep their create / back buttons. Unused
+direct-booking header strings are removed; the payouts title and copy
+strings live in `billing.ts` (底座's) and are left for them.
+
 ## v1.24.0 - 2026-09-30
 
 ### Guest messages read like a messaging app on a phone

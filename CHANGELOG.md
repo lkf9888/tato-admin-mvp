@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.21.3 - 2026-09-30
+
+### A cancelled booking in the basket is not counted as under way
+
+v1.21.2 taught the **Unassigned** panel to say how many of its bookings are already under way. The orders page now hands the panel each booking's status, so one the booking mail has since cancelled -- still parked, with dates that happen to span today -- is left out of that count.
+
+
 ## v1.21.2 - 2026-09-30
 
 ### The unassigned basket says which trips are already under way

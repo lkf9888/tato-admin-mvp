@@ -362,6 +362,9 @@ export default async function OrdersPage({
           vehicleText: row.vehicleText,
           turoAccount: row.turoAccount,
           matchCount: row.matchCount,
+          // So a booking the mail has since cancelled, still parked
+          // here, is not counted as a trip under way.
+          status: row.status,
           // Recomputed rather than stored: a car added to the fleet
           // today should be offered against a booking parked
           // yesterday, without waiting for a sync to rewrite the row.

@@ -71,6 +71,9 @@ export type ApplyOutcome = {
   skippedCompleted: number;
   /** Bookings parked in the unassigned basket this run. */
   pending: number;
+  /** Trips cancelled before they could be placed on a car: neither
+   *  created nor parked, and cleared from the basket if they were in it. */
+  cancelledUnplaced: number;
   /** Overrides that named a plate no vehicle in this workspace has.
    *  Reported rather than ignored: a typo here files nothing, and
    *  silence would look identical to the trip not existing. */
@@ -325,6 +328,7 @@ export async function applyTuroOrderFacts(input: {
     updated: 0,
     skippedCompleted: 0,
     pending: 0,
+    cancelledUnplaced: 0,
     ambiguousVehicle: [],
     unknownPlates: [],
     unresolvedPlateHints: [],
@@ -481,6 +485,21 @@ export async function applyTuroOrderFacts(input: {
               lastBookedAt,
               tripStart: facts.tripStart,
             });
+      if (placement.kind === "pending" && facts.intent === "cancelled") {
+        // Cancelled before it was ever placed. The basket exists to get
+        // real trips onto the calendar, and this one will never run: it
+        // would sit there asking for a car, and placing it by hand only
+        // draws a cancelled strip. So it is left out, and one parked
+        // before the cancellation arrived is taken back out. A CSV that
+        // names its plate still records it, on the right car.
+        if (input.apply) {
+          await prisma.pendingOrder.deleteMany({
+            where: { workspaceId: input.workspaceId, externalOrderId: reservationId },
+          });
+        }
+        outcome.cancelledUnplaced += 1;
+        continue;
+      }
       if (placement.kind === "pending") {
         // Several cars of one model is normal here, and the mail names
         // no plate. Guessing would file a real booking against the

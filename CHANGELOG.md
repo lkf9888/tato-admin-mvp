@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.22.4 - 2026-09-30
+
+### A trip cancelled before it reached a car stays out of the unassigned basket
+
+Some Turo trips could not be matched to a car because several cars of the same model were in the fleet, or none was. The unassigned basket held on to such a trip even after Turo cancelled it, and kept asking someone to pick a car for it. Two cancelled Lexus trips sat there for this reason, and a car was added to the fleet to place them. Placing one only puts a cancelled strip on the calendar.
+
+A trip that has been cancelled and is not yet an order is now neither created nor parked. One that was parked before the cancellation arrived is taken out of the basket at the next sync. The sync's result counts these trips as `cancelledUnplaced`, including on a dry run.
+
+Cancelled trips that are matched to exactly one car, or whose plate is known, still become cancelled orders shown as a strip, as before.
+
+
 ## v1.22.3 - 2026-09-30
 
 ### Account settings describe both kinds of API token

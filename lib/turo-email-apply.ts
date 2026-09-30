@@ -3,6 +3,7 @@ import "server-only";
 import { OrderStatus, VehicleStatus } from "@prisma/client";
 
 import { reconcileVehicleConflicts } from "@/lib/orders";
+import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { prisma } from "@/lib/prisma";
 import { parseTuroOrderEmail, type TuroOrderFacts } from "@/lib/turo-email-order";
 import { matchVehiclesForEmail, placeBooking } from "@/lib/turo-message-match";
@@ -40,6 +41,25 @@ import { foldLatinLookalikes } from "@/lib/utils";
  * damage or reimbursements move it, and the owner ledger is settled on
  * the CSV's figure. Filling `totalPrice` from an email would put an
  * estimate where the accounts expect a settlement.
+ *
+ * THREE SOURCES, ONE ORDER
+ *
+ * Mail, the CSV export and the agent's trip-page reads all describe the
+ * same reservation, keyed on its id. Who decides what:
+ *
+ *   field              CSV             mail / page read
+ *   car                yes (plate)     only when placing a new trip
+ *   dates, status      finished trips  unfinished trips, newest wins
+ *   amounts, fees      yes             never
+ *   phone              if present      fills a blank
+ *
+ * Mail and page reads are folded together by time (`foldFacts`) and are
+ * stored, so every sync re-derives the same answer. A CSV import writes
+ * the export as it stands and then re-applies that fold to the trips it
+ * just wrote (`reapplyTuroObservations`), so an unfinished trip never
+ * shows the export's older dates between syncs. Every order this file
+ * moves or creates is re-run through `syncOrderOwnerLedger`, because the
+ * ledger is written from status and dates, not only from amounts.
  */
 
 export type ApplyOutcome = {
@@ -83,6 +103,11 @@ export type ApplyOutcome = {
   /** Vehicles whose conflict flags were recomputed because this run
    *  moved or added one of their bookings. */
   conflictsRechecked: number;
+  /** Agent reads whose times were the known trip's local wall clock
+   *  labelled as UTC -- a page's "10:00 AM" sent as 10:00Z. Refused and
+   *  listed: stored, they would be the newest observation and move the
+   *  trip by seven or eight hours on every sync after. */
+  suspectedTimezoneShift: { reservationId: string }[];
   unchanged: number;
 };
 
@@ -202,27 +227,68 @@ export async function applyTuroEmailsToOrders(input: {
    *  order matches on its reservation id like any other. */
   plateOverrides?: Record<string, string>;
 }): Promise<ApplyOutcome> {
+  const { facts, plateHints, emailCount } = await loadObservations(input.workspaceId);
+  const outcome = await applyTuroOrderFacts({
+    workspaceId: input.workspaceId,
+    facts,
+    apply: input.apply,
+    actor: input.actor,
+    plateOverrides: input.plateOverrides,
+    plateHints,
+  });
+  return { ...outcome, scanned: emailCount };
+}
+
+/** Every mail and trip-page observation in the workspace, folded. */
+async function loadObservations(workspaceId: string) {
   const [emails, snapshots] = await Promise.all([
     prisma.inboundEmail.findMany({
-      where: { workspaceId: input.workspaceId },
+      where: { workspaceId },
       orderBy: { receivedAt: "asc" },
       select: { subject: true, bodyText: true, receivedAt: true },
     }),
     prisma.turoTripSnapshot.findMany({
-      where: { workspaceId: input.workspaceId },
+      where: { workspaceId },
       select: { reservationId: true, observedAt: true, facts: true, plate: true },
     }),
   ]);
+  return {
+    facts: foldFacts([...mailEvents(emails), ...snapshotEvents(snapshots)]),
+    plateHints: snapshotPlates(snapshots),
+    emailCount: emails.length,
+  };
+}
 
+/**
+ * Re-derive these reservations from mail and trip-page reads, right
+ * after a CSV import has written them.
+ *
+ * The CSV writes every row's dates and status as the export states
+ * them. On an unfinished trip the export can be older than the last
+ * email or page read -- that is why mail wins there -- but the sync that
+ * enforces it only runs every few minutes. Until it did, the calendar
+ * showed the export's dates, conflicts were computed on them, and the
+ * next sync moved them back: one trip, two answers, depending on when
+ * you looked. Running the same fold for the imported reservations
+ * straight away gives the answer the next sync would, with no window.
+ *
+ * Finished trips are untouched by the fold, so on them the CSV stands.
+ */
+export async function reapplyTuroObservations(input: {
+  workspaceId: string;
+  reservationIds: string[];
+  actor?: string;
+}): Promise<ApplyOutcome> {
+  const wanted = new Set(input.reservationIds.map((id) => id.trim()).filter(Boolean));
+  const { facts, plateHints } = await loadObservations(input.workspaceId);
   const outcome = await applyTuroOrderFacts({
     workspaceId: input.workspaceId,
-    facts: foldFacts([...mailEvents(emails), ...snapshotEvents(snapshots)]),
-    apply: input.apply,
-    actor: input.actor,
-    plateOverrides: input.plateOverrides,
-    plateHints: snapshotPlates(snapshots),
+    facts: new Map([...facts].filter(([id]) => wanted.has(id))),
+    apply: true,
+    actor: input.actor ?? "turo-email",
+    plateHints,
   });
-  return { ...outcome, scanned: emails.length };
+  return { ...outcome, scanned: wanted.size };
 }
 
 /**
@@ -265,6 +331,7 @@ export async function applyTuroOrderFacts(input: {
     placedPastDeactivated: [],
     byAccount: {},
     conflictsRechecked: 0,
+    suspectedTimezoneShift: [],
     unchanged: 0,
   };
 
@@ -277,6 +344,12 @@ export async function applyTuroOrderFacts(input: {
   // means the calendar can hold a real double-booking that nothing
   // reports -- the exact failure the detector exists to prevent.
   const touchedVehicles = new Set<string>();
+  // Orders this run created or moved. The owner ledger is written from
+  // an order's status and dates -- a cancelled trip carries no lines, a
+  // line is dated at pickup, commission terms are the ones in force that
+  // day -- so an order changed here without a resync keeps crediting the
+  // owner for a trip Turo has cancelled until the next CSV import.
+  const ledgerOrders = new Set<string>();
 
   const [orders, fleet] = await Promise.all([
     prisma.order.findMany({
@@ -468,7 +541,7 @@ export async function applyTuroOrderFacts(input: {
       }
 
       if (input.apply) {
-        await prisma.order.create({
+        const created = await prisma.order.create({
           data: {
             workspaceId: input.workspaceId,
             vehicleId: vehicle.id,
@@ -485,6 +558,7 @@ export async function applyTuroOrderFacts(input: {
             // mail quotes an estimate; the ledger settles on the CSV.
           },
         });
+        ledgerOrders.add(created.id);
       }
       // It exists now, so it does not belong in the basket. Covers the
       // fleet-changed route; the CSV route clears its own on import.
@@ -550,6 +624,7 @@ export async function applyTuroOrderFacts(input: {
 
     if (input.apply) {
       await prisma.order.update({ where: { id: order.id }, data });
+      if (data.pickupDatetime || data.returnDatetime || data.status) ledgerOrders.add(order.id);
     }
     outcome.updated += 1;
   }
@@ -560,6 +635,9 @@ export async function applyTuroOrderFacts(input: {
   if (input.apply) {
     for (const vehicleId of touchedVehicles) {
       await reconcileVehicleConflicts(vehicleId);
+    }
+    for (const orderId of ledgerOrders) {
+      await syncOrderOwnerLedger(orderId);
     }
   }
   outcome.conflictsRechecked = touchedVehicles.size;
@@ -616,6 +694,40 @@ export async function ingestTuroTripSnapshots(input: {
     : [];
   const latest = new Map<string, StoredSnapshot>(stored.map((row) => [row.reservationId, row]));
 
+  // Only the mail that mentions these reservations; the fold below keeps
+  // only the reservations asked about, so a stray number match is
+  // harmless.
+  const emails = ids.length
+    ? await prisma.inboundEmail.findMany({
+        where: {
+          workspaceId: input.workspaceId,
+          OR: ids.flatMap((id) => [{ bodyText: { contains: id } }, { subject: { contains: id } }]),
+        },
+        orderBy: { receivedAt: "asc" },
+        select: { subject: true, bodyText: true, receivedAt: true },
+      })
+    : [];
+
+  // What is known about each trip before this read: mail and earlier
+  // reads folded, else the order as the CSV wrote it.
+  const known = foldFacts([...mailEvents(emails), ...snapshotEvents(stored)]);
+  const knownOrders = ids.length
+    ? await prisma.order.findMany({
+        where: { workspaceId: input.workspaceId, externalOrderId: { in: ids } },
+        select: { externalOrderId: true, pickupDatetime: true, returnDatetime: true },
+      })
+    : [];
+  const knownDates = new Map<string, { start: Date; end: Date }>();
+  for (const order of knownOrders) {
+    if (order.externalOrderId) {
+      knownDates.set(order.externalOrderId, { start: order.pickupDatetime, end: order.returnDatetime });
+    }
+  }
+  for (const [id, facts] of known) {
+    if (facts.tripStart && facts.tripEnd) knownDates.set(id, { start: facts.tripStart, end: facts.tripEnd });
+  }
+  const suspectedTimezoneShift: { reservationId: string }[] = [];
+
   for (const trip of trips) {
     const { plate, ...facts } = trip;
     const reservationId = trip.reservationId.trim();
@@ -623,6 +735,18 @@ export async function ingestTuroTripSnapshots(input: {
 
     // A read older than the one on file is not news. Keep the newer.
     if (previous && previous.observedAt.getTime() > observedAt.getTime()) continue;
+
+    const before = knownDates.get(reservationId);
+    if (
+      before &&
+      facts.tripStart &&
+      facts.tripEnd &&
+      isWallClockSentAsUtc(before.start, facts.tripStart) &&
+      isWallClockSentAsUtc(before.end, facts.tripEnd)
+    ) {
+      suspectedTimezoneShift.push({ reservationId });
+      continue;
+    }
 
     // Merged over the last read with the same rule as mail, so a field
     // the page did not show this time does not erase one it showed before.
@@ -656,20 +780,6 @@ export async function ingestTuroTripSnapshots(input: {
     }
   }
 
-  // Only the mail that mentions these reservations; the fold below keeps
-  // only the reservations asked about, so a stray number match is
-  // harmless.
-  const emails = ids.length
-    ? await prisma.inboundEmail.findMany({
-        where: {
-          workspaceId: input.workspaceId,
-          OR: ids.flatMap((id) => [{ bodyText: { contains: id } }, { subject: { contains: id } }]),
-        },
-        orderBy: { receivedAt: "asc" },
-        select: { subject: true, bodyText: true, receivedAt: true },
-      })
-    : [];
-
   const snapshots = [...latest.values()];
   const folded = foldFacts([...mailEvents(emails), ...snapshotEvents(snapshots)]);
   const wanted = new Set(ids);
@@ -681,5 +791,27 @@ export async function ingestTuroTripSnapshots(input: {
     actor: input.actor ?? "turo-agent",
     plateHints: snapshotPlates(snapshots),
   });
-  return { ...outcome, scanned: trips.length };
+  return { ...outcome, suspectedTimezoneShift, scanned: trips.length };
+}
+
+/**
+ * True when `sent` is `known`'s wall clock written as UTC: the trip page
+ * says "10:00 AM", the agent sends "10:00:00Z", and the instant lands
+ * seven or eight hours off. Read on the process clock, which is the
+ * fleet's own zone -- the same clock the mail parser builds times on.
+ *
+ * Not a guess at intent: a real change moves a trip by days or to some
+ * other hour, and it would have to move both ends by exactly the zone's
+ * offset to be mistaken for this. Where the zone is UTC the two are the
+ * same instant and nothing is ever flagged.
+ */
+function isWallClockSentAsUtc(known: Date, sent: Date) {
+  const wallClockAsUtc = Date.UTC(
+    known.getFullYear(),
+    known.getMonth(),
+    known.getDate(),
+    known.getHours(),
+    known.getMinutes(),
+  );
+  return wallClockAsUtc !== known.getTime() && sent.getTime() === wallClockAsUtc;
 }

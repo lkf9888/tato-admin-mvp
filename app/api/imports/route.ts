@@ -3,8 +3,9 @@ import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { assertImportWithinBillingLimit } from "@/lib/billing";
-import { normalizeTuroAccount } from "@/lib/csv-mapping";
-import { importTuroOrders } from "@/lib/orders";
+import { csvReservationIds, normalizeTuroAccount } from "@/lib/csv-mapping";
+import { importTuroOrders, normalizeCsvFieldMapping } from "@/lib/orders";
+import { reapplyTuroObservations } from "@/lib/turo-email-apply";
 
 const importSchema = z.object({
   fileName: z.string().min(1),
@@ -51,7 +52,14 @@ export async function POST(request: Request) {
       selectedVehicleKeys: parsed.selectedVehicleKeys ?? [],
     });
 
-    return NextResponse.json(result);
+    // Same step the scheduled sync takes: an unfinished trip gets
+    // mail's newer dates now, not on the next Gmail sync.
+    const reapplied = await reapplyTuroObservations({
+      workspaceId: context.workspace.id,
+      reservationIds: csvReservationIds(parsed.rows, normalizeCsvFieldMapping(parsed.mapping)),
+    });
+
+    return NextResponse.json({ ...result, newerObservationsApplied: reapplied.updated });
   } catch (error) {
     if (
       error instanceof Error &&

@@ -89,3 +89,14 @@ export function normalizeTuroAccount(value: string | null | undefined) {
     .toLowerCase();
   return cleaned || null;
 }
+
+/** The reservation ids a CSV's rows carry, under whatever column the
+ *  mapping gives them. */
+export function csvReservationIds(
+  rows: Record<string, unknown>[],
+  mapping: { externalOrderId?: string },
+): string[] {
+  const column = mapping.externalOrderId;
+  if (!column) return [];
+  return rows.map((row) => String(row[column] ?? "").trim()).filter(Boolean);
+}

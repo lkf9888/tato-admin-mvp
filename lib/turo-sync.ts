@@ -4,7 +4,7 @@ import { basename } from "path";
 import { WorkspaceBillingStatus } from "@prisma/client";
 import Papa from "papaparse";
 
-import { buildCsvHeaderMapping, normalizeTuroAccount } from "@/lib/csv-mapping";
+import { buildCsvHeaderMapping, csvReservationIds, normalizeTuroAccount } from "@/lib/csv-mapping";
 import {
   estimateImportVehicleImpact,
   importTuroOrders,
@@ -12,6 +12,7 @@ import {
   type CsvFieldMapping,
 } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { reapplyTuroObservations } from "@/lib/turo-email-apply";
 import { DEFAULT_WORKSPACE_SLUG } from "@/lib/workspaces";
 
 const FREE_VEHICLE_SLOTS = 5;
@@ -46,6 +47,9 @@ type WorkspaceTuroSyncConfig = {
 export type TuroCsvImportResult = Awaited<ReturnType<typeof importTuroOrders>> & {
   fileName: string;
   totalRows: number;
+  /** Unfinished trips whose dates or status were then moved by newer
+   *  mail or trip-page reads; see `reapplyTuroObservations`. */
+  newerObservationsApplied: number;
 };
 
 export type TuroCsvSyncResult = TuroCsvImportResult & {
@@ -460,7 +464,17 @@ async function importCsvContent(input: {
     turoAccount: input.turoAccount,
   });
 
-  return { ...result, fileName: input.fileName, totalRows: rows.length };
+  const reapplied = await reapplyTuroObservations({
+    workspaceId: input.workspaceId,
+    reservationIds: csvReservationIds(rows, mapping),
+  });
+
+  return {
+    ...result,
+    fileName: input.fileName,
+    totalRows: rows.length,
+    newerObservationsApplied: reapplied.updated,
+  };
 }
 
 /**

@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.19.0 - 2026-09-29
+
+### Mail, the CSV and the agent agree on every Turo trip
+
+Three sources describe the same reservation: booking mail, the trip-earnings CSV, and the agent's reads of Turo's trip pages. Checked against a real 2569-row export, they could disagree in four ways. Now they cannot.
+
+- **A CSV import no longer brings back older dates for a few minutes.** The export's dates and statuses were written first, and the Gmail sync moved unfinished trips back to the newer mail or page read up to five minutes later. Until then, the calendar and the conflict flags used the older dates. The import now applies the newer information to the trips it has just written, in the same step.
+- **The owner ledger follows mail and the agent.** The ledger depends on an order's status and dates, but only the CSV path re-synced it. When a guest cancelled by email, the owner stayed credited until the next export. Every order that mail or the agent creates or moves now goes through `syncOrderOwnerLedger`.
+- **A CSV without the "Vehicle name" column can no longer rewrite the fleet.** The importer then read the listing label (`SPEEDX's Ford (BC #TV951F)`) as a make, giving brand "SPEEDX's", model "Ford (BC #TV951F)", year 2026, and did this on every import, for every car. A name that does not end in a year now leaves the car as it is.
+- **An agent time sent in the wrong time zone is refused.** Sometimes both ends of a trip arrive shifted by exactly the zone's offset: the page's "10:00 AM" was sent as 10:00 UTC. Those reads are not stored and are reported as `suspectedTimezoneShift`. They would otherwise be the newest observation, so they would win on every sync.
+
+Also: a trip the CSV reports as cancelled now leaves the unassigned basket. Before, only trips that were not cancelled did.
+
+Who decides what is written at the top of `lib/turo-email-apply.ts`.
+
+
 ## v1.18.0 - 2026-09-29
 
 ### The three valuation pages are one, and the fleet reads as a table

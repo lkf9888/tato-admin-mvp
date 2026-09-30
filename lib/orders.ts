@@ -664,14 +664,19 @@ function buildProjectedVehicleLabels(input: {
   };
 }
 
+/**
+ * Brand, model and year from Turo's "Vehicle name" column, which reads
+ * "Ford Explorer 2014" -- or null when the string is not in that shape.
+ *
+ * The year at the end is what makes the parse trustworthy. Without the
+ * "Vehicle name" column the importer falls back to the "Vehicle" column,
+ * which is the host's listing label ("SPEEDX's Ford (BC #TV951F)"), and
+ * splitting that on spaces gives brand "SPEEDX's", model "Ford (BC
+ * #TV951F)". Callers treat null as "this row says nothing about the
+ * car's make" instead of writing that over a correct record.
+ */
 function parseVehicleBasics(vehicleName?: string) {
-  const fallback = {
-    brand: "Unknown",
-    model: vehicleName || "Imported Vehicle",
-    year: 2026,
-  };
-
-  if (!vehicleName) return fallback;
+  if (!vehicleName) return null;
 
   const twoWordBrands = [
     "Land Rover",
@@ -681,24 +686,28 @@ function parseVehicleBasics(vehicleName?: string) {
     "Rolls Royce",
   ];
 
-  const yearMatch = vehicleName.match(/(19|20)\d{2}$/);
-  const year = yearMatch ? Number(yearMatch[0]) : fallback.year;
-  const nameWithoutYear = yearMatch ? vehicleName.slice(0, yearMatch.index).trim() : vehicleName.trim();
+  const yearMatch = vehicleName.trim().match(/(?:^|\s)((?:19|20)\d{2})$/);
+  if (!yearMatch) return null;
+  const year = Number(yearMatch[1]);
+  const nameWithoutYear = vehicleName.trim().slice(0, yearMatch.index).trim();
 
   const matchedBrand = twoWordBrands.find((brand) => nameWithoutYear.startsWith(brand));
   if (matchedBrand) {
-    return {
-      brand: matchedBrand,
-      model: nameWithoutYear.slice(matchedBrand.length).trim() || "Imported Vehicle",
-      year,
-    };
+    const model = nameWithoutYear.slice(matchedBrand.length).trim();
+    return model ? { brand: matchedBrand, model, year } : null;
   }
 
-  const [brand, ...rest] = nameWithoutYear.split(" ");
+  const [brand, ...rest] = nameWithoutYear.split(/\s+/);
+  const model = rest.join(" ").trim();
+  return brand && model ? { brand, model, year } : null;
+}
+
+/** What a vehicle created from a row with no parseable name gets. */
+function unparsedVehicleBasics(label?: string) {
   return {
-    brand: brand || fallback.brand,
-    model: rest.join(" ").trim() || "Imported Vehicle",
-    year,
+    brand: "Unknown",
+    model: label || "Imported Vehicle",
+    year: new Date().getFullYear(),
   };
 }
 
@@ -739,7 +748,10 @@ async function createVehicleFromCsvRow(input: {
 
   if (plateNumberCandidates.length === 0) return null;
 
-  const basics = parseVehicleBasics(vehicleName || vehicleLabel);
+  const basics =
+    parseVehicleBasics(vehicleName) ??
+    parseVehicleBasics(vehicleLabel) ??
+    unparsedVehicleBasics(vehicleName || vehicleLabel);
 
   const existingVehicle = await prisma.vehicle.findFirst({
     where: {
@@ -806,7 +818,9 @@ async function syncVehicleFromCsvRow(input: {
   const vehicleName = safeString(input.row[input.mapping.vehicleName ?? ""]);
   const externalVehicleId = safeString(input.row[input.mapping.externalVehicleId ?? ""]);
   const vin = safeString(input.row[input.mapping.vin ?? ""]);
-  const basics = parseVehicleBasics(vehicleName || vehicleLabel);
+  // Null when the row's name is not "Brand Model Year": the car's
+  // make stays as it is rather than being rewritten from a label.
+  const basics = parseVehicleBasics(vehicleName) ?? parseVehicleBasics(vehicleLabel);
 
   // Plates are otherwise left alone here, and for good reason: they are
   // stable identifiers, rewriting them per-row can collide with the
@@ -835,9 +849,9 @@ async function syncVehicleFromCsvRow(input: {
 
   const nextData = {
     nickname: vehicleName || vehicleLabel || input.vehicle.nickname,
-    brand: basics.brand,
-    model: basics.model,
-    year: basics.year,
+    brand: basics?.brand ?? input.vehicle.brand,
+    model: basics?.model ?? input.vehicle.model,
+    year: basics?.year ?? input.vehicle.year,
     vin: vin || input.vehicle.vin || null,
     turoListingName: vehicleName || vehicleLabel || input.vehicle.turoListingName || null,
     turoVehicleCode: externalVehicleId || input.vehicle.turoVehicleCode || null,
@@ -1200,6 +1214,14 @@ export async function importTuroOrders(input: {
         isArchived: status === OrderStatus.cancelled,
       };
 
+      // This reservation now has a real car, named by its plate, so it
+      // leaves the unassigned basket -- cancelled or not. The CSV is the
+      // authority the basket was waiting for, and a cancelled trip left
+      // in it would sit there asking to be placed.
+      await prisma.pendingOrder.deleteMany({
+        where: { workspaceId: input.workspaceId, externalOrderId },
+      });
+
       if (status === OrderStatus.cancelled) {
         const savedCancelledOrder = existing
           ? await prisma.order.update({
@@ -1225,13 +1247,6 @@ export async function importTuroOrders(input: {
         : await prisma.order.create({
             data: payload,
           });
-
-      // This reservation now has a real car, named by its plate, so it
-      // leaves the unassigned basket. The CSV is the authority the
-      // basket was waiting for.
-      await prisma.pendingOrder.deleteMany({
-        where: { workspaceId: input.workspaceId, externalOrderId },
-      });
 
       await syncOrderOwnerLedger(savedOrder.id);
 

@@ -1,6 +1,6 @@
 {
   "name": "turo-admin-mvp",
-  "version": "1.18.0",
+  "version": "1.19.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,7 +13,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
-    "sync:turo-csv": "tsx scripts/sync-turo-csv.ts",
+    "sync:turo-csv": "tsx --conditions=react-server scripts/sync-turo-csv.ts",
     "notify-hub": "tsx --conditions=react-server scripts/notify-hub.ts",
     "db:push": "prisma db push",
     "db:reset": "node -e \"if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT || process.env.ALLOW_DESTRUCTIVE_RESET !== 'true') { console.error('Refusing to reset the database. Set ALLOW_DESTRUCTIVE_RESET=true only for intentional local resets.'); process.exit(1); }\" && prisma migrate reset --force"

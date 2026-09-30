@@ -3,7 +3,6 @@
 
 export const billingMessages = {
     billingPage: {
-      kicker: "購買額度",
       title: "購買 listing 名額",
       copy: "前 5 台車免費。超過部分按每台 $1 USD / 月計費。你也可以輸入 coupon code，獲得折扣或直接增加免費額度。",
       summaryTitle: "當前名額",

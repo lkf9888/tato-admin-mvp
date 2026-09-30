@@ -23,7 +23,6 @@ function copy(locale: string) {
   return locale === "zh" || locale === "zh-Hant"
     ? {
         title: "车主分成",
-        subtitle: "管理车主、共享他们的对账单、对账佣金和报销。",
         searchPlaceholder: "搜索车主、联系方式、备注、车辆...",
         addButton: "+ 新建车主",
         noSearchResults: "没有找到匹配的车主。",
@@ -36,7 +35,6 @@ function copy(locale: string) {
       }
     : {
         title: "Owner revenue share",
-        subtitle: "Manage owners, shared statements, commission ledger, and reimbursements.",
         searchPlaceholder: "Search owner, contact, notes, vehicle...",
         addButton: "+ New owner",
         noSearchResults: "No owners match this search.",
@@ -146,10 +144,7 @@ export default async function OwnersPage({
   return (
     <div className="max-w-5xl p-3 sm:p-6">
       <div className="mb-4 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{labels.title}</h1>
-          <p className="text-sm text-[var(--ink-soft)]">{labels.subtitle}</p>
-        </div>
+        <h1 className="sr-only">{labels.title}</h1>
         <div className="grid grid-cols-1 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
           <QuickVehicleReimbursementButton
             locale={locale}

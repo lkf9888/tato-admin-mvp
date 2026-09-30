@@ -9,7 +9,6 @@
 export const billingMessages = {
   en: {
     billingPage: {
-      kicker: "Listing quota",
       title: "Buy listing quota",
       copy: "Choose how many paid listing slots you want beyond the 5 free vehicles. Stripe handles recurring billing, and coupon codes can either apply a discount or unlock free quota.",
       summaryTitle: "Current quota",
@@ -131,7 +130,6 @@ export const billingMessages = {
   },
   zh: {
     billingPage: {
-      kicker: "购买额度",
       title: "购买 listing 名额",
       copy: "前 5 台车免费。超过部分按每台 $1 USD / 月计费。你也可以输入 coupon code，获得折扣或直接增加免费额度。",
       summaryTitle: "当前名额",

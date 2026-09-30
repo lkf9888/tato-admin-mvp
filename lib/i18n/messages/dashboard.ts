@@ -58,9 +58,7 @@ export const dashboardMessages = {
       },
     },
     activityPage: {
-      kicker: "Audit trail",
       title: "Activity log",
-      copy: "Every action that changes data — orders, vehicles, owners, share links, billing — is recorded here. Use filters to narrow down by who, what, when, or which kind of object.",
       summary: (count: number) => `${count} matching event${count === 1 ? "" : "s"}`,
       empty: "No events match the current filters.",
       filters: {
@@ -148,9 +146,7 @@ export const dashboardMessages = {
       },
     },
     activityPage: {
-      kicker: "审计日志",
       title: "操作日志",
-      copy: "所有改动数据的操作 —— 订单、车辆、车主、共享链接、账务 —— 都会记录在这里。可按操作人、动作、时间或实体类型筛选。",
       summary: (count: number) => `共找到 ${count} 条匹配记录`,
       empty: "当前筛选条件下没有任何记录。",
       filters: {

@@ -161,9 +161,7 @@ const defaultTaskForm = {
 function getStaffScheduleCopy(locale: Locale) {
   return locale === "zh"
     ? {
-        kicker: "团队",
         title: "线下员工排班",
-        subtitle: "把接送车、洗车、验车、维修、文件处理等线下工作分配给员工，并关联车辆或订单。",
         addStaff: "新增员工",
         notificationTemplates: "通知模板",
         notificationTemplateTitle: "任务通知模板",
@@ -284,10 +282,7 @@ function getStaffScheduleCopy(locale: Locale) {
         },
       }
     : {
-        kicker: "Team",
         title: "Offline staff schedule",
-        subtitle:
-          "Assign handoffs, washes, inspections, repairs, document work, and other offline tasks to staff with vehicle and order context.",
         addStaff: "Add staff",
         notificationTemplates: "Templates",
         notificationTemplateTitle: "Task notification templates",
@@ -852,12 +847,8 @@ export function StaffScheduleClient({
 
   return (
     <div className="staff-schedule-surface mx-auto max-w-7xl space-y-4">
-      <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold text-[var(--ink-soft)]">{c.kicker}</p>
-          <h1 className="text-2xl font-semibold text-[var(--ink)]">{c.title}</h1>
-          <p className="mt-1 max-w-3xl text-sm text-[var(--ink-soft)]">{c.subtitle}</p>
-        </div>
+      <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-end">
+        <h1 className="sr-only">{c.title}</h1>
         <div className="flex flex-wrap gap-2">
           <button className="btn-secondary min-h-11 px-4 py-2 text-sm" onClick={() => setNotificationTemplateOpen(true)}>
             <Bell className="h-4 w-4" />

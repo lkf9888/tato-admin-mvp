@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.24.2 - 2026-09-30
+
+### On a phone, the calendar opens as the calendar
+
+The calendar page on a phone opened on a list, with the full group calendar behind a second tab labelled "Timeline" -- which read as "a phone only gets a list". It now opens on the calendar, the same grid a desktop shows, with the switch reading **Calendar | List**. A phone that had saved the list starts on the calendar once more and can still choose the list. Actions the phone folds away (Turo sync, new order, feeds, recurring orders, add vehicle, search) stay one tap away under **More**.
+
+### Title cards removed from nine more pages
+
+Account settings, activity, documents, photos, owners, billing, staff schedule, trash and the phone's calendar list lose the kicker, title and caption at the top; the sidebar already names the page. What those cards said that nothing else does stays: the workspace and email on account settings, the match count on the activity log, and the pricing rule on billing. Each page keeps a screen-reader heading.
+
+
 ## v1.24.1 - 2026-09-30
 
 ### Direct booking, payouts and contracts lose their hero cards

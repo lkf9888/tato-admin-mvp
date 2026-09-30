@@ -56,9 +56,7 @@ export const dashboardMessages = {
       },
     },
     activityPage: {
-      kicker: "審計日誌",
       title: "操作日誌",
-      copy: "所有改動資料的操作 —— 訂單、車輛、車主、共享連結、帳務 —— 都會記錄在這裡。可按操作人、動作、時間或實體型別篩選。",
       summary: (count: number) => `共找到 ${count} 條匹配記錄`,
       empty: "當前篩選條件下沒有任何記錄。",
       filters: {

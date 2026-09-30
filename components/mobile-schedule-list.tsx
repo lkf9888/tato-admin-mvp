@@ -114,7 +114,6 @@ function bucketOrders(orders: ScheduleOrder[], labels: ScheduleListLabels): Buck
 
 export type ScheduleListLabels = {
   title: string;
-  subtitle: string;
   emptyAll: string;
   today: string;
   tomorrow: string;
@@ -139,14 +138,7 @@ export function MobileScheduleList({
 
   return (
     <section className={className}>
-      <header className="mb-3">
-        <p className="text-[9px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
-          {labels.subtitle}
-        </p>
-        <h2 className="mt-0.5 font-serif text-[1.1rem] font-semibold leading-tight text-[var(--ink)]">
-          {labels.title}
-        </h2>
-      </header>
+      <h2 className="sr-only">{labels.title}</h2>
 
       {totalUpcoming === 0 ? (
         <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-5 text-center text-[12px] text-[var(--ink-soft)]">

@@ -194,11 +194,9 @@ export function BillingManagerPanel({
 
       <div className="grid gap-3 xl:grid-cols-[0.92fr_1.08fr]">
         <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
-            {billingMessages.kicker}
-          </p>
-          <h3 className="mt-1 font-serif text-[1.15rem] text-[var(--ink)]">{billingMessages.title}</h3>
-          <p className="mt-2 max-w-xl text-[12px] leading-5 text-[var(--ink-mid)]">{billingMessages.copy}</p>
+          <h1 className="sr-only">{billingMessages.title}</h1>
+          {/* Kept: this is the pricing rule, not a caption. */}
+          <p className="max-w-xl text-[12px] leading-5 text-[var(--ink-mid)]">{billingMessages.copy}</p>
 
           <div className="mt-3 rounded-lg bg-[var(--surface-muted)] p-3">
             <div className="space-y-2 text-[12px] text-[var(--ink-mid)]">

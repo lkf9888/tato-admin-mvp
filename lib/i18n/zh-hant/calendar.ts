@@ -5,9 +5,8 @@ export const calendarMessages = {
     calendar: {
       mobile: {
         viewList: "列表",
-        viewTimeline: "日曆條",
+        viewTimeline: "日曆",
         title: "需要你關注的行程",
-        subtitle: "日程",
         emptyAll: "暫時沒有即將開始的訂單，新訂單會顯示在這裡。",
         today: "今日",
         tomorrow: "明日",
@@ -111,7 +110,6 @@ export const calendarMessages = {
       },
       trashPage: {
         title: "回收站",
-        subtitle: "已刪除的訂單，附件和記錄都還在。恢復後會重新出現在日曆和車主流水帳裡。",
         empty: "沒有已刪除的訂單。",
         restoreAction: "恢復",
         restoringAction: "恢復中…",

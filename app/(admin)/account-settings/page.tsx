@@ -51,24 +51,11 @@ export default async function AccountSettingsPage({
 
   return (
     <div className="space-y-3">
-      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
-        <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
-          {t.kicker}
-        </p>
-        <div className="mt-1 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <h1 className="font-serif text-[1.35rem] leading-tight text-[var(--ink)] sm:text-[1.6rem]">
-              {t.title}
-            </h1>
-            <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
-              {t.copy}
-            </p>
-          </div>
-          <div className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[12px] text-[var(--ink-soft)]">
-            {workspace.name} · {user.email}
-          </div>
-        </div>
-      </header>
+      {/* The page is named in the sidebar; which account this is, is not. */}
+      <h1 className="sr-only">{t.title}</h1>
+      <p className="text-[12px] text-[var(--ink-soft)]">
+        {workspace.name} · {user.email}
+      </p>
 
       {notice ? (
         <section

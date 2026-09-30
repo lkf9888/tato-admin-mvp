@@ -26,7 +26,6 @@ export function TrashList({
   locale: Locale;
   labels: {
     title: string;
-    subtitle: string;
     empty: string;
     restoreAction: string;
     restoringAction: string;
@@ -66,10 +65,7 @@ export function TrashList({
 
   return (
     <div className="space-y-3">
-      <header>
-        <h1 className="text-lg font-semibold text-[var(--ink)]">{labels.title}</h1>
-        <p className="mt-0.5 text-[12px] text-[color:var(--ink-soft)]">{labels.subtitle}</p>
-      </header>
+      <h1 className="sr-only">{labels.title}</h1>
 
       {notice ? (
         <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">

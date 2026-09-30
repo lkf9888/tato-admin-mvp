@@ -168,20 +168,10 @@ export default async function ActivityPage({
 
   return (
     <div className="space-y-4 lg:space-y-3.5">
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-4 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)] sm:p-5">
-        <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)] sm:text-[11px] sm:tracking-[0.28em]">
-          {t.kicker}
-        </p>
-        <h2 className="mt-0.5 font-serif text-[1.05rem] font-semibold leading-tight text-[color:var(--ink)] sm:mt-1 sm:text-[1.5rem] lg:text-[1.6rem]">
-          {t.title}
-        </h2>
-        <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-[color:var(--ink-soft)] sm:text-sm">
-          {t.copy}
-        </p>
-        <p className="mt-3 text-[12px] text-[color:var(--ink-soft)] sm:text-[13px]">
-          {t.summary(totalCount)}
-        </p>
-      </section>
+      <h1 className="sr-only">{t.title}</h1>
+      {/* The count is the one line of the old header that said anything
+          the filters below do not. */}
+      <p className="text-[12px] text-[color:var(--ink-soft)]">{t.summary(totalCount)}</p>
 
       <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:p-5">
         <form method="get" className="space-y-3">

@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 
 /**
- * List or timeline, on a phone; timeline only, on a desktop.
+ * Calendar or list, on a phone; calendar only, on a desktop.
+ *
+ * The calendar -- the same group timeline a desktop shows -- is the
+ * default. It used to be the second tab with the list first, and the
+ * operator read that as "a phone only gets a list". The storage key was
+ * bumped with that change, so a phone that once saved "list" starts on
+ * the calendar again and can still choose the list.
  *
  * The list was the only mobile view, on the reasoning that a
  * horizontal-scroll 2D timeline is hostile at 375px. That is true and
@@ -24,6 +30,8 @@ import { useEffect, useState } from "react";
  * a second copy would mount a second timeline, with its own state, its
  * own resize observer and its own dialogs, permanently invisible.
  */
+const STORAGE_KEY = "tato.calendarMobileView.v2";
+
 export function MobileCalendarSwitch({
   list,
   timeline,
@@ -37,16 +45,24 @@ export function MobileCalendarSwitch({
   timelineLabel: string;
   className?: string;
 }) {
-  const [mode, setMode] = useState<"list" | "timeline">("list");
+  const [mode, setMode] = useState<"list" | "timeline">("timeline");
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("tato.calendarMobileView");
-    if (saved === "list" || saved === "timeline") setMode(saved);
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (saved === "list" || saved === "timeline") setMode(saved);
+    } catch {
+      // Private mode or blocked storage: the default stands.
+    }
   }, []);
 
   function choose(next: "list" | "timeline") {
     setMode(next);
-    window.localStorage.setItem("tato.calendarMobileView", next);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      // Not remembered, still switched.
+    }
   }
 
   return (
@@ -54,7 +70,7 @@ export function MobileCalendarSwitch({
       {/* The switch itself is a phone affordance. A desktop has room
           for the timeline and shows it unconditionally. */}
       <div className="tap-row mb-2 flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface)] p-0.5 lg:hidden">
-        {(["list", "timeline"] as const).map((value) => (
+        {(["timeline", "list"] as const).map((value) => (
           <button
             key={value}
             type="button"

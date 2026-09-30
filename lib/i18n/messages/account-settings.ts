@@ -1,10 +1,7 @@
 export const accountSettingsMessages = {
   en: {
     accountSettingsPage: {
-      kicker: "Account",
       title: "Account settings",
-      copy:
-        "Manage the company profile, login credentials, and Stripe payout binding used by this workspace.",
       saved: {
         profile: "Company and profile settings were saved.",
         email: "Login email was updated.",
@@ -109,9 +106,7 @@ export const accountSettingsMessages = {
   },
   zh: {
     accountSettingsPage: {
-      kicker: "账户",
       title: "账户设置",
-      copy: "管理当前工作台的公司资料、登录信息和 Stripe 收款绑定。",
       saved: {
         profile: "公司和登录名称已保存。",
         email: "登录邮箱已更新。",

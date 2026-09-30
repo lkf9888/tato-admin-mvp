@@ -78,9 +78,7 @@ export default async function PhotosPage({
   const copy =
     locale === "zh"
       ? {
-          kicker: "附件中心",
           title: "照片和视频",
-          description: "集中查看订单和车辆档案上传的车辆照片、交接视频和其他影像资料。",
           empty: "还没有上传照片或视频。请在日历订单详情或车辆编辑里上传。",
           filterLabel: "车辆",
           allVehicles: "全部车辆",
@@ -89,9 +87,7 @@ export default async function PhotosPage({
           apply: "筛选",
         }
       : {
-          kicker: "Attachment center",
           title: "Photos and videos",
-          description: "Review vehicle handoff photos, videos, and media uploaded against orders or vehicles.",
           empty: "No photos or videos yet. Upload from a calendar order detail or vehicle editor.",
           filterLabel: "Vehicle",
           allVehicles: "All vehicles",
@@ -110,15 +106,7 @@ export default async function PhotosPage({
 
   return (
     <div className="space-y-3">
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
-        <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
-          {copy.kicker}
-        </p>
-        <h1 className="mt-1 font-serif text-[1.2rem] font-semibold text-[var(--ink)] sm:text-[1.45rem]">
-          {copy.title}
-        </h1>
-        <p className="mt-1 max-w-3xl text-[12px] text-[var(--ink-soft)]">{copy.description}</p>
-      </section>
+      <h1 className="sr-only">{copy.title}</h1>
 
       <form className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-3 text-sm sm:grid-cols-[12rem_minmax(0,1fr)_auto]">
         <label className="block">

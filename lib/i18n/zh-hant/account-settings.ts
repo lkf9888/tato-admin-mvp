@@ -3,9 +3,7 @@
 
 export const accountSettingsMessages = {
     accountSettingsPage: {
-      kicker: "帳戶",
       title: "帳戶設定",
-      copy: "管理當前工作台的公司資料、登入資訊和 Stripe 收款繫結。",
       saved: {
         profile: "公司和登入名稱已儲存。",
         email: "登入郵箱已更新。",

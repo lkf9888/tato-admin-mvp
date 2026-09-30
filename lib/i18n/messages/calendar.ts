@@ -8,9 +8,8 @@ export const calendarMessages = {
     calendar: {
       mobile: {
         viewList: "List",
-        viewTimeline: "Timeline",
+        viewTimeline: "Calendar",
         title: "What's on your plate",
-        subtitle: "Schedule",
         emptyAll: "No upcoming bookings. New trips will show up here.",
         today: "Today",
         tomorrow: "Tomorrow",
@@ -114,8 +113,6 @@ export const calendarMessages = {
       },
       trashPage: {
         title: "Trash",
-        subtitle:
-          "Deleted orders, with everything still attached. Restoring one puts it back on the calendar and in the owner ledger.",
         empty: "Nothing has been deleted.",
         restoreAction: "Restore",
         restoringAction: "Restoring...",
@@ -228,9 +225,8 @@ export const calendarMessages = {
     calendar: {
       mobile: {
         viewList: "列表",
-        viewTimeline: "日历条",
+        viewTimeline: "日历",
         title: "需要你关注的行程",
-        subtitle: "日程",
         emptyAll: "暂时没有即将开始的订单，新订单会显示在这里。",
         today: "今日",
         tomorrow: "明日",
@@ -334,7 +330,6 @@ export const calendarMessages = {
       },
       trashPage: {
         title: "回收站",
-        subtitle: "已删除的订单，附件和记录都还在。恢复后会重新出现在日历和车主流水账里。",
         empty: "没有已删除的订单。",
         restoreAction: "恢复",
         restoringAction: "恢复中…",

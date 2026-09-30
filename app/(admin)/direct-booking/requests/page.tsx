@@ -3,9 +3,10 @@ import { BookingRequestKind, BookingRequestStatus } from "@prisma/client";
 import { BookingRequestActions } from "@/components/booking-request-actions";
 import { DirectBookingSubpageFrame } from "@/components/direct-booking-subpage-frame";
 import { requireCurrentWorkspace } from "@/lib/auth";
+import { formatBookingMoment } from "@/lib/booking-time";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 export default async function BookingRequestsPage() {
   const workspace = await requireCurrentWorkspace();
@@ -64,8 +65,8 @@ export default async function BookingRequestsPage() {
                   {request.order.vehicle.plateNumber} · {request.order.renterName}
                 </p>
                 <p className="mt-0.5 text-[11px] text-[color:var(--ink-soft)]">
-                  {formatDate(request.order.pickupDatetime, locale)} –{" "}
-                  {formatDate(request.order.returnDatetime, locale)}
+                  {formatBookingMoment(request.order.pickupDatetime)} –{" "}
+                  {formatBookingMoment(request.order.returnDatetime)}
                   {request.order.renterPhone ? ` · ${request.order.renterPhone}` : ""}
                 </p>
               </div>
@@ -76,8 +77,8 @@ export default async function BookingRequestsPage() {
 
             {!isCancel && request.requestedPickupDate && request.requestedReturnDate ? (
               <p className="mt-2 text-[12px] text-[color:var(--ink-mid)]">
-                → {formatDate(request.requestedPickupDate, locale)} –{" "}
-                {formatDate(request.requestedReturnDate, locale)}
+                → {formatBookingMoment(request.requestedPickupDate)} –{" "}
+                {formatBookingMoment(request.requestedReturnDate)}
               </p>
             ) : null}
 

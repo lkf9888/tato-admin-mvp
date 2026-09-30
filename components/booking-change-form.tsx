@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 
+import { BOOKING_TIME_OPTIONS, zonedDateTimeToUtc } from "@/lib/booking-time";
 import { getMessages, type Locale } from "@/lib/i18n";
 
 /**
@@ -20,6 +21,8 @@ export function BookingChangeForm({
   minDate,
   defaultPickupDate,
   defaultReturnDate,
+  defaultPickupTime,
+  defaultReturnTime,
 }: {
   locale: Locale;
   token: string;
@@ -29,10 +32,15 @@ export function BookingChangeForm({
   minDate: string;
   defaultPickupDate: string;
   defaultReturnDate: string;
+  /** `HH:MM`, the trip's current times, on the operator's clock. */
+  defaultPickupTime: string;
+  defaultReturnTime: string;
 }) {
   const copy = getMessages(locale).bookingPage;
   const [pickupDate, setPickupDate] = useState(defaultPickupDate);
   const [returnDate, setReturnDate] = useState(defaultReturnDate);
+  const [pickupTime, setPickupTime] = useState(defaultPickupTime);
+  const [returnTime, setReturnTime] = useState(defaultReturnTime);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -40,7 +48,9 @@ export function BookingChangeForm({
   function submit(kind: "CANCEL" | "RESCHEDULE") {
     setError(null);
 
-    if (kind === "RESCHEDULE" && !(returnDate > pickupDate)) {
+    const pickupAt = zonedDateTimeToUtc(pickupDate, pickupTime);
+    const returnAt = zonedDateTimeToUtc(returnDate, returnTime);
+    if (kind === "RESCHEDULE" && !(pickupAt && returnAt && returnAt > pickupAt)) {
       setError(copy.invalidRange);
       return;
     }
@@ -53,7 +63,7 @@ export function BookingChangeForm({
         body: JSON.stringify({
           kind,
           note: note || undefined,
-          ...(kind === "RESCHEDULE" ? { pickupDate, returnDate } : {}),
+          ...(kind === "RESCHEDULE" ? { pickupDate, returnDate, pickupTime, returnTime } : {}),
         }),
       });
 
@@ -77,7 +87,7 @@ export function BookingChangeForm({
 
   if (!canRequest) return null;
 
-  const field =
+  const field_ =
     "mt-1 h-11 w-full rounded-[var(--control-radius)] border border-[var(--line-strong)] bg-white px-3 text-sm text-[var(--ink)]";
 
   return (
@@ -94,32 +104,42 @@ export function BookingChangeForm({
       <div className="mt-5 border-t border-[var(--line)] pt-5">
         <h3 className="text-sm font-semibold text-[var(--ink)]">{copy.rescheduleHeading}</h3>
         <p className="mt-1 text-[13px] text-[var(--ink-soft)]">{copy.rescheduleCopy}</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-[12px] font-medium text-[var(--ink-mid)]">
-              {copy.newPickupLabel}
-            </span>
-            <input
-              type="date"
-              min={minDate}
-              value={pickupDate}
-              onChange={(event) => setPickupDate(event.target.value)}
-              className={field}
-            />
-          </label>
-          <label className="block">
-            <span className="text-[12px] font-medium text-[var(--ink-mid)]">
-              {copy.newReturnLabel}
-            </span>
-            <input
-              type="date"
-              min={pickupDate || minDate}
-              value={returnDate}
-              onChange={(event) => setReturnDate(event.target.value)}
-              className={field}
-            />
-          </label>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          {(
+            [
+              { label: copy.newPickupLabel, timeLabel: copy.newPickupTimeLabel, date: pickupDate, setDate: setPickupDate, time: pickupTime, setTime: setPickupTime, min: minDate },
+              { label: copy.newReturnLabel, timeLabel: copy.newReturnTimeLabel, date: returnDate, setDate: setReturnDate, time: returnTime, setTime: setReturnTime, min: pickupDate || minDate },
+            ] as const
+          ).map((field) => (
+            <div key={field.label} className="min-w-0 space-y-2">
+              <label className="block">
+                <span className="text-[12px] font-medium text-[var(--ink-mid)]">{field.label}</span>
+                <input
+                  type="date"
+                  min={field.min}
+                  value={field.date}
+                  onChange={(event) => field.setDate(event.target.value)}
+                  className={field_}
+                />
+              </label>
+              <label className="block">
+                <span className="text-[12px] font-medium text-[var(--ink-mid)]">{field.timeLabel}</span>
+                <select
+                  value={field.time}
+                  onChange={(event) => field.setTime(event.target.value)}
+                  className={field_}
+                >
+                  {BOOKING_TIME_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          ))}
         </div>
+        <p className="mt-2 text-[12px] text-[var(--ink-soft)]">{copy.timeZoneNote}</p>
       </div>
 
       <label className="mt-4 block">

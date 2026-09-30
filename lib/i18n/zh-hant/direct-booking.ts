@@ -2,6 +2,34 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const directBookingMessages = {
+    directBookingCancel: {
+      title: "取消此訂單",
+      open: "取消並退款…",
+      summary: (paid: string, policy: string, outcome: "free" | "late" | "started") =>
+        `已付 ${paid}。${
+          outcome === "free"
+            ? `在免費取消期內：按政策退 ${policy}。`
+            : outcome === "late"
+              ? `距取車不足 48 小時：按政策退 ${policy}（扣一天租金）。`
+              : "行程已開始：按政策不退款。"
+        }`,
+      policy: (amount: string) => `按政策退款（${amount}）`,
+      full: (amount: string) => `全額退款（${amount}）`,
+      none: "不退款",
+      custom: "其他金額",
+      noPayment: "這筆訂單不是透過網站付款的，沒有可退的款項。",
+      archive: "同時從日曆刪除（否則以取消細條保留在日曆上）",
+      notePlaceholder: "給租客的說明（可選，會寫進郵件）",
+      submit: (amount: string) => `取消並退款 ${amount}`,
+      working: "取消中…",
+      close: "收起",
+      confirm: (amount: string) => `取消此訂單並退 ${amount} 到租客的卡上？此操作無法撤銷。`,
+      emailTo: (email: string) => `會發郵件通知租客：${email}。`,
+      noEmail: "沒有租客郵箱，請自行通知。",
+      done: (amount: string, emailed: boolean) =>
+        `已取消，退款 ${amount}。${emailed ? "已郵件通知租客。" : ""}`,
+      failed: (detail: string) => `未取消——退款失敗：${detail}`,
+    },
     bookingExtraCharge: {
       title: "補收天數",
       days: (billed: number, current: number) => `已付 ${billed} 天；按現在的取還車時間是 ${current} 天。`,

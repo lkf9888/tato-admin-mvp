@@ -19,7 +19,7 @@ import {
   RENTAL_AGREEMENT_TITLE,
   type RentalAgreementClause,
 } from "@/lib/rental-agreement-text";
-import { utcToZonedDate, utcToZonedTime } from "@/lib/booking-time";
+import { formatBookingMoment, utcToZonedDate, utcToZonedTime } from "@/lib/booking-time";
 import { sendContractSigningEmail } from "@/lib/contract-email";
 import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { getWorkspaceSender } from "@/lib/site-sender";
@@ -214,7 +214,7 @@ export type RentalAgreementValues = Partial<Record<RentalAgreementFieldKey, stri
 
 /** Date and time on the operator's clock, e.g. `2026/10/13 10:00`. */
 function toDisplayDate(value: Date) {
-  return `${utcToZonedDate(value).replace(/-/g, "/")} ${utcToZonedTime(value)}`;
+  return formatBookingMoment(value);
 }
 
 export function buildRentalAgreementValues(input: {

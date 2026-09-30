@@ -1,14 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { BookingRequestKind, BookingRequestStatus, OrderStatus } from "@prisma/client";
+import { BookingRequestKind, BookingRequestStatus, type Order } from "@prisma/client";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { areRequestedDatesFree } from "@/lib/booking-access";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
-import { getStripeSecretKey } from "@/lib/stripe";
-import { readDirectBookingPayment, refundDirectBookingCharge } from "@/lib/stripe-refunds";
-import { dateToDateOnly } from "@/lib/direct-booking";
+import { readDirectBookingPayment } from "@/lib/stripe-refunds";
+import {
+  isDateOnlyMoment,
+  utcToZonedDate,
+  utcToZonedTime,
+  zonedDateTimeToUtc,
+} from "@/lib/booking-time";
+import { cancelDirectBookingWithRefund } from "@/lib/direct-booking-cancel";
+import { sendBookingDecisionEmail } from "@/lib/direct-booking-email";
 
 export const runtime = "nodejs";
 
@@ -64,6 +70,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       entityId: changeRequest.orderId,
       metadata: { requestId: changeRequest.id, kind: changeRequest.kind },
     });
+    await emailRenter(changeRequest.order, workspace.id, "declined", note);
     return NextResponse.json({ ok: true });
   }
 
@@ -73,21 +80,27 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       return NextResponse.json({ error: "DATES_MISSING" }, { status: 400 });
     }
 
+    // A request from before times were asked for was stored as a bare
+    // date; it keeps the trip's own times of day rather than becoming
+    // a 5am handover.
+    const pickupAt = withTripTime(requestedPickupDate, changeRequest.order.pickupDatetime);
+    const returnAt = withTripTime(requestedReturnDate, changeRequest.order.returnDatetime);
+
     // Checked again here, not only when the renter asked: the fleet
     // moves between the two moments, and this is the one that commits.
     const free = await areRequestedDatesFree({
       vehicleId: changeRequest.order.vehicleId,
       excludeOrderId: changeRequest.orderId,
-      pickupDate: dateToDateOnly(requestedPickupDate),
-      returnDate: dateToDateOnly(requestedReturnDate),
+      pickupAt,
+      returnAt,
     });
     if (!free) {
       return NextResponse.json({ error: "DATES_UNAVAILABLE" }, { status: 409 });
     }
 
-    await prisma.order.update({
+    const moved = await prisma.order.update({
       where: { id: changeRequest.orderId },
-      data: { pickupDatetime: requestedPickupDate, returnDatetime: requestedReturnDate },
+      data: { pickupDatetime: pickupAt, returnDatetime: returnAt },
     });
     await prisma.bookingChangeRequest.update({
       where: { id: changeRequest.id },
@@ -107,93 +120,90 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       entityId: changeRequest.orderId,
       metadata: {
         requestId: changeRequest.id,
-        pickupDate: dateToDateOnly(requestedPickupDate),
-        returnDate: dateToDateOnly(requestedReturnDate),
+        pickupAt: pickupAt.toISOString(),
+        returnAt: returnAt.toISOString(),
       },
     });
+    await emailRenter(moved, workspace.id, "rescheduled", note);
     return NextResponse.json({ ok: true });
   }
 
-  // Cancellation.
+  // Cancellation: the refund the renter was quoted when they asked,
+  // not a figure recomputed now, which the closing 48-hour window would
+  // have changed underneath them.
   const refundAmount = changeRequest.quotedRefundAmount ?? 0;
-  const paymentIntentId = readDirectBookingPayment(changeRequest.order.sourceMetadata).paymentIntentId;
-  let stripeRefundId: string | null = null;
-
-  // Refusing beats cancelling silently. A booking marked cancelled
-  // while the renter's money sat where it was is the one state nobody
-  // can see is wrong from the outside -- not the operator, who sees an
-  // approved request, and not the renter, who sees a cancelled trip.
-  // An order with no payment intent (typed in by hand, never paid
-  // through us) has nothing to send back and passes through.
-  if (refundAmount > 0 && paymentIntentId && !getStripeSecretKey()) {
-    await logActivity({
-      workspaceId: workspace.id,
-      actor: user.name,
-      action: "booking_cancel_refund_failed",
-      entityType: "Order",
-      entityId: changeRequest.orderId,
-      metadata: { requestId: changeRequest.id, refundAmount, reason: "stripe_not_configured" },
-    });
-    return NextResponse.json({ error: "REFUND_FAILED" }, { status: 503 });
-  }
-
-  if (refundAmount > 0 && paymentIntentId) {
-    try {
-      // Out of the host's balance, not the platform's, with the
-      // platform's fee handed back pro rata: a cancelled trip is one
-      // the platform should not be earning on either.
-      const refund = await refundDirectBookingCharge({
-        paymentIntentId,
-        amount: refundAmount,
-        refundPlatformFee: true,
-        metadata: { tato_request_id: changeRequest.id, tato_order_id: changeRequest.orderId },
-        idempotencyKey: `booking-request-refund:${changeRequest.id}`,
-      });
-      stripeRefundId = refund.id;
-    } catch (error) {
-      // The trip is NOT cancelled when the money could not move. An
-      // order marked cancelled with the renter unpaid-back is the one
-      // state nobody can see is wrong from the outside.
-      await logActivity({
-        workspaceId: workspace.id,
-        actor: user.name,
-        action: "booking_cancel_refund_failed",
-        entityType: "Order",
-        entityId: changeRequest.orderId,
-        metadata: {
-          requestId: changeRequest.id,
-          refundAmount,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      });
-      return NextResponse.json({ error: "REFUND_FAILED" }, { status: 502 });
-    }
-  }
-
-  await prisma.order.update({
-    where: { id: changeRequest.orderId },
-    data: { status: OrderStatus.cancelled },
+  const result = await cancelDirectBookingWithRefund({
+    workspaceId: workspace.id,
+    orderId: changeRequest.orderId,
+    refundAmount,
+    actor: user.name,
+    idempotencyKey: `booking-request-refund:${changeRequest.id}`,
+    note,
+    metadata: { tato_request_id: changeRequest.id },
   });
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: "REFUND_FAILED" },
+      { status: result.error === "STRIPE_NOT_CONFIGURED" ? 503 : 502 },
+    );
+  }
+
   await prisma.bookingChangeRequest.update({
     where: { id: changeRequest.id },
     data: {
       status: BookingRequestStatus.APPROVED,
       operatorNote: note,
-      refundedAmount: stripeRefundId ? refundAmount : 0,
-      stripeRefundId,
+      refundedAmount: result.refundAmount,
+      stripeRefundId: result.stripeRefundId,
       resolvedAt: new Date(),
       resolvedBy: user.name,
     },
   });
-  await reconcileVehicleConflicts(changeRequest.order.vehicleId);
   await logActivity({
     workspaceId: workspace.id,
     actor: user.name,
     action: "booking_cancel_approved",
     entityType: "Order",
     entityId: changeRequest.orderId,
-    metadata: { requestId: changeRequest.id, refundAmount, stripeRefundId },
+    metadata: {
+      requestId: changeRequest.id,
+      refundAmount: result.refundAmount,
+      stripeRefundId: result.stripeRefundId,
+    },
   });
 
-  return NextResponse.json({ ok: true, refundAmount, stripeRefundId });
+  return NextResponse.json({
+    ok: true,
+    refundAmount: result.refundAmount,
+    stripeRefundId: result.stripeRefundId,
+  });
+}
+
+/** A bare date (a request from before times) takes the trip's own time of day. */
+function withTripTime(requested: Date, original: Date) {
+  if (!isDateOnlyMoment(requested) || isDateOnlyMoment(original)) return requested;
+  return (
+    zonedDateTimeToUtc(utcToZonedDate(requested), utcToZonedTime(original)) ?? requested
+  );
+}
+
+async function emailRenter(
+  order: Order,
+  workspaceId: string,
+  outcome: "rescheduled" | "declined",
+  note: string | null,
+) {
+  const vehicle = await prisma.vehicle.findUnique({
+    where: { id: order.vehicleId },
+    select: { brand: true, model: true, year: true },
+  });
+  if (!vehicle) return;
+  await sendBookingDecisionEmail({
+    workspaceId,
+    order,
+    vehicle,
+    renterEmail: readDirectBookingPayment(order.sourceMetadata).renterEmail,
+    outcome,
+    note,
+  });
 }

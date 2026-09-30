@@ -1,10 +1,10 @@
 import "server-only";
 
 import { randomBytes } from "crypto";
-import { BookingRequestKind, BookingRequestStatus, OrderStatus } from "@prisma/client";
+import { BookingRequestKind, BookingRequestStatus, OrderStatus, type Prisma } from "@prisma/client";
 
 import { getCancellationQuote, type CancellationQuote } from "@/lib/booking-changes";
-import { dateToDateOnly, hasVehicleBookingConflict } from "@/lib/direct-booking";
+import { dateToDateOnly, hasTimedBookingConflict } from "@/lib/direct-booking";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { prisma } from "@/lib/prisma";
 import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
@@ -22,6 +22,31 @@ export function mintRenterToken() {
   return randomBytes(24).toString("hex");
 }
 
+const BOOKING_INCLUDE = {
+  vehicle: {
+    select: {
+      id: true,
+      nickname: true,
+      brand: true,
+      model: true,
+      year: true,
+      plateNumber: true,
+      bookingDailyRate: true,
+      bookingWeeklyDiscountPercent: true,
+      bookingMinimumRentalDays: true,
+      bookingDailyKmAllowance: true,
+      bookingExtraKmRate: true,
+      bookingInsuranceFee: true,
+      bookingDepositAmount: true,
+      bookingTaxName: true,
+      bookingTaxRate: true,
+      workspaceId: true,
+    },
+  },
+  orderPayments: { orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }] },
+  changeRequests: { orderBy: { createdAt: "desc" } },
+} satisfies Prisma.OrderInclude;
+
 export async function loadBookingByToken(token: string) {
   const clean = token.trim();
   // Short enough to be a typo rather than a token. Refusing early
@@ -30,30 +55,15 @@ export async function loadBookingByToken(token: string) {
 
   return prisma.order.findFirst({
     where: { renterToken: clean, isArchived: false },
-    include: {
-      vehicle: {
-        select: {
-          id: true,
-          nickname: true,
-          brand: true,
-          model: true,
-          year: true,
-          plateNumber: true,
-          bookingDailyRate: true,
-          bookingWeeklyDiscountPercent: true,
-          bookingMinimumRentalDays: true,
-          bookingDailyKmAllowance: true,
-          bookingExtraKmRate: true,
-          bookingInsuranceFee: true,
-          bookingDepositAmount: true,
-          bookingTaxName: true,
-          bookingTaxRate: true,
-          workspaceId: true,
-        },
-      },
-      orderPayments: { orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }] },
-      changeRequests: { orderBy: { createdAt: "desc" } },
-    },
+    include: BOOKING_INCLUDE,
+  });
+}
+
+/** The same booking, for the operator: by id, within their workspace. */
+export async function loadBookingById(workspaceId: string, orderId: string) {
+  return prisma.order.findFirst({
+    where: { id: orderId, workspaceId },
+    include: BOOKING_INCLUDE,
   });
 }
 
@@ -62,7 +72,12 @@ export type BookingForRenter = NonNullable<Awaited<ReturnType<typeof loadBooking
 /** What the card actually took, and how much of it was deposit. */
 export function getAmountsPaid(order: BookingForRenter) {
   const paidRows = order.orderPayments.filter((row) => row.paidAt !== null);
-  const paidAmount = paidRows.length
+  // An instalment plan's value is the whole contract, so what was paid
+  // is its paid rows. Any other booking's value is what was charged --
+  // and a paid extra-days charge is added to it -- so its own rows (an
+  // extra charge) are not the whole story and must not replace it.
+  const isInstalmentPlan = order.orderPayments.some((row) => row.note?.startsWith("Period "));
+  const paidAmount = isInstalmentPlan
     ? paidRows.reduce((sum, row) => sum + row.amount, 0)
     : order.totalPrice ?? 0;
   const outstanding = order.orderPayments
@@ -114,7 +129,8 @@ export function canRequestChange(order: BookingForRenter) {
 }
 
 /**
- * Whether the requested dates are free.
+ * Whether the requested times are free, to the minute -- a pickup at
+ * two on the afternoon another renter returns at noon is fine.
  *
  * Checked when the renter asks, so they are told straight away rather
  * than waiting a day to be declined over a clash they could have seen.
@@ -123,8 +139,8 @@ export function canRequestChange(order: BookingForRenter) {
 export async function areRequestedDatesFree(input: {
   vehicleId: string;
   excludeOrderId: string;
-  pickupDate: string;
-  returnDate: string;
+  pickupAt: Date;
+  returnAt: Date;
 }) {
   const orders = await prisma.order.findMany({
     where: {
@@ -136,7 +152,7 @@ export async function areRequestedDatesFree(input: {
     select: { pickupDatetime: true, returnDatetime: true, status: true, isArchived: true },
   });
 
-  return !hasVehicleBookingConflict(orders, input.pickupDate, input.returnDate);
+  return !hasTimedBookingConflict(orders, input.pickupAt, input.returnAt);
 }
 
 export function toDateOnly(value: Date) {

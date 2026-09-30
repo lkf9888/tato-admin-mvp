@@ -1,5 +1,46 @@
 # Changelog
 
+## v1.22.0 - 2026-09-29
+
+### Change requests email both sides, reschedules carry times, and the operator can cancel with a refund
+
+**Emails.** A renter's cancel or reschedule request now emails the
+operator (the site's contact address, else the workspace's first
+account), bilingual, with the trip, the request, the refund the policy
+quotes and a link to 在线预订 → 变更申请. Approving or declining emails
+the renter: cancelled (with what was refunded), moved (with the new
+times), or declined. Before, both sides found out only by opening a
+page.
+
+**Reschedules with times.** The renter's "move the dates" form asks
+for a pick-up and return time too (30-minute slots, Vancouver time,
+defaulting to the trip's own). The request stores the exact moments,
+availability is checked to the minute (`areRequestedDatesFree` now
+takes instants), and approval moves the trip to exactly those times. A
+request made before this, stored as a bare date, keeps the trip's own
+times of day instead of becoming a 5am handover.
+
+**The operator cancels with a refund.** `cancelDirectBookingWithRefund`
+(`lib/direct-booking-cancel.ts`) is now the one path for cancelling a
+direct booking: the refund first (host's balance, commission handed
+back pro rata), the trip cancelled only once the money moved, then the
+renter emailed. Approving a renter's cancellation uses it, and so does
+the new `POST /api/direct-booking/orders/[id]/cancel` behind
+`DirectBookingCancelPanel`: refund under the policy, in full, nothing,
+or another amount (never more than was paid), optionally removing the
+trip from the calendar. Mounting the panel in the order views is 运营's.
+
+**Date-only bookings.** Bookings from before times were asked for were
+stored at noon UTC and showed as 05:00. `formatBookingMoment` shows
+those as a date alone on the renter's page, in emails and in the
+agreement.
+
+**Paid amount with an extra charge.** `getAmountsPaid` summed payment
+rows whenever any existed, so a booking with one extra-days charge
+reported only that charge as paid (and a cancellation would have
+refunded against it). Only an instalment plan's paid amount is its
+rows now; any other booking's is its value.
+
 ## v1.21.3 - 2026-09-30
 
 ### A cancelled booking in the basket is not counted as under way

@@ -9,7 +9,7 @@ import {
   renderDirectBookingEmailTemplate,
   type DirectBookingEmailValues,
 } from "@/lib/direct-booking-email-template";
-import { utcToZonedDate, utcToZonedTime } from "@/lib/booking-time";
+import { formatBookingMoment, isDateOnlyMoment, utcToZonedDate, utcToZonedTime } from "@/lib/booking-time";
 import { getDirectBookingDays } from "@/lib/direct-booking";
 import { formatSiteSender } from "@/lib/site-sender";
 import { sendMail } from "@/lib/email";
@@ -99,8 +99,8 @@ export function buildDirectBookingEmailValues(input: {
     plateNumber: input.vehicle.plateNumber,
     pickupDate: formatDisplayDate(input.order.pickupDatetime),
     returnDate: formatDisplayDate(input.order.returnDatetime),
-    pickupTime: utcToZonedTime(input.order.pickupDatetime),
-    returnTime: utcToZonedTime(input.order.returnDatetime),
+    pickupTime: isDateOnlyMoment(input.order.pickupDatetime) ? "" : utcToZonedTime(input.order.pickupDatetime),
+    returnTime: isDateOnlyMoment(input.order.returnDatetime) ? "" : utcToZonedTime(input.order.returnDatetime),
     pickupLocation: input.order.pickupLocation?.trim() ?? "",
     returnLocation:
       input.order.returnLocation?.trim() &&
@@ -376,7 +376,7 @@ export async function sendExtraChargeEmail(input: {
     const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
     const money = (value: number) => formatCurrency(value, "en");
     const car = `${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`;
-    const when = (value: Date) => `${utcToZonedDate(value)} ${utcToZonedTime(value)}`;
+    const when = (value: Date) => formatBookingMoment(value);
 
     const text = [
       `Hi ${input.order.renterName},`,
@@ -426,6 +426,186 @@ export async function sendExtraChargeEmail(input: {
       workspaceId: input.workspaceId,
       actor: "direct-booking",
       action: "extra_charge_email_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => undefined);
+    return { ok: false, reason: "SEND_FAILED" };
+  }
+}
+
+/**
+ * Tell the operator a renter asked for something. Without it a request
+ * sat in the admin until somebody happened to open the page. Sent to
+ * the site's contact address (the mailbox the operator reads), or the
+ * workspace's first account. Bilingual, because the operator reads the
+ * admin in either language. Never throws.
+ */
+export async function sendChangeRequestNotice(input: {
+  workspaceId: string;
+  order: Pick<Order, "id" | "renterName" | "pickupDatetime" | "returnDatetime">;
+  vehicle: Pick<Vehicle, "plateNumber" | "brand" | "model" | "year">;
+  kind: "CANCEL" | "RESCHEDULE";
+  requestedPickup: Date | null;
+  requestedReturn: Date | null;
+  quotedRefund: number | null;
+  renterNote: string | null;
+}): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const [site, workspace, firstUser] = await Promise.all([
+      prisma.rentalSite.findUnique({ where: { workspaceId: input.workspaceId } }),
+      prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
+      prisma.user.findFirst({
+        where: { workspaceId: input.workspaceId },
+        orderBy: { createdAt: "asc" },
+        select: { email: true },
+      }),
+    ]);
+    const to = site?.contactEmail?.trim() || firstUser?.email;
+    if (!to) return { ok: false, reason: "NO_OPERATOR_EMAIL" };
+    const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
+    const car = `${input.vehicle.plateNumber} · ${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`;
+    const trip = `${formatBookingMoment(input.order.pickupDatetime)} → ${formatBookingMoment(input.order.returnDatetime)}`;
+    const isCancel = input.kind === "CANCEL";
+
+    const text = [
+      isCancel
+        ? `${input.order.renterName} 申请取消订单 / asked to cancel their booking.`
+        : `${input.order.renterName} 申请改期 / asked to move their booking.`,
+      "",
+      `车辆 Car: ${car}`,
+      `原行程 Booked: ${trip}`,
+      !isCancel && input.requestedPickup && input.requestedReturn
+        ? `新行程 Requested: ${formatBookingMoment(input.requestedPickup)} → ${formatBookingMoment(input.requestedReturn)}`
+        : null,
+      isCancel && input.quotedRefund != null
+        ? `按政策退款 Refund under policy: ${formatCurrency(input.quotedRefund, "en")}`
+        : null,
+      input.renterNote ? `租客留言 Note: ${input.renterNote}` : null,
+      "",
+      `批准或拒绝 Approve or decline: ${getAppUrl().replace(/\/$/, "")}/direct-booking/requests`,
+      `订单 Reference: ${bookingReference(input.order.id)}`,
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n");
+
+    const result = await sendMail({
+      to,
+      subject: `[${brandName}] ${isCancel ? "取消申请 Cancellation request" : "改期申请 Change request"} — ${input.vehicle.plateNumber}, ${input.order.renterName}`,
+      text,
+      html: toHtmlBody(text),
+      from: formatSiteSender(site),
+    });
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: result.ok ? "change_request_notice_sent" : "change_request_notice_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { to, kind: input.kind, reason: result.reason ?? null },
+    });
+    return result;
+  } catch (error) {
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "change_request_notice_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => undefined);
+    return { ok: false, reason: "SEND_FAILED" };
+  }
+}
+
+/**
+ * Tell the renter what became of their booking: cancelled (with what
+ * came back), moved, or a request declined. Without it the renter only
+ * found out by reopening their booking page. Never throws.
+ */
+export async function sendBookingDecisionEmail(input: {
+  workspaceId: string;
+  order: Pick<Order, "id" | "renterName" | "pickupDatetime" | "returnDatetime" | "renterToken">;
+  vehicle: Pick<Vehicle, "brand" | "model" | "year">;
+  renterEmail: string | null;
+  outcome: "cancelled" | "rescheduled" | "declined";
+  refundAmount?: number;
+  note?: string | null;
+}): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const to = input.renterEmail?.trim();
+    if (!to) return { ok: false, reason: "NO_RENTER_EMAIL" };
+    const site = await prisma.rentalSite.findUnique({ where: { workspaceId: input.workspaceId } });
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: input.workspaceId },
+      select: { name: true },
+    });
+    const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
+    const car = `${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`;
+    const origin = site?.domain ? `https://${site.domain}` : getAppUrl().replace(/\/$/, "");
+    const trip = `${formatBookingMoment(input.order.pickupDatetime)} to ${formatBookingMoment(input.order.returnDatetime)}`;
+    const refund = input.refundAmount ?? 0;
+
+    const body =
+      input.outcome === "cancelled"
+        ? [
+            `Your booking of the ${car} (${trip}) has been cancelled.`,
+            refund > 0
+              ? `${formatCurrency(refund, "en")} has been refunded to the card you paid with. Refunds usually appear on your statement within 5–10 business days.`
+              : "No refund is due under the cancellation policy.",
+          ]
+        : input.outcome === "rescheduled"
+          ? [`Your booking of the ${car} has been moved. It now runs from ${trip} (Vancouver time).`]
+          : [`Your request for your booking of the ${car} (${trip}) could not be accepted. Your booking stays as it was.`];
+
+    const text = [
+      `Hi ${input.order.renterName},`,
+      "",
+      ...body,
+      input.note ? `\nNote from ${brandName}: ${input.note}` : null,
+      "",
+      input.outcome !== "cancelled" && input.order.renterToken
+        ? `Your booking: ${origin}/booking/${input.order.renterToken}`
+        : null,
+      `Booking reference: ${bookingReference(input.order.id)}`,
+      site?.contactPhone || site?.contactEmail
+        ? `Questions? ${[site?.contactPhone, site?.contactEmail].filter(Boolean).join(" · ")}`
+        : null,
+      "",
+      brandName,
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n");
+
+    const subject =
+      input.outcome === "cancelled"
+        ? `${brandName} — booking cancelled (${bookingReference(input.order.id)})`
+        : input.outcome === "rescheduled"
+          ? `${brandName} — your booking has new dates (${bookingReference(input.order.id)})`
+          : `${brandName} — about your change request (${bookingReference(input.order.id)})`;
+
+    const result = await sendMail({
+      to,
+      subject,
+      text,
+      html: toHtmlBody(text),
+      replyTo: site?.contactEmail?.trim() || undefined,
+      from: formatSiteSender(site),
+    });
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: result.ok ? "booking_decision_email_sent" : "booking_decision_email_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { to, outcome: input.outcome, reason: result.reason ?? null },
+    });
+    return result;
+  } catch (error) {
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "booking_decision_email_failed",
       entityType: "Order",
       entityId: input.order.id,
       metadata: { error: error instanceof Error ? error.message : String(error) },

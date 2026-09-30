@@ -127,3 +127,21 @@ export function getChargedDays(input: {
   const grace = Math.max(0, input.graceMinutes ?? DEFAULT_RETURN_GRACE_MINUTES);
   return Math.max(1, Math.ceil((minutes - grace) / 1440));
 }
+
+/**
+ * Bookings made before times were asked for (before v1.10.0), and
+ * reschedules approved before v1.23.0, were stored at noon UTC -- a
+ * date with no time, which reads as 05:00 (04:00 in winter) here. Those
+ * are shown as a date alone rather than as a 5am handover nobody chose.
+ * A renter who really picked 05:00 in summer lands on the same instant;
+ * showing them the date alone is the harmless side of that trade.
+ */
+export function isDateOnlyMoment(value: Date) {
+  return value.getUTCHours() === 12 && value.getUTCMinutes() === 0 && value.getUTCSeconds() === 0;
+}
+
+/** `YYYY/MM/DD HH:MM` on the operator's clock, or the date alone for a date-only booking. */
+export function formatBookingMoment(value: Date) {
+  const date = utcToZonedDate(value).replace(/-/g, "/");
+  return isDateOnlyMoment(value) ? date : `${date} ${utcToZonedTime(value)}`;
+}

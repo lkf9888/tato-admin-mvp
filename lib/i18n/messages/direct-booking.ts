@@ -6,6 +6,35 @@
  */
 export const directBookingMessages = {
   en: {
+    directBookingCancel: {
+      title: "Cancel this booking",
+      open: "Cancel & refund…",
+      summary: (paid: string, policy: string, outcome: "free" | "late" | "started") =>
+        `Paid ${paid}. ${
+          outcome === "free"
+            ? `Free cancellation window: the policy refunds ${policy}.`
+            : outcome === "late"
+              ? `Within 48 hours of pickup: the policy refunds ${policy} (one day's rent kept).`
+              : "The trip has started: the policy refunds nothing."
+        }`,
+      policy: (amount: string) => `Refund under the policy (${amount})`,
+      full: (amount: string) => `Refund everything paid (${amount})`,
+      none: "No refund",
+      custom: "Another amount",
+      noPayment: "This booking was not paid through the site, so there is nothing to refund.",
+      archive: "Also remove it from the calendar (otherwise it stays as a cancelled strip)",
+      notePlaceholder: "Note to the renter (optional, included in the email)",
+      submit: (amount: string) => `Cancel and refund ${amount}`,
+      working: "Cancelling…",
+      close: "Close",
+      confirm: (amount: string) =>
+        `Cancel this booking and refund ${amount} to the renter's card? This cannot be undone.`,
+      emailTo: (email: string) => `The renter is emailed at ${email}.`,
+      noEmail: "No renter email on file; tell them yourself.",
+      done: (amount: string, emailed: boolean) =>
+        `Cancelled. Refunded ${amount}.${emailed ? " The renter has been emailed." : ""}`,
+      failed: (detail: string) => `Not cancelled -- the refund failed: ${detail}`,
+    },
     bookingExtraCharge: {
       title: "Extra days",
       days: (billed: number, current: number) =>
@@ -404,6 +433,34 @@ export const directBookingMessages = {
     },
   },
   zh: {
+    directBookingCancel: {
+      title: "取消此订单",
+      open: "取消并退款…",
+      summary: (paid: string, policy: string, outcome: "free" | "late" | "started") =>
+        `已付 ${paid}。${
+          outcome === "free"
+            ? `在免费取消期内：按政策退 ${policy}。`
+            : outcome === "late"
+              ? `距取车不足 48 小时：按政策退 ${policy}（扣一天租金）。`
+              : "行程已开始：按政策不退款。"
+        }`,
+      policy: (amount: string) => `按政策退款（${amount}）`,
+      full: (amount: string) => `全额退款（${amount}）`,
+      none: "不退款",
+      custom: "其他金额",
+      noPayment: "这笔订单不是通过网站付款的，没有可退的款项。",
+      archive: "同时从日历删除（否则以取消细条保留在日历上）",
+      notePlaceholder: "给租客的说明（可选，会写进邮件）",
+      submit: (amount: string) => `取消并退款 ${amount}`,
+      working: "取消中…",
+      close: "收起",
+      confirm: (amount: string) => `取消此订单并退 ${amount} 到租客的卡上？此操作无法撤销。`,
+      emailTo: (email: string) => `会发邮件通知租客：${email}。`,
+      noEmail: "没有租客邮箱，请自行通知。",
+      done: (amount: string, emailed: boolean) =>
+        `已取消，退款 ${amount}。${emailed ? "已邮件通知租客。" : ""}`,
+      failed: (detail: string) => `未取消——退款失败：${detail}`,
+    },
     bookingExtraCharge: {
       title: "补收天数",
       days: (billed: number, current: number) => `已付 ${billed} 天；按现在的取还车时间是 ${current} 天。`,

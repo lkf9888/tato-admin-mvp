@@ -10,11 +10,16 @@ import {
   getOpenRequest,
   loadBookingByToken,
   quoteCancellation,
-  toDateOnly,
 } from "@/lib/booking-access";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
-import { utcToZonedDate, utcToZonedTime } from "@/lib/booking-time";
+import {
+  DEFAULT_BOOKING_TIME,
+  formatBookingMoment,
+  isDateOnlyMoment,
+  utcToZonedDate,
+  utcToZonedTime,
+} from "@/lib/booking-time";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 type Params = Promise<{ token: string }>;
@@ -72,7 +77,7 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
     (request) => request.status === BookingRequestStatus.DECLINED,
   );
   const isCancelled = order.status === OrderStatus.cancelled;
-  const today = toDateOnly(new Date());
+  const today = utcToZonedDate(new Date());
 
   const cancelCopy =
     quote.outcome === "free"
@@ -149,10 +154,10 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
               ? copy.pendingCancel
               : copy.pendingReschedule(
                   openRequest.requestedPickupDate
-                    ? formatDate(openRequest.requestedPickupDate, locale)
+                    ? formatBookingMoment(openRequest.requestedPickupDate)
                     : "—",
                   openRequest.requestedReturnDate
-                    ? formatDate(openRequest.requestedReturnDate, locale)
+                    ? formatBookingMoment(openRequest.requestedReturnDate)
                     : "—",
                 )}
           </p>
@@ -171,8 +176,14 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
           cancelOutcome={quote.outcome}
           cancelCopy={cancelCopy}
           minDate={today}
-          defaultPickupDate={toDateOnly(order.pickupDatetime)}
-          defaultReturnDate={toDateOnly(order.returnDatetime)}
+          defaultPickupDate={utcToZonedDate(order.pickupDatetime)}
+          defaultReturnDate={utcToZonedDate(order.returnDatetime)}
+          defaultPickupTime={
+            isDateOnlyMoment(order.pickupDatetime) ? DEFAULT_BOOKING_TIME : utcToZonedTime(order.pickupDatetime)
+          }
+          defaultReturnTime={
+            isDateOnlyMoment(order.returnDatetime) ? DEFAULT_BOOKING_TIME : utcToZonedTime(order.returnDatetime)
+          }
         />
       ) : null}
 
@@ -201,5 +212,5 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
 }
 
 function formatTripMoment(value: Date) {
-  return `${utcToZonedDate(value).replace(/-/g, "/")} ${utcToZonedTime(value)}`;
+  return formatBookingMoment(value);
 }

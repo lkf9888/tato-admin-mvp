@@ -8,7 +8,13 @@ import {
   quoteCancellation,
 } from "@/lib/booking-access";
 import { BookingRequestKind } from "@prisma/client";
-import { dateOnlyToUtcMidday, isDateOnlyRangeValid } from "@/lib/direct-booking";
+import {
+  DEFAULT_BOOKING_TIME,
+  isDateOnlyMoment,
+  utcToZonedTime,
+  zonedDateTimeToUtc,
+} from "@/lib/booking-time";
+import { sendChangeRequestNotice } from "@/lib/direct-booking-email";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 
@@ -20,6 +26,10 @@ const bodySchema = z.object({
   kind: z.enum(["CANCEL", "RESCHEDULE"]),
   pickupDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  // `HH:MM` on the operator's clock. A page from before times were
+  // asked for sends none; the trip's own times of day are kept then.
+  pickupTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  returnTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   note: z.string().trim().max(1000).optional(),
 });
 
@@ -55,7 +65,20 @@ export async function POST(request: Request, { params }: { params: Params }) {
     if (!body.pickupDate || !body.returnDate) {
       return NextResponse.json({ error: "DATES_REQUIRED" }, { status: 400 });
     }
-    if (!isDateOnlyRangeValid(body.pickupDate, body.returnDate)) {
+    const keepTime = (value: Date) =>
+      isDateOnlyMoment(value) ? DEFAULT_BOOKING_TIME : utcToZonedTime(value);
+    const pickupAt = zonedDateTimeToUtc(
+      body.pickupDate,
+      body.pickupTime ?? keepTime(order.pickupDatetime),
+    );
+    const returnAt = zonedDateTimeToUtc(
+      body.returnDate,
+      body.returnTime ?? keepTime(order.returnDatetime),
+    );
+    if (!pickupAt || !returnAt || returnAt <= pickupAt) {
+      return NextResponse.json({ error: "INVALID_RANGE" }, { status: 400 });
+    }
+    if (pickupAt.getTime() < Date.now() - 15 * 60_000) {
       return NextResponse.json({ error: "INVALID_RANGE" }, { status: 400 });
     }
 
@@ -64,15 +87,15 @@ export async function POST(request: Request, { params }: { params: Params }) {
     const free = await areRequestedDatesFree({
       vehicleId: order.vehicleId,
       excludeOrderId: order.id,
-      pickupDate: body.pickupDate,
-      returnDate: body.returnDate,
+      pickupAt,
+      returnAt,
     });
     if (!free) {
       return NextResponse.json({ error: "DATES_UNAVAILABLE" }, { status: 409 });
     }
 
-    requestedPickupDate = dateOnlyToUtcMidday(body.pickupDate);
-    requestedReturnDate = dateOnlyToUtcMidday(body.returnDate);
+    requestedPickupDate = pickupAt;
+    requestedReturnDate = returnAt;
   } else {
     const quote = await quoteCancellation(order);
     if (!quote.isSelfServiceEligible) {
@@ -106,10 +129,25 @@ export async function POST(request: Request, { params }: { params: Params }) {
     metadata: {
       requestId: created.id,
       quotedRefundAmount,
-      pickupDate: body.pickupDate ?? null,
-      returnDate: body.returnDate ?? null,
+      pickupAt: requestedPickupDate?.toISOString() ?? null,
+      returnAt: requestedReturnDate?.toISOString() ?? null,
     },
   });
+
+  // The operator hears about it now, not whenever they next open the
+  // requests page.
+  if (order.workspaceId) {
+    await sendChangeRequestNotice({
+      workspaceId: order.workspaceId,
+      order,
+      vehicle: order.vehicle,
+      kind: body.kind,
+      requestedPickup: requestedPickupDate,
+      requestedReturn: requestedReturnDate,
+      quotedRefund: quotedRefundAmount,
+      renterNote: body.note?.trim() || null,
+    });
+  }
 
   return NextResponse.json({ ok: true, requestId: created.id });
 }

@@ -35,9 +35,12 @@ export const bookingMessages = {
       cancelConfirm: "確定嗎？系統會向車主提交取消申請。",
 
       rescheduleHeading: "更改日期",
-      rescheduleCopy: "選擇你希望的新日期。差價與車主結算。",
+      rescheduleCopy: "選擇你希望的新日期和時間。差價與車主結算。",
       newPickupLabel: "新取車日",
       newReturnLabel: "新還車日",
+      newPickupTimeLabel: "取車時間",
+      newReturnTimeLabel: "還車時間",
+      timeZoneNote: "時間均為溫哥華時間。",
       rescheduleAction: "申請新日期",
       rescheduleUnavailable: "該時段這輛車已被預訂，請換一個時間。",
       noteLabel: "想讓車主知道的事",

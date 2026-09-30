@@ -968,6 +968,32 @@ export async function estimateImportVehicleImpact(input: {
   };
 }
 
+/**
+ * Orders a person deleted and has not restored since, by id.
+ *
+ * Deleting is `isArchived` plus `cancelled` -- the same two fields a
+ * CSV used to set on every trip Turo cancelled -- so the row alone
+ * cannot say which it was. The activity log can: deleting and
+ * restoring are both logged against the order.
+ */
+async function findOrdersDeletedByPerson(workspaceId: string) {
+  const entries = await prisma.activityLog.findMany({
+    where: {
+      workspaceId,
+      entityType: "Order",
+      action: { in: ["order_deleted", "offline_order_deleted", "order_restored"] },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { entityId: true, action: true },
+  });
+  const deleted = new Set<string>();
+  for (const entry of entries) {
+    if (entry.action === "order_restored") deleted.delete(entry.entityId);
+    else deleted.add(entry.entityId);
+  }
+  return deleted;
+}
+
 export async function importTuroOrders(input: {
   workspaceId: string;
   fileName: string;
@@ -1011,6 +1037,7 @@ export async function importTuroOrders(input: {
   /** VIN / vehicle-id pairs taken back from a car that was not theirs. */
   const reclaimedIdentifiers: Array<{ plateNumber: string; takenFrom: string }> = [];
   let deletedCancelledRows = 0;
+  const deletedByPerson = await findOrdersDeletedByPerson(input.workspaceId);
   const deletedStaleOrders = 0;
   let skippedRows = 0;
 
@@ -1211,7 +1238,18 @@ export async function importTuroOrders(input: {
         returnLocation: importedReturnLocation || existing?.returnLocation || null,
         notes: existing?.notes ?? null,
         sourceMetadata: buildSourceMetadata(row),
-        isArchived: status === OrderStatus.cancelled,
+        // A trip Turo cancelled is a cancelled order, not a deleted one:
+        // it stays on the calendar as the thin struck-through strip,
+        // exactly as mail and the agent record a cancellation. Archiving
+        // it filled the trash with hundreds of Turo cancellations, and
+        // made one trip look different depending on which source saw
+        // the cancellation first. A trip a person deleted stays deleted.
+        //
+        // A live row still brings a deleted trip back, as it always has:
+        // Turo says the trip is happening.
+        isArchived:
+          status === OrderStatus.cancelled &&
+          Boolean(existing?.isArchived && deletedByPerson.has(existing.id)),
       };
 
       // This reservation now has a real car, named by its plate, so it
@@ -1276,8 +1314,8 @@ export async function importTuroOrders(input: {
       failures: JSON.stringify(failures),
       notes:
         failures.length > 0
-          ? `${failures.length} row(s) need manual review${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""} · previous Turo orders are kept`
-          : `Import completed without row-level issues${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) archived` : ""} · previous Turo orders are kept`,
+          ? `${failures.length} row(s) need manual review${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) recorded` : ""} · previous Turo orders are kept`
+          : `Import completed without row-level issues${createdVehicles > 0 ? ` · ${createdVehicles} vehicle(s) auto-created` : ""}${updatedVehicles > 0 ? ` · ${updatedVehicles} vehicle(s) refreshed` : ""}${skippedRows > 0 ? ` · ${skippedRows} row(s) skipped by vehicle selection` : ""}${deletedCancelledRows > 0 ? ` · ${deletedCancelledRows} cancelled row(s) recorded` : ""} · previous Turo orders are kept`,
     },
   });
 

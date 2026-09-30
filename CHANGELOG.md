@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.20.0 - 2026-09-29
+
+### A trip Turo cancelled stays on the calendar, wherever the news came from
+
+A Turo cancellation looked different depending on which source reported it first. Mail and the agent marked the trip cancelled, and the calendar drew it as the thin struck-through strip. The CSV archived it instead: it disappeared from the calendar and went into the trash, the same place as a trip someone deleted by hand. So the same trip first showed as a strip and then vanished at the next import, and the trash filled with hundreds of Turo cancellations nobody had deleted.
+
+The CSV now records a cancellation the same way mail and the agent do. The trip is cancelled but not deleted, and it stays on the calendar as a strip. Cancelled trips already count for nothing: they add no conflicts, no owner-ledger lines, no revenue and no "bookings in view". The trash is for trips deleted by a person.
+
+Cancellations the CSV archived before this version come back to the calendar the next time an export is imported. A trip a person deleted stays deleted, even when Turo then cancels it. The activity log records who deleted what, and a trip that was deleted and later restored counts as not deleted. As before, a trip Turo still lists as live comes back from the trash when an export includes it.
+
+
 ## v1.19.1 - 2026-09-29
 
 ### One sidebar entry for vehicle returns

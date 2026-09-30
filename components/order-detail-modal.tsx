@@ -5,6 +5,7 @@ import { Check, Pencil, Save, Share2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { BookingExtraChargePanel } from "@/components/booking-extra-charge-panel";
+import { DirectBookingCancelPanel } from "@/components/direct-booking-cancel-panel";
 import { OrderAttachments } from "@/components/order-attachments";
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
@@ -163,6 +164,7 @@ function labels(locale: Locale) {
         paymentsSettled: "已付清",
         saveError: "订单暂时无法保存，请检查必填项后重试。",
         deleteError: "订单暂时无法删除，请稍后再试。",
+        paidDirectBooking: "这笔是客人在线付过款的订单，不能直接取消或删除。请用下面的「取消并退款」处理，先决定给客人退多少。",
         validationError: "请填写租客、车辆与正确的取还车时间。",
         vehicle: "车辆",
         status: "状态",
@@ -239,6 +241,8 @@ function labels(locale: Locale) {
         paymentsSettled: "Paid off",
         saveError: "We could not save this order. Check the required fields and try again.",
         deleteError: "We could not delete this order right now. Please try again.",
+        paidDirectBooking:
+          "The renter paid for this booking online, so it cannot be cancelled or deleted here. Use Cancel and refund below to decide the refund first.",
         validationError: "Complete renter, vehicle, and a valid pickup/return window.",
         vehicle: "Vehicle",
         status: "Status",
@@ -420,6 +424,12 @@ export function OrderDetailModal({
   const [currentOrder, setCurrentOrder] = useState(order);
   const [draft, setDraft] = useState<OrderDraft>(() => buildDraft(order));
   const [error, setError] = useState<string | null>(null);
+  /** Where a refused cancel sends the operator. */
+  const cancelPanelRef = useRef<HTMLDivElement | null>(null);
+  const pointToRefundPanel = () => {
+    setError(t.paidDirectBooking);
+    cancelPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   const [ownerSyncMessage, setOwnerSyncMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncingOwner, setIsSyncingOwner] = useState(false);
@@ -549,6 +559,10 @@ export function OrderDetailModal({
         | null;
 
       if (!response.ok || !payload?.order) {
+        if (payload?.error === "PAID_DIRECT_BOOKING") {
+          pointToRefundPanel();
+          return null;
+        }
         setError(
           payload?.error === "INVALID_DATES" || payload?.error === "VALIDATION_ERROR"
             ? t.validationError
@@ -800,6 +814,10 @@ export function OrderDetailModal({
         | { deletedId?: string; error?: string }
         | null;
 
+      if (payload?.error === "PAID_DIRECT_BOOKING") {
+        pointToRefundPanel();
+        return;
+      }
       if (!response.ok || payload?.deletedId !== currentOrder.id) {
         setError(t.deleteError);
         return;
@@ -1082,6 +1100,25 @@ export function OrderDetailModal({
                   key={`${currentOrder.id}:${currentOrder.pickupDatetime}:${currentOrder.returnDatetime}`}
                   locale={locale}
                   orderId={currentOrder.id}
+                />
+              </div>
+            ) : null}
+
+            {/* Cancelling a paid online booking, with its refund decided
+                first. The status field and delete refuse to do it for such
+                a booking and scroll here instead. Renders nothing for any
+                other order. Done closes the dialog: the order it showed is
+                now cancelled, and possibly in the trash. */}
+            {currentOrder.source !== "turo" ? (
+              <div ref={cancelPanelRef} className="empty:hidden sm:col-span-2 lg:col-span-4">
+                <DirectBookingCancelPanel
+                  key={`${currentOrder.id}:${currentOrder.status}`}
+                  locale={locale}
+                  orderId={currentOrder.id}
+                  onDone={() => {
+                    router.refresh();
+                    onClose();
+                  }}
                 />
               </div>
             ) : null}

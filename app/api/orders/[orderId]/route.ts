@@ -8,6 +8,7 @@ import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { resolveOrderCleaningFees } from "@/lib/owner-commission";
 import { getOrderFeeLines } from "@/lib/ledger-policy";
 import { findConflictingOrders, logActivity, reconcileVehicleConflicts } from "@/lib/orders";
+import { blocksPlainCancel, PAID_DIRECT_BOOKING } from "@/lib/orders-cancel-guard";
 import { prisma } from "@/lib/prisma";
 import { roundCurrencyAmount } from "@/lib/utils";
 
@@ -152,6 +153,12 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
 
+    // Choosing 已取消 in the status field would cancel a paid online
+    // booking without refunding it; that goes through the refund panel.
+    if (parsed.status === OrderStatus.cancelled && blocksPlainCancel(existing)) {
+      return NextResponse.json({ error: PAID_DIRECT_BOOKING }, { status: 409 });
+    }
+
     const vehicle = await prisma.vehicle.findFirst({
       where: { id: parsed.vehicleId, workspaceId: workspace.id },
       select: { id: true },
@@ -276,6 +283,10 @@ export async function DELETE(_request: Request, { params }: { params: Params }) 
 
     if (!existing) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+    }
+
+    if (blocksPlainCancel(existing)) {
+      return NextResponse.json({ error: PAID_DIRECT_BOOKING }, { status: 409 });
     }
 
     const archivedOrder = await prisma.order.update({

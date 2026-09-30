@@ -37,6 +37,7 @@ import {
   syncVehicleOwnerLedger,
 } from "@/lib/owner-ledger";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
+import { blocksPlainCancel } from "@/lib/orders-cancel-guard";
 import {
   resolveFeeTarget,
   resolveWorkspaceLedgerPolicy,
@@ -1603,6 +1604,10 @@ export async function updateOrderStatusAction(formData: FormData) {
   });
   if (!existingOrder) return;
 
+  if (status === OrderStatus.cancelled && blocksPlainCancel(existingOrder)) {
+    redirect("/orders?error=paid-direct-booking");
+  }
+
   const order = await prisma.order.update({
     where: { id: existingOrder.id },
     data: { status },
@@ -1634,6 +1639,10 @@ export async function deleteOrderAction(formData: FormData) {
 
   if (existing.source === OrderSource.turo) {
     redirect("/orders?error=turo-order-readonly");
+  }
+
+  if (blocksPlainCancel(existing)) {
+    redirect("/orders?error=paid-direct-booking");
   }
 
   const archivedOrder = await prisma.order.update({

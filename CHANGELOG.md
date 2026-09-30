@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.22.1 - 2026-09-30
+
+### A paid online booking is cancelled through its refund
+
+v1.22.0 added **Cancel and refund** for direct bookings. It now sits in the calendar's order popup, under the extra-days bill, and on the order's own page -- and it is the only way to cancel a booking the renter paid for online.
+
+Before, deleting such a booking from the calendar, or setting its status to cancelled, just cancelled it: the renter's money stayed with the host and nobody was shown the refund choice. Delete, the status field, and the orders page's forms now refuse for a paid direct booking that is not yet cancelled, say why, and in the popup scroll to the refund panel. Once it is cancelled, deleting it to the trash works as usual. Other orders are unaffected.
+
+
 ## v1.22.0 - 2026-09-29
 
 ### Change requests email both sides, reschedules carry times, and the operator can cancel with a refund

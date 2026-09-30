@@ -396,7 +396,9 @@ export default async function OrdersPage({
 
       {params.error ? (
         <div className="rounded-lg border border-amber-200/70 bg-[rgba(247,247,247,0.92)] px-4 py-3 text-[12px] text-amber-700 shadow-[0_16px_40px_-36px_rgba(17,19,24,0.45)]">
-          {orderMessages.importedReadOnly}
+          {params.error === "paid-direct-booking"
+            ? orderMessages.paidDirectBooking
+            : orderMessages.importedReadOnly}
         </div>
       ) : null}
 

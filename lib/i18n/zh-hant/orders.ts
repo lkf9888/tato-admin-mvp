@@ -4,6 +4,7 @@
 export const ordersMessages = {
     orders: {
       importedReadOnly: "Turo 匯入訂單預設只讀，如需更新請重新匯入更新後的 CSV。",
+      paidDirectBooking: "這筆是客人線上付過款的訂單。請在訂單裡用「取消並退款」處理，先決定給客人退多少，再取消。",
       createKicker: "新建線下訂單",
       searchKicker: "搜尋訂單",
       placeholders: {

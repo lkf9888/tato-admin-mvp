@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { findConflictingOrders, logActivity, reconcileVehicleConflicts } from "@/lib/orders";
+import { blocksPlainCancel, PAID_DIRECT_BOOKING } from "@/lib/orders-cancel-guard";
 import { prisma } from "@/lib/prisma";
 import { roundCurrencyAmount } from "@/lib/utils";
 
@@ -278,6 +279,10 @@ export async function DELETE(request: Request) {
 
     if (existing.source !== OrderSource.offline) {
       return NextResponse.json({ error: "READ_ONLY_SOURCE" }, { status: 403 });
+    }
+
+    if (blocksPlainCancel(existing)) {
+      return NextResponse.json({ error: PAID_DIRECT_BOOKING }, { status: 409 });
     }
 
     const archivedOrder = await prisma.order.update({

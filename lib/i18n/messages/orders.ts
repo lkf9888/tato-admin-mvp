@@ -8,6 +8,8 @@ export const ordersMessages = {
   en: {
     orders: {
       importedReadOnly: "Imported Turo orders are treated as read-only. Update them by importing a newer CSV file.",
+      paidDirectBooking:
+        "This booking was paid online. Cancel it with Cancel and refund on the order, so the renter's refund is decided first.",
       createKicker: "Create offline order",
       searchKicker: "Search orders",
       placeholders: {
@@ -73,6 +75,7 @@ export const ordersMessages = {
   zh: {
     orders: {
       importedReadOnly: "Turo 导入订单默认只读，如需更新请重新导入更新后的 CSV。",
+      paidDirectBooking: "这笔是客人在线付过款的订单。请在订单里用「取消并退款」处理，先决定给客人退多少，再取消。",
       createKicker: "新建线下订单",
       searchKicker: "搜索订单",
       placeholders: {

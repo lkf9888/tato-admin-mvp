@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.20.1 - 2026-09-29
+
+### Cancelled trips are not offered for a contract
+
+Since v1.20.0 a trip Turo cancelled stays unarchived, drawn as a strip
+on the calendar, so the contracts page's order picker (which filtered
+on `isArchived` alone) would have listed hundreds of them. It now
+leaves out `status: cancelled` too. The rental site's availability,
+the booking webhook and the renter's page already did.
+
 ## v1.20.0 - 2026-09-29
 
 ### A trip Turo cancelled stays on the calendar, wherever the news came from

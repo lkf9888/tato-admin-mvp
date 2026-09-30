@@ -33,7 +33,9 @@ export default async function ContractsPage() {
       },
     }),
     prisma.order.findMany({
-      where: { workspaceId: workspace.id, isArchived: false },
+      // Cancelled trips stay on the calendar as a strip now, unarchived;
+      // nobody signs a contract for one.
+      where: { workspaceId: workspace.id, isArchived: false, status: { not: "cancelled" } },
       orderBy: { pickupDatetime: "desc" },
       take: 200,
       select: {

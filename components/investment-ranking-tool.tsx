@@ -20,6 +20,8 @@ function fill(template: string, values: Record<string, string | number>) {
 }
 
 const ROW_LIMIT = 40;
+/** A search is a question about specific cars, so it shows more of them. */
+const SEARCH_LIMIT = 100;
 
 export function InvestmentRankingTool({
   locale,
@@ -44,13 +46,15 @@ export function InvestmentRankingTool({
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, number>>({});
+  const [query, setQuery] = useState("");
 
   const effectiveCommission = ownerView ? commission / 100 : 0;
 
   // ~3,300 car-years, each a dozen months of arithmetic. Cheap enough to
-  // redo on every keystroke, but not cheap enough to redo on every
-  // render, so it hangs off the inputs that actually change it.
-  const { rows, scored, positive, robust } = useMemo(() => {
+  // redo when an assumption changes, not on every render — and not on
+  // every keystroke in the search box either, which is why filtering
+  // is a second memo over this one rather than part of it.
+  const ranking = useMemo(() => {
     const all = rankVehicles({
       now,
       commission: effectiveCommission,
@@ -61,27 +65,45 @@ export function InvestmentRankingTool({
       minPrice: minPrice ? Number(minPrice) : undefined,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
     });
-    // A car you typed a real price for is the car you are actually
-    // considering. Left to the plain cut-off it vanishes the moment the
-    // price you entered makes it a bad deal — which is exactly the
-    // answer you were looking for, and exactly when you lose sight of
-    // it. Overridden rows stay visible, carrying their true rank.
-    const top = all.slice(0, ROW_LIMIT);
-    const shown = new Set(top.map((r) => overrideKey(r.make, r.model, r.year)));
-    const pinned = all
-      .map((r, index) => ({ row: r, rank: index + 1 }))
-      .filter(
-        ({ row }) =>
-          row.priceIsOverride && !shown.has(overrideKey(row.make, row.model, row.year)),
-      );
-
     return {
-      rows: top.map((row, index) => ({ row, rank: index + 1 })).concat(pinned),
+      // Rank is fixed here, over everything the filters let through, so
+      // a search further down can show where a car really stands.
+      ranked: all.map((row, index) => ({ row, rank: index + 1 })),
       scored: all.length,
       positive: all.filter((r) => r.totalReturn > 0).length,
       robust: all.filter((r) => r.scenarios.worst.totalReturn > 0).length,
     };
   }, [now, effectiveCommission, fixed, budget, sortBy, overrides, minPrice, maxPrice]);
+
+  const { scored, positive, robust } = ranking;
+  const tokens = useMemo(() => query.toLowerCase().split(/\s+/).filter(Boolean), [query]);
+
+  const { rows, matches } = useMemo(() => {
+    const { ranked } = ranking;
+
+    // Searching: every word has to appear in "year make model", so
+    // "toyota 2019" narrows and "sienna" finds every year of it. Ranks
+    // are the ones assigned above, so "#412" means 412th overall.
+    if (tokens.length > 0) {
+      const hits = ranked.filter(({ row }) => {
+        const haystack = `${row.year} ${row.make} ${row.model}`.toLowerCase();
+        return tokens.every((token) => haystack.includes(token));
+      });
+      return { rows: hits.slice(0, SEARCH_LIMIT), matches: hits.length };
+    }
+
+    // A car you typed a real price for is the car you are actually
+    // considering. Left to the plain cut-off it vanishes the moment the
+    // price you entered makes it a bad deal — which is exactly the
+    // answer you were looking for, and exactly when you lose sight of
+    // it. Overridden rows stay visible, carrying their true rank.
+    const top = ranked.slice(0, ROW_LIMIT);
+    const shown = new Set(top.map(({ row }) => overrideKey(row.make, row.model, row.year)));
+    const pinned = ranked.filter(
+      ({ row }) => row.priceIsOverride && !shown.has(overrideKey(row.make, row.model, row.year)),
+    );
+    return { rows: top.concat(pinned), matches: null };
+  }, [ranking, tokens]);
 
   const inputClass =
     "h-10 w-full rounded-[var(--control-radius)] border border-[var(--line-strong)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-soft)]";
@@ -253,8 +275,47 @@ export function InvestmentRankingTool({
         })}
       </p>
 
+      {/* ---------- search ---------- */}
+      <div className="flex items-center gap-3">
+        <div className="relative min-w-0 flex-1">
+          <svg
+            aria-hidden
+            viewBox="0 0 20 20"
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-soft)]"
+          >
+            <circle cx="9" cy="9" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+            <path d="m13.5 13.5 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={copy.searchPlaceholder}
+            aria-label={copy.searchPlaceholder}
+            className="h-9 w-full rounded-[var(--control-radius)] border border-[var(--line-strong)] bg-[var(--surface)] pl-9 pr-3 text-[13px] text-[var(--ink)] outline-none transition focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-soft)]"
+          />
+        </div>
+        {matches != null ? (
+          <p className="shrink-0 text-[12px] tabular-nums text-[var(--ink-soft)]">
+            {fill(copy.searchCount, { count: matches.toLocaleString(getLocaleTag(locale)) })}
+          </p>
+        ) : null}
+      </div>
+      {matches != null && matches > SEARCH_LIMIT ? (
+        <p className="-mt-1 px-1 text-[12px] text-[var(--ink-soft)]">
+          {fill(copy.searchTruncated, {
+            shown: SEARCH_LIMIT,
+            count: matches.toLocaleString(getLocaleTag(locale)),
+          })}
+        </p>
+      ) : null}
+
       {/* ---------- table ---------- */}
-      {rows.length === 0 ? (
+      {rows.length === 0 && matches != null ? (
+        <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--line-strong)] bg-[var(--surface-muted)] px-6 py-10 text-center text-sm text-[var(--ink-soft)]">
+          {fill(copy.searchEmpty, { query: query.trim() })}
+        </div>
+      ) : rows.length === 0 ? (
         <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--line-strong)] bg-[var(--surface-muted)] px-6 py-12 text-center">
           <p className="text-base font-semibold text-[var(--ink)]">{copy.emptyTitle}</p>
           <p className="mt-1.5 text-sm text-[var(--ink-soft)]">{copy.emptyCopy}</p>

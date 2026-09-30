@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.21.0 - 2026-09-30
+
+### The purchase ranking can be searched
+
+买车排名 (`/vehicle-roi/ranking`) gets the same search box as the fleet table. Every word has to appear in the car's year, make and model, so `toyota 2019` narrows and `sienna` lists every year of it.
+
+A match keeps its rank in the whole ranking, so a search answers "where does this car stand": the best Sienna is the 2020 at #277 of 3,305, the 2026 sits at #1,479. The price range still applies first -- capped at $20,000 the same search returns the four 2014-2017 Siennas, ranked among the 1,492 cars under that price. Up to 100 matches are shown, with a note when there are more.
+
+Typing does not recompute the ranking. Scoring every model-year is one memo and the search is a second memo over its result, so a keystroke costs a filter, not 3,305 twelve-month estimates.
+
+With the search empty the page is unchanged: the top 40, plus any car with a price typed in, at its true rank.
+
+
 ## v1.20.1 - 2026-09-29
 
 ### Cancelled trips are not offered for a contract

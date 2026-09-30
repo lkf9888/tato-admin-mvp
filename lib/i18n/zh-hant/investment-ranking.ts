@@ -61,6 +61,10 @@ export const investmentRankingMessages = {
         "已評分 {scored} 個「車型+年份」組合。{positive} 個期望回報為正，其中 {robust} 個在最壞情況下仍為正。",
       emptyTitle: "沒有符合篩選條件的車型",
       emptyCopy: "放寬車價區間或提高預算。",
+      searchPlaceholder: "搜尋品牌、車型或年份",
+      searchCount: "{count} 個匹配",
+      searchTruncated: "顯示排名最靠前的 {shown} 個，共 {count} 個。再加一個詞可以縮小範圍。",
+      searchEmpty: "當前篩選條件下沒有匹配「{query}」的車型年份。",
 
       cautionTitle: "看排名之前，先看這幾條",
       caution1:

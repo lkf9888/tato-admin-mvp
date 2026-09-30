@@ -64,6 +64,10 @@ export const investmentRankingMessages = {
         "{scored} model-years scored. {positive} return a profit as expected; {robust} still do in the worst case.",
       emptyTitle: "Nothing matches those filters",
       emptyCopy: "Widen the price range or raise the budget.",
+      searchPlaceholder: "Search make, model or year",
+      searchCount: "{count} matches",
+      searchTruncated: "Showing the top {shown} of {count}. Add a word to narrow it.",
+      searchEmpty: "No model-year matches “{query}” within the current filters.",
 
       cautionTitle: "Read this before acting on the ranking",
       caution1:
@@ -136,6 +140,10 @@ export const investmentRankingMessages = {
         "已评分 {scored} 个「车型+年份」组合。{positive} 个期望回报为正，其中 {robust} 个在最坏情况下仍为正。",
       emptyTitle: "没有符合筛选条件的车型",
       emptyCopy: "放宽车价区间或提高预算。",
+      searchPlaceholder: "搜索品牌、车型或年份",
+      searchCount: "{count} 个匹配",
+      searchTruncated: "显示排名最靠前的 {shown} 个，共 {count} 个。再加一个词可以缩小范围。",
+      searchEmpty: "当前筛选条件下没有匹配「{query}」的车型年份。",
 
       cautionTitle: "看排名之前，先看这几条",
       caution1:

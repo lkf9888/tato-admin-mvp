@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.22.3 - 2026-09-30
+
+### Account settings describe both kinds of API token
+
+The API section of account settings still said the token is read-only. Since v1.16.0 the Turo reader page also issues read-write tokens, which import Turo's CSV export and trips read off Turo's trip pages. It now says so: a read-only token changes nothing; a read-write token imports, updating orders and owner ledgers as an import on the Imports page does; neither can change a price, a commission rule or a ledger line directly, or delete anything.
+
+### The imports page no longer receives the billing record
+
+Checking a CSV against the plan's vehicle slots returned, along with the slot numbers, the workspace's whole billing record -- Stripe customer and subscription ids included. It only ever reached the signed-in operator, but nothing on the page reads it. The check and its over-the-limit error now return the slot numbers only.
+
+
 ## v1.22.2 - 2026-09-30
 
 ### Change-request notices reach every TATO account too

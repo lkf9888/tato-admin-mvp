@@ -74,9 +74,9 @@ export const accountSettingsMessages = {
       turoReaderCopy:
         "Turo sends no notification when you reply, so guest conversations arriving by email are one-sided. The reader is a browser bookmark you click while signed in to Turo; it writes both halves of every conversation back to TATO. Set it up once.",
       turoReaderLink: "Set up the reader",
-      apiAccessTitle: "Read-only API for AI agents",
+      apiAccessTitle: "API tokens for AI agents",
       apiAccessCopy:
-        "Hand an AI agent or a script a token and it can read this account over HTTP: the fleet, trips and their charges, owners and their ledgers, guest conversations, and the bookings still waiting on a decision. The token is read-only — nothing it reaches can change an order, a price, or a ledger line.",
+        "Hand an AI agent or a script a token and it can read this account over HTTP: the fleet, trips and their charges, owners and their ledgers, guest conversations, and the bookings still waiting on a decision. There are two kinds. A read-only token changes nothing. A read-write token can also import Turo's CSV export and trips read off Turo's trip pages, which update orders and owner ledgers the same way an import on the Imports page does. Neither can change a price, a commission rule or a ledger line directly, or delete anything.",
       apiAccessLink: "Get an API token",
       androidTitle: "Android app",
       androidCopy:
@@ -179,9 +179,9 @@ export const accountSettingsMessages = {
       turoReaderCopy:
         "你回复客人的时候 Turo 不会发任何邮件通知，所以靠邮件同步过来的客人消息只有客人那一半。读取器是一个浏览器书签，在已经登录 Turo 的情况下点一下，就会把整段对话的双方消息都写回 TATO。设置一次即可。",
       turoReaderLink: "去设置读取器",
-      apiAccessTitle: "只读 API（给 AI Agent 用）",
+      apiAccessTitle: "API 令牌（给 AI Agent 用）",
       apiAccessCopy:
-        "把令牌交给 AI Agent 或脚本，它就能通过 HTTP 读取这个账户：车队、订单和逐项收费、车主和分成流水账、客人会话，以及还没挂到车上的预订。令牌只能读——订单、金额、分成规则都改不了。",
+        "把令牌交给 AI Agent 或脚本，它就能通过 HTTP 读取这个账户：车队、订单和逐项收费、车主和分成流水账、客人会话，以及还没挂到车上的预订。令牌分两种：只读令牌什么都改不了；读写令牌还能导入 Turo 导出的 CSV 和从行程页读到的行程，订单和车主账本会像在「导入」页手动导入一样更新。两种都不能直接改价格、分成规则或流水账，也删不了任何东西。",
       apiAccessLink: "签发 API 令牌",
       androidTitle: "安卓 App",
       androidCopy:

@@ -73,9 +73,9 @@ export const accountSettingsMessages = {
       turoReaderCopy:
         "你回覆客人的時候 Turo 不會發任何郵件通知，所以靠郵件同步過來的客人訊息只有客人那一半。讀取器是一個瀏覽器書籤，在已經登入 Turo 的情況下點一下，就會把整段對話的雙方訊息都寫回 TATO。設定一次即可。",
       turoReaderLink: "去設定讀取器",
-      apiAccessTitle: "只讀 API（給 AI Agent 用）",
+      apiAccessTitle: "API 令牌（給 AI Agent 用）",
       apiAccessCopy:
-        "把令牌交給 AI Agent 或指令碼，它就能透過 HTTP 讀取這個帳戶：車隊、訂單和逐項收費、車主和分成流水帳、客人會話，以及還沒掛到車上的預訂。令牌只能讀——訂單、金額、分成規則都改不了。",
+        "把令牌交給 AI Agent 或指令碼，它就能透過 HTTP 讀取這個帳戶：車隊、訂單和逐項收費、車主和分成流水帳、客人會話，以及還沒掛到車上的預訂。令牌分兩種：只讀令牌什麼都改不了；讀寫令牌還能匯入 Turo 匯出的 CSV 和從行程頁讀到的行程，訂單和車主帳本會像在「匯入」頁手動匯入一樣更新。兩種都不能直接改價格、分成規則或流水帳，也刪不了任何東西。",
       apiAccessLink: "簽發 API 令牌",
       androidTitle: "安卓 App",
       androidCopy:

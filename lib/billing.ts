@@ -16,6 +16,7 @@ import {
   getImportVehicleProjection,
   getVehicleSlotSnapshot,
   type ImportVehicleLimitInput,
+  type ImportVehicleProjection,
 } from "@/lib/billing-limits";
 import { prisma } from "@/lib/prisma";
 import { getAppUrl, getStripeClient, getStripePriceId, isStripeBillingConfigured } from "@/lib/stripe";
@@ -221,12 +222,22 @@ async function resolveBillingBypass(input: ImportBillingInput) {
   return Boolean(user.isBillingExempt);
 }
 
+/**
+ * The projection as the browser gets it: the slot numbers the imports
+ * page shows, without the workspace's billing row. That row carries the
+ * Stripe customer and subscription ids, and nothing on the page reads it.
+ */
+function forImportsPage(projection: ImportVehicleProjection) {
+  const { billing: _billing, ...visible } = projection;
+  return { ...visible, stripeConfigured: isStripeBillingConfigured() };
+}
+
 export async function getImportBillingProjection(input: ImportBillingInput) {
   const projection = await getImportVehicleProjection({
     ...input,
     billingBypassActive: await resolveBillingBypass(input),
   });
-  return { ...projection, stripeConfigured: isStripeBillingConfigured() };
+  return forImportsPage(projection);
 }
 
 export async function assertImportWithinBillingLimit(input: ImportBillingInput) {
@@ -235,12 +246,13 @@ export async function assertImportWithinBillingLimit(input: ImportBillingInput) 
     billingBypassActive: await resolveBillingBypass(input),
   });
   if (withinLimit) {
-    return { ...projection, stripeConfigured: isStripeBillingConfigured() };
+    return forImportsPage(projection);
   }
 
   const error = new Error("Vehicle limit exceeded for the current subscription.");
   (error as Error & { code?: string; details?: unknown }).code = "BILLING_LIMIT_EXCEEDED";
-  (error as Error & { code?: string; details?: unknown }).details = projection;
+  // Sent to the browser as the 402's details.
+  (error as Error & { code?: string; details?: unknown }).details = forImportsPage(projection);
   throw error;
 }
 

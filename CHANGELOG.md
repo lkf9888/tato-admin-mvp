@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.23.1 - 2026-09-30
+
+### The dashboard fits on one screen, and a pickup opens the guest's Turo chat
+
+The nine numbers that were two sections of cards are one strip -- a single row on a laptop -- with their explanations on hover. Today, tomorrow and recent activity sit side by side, one line per pickup or return, so the whole page fits a 1440x900 screen without scrolling.
+
+Tapping a pickup or return on a Turo trip opens that reservation's conversation on turo.com; on a phone with the Turo app installed, the phone opens it in the app. Other orders open their own page here, where every row used to lead to the whole orders list. v1.23.0's **Quick CSV import** sits under the numbers.
+
+### An AI agent can record the host's side of Turo conversations
+
+Turo emails TATO when a guest writes and never when the host answers, so a conversation's host side existed only where the browser reader had been. A read-write API token now also holds `messages:write`: `POST /api/agent/messages` records a conversation as it appears on Turo, both sides, and `GET /api/agent/reservations` says which to read first. Both are listed in `GET /api/agent`, with their formats. Tokens issued before this keep their old scopes; issue a new one.
+
+Message times are taken as the page shows them -- `2026-10-15T08:45:00`, read as Vancouver time -- by the same parser the trips endpoint uses. `GET /api/agent/threads` now gives each thread its Turo `reservationId`, the recorded `conversation` in both directions, and `lastHostReplyAt`.
+
+
 ## v1.23.0 - 2026-09-30
 
 ### A Turo CSV imports in one click, with the last import's settings

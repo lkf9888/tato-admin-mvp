@@ -2,6 +2,7 @@ import { corsPreflight, withCors } from "@/lib/agent-cors";
 import { z } from "zod";
 
 import { authenticateAgent, messageFingerprint } from "@/lib/agent-auth";
+import { agentTimeSchema, parseAgentTime } from "@/lib/agent-time";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -27,7 +28,11 @@ const messageSchema = z.object({
   direction: z.enum(["inbound", "outbound"]),
   authorName: z.string().trim().max(120).nullish(),
   body: z.string().trim().min(1).max(8000),
-  sentAt: z.string().datetime(),
+  /** Local time as the page shows it, or ISO 8601 with an offset --
+   *  see `parseAgentTime`. Z-only used to be required, which an agent
+   *  reading Vancouver times off the page could only meet by converting
+   *  them itself. */
+  sentAt: agentTimeSchema,
 });
 
 const payloadSchema = z.object({
@@ -57,11 +62,16 @@ export async function POST(request: Request) {
   let updated = 0;
 
   for (const message of messages) {
+    // Validated above, so never null. Normalised before fingerprinting
+    // so the same moment sent as local time or as UTC is one message --
+    // and the bookmarklet, which has always sent toISOString(), keeps
+    // the ids its rows were stored under.
+    const sentAt = parseAgentTime(message.sentAt)!;
     const externalId =
       message.externalId ||
       messageFingerprint({
         direction: message.direction,
-        sentAt: message.sentAt,
+        sentAt: sentAt.toISOString(),
         body: message.body,
       });
 
@@ -98,7 +108,7 @@ export async function POST(request: Request) {
         direction: message.direction,
         authorName: message.authorName ?? null,
         body: message.body,
-        sentAt: new Date(message.sentAt),
+        sentAt,
         source: source ?? null,
       },
     });

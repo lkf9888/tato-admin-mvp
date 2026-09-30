@@ -28,6 +28,8 @@ export const dashboardMessages = {
         pickupLocationPrefix: "取車地點",
         returnLocationPrefix: "還車地點",
         noLocation: "未填寫地點",
+        openTuroChat: "在 Turo 開啟和客人的聊天",
+        openOrder: "開啟訂單",
       },
       openOrders: "檢視訂單",
       activityKicker: "操作記錄",

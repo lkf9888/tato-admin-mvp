@@ -21,10 +21,11 @@ export const runtime = "nodejs";
  * read -- a quarter's worth, which is more conversation than any
  * automation needs and cannot grow without bound as the mailbox does.
  *
- * What this does not carry is our own replies. Turo notifies on the
- * guest's messages and says nothing when the host answers, so unless
- * the browser reader has been over a thread, every conversation here
- * is one-sided by construction rather than by omission.
+ * The mail carries only the guest's side: Turo notifies on the guest's
+ * messages and says nothing when the host answers. The host's side
+ * exists only where the Turo reader or an agent has recorded the
+ * conversation (POST /api/agent/messages), and each thread carries
+ * that recording, both directions, under `conversation`.
  */
 export async function GET(request: Request) {
   const agent = await authenticateAgent(request, "read");
@@ -107,6 +108,31 @@ export async function GET(request: Request) {
     }),
   );
 
+  // Threads name a TATO order; the recorded conversation is keyed on
+  // Turo's reservation id, which is also what an agent writes back to.
+  const orderIds = [...new Set(threads.map((thread) => thread.orderId).filter((id): id is string => Boolean(id)))];
+  const reservationByOrder = new Map(
+    (
+      await prisma.order.findMany({
+        where: { workspaceId: agent.workspaceId, id: { in: orderIds } },
+        select: { id: true, externalOrderId: true },
+      })
+    )
+      .filter((order) => order.externalOrderId)
+      .map((order) => [order.id, order.externalOrderId!.trim()]),
+  );
+  const recorded = await prisma.turoConversationMessage.findMany({
+    where: { workspaceId: agent.workspaceId, reservationId: { in: [...new Set(reservationByOrder.values())] } },
+    orderBy: { sentAt: "asc" },
+    select: { reservationId: true, direction: true, authorName: true, body: true, sentAt: true },
+  });
+  const conversationByReservation = new Map<string, typeof recorded>();
+  for (const message of recorded) {
+    const list = conversationByReservation.get(message.reservationId) ?? [];
+    list.push(message);
+    conversationByReservation.set(message.reservationId, list);
+  }
+
   const filtered = threads
     .filter((thread) => (unansweredOnly ? thread.openCount > 0 : true))
     .filter((thread) => {
@@ -123,7 +149,11 @@ export async function GET(request: Request) {
     });
 
   return withCors({
-    data: filtered.slice(0, limit).map((thread) => ({
+    data: filtered.slice(0, limit).map((thread) => {
+      const reservationId = thread.orderId ? reservationByOrder.get(thread.orderId) ?? null : null;
+      const conversation = reservationId ? conversationByReservation.get(reservationId) ?? [] : [];
+      const lastHostReply = [...conversation].reverse().find((message) => message.direction === "outbound");
+      return {
       key: thread.key,
       guestName: thread.guestName,
       vehicle: thread.vehicleId
@@ -133,6 +163,9 @@ export async function GET(request: Request) {
        *  means the subject named a model the fleet could not resolve
        *  to a single car -- see /api/agent/pending-orders. */
       orderId: thread.orderId,
+      /** Turo's reservation id for that trip -- the id to record this
+       *  conversation under with POST /api/agent/messages. */
+      reservationId,
       latestAt: iso(thread.latestAt),
       /** Messages nobody has marked handled. Zero means the thread is
        *  dealt with, as far as TATO can tell. */
@@ -151,7 +184,19 @@ export async function GET(request: Request) {
         acknowledgedAt: iso(message.acknowledgedAt),
         needsAction: message.needsAction,
       })),
-    })),
+      /** The conversation as last recorded from Turo, both sides,
+       *  oldest first -- the latest 50. Empty until the Turo reader or
+       *  an agent has recorded it. */
+      conversation: conversation.slice(-50).map((message) => ({
+        direction: message.direction,
+        authorName: message.authorName,
+        body: message.body,
+        sentAt: iso(message.sentAt),
+      })),
+      /** When the host last wrote, as far as the recording shows. */
+      lastHostReplyAt: iso(lastHostReply?.sentAt ?? null),
+      };
+    }),
     /** Threads are assembled and re-sorted in memory, so there is no
      *  stable cursor to hand back. Raise `limit` (max
      *  MAX_PAGE_SIZE) or narrow with filters instead. */

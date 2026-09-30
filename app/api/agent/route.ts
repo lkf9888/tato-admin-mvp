@@ -1,4 +1,5 @@
-import { authenticateAgent } from "@/lib/agent-auth";
+import { authenticateAgent, type AgentScope } from "@/lib/agent-auth";
+import { AGENT_TIME_FORMAT } from "@/lib/agent-time";
 import { corsPreflight, withCors } from "@/lib/agent-cors";
 import { MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE } from "@/lib/agent-read";
 
@@ -23,6 +24,11 @@ export async function GET(request: Request) {
   if (!agent) return withCors({ error: "UNAUTHORIZED" }, { status: 401 });
 
   const canWriteOrders = agent.scopes.includes("orders:write");
+  const canWriteMessages = agent.scopes.includes("messages:write");
+  // Listed only to a token that can call them: a read-only agent shown
+  // write endpoints would try them, get 401, and conclude the token is
+  // broken.
+  const writeEndpoints = WRITE_ENDPOINTS.filter((endpoint) => agent.scopes.includes(endpoint.scope));
 
   return withCors({
     version: 1,
@@ -88,7 +94,7 @@ export async function GET(request: Request) {
       {
         path: "/api/agent/threads",
         method: "GET",
-        summary: "Guest conversations grouped by guest and car, with the matched trip and whether anything is unanswered.",
+        summary: "Guest conversations grouped by guest and car, with the matched trip, its Turo reservationId, whether anything is unanswered, and -- where it has been recorded -- the whole Turo conversation, host replies included (conversation, lastHostReplyAt).",
         query: {
           unansweredOnly: "true to return only threads still awaiting a reply",
           vehicleId: "threads about one car",
@@ -107,22 +113,25 @@ export async function GET(request: Request) {
         query: { vehicleId: "templates for one car plus the general ones" },
       },
     ],
-    // Listed only to a token that can call them: a read-only agent
-    // shown write endpoints would try them, get 401, and conclude the
-    // token is broken.
-    ...(canWriteOrders ? { writeEndpoints: WRITE_ENDPOINTS } : {}),
+    ...(writeEndpoints.length > 0 ? { writeEndpoints } : {}),
     notes: [
-      canWriteOrders
-        ? "This token can import Turo trips (orders:write). It cannot change a price, a commission rule or a ledger line directly, and cannot delete anything."
+      canWriteOrders || canWriteMessages
+        ? `This token can ${[
+            canWriteOrders ? "import Turo trips (orders:write)" : null,
+            canWriteMessages ? "record Turo conversation messages, host replies included (messages:write)" : null,
+          ]
+            .filter(Boolean)
+            .join(" and ")}. It cannot change a price, a commission rule or a ledger line directly, and cannot delete anything.`
         : "This token is read-only. Nothing reachable from it can change an order, a price, or a ledger line.",
-      "TATO cannot send a Turo message: there is no write access to that channel. Reply text still has to be pasted into Turo by a person.",
+      "TATO cannot send a Turo message: there is no write access to that channel. Recording a message here does not send it; replies are still sent in Turo by a person.",
       "Guest phone numbers are returned unmasked, because an automation that contacts guests needs them. Treat this token as carrying customer PII.",
     ],
   });
 }
 
 /**
- * The write side, for tokens that hold `orders:write`.
+ * The write side. Each endpoint names the scope it needs, and a token
+ * is shown only the ones it holds.
  *
  * Two doors into the importers the rest of TATO uses, not new ones. The
  * CSV route runs the imports page's code; the trips route runs the
@@ -130,8 +139,9 @@ export async function GET(request: Request) {
  * on its reservation id and parked when ambiguous by exactly the code
  * that already does it, and a rule changed there changes here.
  */
-const WRITE_ENDPOINTS = [
+const WRITE_ENDPOINTS: Array<{ scope: AgentScope } & Record<string, unknown>> = [
   {
+    scope: "orders:write",
     path: "/api/agent/imports",
     method: "POST",
     summary:
@@ -148,6 +158,7 @@ const WRITE_ENDPOINTS = [
     ],
   },
   {
+    scope: "orders:write",
     path: "/api/agent/trips",
     method: "POST",
     summary:
@@ -164,8 +175,7 @@ const WRITE_ENDPOINTS = [
           plate: "optional. If the page shows the licence plate, send it as shown: it decides the car",
           guestName: "optional",
           guestPhone: "optional",
-          tripStart:
-            "the time as the page shows it, WITHOUT an offset: 2026-10-15T10:00:00 is read as Vancouver local time. Do not append Z unless you actually converted to UTC.",
+          tripStart: AGENT_TIME_FORMAT,
           tripEnd: "same format as tripStart",
           pickupLocation: "optional",
         },
@@ -175,6 +185,40 @@ const WRITE_ENDPOINTS = [
       "At most 200 trips per request. Idempotent on reservationId.",
       "A finished trip keeps its recorded dates: completed trips are settled by the CSV, not moved by a page read.",
       "Returns created / updated / unchanged / pending counts, notPlaced (each trip that could not be put on one car, with how many cars matched), unknownPlates, and suspectedTimezoneShift -- trips refused because their times look like local times sent as UTC; resend those without an offset.",
+    ],
+  },
+  {
+    scope: "messages:write",
+    path: "/api/agent/reservations",
+    method: "GET",
+    summary:
+      "Which Turo conversations to read next: reservation ids ordered by the newest guest message TATO has seen, so the ones that moved come first.",
+    query: { limit: "default 20, max 100" },
+    returns: "{ reservationIds: string[] }. Open https://turo.com/us/en/reservation/{id}/messages for each.",
+  },
+  {
+    scope: "messages:write",
+    path: "/api/agent/messages",
+    method: "POST",
+    summary:
+      "Record a Turo conversation as it appears on the reservation's messages page -- both the guest's messages and the host's replies. Turo emails TATO when a guest writes and never when the host answers, so the host's side exists in TATO only if something records it here. Recording does not send anything.",
+    body: {
+      reservationId: "required. Turo's reservation id (digits), the same one /api/agent/reservations returns",
+      source: "optional. A label for this run, for tracing a bad read back",
+      messages: [
+        {
+          direction: "inbound (from the guest) | outbound (from the host or a co-host)",
+          body: "the message text",
+          sentAt: AGENT_TIME_FORMAT,
+          authorName: "optional",
+          externalId: "optional. Turo's id for the message if the page exposes one; otherwise TATO fingerprints direction + time + text",
+        },
+      ],
+    },
+    notes: [
+      "1 to 200 messages per request. Idempotent: re-sending a conversation updates changed text and adds new messages, never duplicates.",
+      "Send the whole visible conversation each time; there is no need to work out which messages are new.",
+      "Returns { created, updated }. GET /api/agent/threads then shows these under each thread's conversation.",
     ],
   },
 ];

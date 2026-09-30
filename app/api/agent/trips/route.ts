@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { authenticateAgent } from "@/lib/agent-auth";
 import { corsPreflight, withCors } from "@/lib/agent-cors";
-import { zonedDateTimeToUtc } from "@/lib/booking-time";
+import { agentTimeSchema, parseAgentTime } from "@/lib/agent-time";
 import { normalizeTuroAccount } from "@/lib/csv-mapping";
 import { logActivity } from "@/lib/orders";
 import { ingestTuroTripSnapshots, type TuroTripObservation } from "@/lib/turo-email-apply";
@@ -23,32 +23,6 @@ export const runtime = "nodejs";
  * to be recorded, or the next Gmail sync re-derives the trip from mail
  * alone and moves a page-only extension straight back.
  */
-const LOCAL_DATETIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::00(?:\.0+)?)?$/;
-
-/**
- * A trip time as the agent sends it, as the instant it is.
- *
- * Preferably without an offset -- "2026-10-15T10:00:00" -- read on the
- * fleet's clock. That is what the page shows, and leaving the offset to
- * us is the point: an agent that appends one has to know Vancouver is
- * -07:00 until November and -08:00 after, and an agent that appends "Z"
- * to a time it never converted puts every trip seven hours early. With
- * an explicit offset or Z, the string is taken at its word.
- */
-function parseTripTime(value: string): Date | null {
-  const local = LOCAL_DATETIME.exec(value);
-  if (local) return zonedDateTimeToUtc(local[1], local[2]);
-  if (!z.string().datetime({ offset: true }).safeParse(value).success) return null;
-  return new Date(value);
-}
-
-const tripTime = z
-  .string()
-  .trim()
-  .refine((value) => parseTripTime(value) !== null, {
-    message: "Use 2026-10-15T10:00:00 (Vancouver local time), or ISO 8601 with an offset",
-  });
-
 const tripSchema = z.object({
   reservationId: z.string().trim().regex(/^\d{5,}$/, "Turo reservation ids are digits"),
   status: z.enum(["booked", "ongoing", "changed", "cancelled", "completed"]),
@@ -57,8 +31,8 @@ const tripSchema = z.object({
   plate: z.string().trim().max(20).nullish(),
   guestName: z.string().trim().max(120).nullish(),
   guestPhone: z.string().trim().max(40).nullish(),
-  tripStart: tripTime,
-  tripEnd: tripTime,
+  tripStart: agentTimeSchema,
+  tripEnd: agentTimeSchema,
   pickupLocation: z.string().trim().max(300).nullish(),
 });
 
@@ -68,7 +42,7 @@ const payloadSchema = z.object({
   turoAccount: z.string().trim().max(80).nullish(),
   /** When the pages were read, if not just now -- a batch read earlier
    *  must not outrank mail that arrived since. */
-  observedAt: z.string().datetime({ offset: true }).optional(),
+  observedAt: agentTimeSchema.optional(),
   /** true: report what would happen, write nothing. */
   dryRun: z.boolean().optional(),
   trips: z.array(tripSchema).min(1).max(200),
@@ -103,7 +77,7 @@ export async function POST(request: Request) {
   const times = new Map(
     trips.map((trip) => [
       trip.reservationId,
-      { start: parseTripTime(trip.tripStart)!, end: parseTripTime(trip.tripEnd)! },
+      { start: parseAgentTime(trip.tripStart)!, end: parseAgentTime(trip.tripEnd)! },
     ]),
   );
   const invalid = trips.find((trip) => {
@@ -129,8 +103,8 @@ export async function POST(request: Request) {
     vehicleYear: null,
     guestName: trip.guestName ?? null,
     guestPhone: trip.guestPhone ?? null,
-    tripStart: parseTripTime(trip.tripStart)!,
-    tripEnd: parseTripTime(trip.tripEnd)!,
+    tripStart: parseAgentTime(trip.tripStart)!,
+    tripEnd: parseAgentTime(trip.tripEnd)!,
     earnings: null,
     mileageIncludedKm: null,
     location: trip.pickupLocation ?? null,
@@ -145,7 +119,7 @@ export async function POST(request: Request) {
     workspaceId: agent.workspaceId,
     actor,
     apply: !dryRun,
-    observedAt: parsed.data.observedAt ? new Date(parsed.data.observedAt) : undefined,
+    observedAt: parsed.data.observedAt ? parseAgentTime(parsed.data.observedAt)! : undefined,
     trips: observations,
   });
 

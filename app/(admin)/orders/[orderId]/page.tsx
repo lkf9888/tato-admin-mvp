@@ -9,7 +9,7 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { readDirectBookingPayment } from "@/lib/stripe-refunds";
-import { getNetEarningFromFinancials } from "@/lib/utils";
+import { getNetEarningFromFinancials, turoReservationUrl } from "@/lib/utils";
 
 /**
  * One trip, laid out the way Turo lays out a reservation.
@@ -104,9 +104,7 @@ export default async function OrderDetailPage({
     Boolean(directPayment.paymentIntentId) &&
     (order.depositAmount ?? 0) > 0;
 
-  const turoUrl = order.externalOrderId
-    ? `https://turo.com/us/en/reservation/${order.externalOrderId.trim()}`
-    : null;
+  const turoUrl = turoReservationUrl(order);
 
   return (
     <div className="space-y-3">

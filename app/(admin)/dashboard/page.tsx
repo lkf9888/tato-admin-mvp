@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { prisma } from "@/lib/prisma";
-import { MetricCard } from "@/components/metric-card";
 import {
   cn,
   formatCurrency,
@@ -11,7 +10,9 @@ import {
   formatNumber,
   formatPercentage,
   getOrderNetEarning,
+  turoReservationUrl,
 } from "@/lib/utils";
+import { CsvQuickImportButton } from "@/components/csv-quick-import-button";
 import { StatusBadge } from "@/components/status-badge";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getActivityActionLabel, getLocaleTag, type Locale } from "@/lib/i18n";
@@ -232,277 +233,253 @@ export default async function DashboardPage() {
       ? `${deltaHint} · ${monthlyMessages.lastMonthAmount(formatCurrency(lastMonthNet, locale))}`
       : deltaHint;
 
-  // Pickup/return event row used by both Today and Tomorrow panels.
-  // Renders as a tappable list cell — the entire row is a Link to
-  // /orders so finger-anywhere navigation works the same as the iOS
-  // list-cell pattern used elsewhere in the dashboard.
+  // One pickup or return, on one line on a laptop and two on a phone.
   //
-  // v0.20.2 density pass: padding tightened (px-3 py-2 vs px-4 py-3),
-  // text reflowed (vehicle line at 13px mobile, location at 11px) so
-  // a typical 5-event day fits without pushing the panel below the
-  // fold on a 1080p laptop.
+  // A Turo trip opens the guest conversation on turo.com -- the reason
+  // anyone taps a pickup is usually to message the guest about it. On a
+  // phone with the Turo app, the OS opens that link in the app. Any
+  // other order opens its own page here rather than the whole orders
+  // list, which is where the old row went.
   const renderEvent = (event: DayEvent) => {
     const isPickup = event.kind === "pickup";
-    const locationPrefix = isPickup
-      ? eventMessages.pickupLocationPrefix
-      : eventMessages.returnLocationPrefix;
-    const locationValue = event.location?.trim() || eventMessages.noLocation;
     const order = event.order;
+    const turoChat = turoReservationUrl(order, "messages");
+    const location = event.location?.trim();
+    const rowClass =
+      "tap-press group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 hover:bg-[var(--surface-muted)]";
 
-    return (
+    const content = (
+      <>
+        <span className="flex items-center gap-1.5">
+          <span
+            className={cn(
+              "inline-flex w-9 justify-center rounded px-1 py-0.5 text-[10px] font-semibold",
+              isPickup ? "bg-[var(--accent-soft)] text-[var(--ink)]" : "bg-[var(--ink)] text-white",
+            )}
+          >
+            {isPickup ? eventMessages.pickupBadge : eventMessages.returnBadge}
+          </span>
+          <span className="w-11 text-[12px] font-semibold tabular-nums text-[var(--ink)]">
+            {formatTimeOnly(event.time)}
+          </span>
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-[12.5px] font-semibold text-[var(--ink)]">
+            {order.vehicle.plateNumber || order.vehicle.nickname}
+            <span className="font-normal text-[var(--ink-soft)]"> · </span>
+            {order.renterName}
+          </span>
+          <span
+            className="block truncate text-[11px] text-[var(--ink-soft)]"
+            title={location || undefined}
+          >
+            {order.vehicle.plateNumber ? `${order.vehicle.nickname} · ` : ""}
+            {location || eventMessages.noLocation}
+          </span>
+        </span>
+        <span className="flex items-center gap-1">
+          {order.hasConflict ? <StatusBadge value="conflict" locale={locale} /> : null}
+          {order.source !== "turo" ? <StatusBadge value={order.source} locale={locale} /> : null}
+          <span
+            aria-hidden
+            className="text-[12px] text-[var(--ink-soft)] group-hover:text-[var(--brand)]"
+          >
+            {turoChat ? "↗" : "›"}
+          </span>
+        </span>
+      </>
+    );
+
+    return turoChat ? (
+      <a
+        key={`${order.id}-${event.kind}`}
+        href={turoChat}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={eventMessages.openTuroChat}
+        className={rowClass}
+      >
+        {content}
+      </a>
+    ) : (
       <Link
         key={`${order.id}-${event.kind}`}
-        href="/orders"
-        className="tap-press flex flex-col gap-1.5 rounded-lg border border-[var(--line)] px-3 py-2 hover:border-[var(--line-strong)] hover:bg-[var(--surface-muted)]/50 sm:flex-row sm:items-start sm:justify-between sm:gap-2.5 sm:px-3.5 sm:py-2.5"
+        href={`/orders/${order.id}`}
+        title={eventMessages.openOrder}
+        className={rowClass}
       >
-        <div className="min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span
-              className={cn(
-                "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em]",
-                isPickup
-                  ? "bg-[var(--accent-soft)] text-[var(--ink)]"
-                  : "bg-[var(--ink)] text-white",
-              )}
-            >
-              {isPickup ? eventMessages.pickupBadge : eventMessages.returnBadge}
-            </span>
-            <span className="text-[12px] font-semibold tabular-nums text-[var(--ink)] sm:text-[13px]">
-              {formatTimeOnly(event.time)}
-            </span>
-          </div>
-          <p className="mt-0.5 truncate text-[13px] font-semibold text-[var(--ink)] sm:text-[13.5px]">
-            {order.vehicle.plateNumber
-              ? `${order.vehicle.plateNumber} · ${order.vehicle.nickname}`
-              : order.vehicle.nickname}
-            {" · "}
-            {order.renterName}
-          </p>
-          <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[12px]">
-            <span className="text-[var(--ink-soft)]">{locationPrefix}:</span>{" "}
-            <span className="text-[var(--ink-mid)]">{locationValue}</span>
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-1 sm:flex-nowrap sm:gap-1.5">
-          <StatusBadge value={order.source} locale={locale} />
-          <StatusBadge value={order.status} locale={locale} />
-          {order.hasConflict ? <StatusBadge value="conflict" locale={locale} /> : null}
-        </div>
+        {content}
       </Link>
     );
   };
 
-  // Compact panel link (e.g. "Open orders →") shared by Today /
-  // Tomorrow / Activity headers. Density pass shrank padding from
-  // `px-3 py-1.5` to `px-2.5 py-1` and the text from `text-xs` to
-  // `text-[11px]` so the link doesn't dominate the card header.
   const panelLinkClass =
-    "tap-press inline-flex w-fit items-center gap-1 self-start rounded-md border border-[var(--line)] bg-white px-2.5 py-1 text-[11px] font-medium text-[var(--ink-mid)] sm:self-auto";
+    "tap-press shrink-0 text-[11px] font-medium text-[var(--ink-soft)] hover:text-[var(--brand)]";
 
-  const renderDayPanel = (
-    kicker: string,
+  const renderPanel = (
     title: string,
-    events: DayEvent[],
-    emptyMessage: string,
+    count: number | null,
+    link: { href: string; label: string },
+    body: React.ReactNode,
   ) => (
-    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
-      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <div className="min-w-0">
-          <p className="text-[9px] uppercase tracking-[0.22em] text-[var(--ink-soft)] sm:text-[10px] sm:tracking-[0.24em]">
-            {kicker}
-          </p>
-          <h3 className="mt-0.5 font-serif text-[0.95rem] font-semibold leading-tight text-[var(--ink)] sm:text-[1.15rem]">
-            {title}
-          </h3>
-        </div>
-        <Link href="/orders" className={panelLinkClass}>
-          {dashboardMessages.openOrders}
-          <span aria-hidden>→</span>
+    <section className="flex min-w-0 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)] p-2 sm:p-2.5">
+      <header className="flex items-baseline justify-between gap-2 px-1 pb-1">
+        <h3 className="truncate text-[13px] font-semibold text-[var(--ink)]">
+          {title}
+          {count != null ? (
+            <span className="ml-1.5 text-[12px] font-normal tabular-nums text-[var(--ink-soft)]">
+              {count}
+            </span>
+          ) : null}
+        </h3>
+        <Link href={link.href} className={panelLinkClass}>
+          {link.label} →
         </Link>
-      </div>
-
-      <div className="mt-2 space-y-1.5 sm:mt-2.5">
-        {events.length === 0 ? (
-          <p className="rounded-lg bg-[var(--surface-muted)] px-3 py-3.5 text-center text-[12px] text-[var(--ink-soft)]">
-            {emptyMessage}
-          </p>
-        ) : (
-          events.map(renderEvent)
-        )}
-      </div>
-    </div>
+      </header>
+      <div className="space-y-0.5">{body}</div>
+    </section>
   );
 
+  const emptyRow = (message: string) => (
+    <p className="rounded-md bg-[var(--surface-muted)] px-2 py-2.5 text-center text-[12px] text-[var(--ink-soft)]">
+      {message}
+    </p>
+  );
+
+  // Nine numbers in one strip rather than nine cards in two sections:
+  // the whole state of the business in one row on a laptop, three rows
+  // of three on a phone. The explanations that used to sit under each
+  // number are on hover, where they cost no height.
+  const stats: Array<{ label: string; value: string; hint: string; sub?: string; tone?: "alert" }> = [
+    {
+      label: dashboardMessages.metrics.inUseLabel,
+      value: String(todaysRentals),
+      hint: dashboardMessages.metrics.inUseHint,
+    },
+    {
+      label: dashboardMessages.metrics.pickupsLabel,
+      value: String(todaysPickups),
+      hint: dashboardMessages.metrics.pickupsHint,
+    },
+    {
+      label: dashboardMessages.metrics.returnsLabel,
+      value: String(todaysReturns),
+      hint: dashboardMessages.metrics.returnsHint,
+    },
+    {
+      label: dashboardMessages.metrics.conflictsLabel,
+      value: String(conflictOrders.length),
+      hint: dashboardMessages.metrics.conflictsHint,
+      tone: conflictOrders.length > 0 ? "alert" : undefined,
+    },
+    {
+      label: dashboardMessages.metrics.lastSyncLabel,
+      value: latestImport
+        ? formatDateTime(latestImport.importedAt, locale)
+        : dashboardMessages.metrics.never,
+      hint: dashboardMessages.metrics.lastSyncHint,
+    },
+    {
+      label: monthlyMessages.netLabel,
+      value: formatCurrencyCompact(currentMonthNet, locale),
+      hint: `${formatCurrency(currentMonthNet, locale)} · ${netHint}`,
+      sub: deltaHint,
+    },
+    {
+      label: monthlyMessages.tripsLabel,
+      value: formatNumber(currentMonthTripCount, locale, 0),
+      hint: currentMonthTripCount === 0 ? monthlyMessages.emptyMonth : monthlyMessages.tripsHint,
+    },
+    {
+      label: monthlyMessages.activeVehiclesLabel,
+      value: formatNumber(activeVehicleCount, locale, 0),
+      hint: monthlyMessages.activeVehiclesHint,
+    },
+    {
+      label: monthlyMessages.avgPerTripLabel,
+      value: avgPerTrip != null ? formatCurrencyCompact(avgPerTrip, locale) : "—",
+      hint: `${avgPerTrip != null ? `${formatCurrency(avgPerTrip, locale)} · ` : ""}${monthlyMessages.avgPerTripHint}`,
+    },
+  ];
+
   return (
-    <div className="space-y-3 sm:space-y-3.5 lg:space-y-3">
-      {/*
-       * Daily-snapshot strip. On phones the five cards are hot in a horizontal
-       * snap-scroll row — same pattern App Store / Apple Wallet use for
-       * widget rows. The negative horizontal margin (-mx-3) lets the
-       * row bleed all the way to the screen edge so the right-most
-       * card hints "swipe me" without pretending the page has more
-       * margin than it does. On `sm:` and up we revert to the original
-       * static grid.
-       *
-       * v0.20.2: card width dropped from 58% to 52% so a sliver of the
-       * second card is visible at rest (the swipe affordance is
-       * stronger), and the desktop grid gap tightened from gap-4 to
-       * gap-3 to match the rest of the page's density.
-       */}
-      <section>
-        <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-5">
-          <div>
-            <MetricCard
-              label={dashboardMessages.metrics.inUseLabel}
-              value={String(todaysRentals)}
-              hint={dashboardMessages.metrics.inUseHint}
-            />
-          </div>
-          <div>
-            <MetricCard
-              label={dashboardMessages.metrics.pickupsLabel}
-              value={String(todaysPickups)}
-              hint={dashboardMessages.metrics.pickupsHint}
-            />
-          </div>
-          <div>
-            <MetricCard
-              label={dashboardMessages.metrics.returnsLabel}
-              value={String(todaysReturns)}
-              hint={dashboardMessages.metrics.returnsHint}
-            />
-          </div>
-          <div>
-            <MetricCard
-              label={dashboardMessages.metrics.conflictsLabel}
-              value={String(conflictOrders.length)}
-              hint={dashboardMessages.metrics.conflictsHint}
-            />
-          </div>
-          <div>
-            <MetricCard
-              label={dashboardMessages.metrics.lastSyncLabel}
-              value={
-                latestImport
-                  ? formatDateTime(latestImport.importedAt, locale)
-                  : dashboardMessages.metrics.never
-              }
-              hint={dashboardMessages.metrics.lastSyncHint}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/*
-       * Monthly KPI strip. Lives below the daily snapshot because
-       * "what happened today?" is the single most-checked stat; the
-       * monthly numbers are second-tier glanceability. Same
-       * snap-scroll pattern on mobile, 4-col grid on desktop.
-       */}
-      <section className="space-y-1.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 px-1">
-          <p className="text-[10px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)] sm:text-[10px] sm:tracking-[0.26em]">
-            {dashboardMessages.monthlyKicker}
-          </p>
-          <p className="text-[10px] text-[color:var(--ink-soft)] sm:text-[11px]">{monthlyMessages.title(monthLabel)}</p>
-        </div>
-        <div>
-          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
-            <div>
-              <MetricCard
-                label={monthlyMessages.netLabel}
-                value={formatCurrency(currentMonthNet, locale)}
-                compactValue={formatCurrencyCompact(currentMonthNet, locale)}
-                hint={netHint}
-              />
-            </div>
-            <div>
-              <MetricCard
-                label={monthlyMessages.tripsLabel}
-                value={formatNumber(currentMonthTripCount, locale, 0)}
-                hint={
-                  currentMonthTripCount === 0
-                    ? monthlyMessages.emptyMonth
-                    : monthlyMessages.tripsHint
-                }
-              />
-            </div>
-            <div>
-              <MetricCard
-                label={monthlyMessages.activeVehiclesLabel}
-                value={formatNumber(activeVehicleCount, locale, 0)}
-                hint={monthlyMessages.activeVehiclesHint}
-              />
-            </div>
-            <div>
-              <MetricCard
-                label={monthlyMessages.avgPerTripLabel}
-                value={avgPerTrip != null ? formatCurrency(avgPerTrip, locale) : "—"}
-                compactValue={avgPerTrip != null ? formatCurrencyCompact(avgPerTrip, locale) : "—"}
-                hint={monthlyMessages.avgPerTripHint}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/*
-       * Today / Tomorrow stacked in the wider left column; Activity
-       * stays in the right column. On mobile everything stacks into
-       * a single column. The left column is wrapped in its own
-       * `<div className="space-y-...">` so the two day panels share
-       * spacing without interfering with the outer grid's gap.
-       */}
-      <section className="grid gap-3 sm:gap-3.5 lg:gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-3 sm:space-y-3.5 lg:space-y-3">
-          {renderDayPanel(
-            dashboardMessages.todayKicker,
-            dashboardMessages.todayTitle,
-            todayEvents,
-            dashboardMessages.todayEmpty,
-          )}
-          {renderDayPanel(
-            dashboardMessages.tomorrowKicker,
-            dashboardMessages.tomorrowTitle,
-            tomorrowEvents,
-            dashboardMessages.tomorrowEmpty,
-          )}
-        </div>
-
-        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
-          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-            <div className="min-w-0">
-              <p className="text-[9px] uppercase tracking-[0.22em] text-[var(--ink-soft)] sm:text-[10px] sm:tracking-[0.24em]">
-                {dashboardMessages.activityKicker}
-              </p>
-              <h3 className="mt-0.5 font-serif text-[0.95rem] font-semibold leading-tight text-[var(--ink)] sm:text-[1.15rem]">
-                {dashboardMessages.activityTitle}
-              </h3>
-            </div>
-            <Link href="/activity" className={panelLinkClass}>
-              {dashboardMessages.openActivity}
-              <span aria-hidden>→</span>
-            </Link>
-          </div>
-          <div className="mt-2 space-y-1.5 sm:mt-2.5">
-            {latestLogs.length === 0 ? (
-              <p className="rounded-lg bg-[var(--surface-muted)] px-3 py-3.5 text-center text-[12px] text-[var(--ink-soft)]">
-                {dashboardMessages.activityEmpty}
-              </p>
+    <div className="space-y-2.5">
+      <section
+        aria-label={`${dashboardMessages.todayKicker} · ${monthlyMessages.title(monthLabel)}`}
+        className="grid grid-cols-3 overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--line)] [gap:1px] sm:grid-cols-5 xl:grid-cols-9"
+      >
+        {stats.map((stat, index) => (
+          <div
+            key={stat.label}
+            title={stat.hint}
+            className={cn(
+              "min-w-0 bg-[var(--surface)] px-2.5 py-2",
+              // The month's four start a new row below xl; a faint
+              // tint marks where "today" ends and "this month" begins.
+              index >= 5 && "bg-[var(--surface-muted)]/40",
+            )}
+          >
+            <p className="truncate text-[10.5px] leading-tight text-[var(--ink-soft)]">{stat.label}</p>
+            <p
+              className={cn(
+                "mt-0.5 truncate text-[16px] font-semibold leading-tight tabular-nums sm:text-[17px]",
+                stat.tone === "alert" ? "text-[var(--bad-fg)]" : "text-[var(--ink)]",
+                // The last-sync timestamp is a sentence, not a number.
+                index === 4 && "text-[12px] sm:text-[12.5px]",
+              )}
+            >
+              {stat.value}
+            </p>
+            {stat.sub ? (
+              <p className="truncate text-[10px] leading-tight text-[var(--ink-soft)]">{stat.sub}</p>
             ) : null}
-            {latestLogs.map((log) => (
-              <div key={log.id} className="rounded-lg bg-[var(--surface-muted)] px-3 py-1.5 sm:py-2">
-                <p className="text-[12.5px] font-medium text-[var(--ink)] sm:text-[13px]">
-                  {getActivityActionLabel(log.action, locale)}
-                </p>
-                <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-soft)] sm:text-[11.5px]">
-                  {log.actor} · {log.entityType} · {formatDateTime(log.createdAt, locale)}
-                </p>
-              </div>
-            ))}
           </div>
-        </div>
+        ))}
       </section>
+
+      {/* One click to bring the latest Turo export in, on the settings
+          the last import used. The component is the sync's; it owns the
+          upload, the result lines and the refresh. */}
+      <div className="flex justify-end">
+        <CsvQuickImportButton locale={locale} />
+      </div>
+
+      <div className="grid gap-2.5 lg:grid-cols-3">
+        {renderPanel(
+          `${dashboardMessages.todayKicker} · ${dashboardMessages.todayTitle}`,
+          todayEvents.length,
+          { href: "/orders", label: dashboardMessages.openOrders },
+          todayEvents.length === 0 ? emptyRow(dashboardMessages.todayEmpty) : todayEvents.map(renderEvent),
+        )}
+        {renderPanel(
+          `${dashboardMessages.tomorrowKicker} · ${dashboardMessages.tomorrowTitle}`,
+          tomorrowEvents.length,
+          { href: "/orders", label: dashboardMessages.openOrders },
+          tomorrowEvents.length === 0
+            ? emptyRow(dashboardMessages.tomorrowEmpty)
+            : tomorrowEvents.map(renderEvent),
+        )}
+        {renderPanel(
+          dashboardMessages.activityTitle,
+          null,
+          { href: "/activity", label: dashboardMessages.openActivity },
+          latestLogs.length === 0
+            ? emptyRow(dashboardMessages.activityEmpty)
+            : latestLogs.map((log) => (
+                <div key={log.id} className="flex items-baseline justify-between gap-2 rounded-md px-2 py-1.5">
+                  <span className="min-w-0">
+                    <span className="block truncate text-[12.5px] font-medium text-[var(--ink)]">
+                      {getActivityActionLabel(log.action, locale)}
+                    </span>
+                    <span className="block truncate text-[11px] text-[var(--ink-soft)]">{log.actor}</span>
+                  </span>
+                  <span className="shrink-0 text-[11px] tabular-nums text-[var(--ink-soft)]">
+                    {formatDateTime(log.createdAt, locale)}
+                  </span>
+                </div>
+              )),
+        )}
+      </div>
     </div>
   );
 }

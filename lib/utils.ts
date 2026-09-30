@@ -357,6 +357,27 @@ export function getNetEarningFromFinancials(
   return totalEarnings ?? fallbackValue ?? null;
 }
 
+/**
+ * A Turo reservation's page on turo.com, or null when the order is not a
+ * Turo trip with a reservation id.
+ *
+ * `messages` opens the conversation with the guest. It is the same path
+ * Turo's own booking mail links to and the Turo reader walks, so it is
+ * known to resolve. A plain https link rather than an app scheme on
+ * purpose: on a phone with the Turo app installed, iOS and Android open
+ * turo.com links in the app, and without the app the browser still
+ * works -- a custom scheme would fail outright there.
+ */
+export function turoReservationUrl(
+  order: { source: string; externalOrderId: string | null },
+  page: "trip" | "messages" = "trip",
+) {
+  const reservationId = order.externalOrderId?.trim();
+  if (order.source !== "turo" || !reservationId || !/^\d+$/.test(reservationId)) return null;
+  const base = `https://turo.com/us/en/reservation/${reservationId}`;
+  return page === "messages" ? `${base}/messages` : base;
+}
+
 export function getOrderNetEarning(sourceMetadata?: string | null, fallbackValue?: number | null) {
   if (fallbackValue != null) return fallbackValue;
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.24.0 - 2026-09-30
+
+### Guest messages read like a messaging app on a phone
+
+On a phone the messages page opened straight into the first guest's conversation, so the list only appeared after finding the back link. The trip then filled half the screen as a nine-cell grid before any message showed.
+
+- **The list comes first.** Each row has the guest, when they last wrote (a time for today, "yesterday", a weekday within the week, a date beyond that), a preview of the last message, and the car. Threads waiting for a reply are bold, with a red count. A trip close to pickup or return carries a small tag. A toggle above the list switches between all threads and only those needing a reply.
+- **A conversation opens full screen.** A pinned bar holds back, the guest and car, and a Turo button. Where the trip is known, the button opens the reservation's messages on turo.com, which a phone with the Turo app opens in the app. The trip folds into one line of status, dates and amount; tap it for the rest, with a tappable phone number. Messages are chat bubbles, the guest's on the left and ours on the right, with the Chinese underneath and dividers between days. The thread opens at the newest message.
+- **The reply sits at the bottom.** An AI draft is edited in place and copied, and "mark handled" is next to it. TATO still cannot send a Turo message.
+- **The system back gesture returns to the list** instead of leaving the page.
+
+On a desktop the list and the conversation stay side by side, fit one screen, and the first thread opens by itself.
+
+### Five pages lose their title card
+
+Assistant, CSV imports, messages, updates and the Turo reader opened with a card holding a label, a title and a paragraph that said what the navigation already said. They start with their content now; each keeps a heading for screen readers. The CSV imports page keeps its Turo auto sync section, which is a settings panel, and its how-to-import steps, folded as before.
+
+
 ## v1.23.2 - 2026-09-30
 
 ### Vehicle returns opens on its tabs, not on a title

@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { classifyTuroSubject } from "@/lib/turo-subjects";
 import { matchVehiclesForEmail } from "@/lib/turo-message-match";
 import { isPlateUnconfirmed } from "@/lib/vehicle-assignment";
-import { getNetEarningFromFinancials } from "@/lib/utils";
+import { getNetEarningFromFinancials, turoReservationUrl } from "@/lib/utils";
 
 /**
  * Why a message could not be filed against a trip.
@@ -283,19 +283,9 @@ export default async function GuestMessagesPage() {
       .map((thread) => thread.key),
   );
 
-  const t = messages.guestMessagesPage;
-
   return (
-    <div className="space-y-3">
-      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-          {t.kicker}
-        </p>
-        <h1 className="mt-0.5 text-[17px] font-semibold text-[var(--ink)] sm:text-[19px]">
-          {t.title}
-        </h1>
-        <p className="mt-1 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">{t.copy}</p>
-      </header>
+    <div>
+      <h1 className="sr-only">{messages.shell.nav.guestMessages}</h1>
 
       <GuestMessagesView
         locale={locale}
@@ -381,6 +371,7 @@ export default async function GuestMessagesPage() {
             vehicleLabel: order.vehicle
               ? `${order.vehicle.year} ${order.vehicle.brand} ${order.vehicle.model} · ${order.vehicle.plateNumber}`
               : null,
+            turoMessagesUrl: turoReservationUrl(order, "messages"),
           };
         })}
       />

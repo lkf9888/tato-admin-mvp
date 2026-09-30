@@ -392,20 +392,10 @@ export function CsvImportPanel({
   return (
     <>
       <section className="rounded-lg border border-[color:var(--line)] bg-white px-3 py-3 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:px-4 sm:py-3.5">
-        <div className="flex flex-col gap-1">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--ink-soft)]">
-            {importMessages.pageKicker}
-          </p>
-          <h2 className="font-serif text-[1.18rem] leading-tight text-[color:var(--ink)] sm:text-[1.32rem]">
-            {importMessages.pageTitle}
-          </h2>
-          <p className="text-[12px] text-[color:var(--ink-soft)]">{importMessages.pageSubtitle}</p>
-        </div>
-
         {/* The four steps are read once and then known. Folded away
             rather than deleted, because the first import is the one
             that needs them. */}
-        <details className="mt-3 border-t border-[color:var(--line)] pt-3">
+        <details>
           <summary className="tap-press cursor-pointer list-none text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)] underline underline-offset-2">
             {importMessages.guideTitle}
           </summary>

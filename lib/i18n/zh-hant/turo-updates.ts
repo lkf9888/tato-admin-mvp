@@ -3,9 +3,6 @@
 
 export const turoUpdatesMessages = {
     turoUpdates: {
-      kicker: "動態",
-      title: "Turo 動態更新",
-      copy: "Turo 發來的所有郵件，每條一句話概要。看這裡就不用去翻郵箱。",
       empty: "還沒有收到任何動態。",
       today: "今天",
       yesterday: "昨天",

@@ -153,14 +153,7 @@ export function AgentSetupPanel({
 
   return (
     <div className="space-y-3">
-      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
-        <p className="t-eyebrow text-[var(--ink-soft)]">AGENT</p>
-        <h1 className="mt-0.5 text-[17px] font-bold text-[var(--ink)] sm:text-[19px]">{title}</h1>
-        <p className="mt-1 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
-          Turo 只在客人发消息时发邮件，你回复时什么都不发——所以系统里的每个会话都是单向的。
-          这个书签在你自己的浏览器里读回完整对话，包括你说过的话。
-        </p>
-      </header>
+      <h1 className="sr-only">{title}</h1>
 
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
         <h2 className="t-title text-[var(--ink)]">已读回</h2>

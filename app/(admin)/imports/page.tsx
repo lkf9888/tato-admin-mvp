@@ -63,6 +63,7 @@ export default async function ImportsPage({
 
   return (
     <div className="space-y-3">
+      <h1 className="sr-only">{messages.shell.nav.imports}</h1>
       {/* Closed by default. Seven inputs, a cURL paste and two secret
           headers -- configured once and then never again, yet it was
           the first 879px of a page whose job is "upload this file". */}

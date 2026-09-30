@@ -53,15 +53,10 @@ export default async function TuroUpdatesPage() {
     },
   });
 
-  const t = messages.turoUpdates;
 
   return (
     <div className="space-y-3">
-      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
-        <p className="t-eyebrow text-[var(--ink-soft)]">{t.kicker}</p>
-        <h1 className="mt-0.5 text-[17px] font-bold text-[var(--ink)] sm:text-[19px]">{t.title}</h1>
-        <p className="mt-1 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">{t.copy}</p>
-      </header>
+      <h1 className="sr-only">{messages.shell.nav.turoUpdates}</h1>
 
       <TuroUpdatesFeed
         locale={locale}

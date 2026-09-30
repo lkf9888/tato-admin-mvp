@@ -7,9 +7,6 @@
 export const importsMessages = {
   en: {
     imports: {
-      pageKicker: "CSV import",
-      pageTitle: "Import Turo trips",
-      pageSubtitle: "Sync your Turo earnings export into this workspace in four short steps.",
       guideTitle: "How to import",
       guideSteps: [
         {
@@ -148,9 +145,6 @@ export const importsMessages = {
   },
   zh: {
     imports: {
-      pageKicker: "CSV 导入",
-      pageTitle: "导入 Turo 行程",
-      pageSubtitle: "按四个步骤，把 Turo 收益导出文件同步进这个工作台。",
       guideTitle: "导入步骤",
       guideSteps: [
         {

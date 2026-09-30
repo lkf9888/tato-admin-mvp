@@ -1,9 +1,6 @@
 export const assistantMessages = {
   en: {
     assistantPage: {
-      kicker: "Assistant",
-      title: "Fleet assistant",
-      copy: "Ask about today's schedule, conflicts, revenue, or unread Turo messages. The assistant answers from your live fleet data and can draft messages for you — it never sends anything or changes a record.",
       emptyState:
         "Ask anything about your fleet. Answers come from your live data, not from the model's guesses.",
       suggest1: "What's happening today?",
@@ -44,9 +41,6 @@ export const assistantMessages = {
   },
   zh: {
     assistantPage: {
-      kicker: "助理",
-      title: "车队助理",
-      copy: "问今天的行程、订单冲突、收入,或者还没回复的 Turo 消息。助理基于你的实时车队数据回答,也能帮你起草消息——但它不会发送任何东西,也不会改动任何记录。",
       emptyState: "关于车队的问题都可以问。回答来自你的实时数据,不是模型的猜测。",
       suggest1: "今天有什么安排?",
       suggest2: "有需要处理的订单冲突吗?",

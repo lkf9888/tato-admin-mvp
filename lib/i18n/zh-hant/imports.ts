@@ -3,9 +3,6 @@
 
 export const importsMessages = {
     imports: {
-      pageKicker: "CSV 匯入",
-      pageTitle: "匯入 Turo 行程",
-      pageSubtitle: "按四個步驟，把 Turo 收益匯出檔案同步進這個工作台。",
       guideTitle: "匯入步驟",
       guideSteps: [
         {

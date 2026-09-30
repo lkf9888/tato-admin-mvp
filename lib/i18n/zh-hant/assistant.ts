@@ -3,9 +3,6 @@
 
 export const assistantMessages = {
     assistantPage: {
-      kicker: "助理",
-      title: "車隊助理",
-      copy: "問今天的行程、訂單衝突、收入,或者還沒回復的 Turo 訊息。助理基於你的實時車隊資料回答,也能幫你起草訊息——但它不會傳送任何東西,也不會改動任何記錄。",
       emptyState: "關於車隊的問題都可以問。回答來自你的實時資料,不是模型的猜測。",
       suggest1: "今天有什麼安排?",
       suggest2: "有需要處理的訂單衝突嗎?",

@@ -14,7 +14,6 @@ export default async function AssistantPage() {
     requireCurrentAdminContext(),
   ]);
 
-  const t = messages.assistantPage;
 
   // Resume the operator's most recent conversation rather than opening
   // a blank one every visit — an assistant you have to re-brief on each
@@ -47,13 +46,7 @@ export default async function AssistantPage() {
 
   return (
     <div className="space-y-3">
-      <header className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
-        <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">{t.kicker}</p>
-        <h1 className="mt-1 font-serif text-[1.35rem] leading-tight text-[var(--ink)] sm:text-[1.6rem]">
-          {t.title}
-        </h1>
-        <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">{t.copy}</p>
-      </header>
+      <h1 className="sr-only">{messages.shell.nav.assistant}</h1>
 
       <AssistantAlertsPanel
         locale={locale}

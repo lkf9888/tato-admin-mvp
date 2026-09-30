@@ -1,9 +1,6 @@
 export const turoUpdatesMessages = {
   en: {
     turoUpdates: {
-      kicker: "Updates",
-      title: "Turo activity",
-      copy: "Everything Turo has emailed you, summarised in one line each. Skim this instead of the mailbox.",
       empty: "Nothing has arrived yet.",
       today: "Today",
       yesterday: "Yesterday",
@@ -28,9 +25,6 @@ export const turoUpdatesMessages = {
   },
   zh: {
     turoUpdates: {
-      kicker: "动态",
-      title: "Turo 动态更新",
-      copy: "Turo 发来的所有邮件，每条一句话概要。看这里就不用去翻邮箱。",
       empty: "还没有收到任何动态。",
       today: "今天",
       yesterday: "昨天",

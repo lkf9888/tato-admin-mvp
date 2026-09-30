@@ -190,7 +190,6 @@ export const rentalSiteMessages = {
       perDay: "/ day",
       viewDetails: "View & book",
       depositLabel: "Deposit",
-      insuranceLabel: "Insurance / day",
       emptyFleet: "No vehicles are listed right now. Please check back soon.",
       emptyResults: "No car is free for those dates. Try a different range.",
       resultsSummary: (available: number, total: number) =>
@@ -412,7 +411,6 @@ export const rentalSiteMessages = {
       perDay: "/ 天",
       viewDetails: "查看并预订",
       depositLabel: "押金",
-      insuranceLabel: "保险 / 天",
       emptyFleet: "目前还没有上架车辆，请稍后再来。",
       emptyResults: "所选日期没有空车。换个时间段试试。",
       resultsSummary: (available: number, total: number) =>

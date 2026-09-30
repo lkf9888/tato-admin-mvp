@@ -454,7 +454,10 @@ export async function POST(request: Request) {
         quantity: 1,
         price_data: {
           currency: "cad",
-          unit_amount: Math.round(chargedRent * 100),
+          // Rent and insurance as one line: the operator presents
+          // insurance as part of the price, not an extra. They are
+          // still taxed (rent only) and commissioned as before.
+          unit_amount: Math.round((chargedRent + chargedInsurance) * 100),
           product_data: {
             name: `${vehicle.nickname} booking`,
             description:
@@ -465,24 +468,6 @@ export async function POST(request: Request) {
           },
         },
       },
-      ...(insuranceFee > 0
-        ? [
-            {
-              quantity: chargedDays,
-              price_data: {
-                currency: "cad",
-                unit_amount: Math.round(insuranceFee * 100),
-                product_data: {
-                  name: `${vehicle.nickname} insurance`,
-                  description:
-                    parsed.hasLocalLicence === "no"
-                      ? "Daily protection fee (non-BC licence)"
-                      : "Daily protection fee",
-                },
-              },
-            },
-          ]
-        : []),
       // One line per tax, as each is filed: GST and PST are separate
       // on the receipt the renter keeps. Rent only, so says the note.
       ...chargedTaxes

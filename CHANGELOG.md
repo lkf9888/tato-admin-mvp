@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.25.0 - 2026-09-30
+
+### Renters see one daily price with insurance in it, and a tidier booking form
+
+**Insurance folded into the price.** The operator does not want
+insurance presented as an extra: a renter should read one daily price
+that already includes cover. `renterDailyPrice` (rent + the BC
+insurance rate) is now what the site's car cards, the car page, the
+`/reserve` page and the structured data (`offers.price`) show. The
+licence question no longer prints a fee under each answer; choosing
+"another licence" simply raises the daily price shown. The quote drops
+its insurance line: "vehicle price" is rent plus insurance, with any
+coupon taken off below it. The Stripe checkout and the extra-days bill
+merge rent and insurance into one line too.
+
+Nothing charged changes: a coupon still comes off the rent only (never
+insurance), tax is still on the rent only, and the commission base is
+as before; order metadata still records insurance separately. The
+signed rental agreement still itemises insurance, because its
+insurance clause refers to that line.
+
+**The form.** Pick-up date and time share a row, and so do return date
+and time. The renter's name is two fields, "Driver first name" and
+"Driver last name" (joined for the order, contract and emails), and
+email and phone share a row. The `/reserve` page loses its "Managed
+by" tile and its fallback intro ("no need to go back to Turo"); a car's
+own intro still shows when set. Unused insurance, owner and intro
+strings are removed.
+
 ## v1.24.3 - 2026-09-30
 
 ### Condition photos loses its title card

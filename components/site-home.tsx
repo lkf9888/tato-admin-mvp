@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { siteHref, telHref } from "@/components/site-shell";
+import { renterDailyPrice } from "@/lib/booking-policy";
 import { getSiteOrigin, getSiteUrl, type SiteFleetVehicle } from "@/lib/rental-site";
 import type { LocalizedSite } from "@/lib/rental-site-content";
 import type { Messages } from "@/lib/i18n";
@@ -63,7 +64,9 @@ export function SiteHome({
   // The business itself, for the local results a "car rental near me"
   // search draws from. Each car page already describes its car; this
   // is the one place that says who rents them and where to find them.
-  const rates = fleet.map((vehicle) => vehicle.dailyRate).filter((rate) => rate > 0);
+  const rates = fleet
+    .map((vehicle) => (vehicle.dailyRate > 0 ? renterDailyPrice(vehicle.dailyRate, vehicle.insuranceFee) : 0))
+    .filter((rate) => rate > 0);
   const businessData = {
     "@context": "https://schema.org",
     "@type": "AutoRental",
@@ -283,7 +286,8 @@ export function SiteHome({
                     <div className="mt-5 flex items-end justify-between gap-2 border-t border-[var(--line)] pt-4">
                       <p className="text-[var(--ink)]">
                         <span className="text-[1.5rem] font-bold tracking-[-0.02em]">
-                          {formatCurrency(vehicle.dailyRate, locale)}
+                          {/* Insurance included: one price, no extras. */}
+                          {formatCurrency(renterDailyPrice(vehicle.dailyRate, vehicle.insuranceFee), locale)}
                         </span>
                         <span className="text-[13px] text-[var(--ink-soft)]"> {copy.perDay}</span>
                       </p>

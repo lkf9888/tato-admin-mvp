@@ -19,7 +19,7 @@ import {
   type BusyWindow,
   type DateOnlyBookingWindow,
 } from "@/lib/direct-booking";
-import type { TaxLine } from "@/lib/booking-policy";
+import { renterDailyPrice, type TaxLine } from "@/lib/booking-policy";
 import { normalizeCouponCode, type CouponDiscount } from "@/lib/booking-coupons";
 import type { BookingAddOnOption } from "@/lib/booking-add-ons";
 import {
@@ -39,7 +39,9 @@ type StoredBookingState = {
   returnTime?: string;
   pickupDate: string;
   returnDate: string;
-  renterName: string;
+  renterName?: string;
+  renterFirstName?: string;
+  renterLastName?: string;
   renterEmail: string;
   renterPhone: string;
   agreementAccepted: boolean;
@@ -258,6 +260,33 @@ function BookingDatePicker({
   );
 }
 
+function BookingTimeSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] sm:px-4 sm:py-3"
+      >
+        {BOOKING_TIME_OPTIONS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function PublicBookingPanel({
   locale,
   vehicleId,
@@ -334,7 +363,10 @@ export function PublicBookingPanel({
   const [returnDate, setReturnDate] = useState(defaultReturnDate);
   const [pickupTime, setPickupTime] = useState(DEFAULT_BOOKING_TIME);
   const [returnTime, setReturnTime] = useState(DEFAULT_BOOKING_TIME);
-  const [renterName, setRenterName] = useState("");
+  const [renterFirstName, setRenterFirstName] = useState("");
+  const [renterLastName, setRenterLastName] = useState("");
+  // What the booking, the contract and the emails call the renter.
+  const renterName = `${renterFirstName.trim()} ${renterLastName.trim()}`.trim();
   const [renterEmail, setRenterEmail] = useState("");
   const [renterPhone, setRenterPhone] = useState("");
   // Only asked when the answer changes the price.
@@ -431,7 +463,15 @@ export function PublicBookingPanel({
       if (parsed.hasLocalLicence === "yes" || parsed.hasLocalLicence === "no") {
         setHasLocalLicence(parsed.hasLocalLicence);
       }
-      setRenterName(parsed.renterName || "");
+      if (parsed.renterFirstName != null || parsed.renterLastName != null) {
+        setRenterFirstName(parsed.renterFirstName || "");
+        setRenterLastName(parsed.renterLastName || "");
+      } else if (parsed.renterName) {
+        // Saved by the page before names were split.
+        const [first, ...rest] = parsed.renterName.trim().split(/\s+/);
+        setRenterFirstName(first ?? "");
+        setRenterLastName(rest.join(" "));
+      }
       setRenterEmail(parsed.renterEmail || "");
       setRenterPhone(parsed.renterPhone || "");
       setAgreementAccepted(Boolean(parsed.agreementAccepted));
@@ -468,7 +508,8 @@ export function PublicBookingPanel({
       pickupTime,
       returnTime,
       hasLocalLicence,
-      renterName,
+      renterFirstName,
+      renterLastName,
       renterEmail,
       renterPhone,
       agreementAccepted,
@@ -484,7 +525,8 @@ export function PublicBookingPanel({
     returnTime,
     pickupDate,
     renterEmail,
-    renterName,
+    renterFirstName,
+    renterLastName,
     renterPhone,
     returnDate,
     storageKey,
@@ -647,7 +689,7 @@ export function PublicBookingPanel({
       return;
     }
 
-    if (!renterName.trim() || !renterEmail.trim()) {
+    if (!renterFirstName.trim() || !renterLastName.trim() || !renterEmail.trim()) {
       setError(reserveMessages.missingFields);
       return;
     }
@@ -742,6 +784,7 @@ export function PublicBookingPanel({
         </div>
       ) : null}
 
+      {/* Each leg on its own row: its date, then its time. */}
       <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-6 sm:gap-4">
         <BookingDatePicker
           locale={locale}
@@ -752,10 +795,19 @@ export function PublicBookingPanel({
           isDateDisabled={isPickupDateDisabled}
           minDate={todayDate}
         />
+        <BookingTimeSelect
+          label={reserveMessages.pickupTime}
+          value={pickupTime}
+          onChange={(value) => {
+            setError("");
+            setPickupTime(value);
+          }}
+        />
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-4">
         <BookingDatePicker
           locale={locale}
           label={reserveMessages.returnDate}
-          align="right"
           value={returnDate}
           placeholder={reserveMessages.selectDatePlaceholder}
           onChange={handleReturnDateChange}
@@ -763,33 +815,14 @@ export function PublicBookingPanel({
           minDate={pickupDate}
           disabled={!pickupDate}
         />
-      </div>
-
-      <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-4">
-        {(
-          [
-            { label: reserveMessages.pickupTime, value: pickupTime, onChange: setPickupTime },
-            { label: reserveMessages.returnTime, value: returnTime, onChange: setReturnTime },
-          ] as const
-        ).map((field) => (
-          <label key={field.label} className="block">
-            <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{field.label}</span>
-            <select
-              value={field.value}
-              onChange={(event) => {
-                setError("");
-                field.onChange(event.target.value);
-              }}
-              className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] sm:px-4 sm:py-3"
-            >
-              {BOOKING_TIME_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-        ))}
+        <BookingTimeSelect
+          label={reserveMessages.returnTime}
+          value={returnTime}
+          onChange={(value) => {
+            setError("");
+            setReturnTime(value);
+          }}
+        />
       </div>
       <p className="mt-1.5 text-[11px] leading-4 text-[var(--ink-soft)] sm:mt-2 sm:text-xs sm:leading-5">
         {reserveMessages.timeZoneNote}
@@ -803,32 +836,46 @@ export function PublicBookingPanel({
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-4">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{reserveMessages.renterName}</span>
+          <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{reserveMessages.renterFirstName}</span>
           <input
-            value={renterName}
-            onChange={(event) => setRenterName(event.target.value)}
+            value={renterFirstName}
+            autoComplete="given-name"
+            onChange={(event) => setRenterFirstName(event.target.value)}
             className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none sm:px-4 sm:py-3 transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
           />
         </label>
         <label className="block">
+          <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{reserveMessages.renterLastName}</span>
+          <input
+            value={renterLastName}
+            autoComplete="family-name"
+            onChange={(event) => setRenterLastName(event.target.value)}
+            className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none sm:px-4 sm:py-3 transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
+          />
+        </label>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-4">
+        <label className="block min-w-0">
           <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{reserveMessages.renterEmail}</span>
           <input
             type="email"
+            autoComplete="email"
             value={renterEmail}
             onChange={(event) => setRenterEmail(event.target.value)}
             className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none sm:px-4 sm:py-3 transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
           />
         </label>
+        <label className="block min-w-0">
+          <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{reserveMessages.renterPhone}</span>
+          <input
+            type="tel"
+            autoComplete="tel"
+            value={renterPhone}
+            onChange={(event) => setRenterPhone(event.target.value)}
+            className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none sm:px-4 sm:py-3 transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
+          />
+        </label>
       </div>
-
-      <label className="mt-2 block sm:mt-4">
-        <span className="mb-1 block text-xs font-medium text-[var(--ink)] sm:mb-2 sm:text-sm">{reserveMessages.renterPhone}</span>
-        <input
-          value={renterPhone}
-          onChange={(event) => setRenterPhone(event.target.value)}
-          className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none sm:px-4 sm:py-3 transition focus:border-[var(--line-strong)] focus:ring-2 focus:ring-[var(--line)]"
-        />
-      </label>
 
       <div className="mt-3 rounded-lg border border-[var(--line)] bg-white p-3 sm:mt-5 sm:p-4">
         <p className="text-sm font-semibold text-[var(--ink)]">{reserveMessages.licenseUploadTitle}</p>
@@ -841,16 +888,8 @@ export function PublicBookingPanel({
             <div className="mt-1.5 grid grid-cols-2 gap-2 sm:mt-2">
               {(
                 [
-                  {
-                    value: "yes" as const,
-                    label: reserveMessages.licenceRegionYes,
-                    fee: localInsuranceFee,
-                  },
-                  {
-                    value: "no" as const,
-                    label: reserveMessages.licenceRegionNo,
-                    fee: bookingInsuranceFeeNonLocal ?? localInsuranceFee,
-                  },
+                  { value: "yes" as const, label: reserveMessages.licenceRegionYes },
+                  { value: "no" as const, label: reserveMessages.licenceRegionNo },
                 ]
               ).map((option) => (
                 <label
@@ -873,12 +912,7 @@ export function PublicBookingPanel({
                     }}
                     className="mt-0.5"
                   />
-                  <span>
-                    <span className="block font-medium text-[var(--ink)]">{option.label}</span>
-                    <span className="block text-xs text-[var(--ink-soft)]">
-                      {reserveMessages.licenceRegionInsurance(formatCurrency(option.fee, locale))}
-                    </span>
-                  </span>
+                  <span className="block font-medium text-[var(--ink)]">{option.label}</span>
                 </label>
               ))}
             </div>
@@ -926,17 +960,6 @@ export function PublicBookingPanel({
         </div>
         <p className="mt-3 hidden text-xs leading-5 text-[var(--ink-soft)] sm:block">{reserveMessages.licenseUploadHint}</p>
       </div>
-
-      {/* A statement, not a choice: the fee is part of every booking of
-          a car that has one, and the server charges it regardless. */}
-      {bookingInsuranceFee > 0 ? (
-        <div className="mt-3 hidden rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 sm:mt-5 sm:block sm:px-4 sm:py-4">
-          <p className="text-sm font-medium text-[var(--ink)]">{reserveMessages.insuranceToggle}</p>
-          <p className="mt-0.5 text-[11px] leading-4 sm:mt-1 sm:text-xs sm:leading-5 text-[var(--ink-soft)]">
-            {reserveMessages.insuranceToggleHint(formatCurrency(bookingInsuranceFee, locale))}
-          </p>
-        </div>
-      ) : null}
 
       {locations.length > 1 ? (
         <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
@@ -1078,7 +1101,7 @@ export function PublicBookingPanel({
       <div className="mt-3 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3 sm:mt-5 sm:p-4">
         <div className="flex items-center justify-between text-sm text-[var(--ink-mid)]">
           <span>{reserveMessages.quoteDays(quote.days)}</span>
-          <span>{formatCurrency(bookingDailyRate, locale)}</span>
+          <span>{formatCurrency(renterDailyPrice(bookingDailyRate, bookingInsuranceFee), locale)}</span>
         </div>
         <div className="mt-2 space-y-1 text-[13px] text-[var(--ink-mid)] sm:mt-4 sm:space-y-3 sm:text-sm">
           <div className="flex items-center justify-between">
@@ -1086,10 +1109,15 @@ export function PublicBookingPanel({
             <span>
               {quote.isWeeklyRateApplied ? (
                 <span className="mr-2 text-[var(--ink-soft)] line-through">
-                  {formatCurrency(quote.listBaseAmount, locale)}
+                  {formatCurrency(quote.listBaseAmount + quote.insuranceAmount, locale)}
                 </span>
               ) : null}
-              {formatCurrency(Math.round((quote.baseAmount + quote.couponAmount) * 100) / 100, locale)}
+              {/* Rent and insurance as one price, before any coupon: the
+                  operator does not present insurance as an extra. */}
+              {formatCurrency(
+                Math.round((quote.baseAmount + quote.couponAmount + quote.insuranceAmount) * 100) / 100,
+                locale,
+              )}
             </span>
           </div>
           {quote.isWeeklyRateApplied ? (
@@ -1102,12 +1130,6 @@ export function PublicBookingPanel({
             <div className="flex items-center justify-between text-[var(--ok-fg)]">
               <span>{reserveMessages.couponLine(appliedCoupon.code)}</span>
               <span>-{formatCurrency(quote.couponAmount, locale)}</span>
-            </div>
-          ) : null}
-          {quote.insuranceAmount > 0 ? (
-            <div className="flex items-center justify-between">
-              <span>{reserveMessages.quoteInsurance}</span>
-              <span>{formatCurrency(quote.insuranceAmount, locale)}</span>
             </div>
           ) : null}
           {quote.addOnLines.map((line) => (

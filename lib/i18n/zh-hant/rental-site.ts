@@ -178,7 +178,6 @@ export const rentalSiteMessages = {
       perDay: "/ 天",
       viewDetails: "檢視並預訂",
       depositLabel: "押金",
-      insuranceLabel: "保險 / 天",
       emptyFleet: "目前還沒有上架車輛，請稍後再來。",
       emptyResults: "所選日期沒有空車。換個時間段試試。",
       resultsSummary: (available: number, total: number) =>

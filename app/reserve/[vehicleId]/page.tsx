@@ -16,6 +16,7 @@ import {
   getSiteUrl,
 } from "@/lib/rental-site";
 import { prisma } from "@/lib/prisma";
+import { renterDailyPrice } from "@/lib/booking-policy";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
@@ -96,7 +97,6 @@ export default async function ReserveVehiclePage({
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
     include: {
-      owner: true,
       orders: {
         where: {
           isArchived: false,
@@ -217,33 +217,21 @@ export default async function ReserveVehiclePage({
               <h2 className="mt-3 text-3xl font-semibold leading-tight text-[var(--ink)] sm:text-4xl">
                 {vehicle.plateNumber} · {vehicle.brand} {vehicle.model} {vehicle.year}
               </h2>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--ink-mid)]">
-                {vehicle.bookingIntro?.trim() || reserveMessages.introFallback}
-              </p>
+              {vehicle.bookingIntro?.trim() ? (
+                <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--ink-mid)]">
+                  {vehicle.bookingIntro.trim()}
+                </p>
+              ) : null}
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
                     {reserveMessages.rateLabel}
                   </p>
                   <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
-                    {formatCurrency(dailyRate, locale)}
+                    {/* Insurance included: one price, no extras. */}
+                    {formatCurrency(renterDailyPrice(dailyRate, policy.insuranceFee), locale)}
                   </p>
-                </div>
-                <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-                    {reserveMessages.insuranceLabel}
-                  </p>
-                  <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
-                    {formatCurrency(policy.insuranceFee, locale)}
-                  </p>
-                  {policy.insuranceFeeNonLocal !== policy.insuranceFee ? (
-                    <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                      {reserveMessages.insuranceNonLocalNote(
-                        formatCurrency(policy.insuranceFeeNonLocal, locale),
-                      )}
-                    </p>
-                  ) : null}
                 </div>
                 <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
@@ -251,14 +239,6 @@ export default async function ReserveVehiclePage({
                   </p>
                   <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
                     {formatCurrency(policy.depositAmount, locale)}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-                    {reserveMessages.ownerLabel}
-                  </p>
-                  <p className="mt-3 truncate text-lg font-semibold text-[var(--ink)]">
-                    {vehicle.owner?.name ?? "TATO"}
                   </p>
                 </div>
               </div>

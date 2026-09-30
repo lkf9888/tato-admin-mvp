@@ -272,3 +272,15 @@ function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.min(90, Math.max(0, value));
 }
+
+/**
+ * The daily price a renter is shown: rent and insurance as one number.
+ *
+ * The operator's choice (v1.25.0): insurance is part of every booking
+ * and is not presented as an extra -- a renter reads one price that
+ * already includes cover. It is still charged, taxed (not at all) and
+ * discounted (never) as insurance; only what the renter reads merges.
+ */
+export function renterDailyPrice(dailyRate: number, insuranceFee: number | null | undefined) {
+  return Math.round((Math.max(0, dailyRate) + Math.max(0, insuranceFee ?? 0)) * 100) / 100;
+}

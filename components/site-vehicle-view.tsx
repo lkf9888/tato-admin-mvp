@@ -8,7 +8,7 @@ import {
   getBookingBusyWindows,
   getDateOnlyBookingWindows,
 } from "@/lib/direct-booking";
-import type { BookingPolicy } from "@/lib/booking-policy";
+import { renterDailyPrice, type BookingPolicy } from "@/lib/booking-policy";
 import type { BookingAddOnOption } from "@/lib/booking-add-ons";
 import { siteHref } from "@/components/site-shell";
 import { buildVehicleSlug, getSiteOrigin, getSiteUrl } from "@/lib/rental-site";
@@ -69,6 +69,8 @@ export function SiteVehicleView({
   checkoutState: "idle" | "success" | "cancelled" | "error";
 }) {
   const reserveMessages = messages.reservePage;
+  // What a renter is shown: rent with insurance folded in (BC rate).
+  const shownDailyRate = renterDailyPrice(dailyRate, policy.insuranceFee);
   const copy = messages.sitePublic;
   const blockedDateWindows = getDateOnlyBookingWindows(vehicle.orders);
   const photos = vehicle.attachments
@@ -95,11 +97,11 @@ export function SiteVehicleView({
       "@type": "Offer",
       url: canonical,
       priceCurrency: "CAD",
-      price: dailyRate,
+      price: shownDailyRate,
       availability: "https://schema.org/InStock",
       priceSpecification: {
         "@type": "UnitPriceSpecification",
-        price: dailyRate,
+        price: shownDailyRate,
         priceCurrency: "CAD",
         // UN/CEFACT code for "day" — what tells Google the price is a
         // daily rate and not the cost of the car.
@@ -155,27 +157,14 @@ export function SiteVehicleView({
               </ul>
             ) : null}
 
-            <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-3">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-6 sm:gap-3">
               <div className="rounded-xl bg-[var(--brand-tint)] p-2.5 sm:rounded-[18px] sm:p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--brand-deep)] sm:text-[12px] sm:tracking-[0.08em]">
                   {reserveMessages.rateLabel}
                 </p>
                 <p className="mt-1 text-[1rem] font-bold tracking-[-0.02em] text-[var(--ink)] sm:mt-2 sm:text-[1.6rem]">
-                  {formatCurrency(dailyRate, locale)}
+                  {formatCurrency(shownDailyRate, locale)}
                 </p>
-              </div>
-              <div className="rounded-xl bg-[var(--brand-tint)] p-2.5 sm:rounded-[18px] sm:p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--brand-deep)] sm:text-[12px] sm:tracking-[0.08em]">
-                  {copy.insuranceLabel}
-                </p>
-                <p className="mt-1 text-[1rem] font-bold tracking-[-0.02em] text-[var(--ink)] sm:mt-2 sm:text-[1.6rem]">
-                  {formatCurrency(policy.insuranceFee, locale)}
-                </p>
-                {policy.insuranceFeeNonLocal !== policy.insuranceFee ? (
-                  <p className="mt-0.5 text-[10px] leading-3 text-[var(--ink-mid)] sm:mt-1 sm:text-[12px] sm:leading-4">
-                    {messages.reservePage.insuranceNonLocalNote(formatCurrency(policy.insuranceFeeNonLocal, locale))}
-                  </p>
-                ) : null}
               </div>
               <div className="rounded-xl bg-[var(--brand-tint)] p-2.5 sm:rounded-[18px] sm:p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--brand-deep)] sm:text-[12px] sm:tracking-[0.08em]">

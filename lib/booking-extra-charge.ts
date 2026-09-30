@@ -186,9 +186,9 @@ export async function quoteExtraCharge(workspaceId: string, orderId: string): Pr
   const taxes = computeTaxes(taxableBase, { taxLines });
   const addOnTotal = addOnLines.reduce((sum, line) => sum + line.amount, 0);
 
+  // Rent and insurance as one line, as the booking showed them.
   const lines = [
-    { label: `Rental, ${extraDays} extra day(s)`, amount: rent },
-    ...(insurance > 0 ? [{ label: `Insurance, ${extraDays} day(s)`, amount: insurance }] : []),
+    { label: `Rental, ${extraDays} extra day(s)`, amount: roundMoney(rent + insurance) },
     ...addOnLines.map(({ label, amount }) => ({ label, amount })),
     ...taxes
       .filter((tax) => tax.amount > 0)

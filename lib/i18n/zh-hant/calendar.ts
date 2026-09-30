@@ -25,8 +25,8 @@ export const calendarMessages = {
       searchSourcesPlaceholder: "搜尋訂單來源...",
       manualCreate: "手動建立訂單",
       turoSyncAction: "同步 Turo",
-      showControls: "篩選",
-      hideControls: "收起篩選",
+      showControls: "更多操作",
+      hideControls: "收起操作",
       turoSyncingAction: "同步中...",
       turoSyncSuccess: (successRows: number, createdVehicles: number, updatedVehicles: number) =>
         `Turo 同步完成：${successRows} 行，新增 ${createdVehicles} 台車，更新 ${updatedVehicles} 台車。`,

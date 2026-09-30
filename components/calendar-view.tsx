@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { CalendarPricePanel } from "@/components/calendar-price-panel";
@@ -362,9 +362,19 @@ function assignTimelineBars(
   };
 }
 
-function formatWeekday(date: Date, locale: Locale) {
+function formatWeekday(date: Date, locale: Locale, compact = false) {
+  // A phone's day column is about 34px: "MON" plus its letter spacing
+  // did not fit and read as "M…". Two letters in English and the bare
+  // numeral in Chinese (一, 二) stay distinct -- one letter would make
+  // Tuesday and Thursday the same "T".
+  if (compact) {
+    if (locale === "zh") {
+      return new Intl.DateTimeFormat("zh-CN", { weekday: "narrow" }).format(date);
+    }
+    return new Intl.DateTimeFormat("en-CA", { weekday: "short" }).format(date).slice(0, 2);
+  }
   return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-CA", {
-    weekday: locale === "zh" ? "short" : "short",
+    weekday: "short",
   }).format(date);
 }
 
@@ -1008,19 +1018,26 @@ export function CalendarView({
     };
   }, []);
 
-  useEffect(() => {
+  // Layout effect, so the first width is known before the first paint
+  // after hydration: measured afterwards, a phone painted the desktop
+  // layout -- 188px plate column, "MON" headers -- and then jumped.
+  useLayoutEffect(() => {
     const node = timelineViewportRef.current;
     if (!node) return;
 
+    // Zero is "hidden" (the phone's List tab sets display:none), not a
+    // width. Taking it made the grid re-derive its focus date from the
+    // desktop column width, and the address bar jumped two months back.
     const syncWidth = () => {
-      setTimelineViewportWidth(node.clientWidth);
+      if (node.clientWidth > 0) setTimelineViewportWidth(node.clientWidth);
     };
 
     syncWidth();
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
-      setTimelineViewportWidth(Math.round(entry?.contentRect.width ?? node.clientWidth));
+      const width = Math.round(entry?.contentRect.width ?? node.clientWidth);
+      if (width > 0) setTimelineViewportWidth(width);
     });
 
     observer.observe(node);
@@ -1803,9 +1820,19 @@ export function CalendarView({
       const current = timelineViewportRef.current;
       current.scrollLeft = wanted;
       attempts += 1;
-      if (Math.abs(current.scrollLeft - wanted) > 1 && attempts < 30) {
-        requestAnimationFrame(settle);
+      if (Math.abs(current.scrollLeft - wanted) > 1) {
+        // Frames first, then a timer: a phone that paints the page
+        // late, or a tab in the background, can go longer than thirty
+        // frames before the strip is laid out -- and then the calendar
+        // opened six months back, on columns nobody asked for.
+        if (attempts < 30) requestAnimationFrame(settle);
+        else if (attempts < 60) window.setTimeout(settle, 100);
+        return;
       }
+      // The visible columns are chosen from this state. Set it here
+      // rather than waiting for the scroll event, so the first paint
+      // after the jump draws the right days.
+      setScrollLeft(current.scrollLeft);
     };
     settle();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2022,7 +2049,18 @@ export function CalendarView({
            * prev/next pair gets its own tiny segment-control wrapper so
            * the relationship reads at a glance; everything else stands
            * on its own with the standard chip look. */}
-          <div className="flex flex-wrap items-center gap-1.5 2xl:flex-nowrap">
+          {/* One row that scrolls sideways on a phone. Wrapped, the
+              44px touch targets took two rows -- a third of the screen
+              above the calendar. */}
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-1.5 2xl:flex-nowrap [&>*]:shrink-0",
+              // Collapsed, the phone row scrolls sideways; opened, the
+              // actions it reveals wrap onto the screen instead of
+              // disappearing past its right edge.
+              !mobileControlsOpen && "max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:pb-0.5 max-sm:[scrollbar-width:none]",
+            )}
+          >
             <div className="inline-flex rounded-md border border-[var(--line)] bg-white p-0.5">
               <button
                 type="button"
@@ -2412,7 +2450,14 @@ export function CalendarView({
             </div>
 
             <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 xl:justify-end">
-              <label className="flex min-w-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80">
+              {/* A phone fits seven days to its width and never reads
+                  this, so the slider moved nothing there. */}
+              <label
+                className={cn(
+                  "flex min-w-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80",
+                  compact && "hidden",
+                )}
+              >
                 <span>{calendarMessages.dayWidthLabel}</span>
                 <input
                   type="range"
@@ -2548,7 +2593,10 @@ export function CalendarView({
       {/* One bar, two selections. It is fixed rather than in flow so it
           cannot shove the grid down under the cursor mid-gesture. */}
       {!readOnly && (daySelection || (bulkMode && bulkSelection.size > 0) || bulkNotice) ? (
-        <div className="fixed inset-x-0 bottom-0 z-[60] border-t border-[color:var(--line)] bg-[rgba(255,255,255,0.97)] px-3 py-2 shadow-[0_-18px_40px_-28px_rgba(17,19,24,0.5)] backdrop-blur pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        // On a phone it sits on top of the tab bar, not over it: at
+        // bottom-0 it covered Home and Calendar, the way out of this
+        // screen.
+        <div className="fixed inset-x-0 bottom-0 z-[60] border-t border-[color:var(--line)] bg-[rgba(255,255,255,0.97)] px-3 py-2 shadow-[0_-18px_40px_-28px_rgba(17,19,24,0.5)] backdrop-blur pb-[calc(0.5rem+env(safe-area-inset-bottom))] max-lg:bottom-[calc(env(safe-area-inset-bottom)+56px)] max-lg:pb-2">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 text-[12px]">
             {daySelection ? (
               <>
@@ -2589,7 +2637,9 @@ export function CalendarView({
                   </button>
                 ) : null}
 
-                <label className="flex min-w-0 flex-1 items-center gap-1.5">
+                {/* Its own row on a phone. Sharing one with four buttons
+                    left the field three letters wide. */}
+                <label className="flex min-w-0 flex-1 items-center gap-1.5 max-sm:basis-full">
                   <span className="whitespace-nowrap text-[color:var(--ink-soft)]">
                     {calendarMessages.noteLabel}
                   </span>
@@ -2682,7 +2732,13 @@ export function CalendarView({
                is the back/forward swipe -- so a hard scroll towards
                next month stops the calendar and navigates the app
                away instead. */
-            className="max-h-[76vh] cursor-grab touch-pan-y overflow-auto overscroll-x-contain rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+            className={cn(
+              "max-h-[76vh] cursor-grab touch-pan-y overflow-auto overscroll-x-contain rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]",
+              // The server cannot know the screen, so its markup is the
+              // desktop layout. Hidden until measured, so a phone never
+              // shows that frame before its own.
+              timelineViewportWidth === null && "invisible",
+            )}
           >
             <div style={{ width: tableWidth, minWidth: vehicleColumnWidth + timelineWidth }}>
               <div
@@ -2693,7 +2749,9 @@ export function CalendarView({
               >
                 <div className="sticky left-0 z-50 border-r border-[color:var(--line)] bg-[linear-gradient(180deg,#ffffff,#f7f7f7)] px-3 py-3 max-lg:px-2 max-lg:py-2">
                   <div className="flex items-center justify-between gap-1">
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)]">
+                    {/* 88px on a phone: the word and the sort button
+                        overlapped. The column needs no caption there. */}
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--ink-soft)] max-sm:sr-only">
                       {messages.shell.nav.vehicles}
                     </p>
                     <button
@@ -2741,8 +2799,8 @@ export function CalendarView({
                           every bar below is read against it -- and it
                           was set two steps smaller than the body text
                           it labels. */}
-                      <p className="truncate text-[11px] font-semibold uppercase tracking-[0.04em] text-[color:var(--ink-soft)] max-lg:text-[9px]">
-                        {formatWeekday(date, locale)}
+                      <p className="truncate text-[11px] font-semibold uppercase tracking-[0.04em] text-[color:var(--ink-soft)] max-lg:text-[9px] max-lg:tracking-normal">
+                        {formatWeekday(date, locale, compact)}
                       </p>
                       <p className="mt-0.5 whitespace-nowrap text-[14px] font-bold leading-tight text-[color:var(--ink)] tabular-nums max-lg:text-[11px]">
                         {formatTimelineDateLabel(date)}
@@ -2803,7 +2861,9 @@ export function CalendarView({
                         .filter(Boolean)
                         .join(" · ")}
                     >
-                      <span className="flex min-w-0 items-center gap-1">
+                      {/* On a phone the two badges drop under the plate
+                          rather than squeezing it to "DJ…". */}
+                      <span className="flex min-w-0 items-center gap-1 max-sm:flex-wrap max-sm:gap-y-0.5">
                       {!readOnly && vehicle.editVehicle ? (
                         <VehicleEditDialog
                           locale={locale}
@@ -3031,26 +3091,49 @@ export function CalendarView({
                         );
                       })}
 
-                      {bars.length === 0 ? (
-                        <div className="absolute inset-y-0 left-3 flex items-center text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/70">
+                      {/* Anchored to what is on screen. It used to sit at the
+                          canvas's left edge -- six months back -- so it showed
+                          only there, and there it ran across the price in
+                          each cell. With prices on, the prices already say
+                          the car is free. */}
+                      {bars.length === 0 && !showPrices ? (
+                        <div
+                          className="pointer-events-none absolute inset-y-0 flex items-center text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/70"
+                          style={{ left: scrollLeft + 12 }}
+                        >
                           {calendarMessages.emptyRow}
                         </div>
                       ) : null}
 
                       {bars.map((bar) => {
                         const startTime = formatTime(bar.order.pickupDatetime);
+                        // A trip that began before the visible days has
+                        // its label off-screen to the left -- a month-long
+                        // stay read as a bare coloured strip. The label
+                        // follows the left edge of what is visible, and
+                        // stops short of the bar's own end.
+                        const labelInset = Math.max(
+                          0,
+                          Math.min(scrollLeft - bar.left, bar.width - 56),
+                        );
+                        // Too narrow even for a time: "14:00" truncated
+                        // to a lone "1", which read as a count. A bare
+                        // block says "something is here"; the tap and
+                        // the tooltip say what.
+                        const visibleBarWidth = bar.width - labelInset;
                         const shortLabel =
-                          bar.width < 96
-                            ? startTime
-                            : `${startTime} ${bar.order.renterName}`;
-                        const fullLabel = `${startTime} ${bar.order.renterName}`;
+                          visibleBarWidth < 40
+                            ? ""
+                            : visibleBarWidth < 96
+                              ? startTime
+                              : `${startTime} ${bar.order.renterName}`;
 
                         return (
                           <button
                             key={bar.order.id}
                             type="button"
                             data-calendar-order-bar="true"
-                            title={`${bar.order.vehicleName} · ${bar.order.renterName}`}
+                            title={`${startTime} · ${bar.order.vehicleName} · ${bar.order.renterName}`}
                             onClick={() => {
                               if (bulkMode) {
                                 // In bulk mode a bar is a checkbox, not
@@ -3082,7 +3165,12 @@ export function CalendarView({
                               height: barHeight,
                             }}
                           >
-                            <span className="truncate">{highlightText(shortLabel || fullLabel, calendarSearchQuery)}</span>
+                            <span
+                              className="truncate"
+                              style={labelInset > 0 ? { marginLeft: labelInset } : undefined}
+                            >
+                              {shortLabel ? highlightText(shortLabel, calendarSearchQuery) : null}
+                            </span>
                           </button>
                         );
                       })}

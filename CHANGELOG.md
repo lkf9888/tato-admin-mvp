@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.25.1 - 2026-09-30
+
+### The calendar works on a phone
+
+Fourteen display faults found by opening the calendar at phone width and going through it.
+
+- **Grid.** It opens on today reliably, and no longer flashes the desktop layout before the phone one. Weekdays read MO/TU/WE (一/二/三 in Chinese) instead of a clipped "M…". The plate is no longer squeezed to "DJ…" -- its badges drop to a second line -- and the vehicles caption no longer collides with the sort button. A trip that began before the visible days keeps its name on screen at the left edge instead of showing as a bare strip. A trip too short to hold a time shows as a plain block rather than a lone "1". The "Available" watermark no longer runs across the prices. Switching to the list and back no longer moves the calendar two months.
+- **Controls.** The toolbar is one sideways-scrolling row until opened, and when opened its actions wrap onto the screen. The toggle that opens them is called **Actions / 更多操作** -- it opens mostly actions, and "More" was already the tab bar's. The day-width slider, which a phone ignores, is hidden there. The bar that appears when days are picked sits above the tab bar instead of over it, with the note field on its own row.
+- **Order popup.** The decorative title and caption are gone, the four summary figures sit two by two, and the edit pencils no longer make every field 70px tall.
+
+
 ## v1.25.0 - 2026-09-30
 
 ### Renters see one daily price with insurance in it, and a tidier booking form

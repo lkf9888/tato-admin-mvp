@@ -28,8 +28,8 @@ export const calendarMessages = {
       searchSourcesPlaceholder: "Search source...",
       manualCreate: "Create manual order",
       turoSyncAction: "Sync Turo",
-      showControls: "Filters",
-      hideControls: "Hide filters",
+      showControls: "Actions",
+      hideControls: "Hide actions",
       turoSyncingAction: "Syncing...",
       turoSyncSuccess: (successRows: number, createdVehicles: number, updatedVehicles: number) =>
         `Turo sync complete: ${successRows} row(s), ${createdVehicles} new vehicle(s), ${updatedVehicles} refreshed vehicle(s).`,
@@ -245,8 +245,8 @@ export const calendarMessages = {
       searchSourcesPlaceholder: "搜索订单来源...",
       manualCreate: "手动创建订单",
       turoSyncAction: "同步 Turo",
-      showControls: "筛选",
-      hideControls: "收起筛选",
+      showControls: "更多操作",
+      hideControls: "收起操作",
       turoSyncingAction: "同步中...",
       turoSyncSuccess: (successRows: number, createdVehicles: number, updatedVehicles: number) =>
         `Turo 同步完成：${successRows} 行，新增 ${createdVehicles} 台车，更新 ${updatedVehicles} 台车。`,

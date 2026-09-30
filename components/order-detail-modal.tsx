@@ -132,7 +132,6 @@ function labels(locale: Locale) {
   return locale === "zh"
     ? {
         title: "订单详情与编辑",
-        subtitle: "日历和订单页使用同一个详情面板",
         close: "关闭",
         edit: "编辑",
         save: "保存",
@@ -208,7 +207,6 @@ function labels(locale: Locale) {
       }
     : {
         title: "Order details and edits",
-        subtitle: "Calendar and Orders open the same detail panel",
         close: "Close",
         edit: "Edit",
         save: "Save",
@@ -339,7 +337,10 @@ function EditableField({
   return (
     <div
       className={cn(
-        "grid min-w-0 gap-0.5 rounded-md border px-3 py-1.5 transition",
+        // A field not being edited shows a read-only input. The touch
+        // rule's 44px minimum is for things you type into, and on these
+        // it made a name or a phone twice the height of its neighbours.
+        "grid min-w-0 gap-0.5 rounded-md border px-3 py-1.5 transition [&_input[readonly]]:min-h-0",
         editing
           ? "border-[var(--accent)] bg-white shadow-[0_0_0_3px_rgba(89,60,251,0.1)]"
           : "border-[rgba(17,19,24,0.1)] bg-white/84 focus-within:border-[rgba(17,19,24,0.28)]",
@@ -361,7 +362,7 @@ function EditableField({
                   disabled={saving}
                   title={saveTitle}
                   aria-label={saveTitle}
-                  className="flex h-5 w-5 items-center justify-center rounded text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40"
+                  className="tap-compact flex h-7 w-7 items-center justify-center rounded text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40 sm:h-5 sm:w-5"
                 >
                   <Save className="h-3 w-3" aria-hidden />
                 </button>
@@ -371,7 +372,7 @@ function EditableField({
                   disabled={saving}
                   title={cancelTitle}
                   aria-label={cancelTitle}
-                  className="flex h-5 w-5 items-center justify-center rounded text-[color:var(--ink-soft)] transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
+                  className="tap-compact flex h-7 w-7 items-center justify-center rounded text-[color:var(--ink-soft)] transition hover:bg-[var(--surface-muted)] disabled:opacity-40 sm:h-5 sm:w-5"
                 >
                   <X className="h-3 w-3" aria-hidden />
                 </button>
@@ -384,7 +385,9 @@ function EditableField({
                 title={editTitle}
                 aria-label={editTitle}
                 className={cn(
-                  "flex h-5 w-5 items-center justify-center rounded transition hover:bg-[var(--surface-muted)] disabled:opacity-40",
+                  // Compact on purpose: at the 44px touch minimum this
+                  // pencil made every field a 70px box on a phone.
+                  "tap-compact -my-1 flex h-7 w-7 items-center justify-center rounded transition hover:bg-[var(--surface-muted)] disabled:opacity-40 sm:my-0 sm:h-5 sm:w-5",
                   justSaved ? "text-emerald-600" : "text-[color:var(--ink-soft)] hover:text-[var(--ink)]",
                 )}
               >
@@ -846,6 +849,7 @@ export function OrderDetailModal({
       className="fixed inset-0 z-[90] flex items-end justify-center bg-[var(--ink)]/35 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onClose}
       role="dialog"
+      aria-label={t.title}
       aria-modal="true"
     >
       <div
@@ -862,17 +866,17 @@ export function OrderDetailModal({
         <div className="sticky top-0 z-10 border-b border-[var(--line)] bg-[rgba(255,255,255,0.94)] px-4 py-3 backdrop-blur">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--ink-soft)]">
-                {t.title}
-              </p>
-              <h3 className="mt-1 truncate font-serif text-[1.15rem] font-semibold text-[color:var(--ink)] sm:text-[1.35rem]">
+              <h3 className="truncate font-serif text-[1.15rem] font-semibold text-[color:var(--ink)] sm:text-[1.35rem]">
                 {currentOrder.vehiclePlateNumber
                   ? `${currentOrder.vehiclePlateNumber} · ${currentOrder.vehicleName}`
                   : currentOrder.vehicleName}
               </h3>
-              <p className="mt-1 text-[12px] text-[color:var(--ink-soft)]">
-                {readOnly ? t.readOnly : t.subtitle}
-              </p>
+              {/* Only the read-only notice: the caption for editors
+                  ("Calendar and Orders open the same detail panel")
+                  said nothing an operator acts on. */}
+              {readOnly ? (
+                <p className="mt-1 text-[12px] text-[color:var(--ink-soft)]">{t.readOnly}</p>
+              ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {!readOnly ? (
@@ -911,7 +915,7 @@ export function OrderDetailModal({
         </div>
 
         <div className="px-4 py-4">
-          <div className="grid gap-3 text-[12px] text-[color:var(--ink)] md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 text-[12px] text-[color:var(--ink)] sm:gap-3 md:grid-cols-4">
             <div className="min-w-0 rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
               <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                 {t.owner}

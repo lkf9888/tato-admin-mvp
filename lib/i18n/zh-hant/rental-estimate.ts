@@ -3,15 +3,10 @@
 
 export const rentalEstimateMessages = {
     valuation: {
-      kicker: "溫哥華 · 車隊經濟",
       title: "車輛投資回報",
       tabFleet: "車隊表現",
       tabEstimate: "租金預估",
       tabRanking: "買車排名",
-      introFleet:
-        "每台車實際賺了多少：本月、近六個月、每公里，以及相對購車價的回報。資料來自匯入的訂單。",
-      introEstimate: "輸入年份、品牌和車型，檢視未來 12 個月的收入預估。基於我們自己在溫哥華的訂單。",
-      introRanking: "對所有可上架的車型和年份評分：能賺多少，對比買車、養車、修車和賣車的代價。",
 
       statMonth: "本月車隊收益",
       statPerKm: "車隊每公里收益",
@@ -101,8 +96,6 @@ export const rentalEstimateMessages = {
       assumption3:
         "金額為加元計價的租金總收入，未扣除保險、貸款、保養、清潔、停車、折舊與稅費。",
       assumption4: "歷史表現不構成承諾。市場需求、同行競爭和平台政策都會變化。",
-
-      statsBadge: "{trips} 筆真實訂單 · {vehicles} 台車 · {from} 至 {to}",
 
       downloadAction: "下載 PDF 報告",
       downloadingAction: "正在生成…",

@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.23.2 - 2026-09-30
+
+### Vehicle returns opens on its tabs, not on a title
+
+`/vehicle-roi` no longer starts with a kicker and a large "车辆投资回报" above the tabs, and its three views drop the one-line description each carried beneath them. The sidebar already says where you are and the tabs say which view; on a phone the header was a screen of text before the first number. The fleet's figures and table now start directly under the tabs.
+
+The estimate's data badge -- trips, cars, date range -- goes with it; the same basis is spelled out in the estimator's method section. The page name stays in a screen-reader-only `h1`, and the tab bar is labelled with the page's name rather than, as it was, its first tab's.
+
+
 ## v1.23.1 - 2026-09-30
 
 ### The dashboard fits on one screen, and a pickup opens the guest's Turo chat

@@ -12,10 +12,5 @@ import { getI18n } from "@/lib/i18n-server";
 export default async function VehicleRoiRankingPage() {
   const { locale, messages } = await getI18n();
 
-  return (
-    <div className="space-y-3">
-      <p className="text-[12px] leading-5 text-[var(--ink-soft)]">{messages.valuation.introRanking}</p>
-      <InvestmentRankingTool locale={locale} copy={messages.investmentRanking} />
-    </div>
-  );
+  return <InvestmentRankingTool locale={locale} copy={messages.investmentRanking} />;
 }

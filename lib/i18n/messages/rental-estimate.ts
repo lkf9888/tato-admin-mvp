@@ -16,17 +16,10 @@
 export const rentalEstimateMessages = {
   en: {
     valuation: {
-      kicker: "Vancouver · Fleet economics",
       title: "Vehicle returns",
       tabFleet: "Fleet",
       tabEstimate: "Rental estimate",
       tabRanking: "Which car to buy",
-      introFleet:
-        "What each car has actually earned, from imported trips: this month, the last six, per kilometre, and against what it cost.",
-      introEstimate:
-        "Twelve months of projected income for any year, make and model, from our own Vancouver trips.",
-      introRanking:
-        "Every eligible model-year, scored on what it earns against what it costs to buy, run, repair and sell.",
 
       statMonth: "Fleet this month",
       statPerKm: "Fleet per km",
@@ -121,8 +114,6 @@ export const rentalEstimateMessages = {
       assumption4:
         "Past performance is not a promise. Demand, competition and platform terms all move.",
 
-      statsBadge: "{trips} trips · {vehicles} cars · {from} – {to}",
-
       downloadAction: "Download PDF",
       downloadingAction: "Building PDF…",
       downloadFailed: "Could not build the PDF. Try again.",
@@ -139,15 +130,10 @@ export const rentalEstimateMessages = {
   },
   zh: {
     valuation: {
-      kicker: "温哥华 · 车队经济",
       title: "车辆投资回报",
       tabFleet: "车队表现",
       tabEstimate: "租金预估",
       tabRanking: "买车排名",
-      introFleet:
-        "每台车实际赚了多少：本月、近六个月、每公里，以及相对购车价的回报。数据来自导入的订单。",
-      introEstimate: "输入年份、品牌和车型，查看未来 12 个月的收入预估。基于我们自己在温哥华的订单。",
-      introRanking: "对所有可上架的车型和年份评分：能赚多少，对比买车、养车、修车和卖车的代价。",
 
       statMonth: "本月车队收益",
       statPerKm: "车队每公里收益",
@@ -237,8 +223,6 @@ export const rentalEstimateMessages = {
       assumption3:
         "金额为加元计价的租金总收入，未扣除保险、贷款、保养、清洁、停车、折旧与税费。",
       assumption4: "历史表现不构成承诺。市场需求、同行竞争和平台政策都会变化。",
-
-      statsBadge: "{trips} 笔真实订单 · {vehicles} 台车 · {from} 至 {to}",
 
       downloadAction: "下载 PDF 报告",
       downloadingAction: "正在生成…",

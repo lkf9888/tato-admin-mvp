@@ -14,8 +14,11 @@ import { cn } from "@/lib/utils";
  * the one being looked at.
  */
 export function VehicleRoiTabs({
+  label,
   labels,
 }: {
+  /** The page's name; the nav has no visible heading to borrow it from. */
+  label: string;
   labels: { fleet: string; estimate: string; ranking: string };
 }) {
   const pathname = usePathname();
@@ -26,7 +29,7 @@ export function VehicleRoiTabs({
   ];
 
   return (
-    <nav className="flex gap-1 overflow-x-auto" aria-label={labels.fleet}>
+    <nav className="flex gap-1 overflow-x-auto" aria-label={label}>
       {tabs.map((tab) => {
         const active = pathname === tab.href;
         return (

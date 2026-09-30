@@ -151,8 +151,6 @@ export default async function VehicleRoiFleetPage() {
 
   return (
     <div className="space-y-3">
-      <p className="text-[12px] leading-5 text-[var(--ink-soft)]">{copy.introFleet}</p>
-
       <dl className="grid grid-cols-3 divide-x divide-[var(--line)] rounded-lg border border-[var(--line)] bg-[var(--surface)]">
         {stats.map((stat) => (
           <div key={stat.label} className="min-w-0 px-3 py-2">

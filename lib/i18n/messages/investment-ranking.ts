@@ -6,15 +6,6 @@
 export const investmentRankingMessages = {
   en: {
     investmentRanking: {
-      metaTitle: "Which car to buy · TATO",
-      metaDescription:
-        "Rank vehicles by return on investment, from our own Vancouver rental history plus running costs.",
-
-      kicker: "Vancouver · Return on investment",
-      title: "Which car is worth buying?",
-      intro:
-        "Every eligible model and year, scored on what it would earn against what it costs to buy, run, repair and eventually sell. Ranked for a fixed budget.",
-
       budgetLabel: "Budget",
       budgetHint: "Used for the “how many” and total-return columns.",
       perspectiveLabel: "Whose return",
@@ -87,15 +78,6 @@ export const investmentRankingMessages = {
   },
   zh: {
     investmentRanking: {
-      metaTitle: "买哪台车 · TATO",
-      metaDescription:
-        "基于自有车队温哥华出租数据与运营成本，对车型投资回报率进行排名。",
-
-      kicker: "温哥华 · 投资回报",
-      title: "买哪台车最划算？",
-      intro:
-        "对所有可上架的车型和年份评分：能赚多少，对比买车、养车、修车和最终卖车的代价。按固定预算排名。",
-
       budgetLabel: "预算",
       budgetHint: "用于计算「可买台数」和「预算总回报」。",
       perspectiveLabel: "算谁的回报",

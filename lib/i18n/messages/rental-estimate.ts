@@ -1,5 +1,11 @@
 /**
- * Strings for the public rental-income estimator at /rental-estimate.
+ * Strings for the valuation pages under /vehicle-roi: the fleet table
+ * (`valuation`), the income estimator (`rentalEstimate`), and — in its
+ * own file — the purchase ranking.
+ *
+ * `valuation` lives here rather than in a file of its own so the merged
+ * page needs nothing appended to `lib/i18n.ts`, which belongs to the
+ * base session; this module is already spread into every locale.
  *
  * Every value here is a plain string — no getters — because the whole
  * block is handed to a client component, and function values do not
@@ -9,16 +15,47 @@
  */
 export const rentalEstimateMessages = {
   en: {
+    valuation: {
+      kicker: "Vancouver · Fleet economics",
+      title: "Vehicle returns",
+      tabFleet: "Fleet",
+      tabEstimate: "Rental estimate",
+      tabRanking: "Which car to buy",
+      introFleet:
+        "What each car has actually earned, from imported trips: this month, the last six, per kilometre, and against what it cost.",
+      introEstimate:
+        "Twelve months of projected income for any year, make and model, from our own Vancouver trips.",
+      introRanking:
+        "Every eligible model-year, scored on what it earns against what it costs to buy, run, repair and sell.",
+
+      statMonth: "Fleet this month",
+      statPerKm: "Fleet per km",
+      statPerKmDistance: "{km} km tracked",
+      statPerKmNoDistance: "No distance data yet",
+      statPriced: "Purchase price entered",
+
+      searchPlaceholder: "Search plate, nickname, make, model, year or owner",
+      searchCount: "{shown} of {total}",
+      searchEmpty: "No vehicle matches “{query}”.",
+      empty: "No vehicles to analyse yet.",
+
+      colVehicle: "Vehicle",
+      colTrend: "Last 6 months",
+      colMonth: "This month",
+      colTtm: "12 mo",
+      colPerKm: "Per km",
+      colDistance: "Km",
+      colRoi: "Return",
+      colPrice: "Price",
+      unassignedOwner: "Unassigned",
+      pricePlaceholder: "Add price",
+      priceSave: "Save",
+      priceSaving: "Saving…",
+      roiNeedsPrice: "Add a purchase price to see the annual return.",
+      footnote:
+        "Net of Turo's cut. Per-km uses only trips that carried an odometer reading; annual return is the last twelve months over purchase price.",
+    },
     rentalEstimate: {
-      metaTitle: "What could your car earn? · TATO",
-      metaDescription:
-        "Estimate what your car could earn on Turo in Vancouver, month by month, from 5,789 real trips run by TATO.",
-
-      kicker: "Vancouver · Lower Mainland",
-      title: "What could your car earn?",
-      intro:
-        "Pick your car and see twelve months of projected rental income — built from what our own fleet actually earned in this city, not a national average.",
-
       makeLabel: "Make",
       modelLabel: "Model",
       yearLabel: "Year",
@@ -84,7 +121,6 @@ export const rentalEstimateMessages = {
       assumption4:
         "Past performance is not a promise. Demand, competition and platform terms all move.",
 
-
       statsBadge: "{trips} trips · {vehicles} cars · {from} – {to}",
 
       downloadAction: "Download PDF",
@@ -102,16 +138,45 @@ export const rentalEstimateMessages = {
     },
   },
   zh: {
+    valuation: {
+      kicker: "温哥华 · 车队经济",
+      title: "车辆投资回报",
+      tabFleet: "车队表现",
+      tabEstimate: "租金预估",
+      tabRanking: "买车排名",
+      introFleet:
+        "每台车实际赚了多少：本月、近六个月、每公里，以及相对购车价的回报。数据来自导入的订单。",
+      introEstimate: "输入年份、品牌和车型，查看未来 12 个月的收入预估。基于我们自己在温哥华的订单。",
+      introRanking: "对所有可上架的车型和年份评分：能赚多少，对比买车、养车、修车和卖车的代价。",
+
+      statMonth: "本月车队收益",
+      statPerKm: "车队每公里收益",
+      statPerKmDistance: "已统计 {km} 公里",
+      statPerKmNoDistance: "暂无行驶距离数据",
+      statPriced: "已填购车价",
+
+      searchPlaceholder: "搜索车牌、昵称、品牌、车型、年份或车主",
+      searchCount: "{shown} / {total}",
+      searchEmpty: "没有匹配「{query}」的车辆。",
+      empty: "目前还没有可分析的车辆。",
+
+      colVehicle: "车辆",
+      colTrend: "近 6 个月",
+      colMonth: "本月",
+      colTtm: "近 12 个月",
+      colPerKm: "每公里",
+      colDistance: "里程",
+      colRoi: "年化回报",
+      colPrice: "购车价",
+      unassignedOwner: "未分配",
+      pricePlaceholder: "填写价格",
+      priceSave: "保存",
+      priceSaving: "保存中…",
+      roiNeedsPrice: "填写购车价后才能计算年化回报。",
+      footnote:
+        "金额为扣除 Turo 分成后的净收益。每公里收益只计有里程表读数的订单；年化回报 = 近 12 个月净收益 ÷ 购车价。",
+    },
     rentalEstimate: {
-      metaTitle: "车辆租金预估 · TATO",
-      metaDescription:
-        "输入车型和年份，查看你的车在温哥华出租的未来 12 个月月度收入预估。基于 TATO 自营车队 5,789 笔真实订单。",
-
-      kicker: "温哥华 · 大温地区",
-      title: "你的车能赚多少？",
-      intro:
-        "选择车型，查看未来 12 个月的租金收入预估。数据来自我们自己的车队在温哥华的真实成交记录，不是全国平均值。",
-
       makeLabel: "品牌",
       modelLabel: "车型",
       yearLabel: "年份",
@@ -172,7 +237,6 @@ export const rentalEstimateMessages = {
       assumption3:
         "金额为加元计价的租金总收入，未扣除保险、贷款、保养、清洁、停车、折旧与税费。",
       assumption4: "历史表现不构成承诺。市场需求、同行竞争和平台政策都会变化。",
-
 
       statsBadge: "{trips} 笔真实订单 · {vehicles} 台车 · {from} 至 {to}",
 

@@ -3,15 +3,6 @@
 
 export const investmentRankingMessages = {
     investmentRanking: {
-      metaTitle: "買哪台車 · TATO",
-      metaDescription:
-        "基於自有車隊溫哥華出租資料與運營成本，對車型投資回報率進行排名。",
-
-      kicker: "溫哥華 · 投資回報",
-      title: "買哪台車最划算？",
-      intro:
-        "對所有可上架的車型和年份評分：能賺多少，對比買車、養車、修車和最終賣車的代價。按固定預算排名。",
-
       budgetLabel: "預算",
       budgetHint: "用於計算「可買台數」和「預算總回報」。",
       perspectiveLabel: "算誰的回報",

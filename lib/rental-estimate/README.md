@@ -1,8 +1,12 @@
 # Rental income estimator
 
-Powers `/rental-estimate` in the admin nav (Fleet group), where you pick
-a year/make/model and get twelve months of projected earnings — a desk
-tool for answering an owner who asks what their car would make.
+Powers `/vehicle-roi/estimate`, where you pick a year/make/model and get
+twelve months of projected earnings — a desk tool for answering an owner
+who asks what their car would make — and `/vehicle-roi/ranking`, below.
+
+Both are tabs of `/vehicle-roi`, whose first tab is the fleet itself:
+what each car we run has actually earned. The old `/rental-estimate`
+and `/investment-ranking` paths redirect to their tabs.
 
 Everything runs client-side off two JSON files. No database query, no
 network call to Turo — so the page has nothing to wait on, and it cannot
@@ -120,7 +124,7 @@ the elasticity and the segment multipliers is not — check
 
 ## The investment ranking
 
-`/investment-ranking` scores every eligible model-year — about 3,300 of
+`/vehicle-roi/ranking` scores every eligible model-year — about 3,300 of
 them — on what it earns against what it costs to buy, run, repair and
 eventually sell:
 

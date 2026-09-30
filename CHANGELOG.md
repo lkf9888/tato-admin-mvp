@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.18.0 - 2026-09-29
+
+### The three valuation pages are one, and the fleet reads as a table
+
+What a car earns lived on three sidebar entries -- the fleet's actual returns, the income estimator, and the purchase ranking -- each with its own large header. They are now tabs of one page, `/vehicle-roi`: **车队表现** (the fleet), **租金预估** (`/vehicle-roi/estimate`) and **买车排名** (`/vehicle-roi/ranking`). Each tab is its own URL, so a bookmark or a shared link lands on the right one. The old `/rental-estimate` and `/investment-ranking` redirect to their tabs.
+
+The fleet view was one card per car, three panels deep -- a screen per vehicle. It is now one row per car: plate and nickname, model and owner on the line beneath, a six-month sparkline, this month, twelve months, per kilometre, distance, annual return, and the purchase price, edited in the row. It fits a 1024px screen without scrolling sideways; on a phone the table scrolls inside its own box with the car pinned on the left.
+
+A search box matches plate, nickname, make, model, year and owner, and every word has to match, so `toyota 2016` narrows and `tc 22` still finds TC22CC. Rank is taken over the whole fleet before the search filters it, so a search shows where that car actually stands rather than "#1 of one". Clicking a column heading sorts by it; the default is still revenue per kilometre.
+
+The arithmetic is unchanged -- same orders, same net-of-Turo earnings, same trailing twelve months over purchase price. Only the layout moved.
+
+The sidebar's single entry ships separately, from the base session.
+
+
 ## v1.17.1 - 2026-09-29
 
 ### An AI agent can push the trips it reads off Turo

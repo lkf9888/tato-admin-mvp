@@ -2,16 +2,45 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const rentalEstimateMessages = {
+    valuation: {
+      kicker: "溫哥華 · 車隊經濟",
+      title: "車輛投資回報",
+      tabFleet: "車隊表現",
+      tabEstimate: "租金預估",
+      tabRanking: "買車排名",
+      introFleet:
+        "每台車實際賺了多少：本月、近六個月、每公里，以及相對購車價的回報。資料來自匯入的訂單。",
+      introEstimate: "輸入年份、品牌和車型，檢視未來 12 個月的收入預估。基於我們自己在溫哥華的訂單。",
+      introRanking: "對所有可上架的車型和年份評分：能賺多少，對比買車、養車、修車和賣車的代價。",
+
+      statMonth: "本月車隊收益",
+      statPerKm: "車隊每公里收益",
+      statPerKmDistance: "已統計 {km} 公里",
+      statPerKmNoDistance: "暫無行駛距離資料",
+      statPriced: "已填購車價",
+
+      searchPlaceholder: "搜尋車牌、暱稱、品牌、車型、年份或車主",
+      searchCount: "{shown} / {total}",
+      searchEmpty: "沒有匹配「{query}」的車輛。",
+      empty: "目前還沒有可分析的車輛。",
+
+      colVehicle: "車輛",
+      colTrend: "近 6 個月",
+      colMonth: "本月",
+      colTtm: "近 12 個月",
+      colPerKm: "每公里",
+      colDistance: "里程",
+      colRoi: "年化回報",
+      colPrice: "購車價",
+      unassignedOwner: "未分配",
+      pricePlaceholder: "填寫價格",
+      priceSave: "儲存",
+      priceSaving: "儲存中…",
+      roiNeedsPrice: "填寫購車價後才能計算年化回報。",
+      footnote:
+        "金額為扣除 Turo 分成後的淨收益。每公里收益只計有里程錶讀數的訂單；年化回報 = 近 12 個月淨收益 ÷ 購車價。",
+    },
     rentalEstimate: {
-      metaTitle: "車輛租金預估 · TATO",
-      metaDescription:
-        "輸入車型和年份，檢視你的車在溫哥華出租的未來 12 個月月度收入預估。基於 TATO 自營車隊 5,789 筆真實訂單。",
-
-      kicker: "溫哥華 · 大溫地區",
-      title: "你的車能賺多少？",
-      intro:
-        "選擇車型，檢視未來 12 個月的租金收入預估。資料來自我們自己的車隊在溫哥華的真實成交記錄，不是全國平均值。",
-
       makeLabel: "品牌",
       modelLabel: "車型",
       yearLabel: "年份",
@@ -72,7 +101,6 @@ export const rentalEstimateMessages = {
       assumption3:
         "金額為加元計價的租金總收入，未扣除保險、貸款、保養、清潔、停車、折舊與稅費。",
       assumption4: "歷史表現不構成承諾。市場需求、同行競爭和平台政策都會變化。",
-
 
       statsBadge: "{trips} 筆真實訂單 · {vehicles} 台車 · {from} 至 {to}",
 

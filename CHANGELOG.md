@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.23.0 - 2026-09-30
+
+### A Turo CSV imports in one click, with the last import's settings
+
+The CSV imports page asks the same questions every time: which column is which, which Turo account, which new cars to create. For the routine case, the same export downloaded again, the answers do not change. **快速导入 CSV** picks a file and imports it immediately.
+
+It reuses the last import's column mapping and Turo account. The mapping is reused only if every column it names is still in the file, with the reservation id, pickup and return among them. Turo does rename export columns, and a mapping that points at a column that is gone would fail every row. If the mapping does not fit, the columns are matched by their headers and the result says so.
+
+A quick import never creates a vehicle, because each car is a billing slot and nobody reviews the ones it would add. Plates the fleet does not have are listed with a link to the imports page. The vehicle limit is still checked, and the importing user's billing exemption applies. The button reports how many rows went in and how many failed, then refreshes the page. The import itself, including picking up newer mail for unfinished trips, is the same one every other CSV path runs.
+
+The button is `components/csv-quick-import-button.tsx`, backed by `POST /api/imports/quick`. It goes on the dashboard, next to the last sync.
+
+
 ## v1.22.4 - 2026-09-30
 
 ### A trip cancelled before it reached a car stays out of the unassigned basket

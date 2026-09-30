@@ -417,9 +417,13 @@ async function importCsvContent(input: {
   createMissingVehicles: boolean;
   billingBypassActive?: boolean;
   syncConfig: WorkspaceTuroSyncConfig;
+  /** Given, used instead of the configured mapping or the header guess.
+   *  Gets the headers, because only the caller knows whether it fits. */
+  chooseMapping?: (headers: string[]) => CsvFieldMapping | null;
 }): Promise<TuroCsvImportResult> {
   const { rows, headers } = parseCsvRows(input.content);
-  const mapping = getConfiguredMapping(headers, input.syncConfig);
+  const mapping =
+    input.chooseMapping?.(headers) ?? getConfiguredMapping(headers, input.syncConfig);
 
   await assertTuroSyncWithinBillingLimit({
     workspaceId: input.workspaceId,
@@ -487,6 +491,90 @@ export async function importTuroCsvText(input: {
     createMissingVehicles: input.createMissingVehicles ?? false,
     syncConfig,
   });
+}
+
+/**
+ * One-click import: a file, and the settings of the last import.
+ *
+ * "The settings" are what an ImportBatch keeps -- the column mapping and
+ * the Turo account. The mapping is reused only when every column it
+ * names is in the new file; Turo does add and rename export columns, and
+ * a mapping pointing at a column that is gone would fail every row. Then
+ * it falls back to the same guess any other import makes, and says so.
+ *
+ * Never creates vehicles, as with the agent: nobody reviews the cars a
+ * one-click import would add, and each is a billing slot. Unknown plates
+ * come back as failed rows. The vehicle limit is still checked, with the
+ * caller's billing exemption.
+ */
+export async function importTuroCsvWithLastSettings(input: {
+  workspaceId: string;
+  actor: string;
+  fileName: string;
+  content: string;
+  billingBypassActive: boolean;
+}): Promise<
+  TuroCsvImportResult & {
+    settings: { mapping: "last" | "guessed"; turoAccount: string | null; lastImportedAt: Date | null };
+  }
+> {
+  const [last, syncConfig] = await Promise.all([
+    prisma.importBatch.findFirst({
+      where: { workspaceId: input.workspaceId },
+      orderBy: { importedAt: "desc" },
+      select: { mapping: true, turoAccount: true, importedAt: true },
+    }),
+    getWorkspaceTuroSyncConfig(input.workspaceId),
+  ]);
+
+  let mappingUsed: "last" | "guessed" = "guessed";
+  const lastMapping = parseStoredMapping(last?.mapping);
+  const result = await importCsvContent({
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    fileName: input.fileName,
+    content: input.content,
+    turoAccount: normalizeTuroAccount(last?.turoAccount),
+    createMissingVehicles: false,
+    billingBypassActive: input.billingBypassActive,
+    syncConfig,
+    chooseMapping: (headers) => {
+      if (!lastMapping || !mappingFitsHeaders(lastMapping, headers)) return null;
+      mappingUsed = "last";
+      return lastMapping;
+    },
+  });
+
+  return {
+    ...result,
+    settings: {
+      mapping: mappingUsed,
+      turoAccount: normalizeTuroAccount(last?.turoAccount),
+      lastImportedAt: last?.importedAt ?? null,
+    },
+  };
+}
+
+function parseStoredMapping(value: string | null | undefined): CsvFieldMapping | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return normalizeCsvFieldMapping(parsed as Record<string, string>) as CsvFieldMapping;
+  } catch {
+    return null;
+  }
+}
+
+/** Every column the mapping names exists in the file, and the three an
+ *  order cannot be made without are among them. */
+function mappingFitsHeaders(mapping: CsvFieldMapping, headers: string[]) {
+  const present = new Set(headers);
+  const named = Object.values(mapping).filter((column): column is string => Boolean(column));
+  return (
+    Boolean(mapping.externalOrderId && mapping.pickupDatetime && mapping.returnDatetime) &&
+    named.every((column) => present.has(column))
+  );
 }
 
 export async function runTuroCsvSync(input: {

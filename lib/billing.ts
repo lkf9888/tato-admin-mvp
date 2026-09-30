@@ -10,18 +10,24 @@ import type Stripe from "stripe";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import {
-  estimateImportVehicleImpact,
-  type CsvFieldMapping,
-} from "@/lib/orders";
+  checkImportVehicleLimit,
+  ensureWorkspaceBillingForWorkspace,
+  FREE_VEHICLE_SLOTS,
+  getImportVehicleProjection,
+  getVehicleSlotSnapshot,
+  type ImportVehicleLimitInput,
+} from "@/lib/billing-limits";
 import { prisma } from "@/lib/prisma";
 import { getAppUrl, getStripeClient, getStripePriceId, isStripeBillingConfigured } from "@/lib/stripe";
 
-export const FREE_VEHICLE_SLOTS = 5;
-
-const ACTIVE_BILLING_STATUSES = new Set<WorkspaceBillingStatus>([
-  WorkspaceBillingStatus.active,
-  WorkspaceBillingStatus.trialing,
-]);
+// The slot arithmetic lives in lib/billing-limits, which callers with
+// no signed-in user can load; re-exported so existing imports stand.
+export {
+  FREE_VEHICLE_SLOTS,
+  getAllowedVehicleCount,
+  getEffectivePurchasedVehicleSlots,
+  getRequiredPaidSlotsForVehicleCount,
+} from "@/lib/billing-limits";
 
 type FreeSlotCouponConfig = {
   code: string;
@@ -195,134 +201,41 @@ export async function ensureWorkspaceBilling() {
   });
 }
 
-async function ensureWorkspaceBillingForWorkspace(workspaceId: string) {
-  return prisma.workspaceBilling.upsert({
-    where: { workspaceId },
-    update: {},
-    create: {
-      workspaceId,
-      freeVehicleSlots: FREE_VEHICLE_SLOTS,
-    },
-  });
-}
-
-export function getEffectivePurchasedVehicleSlots(billing: WorkspaceBilling) {
-  return ACTIVE_BILLING_STATUSES.has(billing.status) ? billing.purchasedVehicleSlots : 0;
-}
-
-export function getAllowedVehicleCount(billing: WorkspaceBilling) {
-  return billing.freeVehicleSlots + billing.bonusVehicleSlots + getEffectivePurchasedVehicleSlots(billing);
-}
-
-export function getRequiredPaidSlotsForVehicleCount(
-  vehicleCount: number,
-  freeVehicleSlots = FREE_VEHICLE_SLOTS,
-  bonusVehicleSlots = 0,
-) {
-  return Math.max(0, vehicleCount - freeVehicleSlots - bonusVehicleSlots);
-}
-
 export async function getWorkspaceBillingSnapshot() {
   const { user, workspace } = await requireCurrentAdminContext();
-  const [billing, currentVehicleCount] = await Promise.all([
-    ensureWorkspaceBillingForWorkspace(workspace.id),
-    prisma.vehicle.count({
-      where: { workspaceId: workspace.id },
-    }),
-  ]);
-
-  const effectivePurchasedVehicleSlots = getEffectivePurchasedVehicleSlots(billing);
-  const allowedVehicleCount = getAllowedVehicleCount(billing);
-  const billingBypassActive = Boolean(user.isBillingExempt);
-  const requiredPaidSlots = getRequiredPaidSlotsForVehicleCount(
-    currentVehicleCount,
-    billing.freeVehicleSlots,
-    billing.bonusVehicleSlots,
-  );
-
-  return {
-    billing,
-    currentVehicleCount,
-    freeVehicleSlots: billing.freeVehicleSlots,
-    bonusVehicleSlots: billing.bonusVehicleSlots,
-    purchasedVehicleSlots: billing.purchasedVehicleSlots,
-    effectivePurchasedVehicleSlots,
-    allowedVehicleCount,
-    requiredPaidSlots,
-    isOverLimit: billingBypassActive ? false : currentVehicleCount > allowedVehicleCount,
-    billingBypassActive,
-    stripeConfigured: isStripeBillingConfigured(),
-    status: billing.status,
-    currentPeriodEnd: billing.currentPeriodEnd,
-  };
+  const snapshot = await getVehicleSlotSnapshot(workspace.id, {
+    billingBypassActive: Boolean(user.isBillingExempt),
+  });
+  return { ...snapshot, stripeConfigured: isStripeBillingConfigured() };
 }
 
-export async function getImportBillingProjection(input: {
-  workspaceId: string;
-  mapping: CsvFieldMapping;
-  rows: Record<string, string>[];
-  createMissingVehicles?: boolean;
-  selectedVehicleKeys?: string[];
-}) {
-  const [snapshot, impact] = await Promise.all([
-    getWorkspaceBillingSnapshot(),
-    estimateImportVehicleImpact({
-      workspaceId: input.workspaceId,
-      mapping: input.mapping,
-      rows: input.rows,
-      createMissingVehicles: input.createMissingVehicles,
-    }),
-  ]);
+type ImportBillingInput = Omit<ImportVehicleLimitInput, "billingBypassActive"> & {
+  /** Omitted, read from the signed-in user -- right for the imports
+   *  page. A caller with no session uses lib/billing-limits directly. */
+  billingBypassActive?: boolean;
+};
 
-  const availableNewVehicleSlots = Math.max(0, snapshot.allowedVehicleCount - snapshot.currentVehicleCount);
-  const validSelectedVehicleKeys = new Set(
-    (input.selectedVehicleKeys ?? []).filter((key) =>
-      impact.projectedVehicleOptions.some((vehicle) => vehicle.key === key),
-    ),
-  );
-  const selectedProjectedNewVehicleCount =
-    input.createMissingVehicles && validSelectedVehicleKeys.size > 0
-      ? validSelectedVehicleKeys.size
-      : impact.projectedNewVehicleCount;
-  const projectedVehicleCount = Math.max(
-    snapshot.currentVehicleCount,
-    snapshot.currentVehicleCount + selectedProjectedNewVehicleCount,
-  );
-  const requiredPaidSlots = getRequiredPaidSlotsForVehicleCount(
-    projectedVehicleCount,
-    snapshot.freeVehicleSlots,
-    snapshot.bonusVehicleSlots,
-  );
-  const additionalPaidSlotsNeeded = Math.max(
-    0,
-    requiredPaidSlots - snapshot.effectivePurchasedVehicleSlots,
-  );
-
-  return {
-    ...snapshot,
-    projectedVehicleCount,
-    projectedNewVehicleCount: impact.projectedNewVehicleCount,
-    selectedProjectedNewVehicleCount,
-    requiredProjectedPaidSlots: requiredPaidSlots,
-    additionalPaidSlotsNeeded,
-    availableNewVehicleSlots,
-    selectableVehicleOptions: impact.projectedVehicleOptions,
-    exceedsPurchasedLimit: snapshot.billingBypassActive
-      ? false
-      : projectedVehicleCount > snapshot.allowedVehicleCount,
-  };
+async function resolveBillingBypass(input: ImportBillingInput) {
+  if (input.billingBypassActive !== undefined) return input.billingBypassActive;
+  const { user } = await requireCurrentAdminContext();
+  return Boolean(user.isBillingExempt);
 }
 
-export async function assertImportWithinBillingLimit(input: {
-  workspaceId: string;
-  mapping: CsvFieldMapping;
-  rows: Record<string, string>[];
-  createMissingVehicles?: boolean;
-  selectedVehicleKeys?: string[];
-}) {
-  const projection = await getImportBillingProjection(input);
-  if (!projection.exceedsPurchasedLimit) {
-    return projection;
+export async function getImportBillingProjection(input: ImportBillingInput) {
+  const projection = await getImportVehicleProjection({
+    ...input,
+    billingBypassActive: await resolveBillingBypass(input),
+  });
+  return { ...projection, stripeConfigured: isStripeBillingConfigured() };
+}
+
+export async function assertImportWithinBillingLimit(input: ImportBillingInput) {
+  const { projection, withinLimit } = await checkImportVehicleLimit({
+    ...input,
+    billingBypassActive: await resolveBillingBypass(input),
+  });
+  if (withinLimit) {
+    return { ...projection, stripeConfigured: isStripeBillingConfigured() };
   }
 
   const error = new Error("Vehicle limit exceeded for the current subscription.");

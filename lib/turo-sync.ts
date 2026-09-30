@@ -1,12 +1,11 @@
 import { readFile } from "fs/promises";
 import { basename } from "path";
 
-import { WorkspaceBillingStatus } from "@prisma/client";
 import Papa from "papaparse";
 
+import { checkImportVehicleLimit } from "@/lib/billing-limits";
 import { buildCsvHeaderMapping, csvReservationIds, normalizeTuroAccount } from "@/lib/csv-mapping";
 import {
-  estimateImportVehicleImpact,
   importTuroOrders,
   normalizeCsvFieldMapping,
   type CsvFieldMapping,
@@ -15,13 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { reapplyTuroObservations } from "@/lib/turo-email-apply";
 import { DEFAULT_WORKSPACE_SLUG } from "@/lib/workspaces";
 
-const FREE_VEHICLE_SLOTS = 5;
 const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
-
-const activeBillingStatuses = new Set<WorkspaceBillingStatus>([
-  WorkspaceBillingStatus.active,
-  WorkspaceBillingStatus.trialing,
-]);
 
 type CsvRow = Record<string, string>;
 
@@ -329,6 +322,12 @@ function getConfiguredMapping(headers: string[], config: WorkspaceTuroSyncConfig
   return normalizeCsvFieldMapping(mapping) as CsvFieldMapping;
 }
 
+/**
+ * The plan's vehicle limit, from `lib/billing-limits` -- the same
+ * arithmetic the imports page runs, without a session. The error keeps
+ * the fields it always carried and no more: the projection also holds
+ * the billing row, and this payload reaches API callers.
+ */
 async function assertTuroSyncWithinBillingLimit(input: {
   workspaceId: string;
   mapping: CsvFieldMapping;
@@ -336,54 +335,30 @@ async function assertTuroSyncWithinBillingLimit(input: {
   createMissingVehicles: boolean;
   billingBypassActive?: boolean;
 }) {
-  const [billing, currentVehicleCount, impact] = await Promise.all([
-    prisma.workspaceBilling.upsert({
-      where: { workspaceId: input.workspaceId },
-      update: {},
-      create: {
-        workspaceId: input.workspaceId,
-        freeVehicleSlots: FREE_VEHICLE_SLOTS,
-      },
-    }),
-    prisma.vehicle.count({
-      where: { workspaceId: input.workspaceId },
-    }),
-    estimateImportVehicleImpact({
-      workspaceId: input.workspaceId,
-      mapping: input.mapping,
-      rows: input.rows,
-      createMissingVehicles: input.createMissingVehicles,
-    }),
-  ]);
-
-  const effectivePurchasedVehicleSlots = activeBillingStatuses.has(billing.status)
-    ? billing.purchasedVehicleSlots
-    : 0;
-  const allowedVehicleCount =
-    billing.freeVehicleSlots + billing.bonusVehicleSlots + effectivePurchasedVehicleSlots;
-  const projectedVehicleCount = currentVehicleCount + impact.projectedNewVehicleCount;
-  const exceedsPurchasedLimit =
-    input.billingBypassActive ? false : projectedVehicleCount > allowedVehicleCount;
-
-  if (!exceedsPurchasedLimit) {
-    return;
-  }
+  const { projection, withinLimit } = await checkImportVehicleLimit({
+    workspaceId: input.workspaceId,
+    mapping: input.mapping,
+    rows: input.rows,
+    createMissingVehicles: input.createMissingVehicles,
+    billingBypassActive: input.billingBypassActive ?? false,
+  });
+  if (withinLimit) return;
 
   throw new TuroSyncError(
     "Vehicle limit exceeded for the current subscription.",
     "BILLING_LIMIT_EXCEEDED",
     402,
     {
-      currentVehicleCount,
-      projectedVehicleCount,
-      projectedNewVehicleCount: impact.projectedNewVehicleCount,
-      allowedVehicleCount,
-      freeVehicleSlots: billing.freeVehicleSlots,
-      bonusVehicleSlots: billing.bonusVehicleSlots,
-      purchasedVehicleSlots: billing.purchasedVehicleSlots,
-      effectivePurchasedVehicleSlots,
-      selectableVehicleOptions: impact.projectedVehicleOptions,
-      exceedsPurchasedLimit,
+      currentVehicleCount: projection.currentVehicleCount,
+      projectedVehicleCount: projection.projectedVehicleCount,
+      projectedNewVehicleCount: projection.projectedNewVehicleCount,
+      allowedVehicleCount: projection.allowedVehicleCount,
+      freeVehicleSlots: projection.freeVehicleSlots,
+      bonusVehicleSlots: projection.bonusVehicleSlots,
+      purchasedVehicleSlots: projection.purchasedVehicleSlots,
+      effectivePurchasedVehicleSlots: projection.effectivePurchasedVehicleSlots,
+      selectableVehicleOptions: projection.selectableVehicleOptions,
+      exceedsPurchasedLimit: projection.exceedsPurchasedLimit,
     },
   );
 }

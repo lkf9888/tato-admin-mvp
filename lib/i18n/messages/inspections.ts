@@ -6,8 +6,6 @@ export const inspectionsMessages = {
   en: {
     inspections: {
       title: "Condition photos",
-      subtitle:
-        "Walk-arounds shot by staff, and the trips still waiting for one. A claim needs photos from both ends of the trip, taken inside the 24-hour window.",
       dueTitle: "Waiting for photos",
       dueEmpty: "Every trip in the last week has its photos.",
       dueExpired: "Window closed",
@@ -65,8 +63,6 @@ export const inspectionsMessages = {
   zh: {
     inspections: {
       title: "车况存证",
-      subtitle:
-        "员工拍的绕车记录，以及还没拍的车。一次理赔需要交车和还车两头的照片，而且都得在 24 小时窗口内拍。",
       dueTitle: "还没拍的",
       dueEmpty: "最近一周的行程都拍过了。",
       dueExpired: "窗口已关闭",

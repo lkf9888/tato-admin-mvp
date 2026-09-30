@@ -46,10 +46,7 @@ export default async function InspectionsPage() {
 
   return (
     <div className="space-y-8">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold text-slate-900">{t.title}</h1>
-        <p className="max-w-3xl text-sm text-slate-600">{t.subtitle}</p>
-      </header>
+      <h1 className="sr-only">{t.title}</h1>
 
       <section className="space-y-3">
         <h2 className="text-lg font-medium text-slate-900">{t.dueTitle}</h2>

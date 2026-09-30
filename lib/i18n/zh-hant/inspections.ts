@@ -4,8 +4,6 @@
 export const inspectionsMessages = {
     inspections: {
       title: "車況存證",
-      subtitle:
-        "員工拍的繞車記錄，以及還沒拍的車。一次理賠需要交車和還車兩頭的照片，而且都得在 24 小時時段內拍。",
       dueTitle: "還沒拍的",
       dueEmpty: "最近一週的行程都拍過了。",
       dueExpired: "時段已關閉",

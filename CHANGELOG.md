@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.24.3 - 2026-09-30
+
+### Condition photos loses its title card
+
+As on the other admin pages: the title and caption at the top of 车况存证 are gone, with an `sr-only` h1 left for screen readers, and the page opens on the trips still waiting for photos. What mattered in the caption still shows where it applies: each waiting trip carries its hours left or hours past the deadline, and a closed window says a photo taken now cannot be used for a claim. The general rule it spelled out -- both ends of the trip, inside 24 hours -- is no longer written on the page. The per-session page keeps its heading, because that one names a specific car and a handover or return. The unused `inspections.subtitle` string is removed.
+
 ## v1.24.2 - 2026-09-30
 
 ### On a phone, the calendar opens as the calendar

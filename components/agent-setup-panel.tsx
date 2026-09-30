@@ -29,11 +29,13 @@ const READ_ENDPOINTS: Array<[string, string]> = [
   ["GET /api/agent/message-templates", "消息模板"],
 ];
 
-/** What a read-write token adds. It feeds the same import code as the
- *  CSV page, so a trip written here is matched and deduplicated exactly
- *  as an uploaded one. */
+/** What a read-write token adds. Both feed import code that already
+ *  exists -- the CSV page's and the booking mail's -- so a trip written
+ *  here is matched, deduplicated and parked exactly as one arriving any
+ *  other way. */
 const WRITE_ENDPOINTS: Array<[string, string]> = [
   ["POST /api/agent/imports", "上传 Turo 导出的 CSV 原文——带车牌和金额，和手动导入 CSV 同一套逻辑"],
+  ["POST /api/agent/trips", "逐笔推送从 Turo 行程页读到的订单——和预订邮件同一套配车规则，配不上就进待分配，不写金额"],
 ];
 
 export function AgentSetupPanel({
@@ -281,7 +283,7 @@ export function AgentSetupPanel({
         <h2 className="t-title text-[var(--ink)]">API</h2>
         <p className="mt-1 text-[12px] leading-5 text-[var(--ink-soft)]">
           给 AI Agent 或脚本用。<strong>只读令牌</strong>只能读——订单、金额、分成规则、流水账都改不了。
-          <strong>读写令牌</strong>另外能把 Turo 导出的 CSV 导进来，新建或更新订单；
+          <strong>读写令牌</strong>另外能把 Turo 的订单导进来：新建或更新订单，配不上车的放进待分配；
           不会新建车辆，改不了分成规则，也删不掉任何东西。只需要读的 Agent，就给它只读的。
         </p>
 

@@ -124,11 +124,11 @@ export async function GET(request: Request) {
 /**
  * The write side, for tokens that hold `orders:write`.
  *
- * A door into the importer the rest of TATO uses, not a second
- * importer: the CSV route runs the code the imports page and the
- * scheduled sync run, so a trip written here is matched, deduplicated
- * and settled exactly as an uploaded one, and a rule changed there
- * changes here.
+ * Two doors into the importers the rest of TATO uses, not new ones. The
+ * CSV route runs the imports page's code; the trips route runs the
+ * booking mail's. So an agent's trip is matched to a car, deduplicated
+ * on its reservation id and parked when ambiguous by exactly the code
+ * that already does it, and a rule changed there changes here.
  */
 const WRITE_ENDPOINTS = [
   {
@@ -145,6 +145,35 @@ const WRITE_ENDPOINTS = [
     notes: [
       "Rows whose car is not in the fleet are reported as failures; the API never creates vehicles.",
       "Returns counts plus per-row failures with a reason.",
+    ],
+  },
+  {
+    path: "/api/agent/trips",
+    method: "POST",
+    summary:
+      "Push trips read from Turo's trip pages -- new bookings not yet in any CSV export, or changes made in Turo's own interface. Same code as Turo's booking email: a trip is placed on a car only when exactly one car answers to the model and year (or the plate you send matches one); otherwise it waits in pending-orders for a person. Amounts are not written; the CSV export settles them. What you send is remembered, so the Gmail sync will not move a newer date back to an older email's.",
+    body: {
+      turoAccount: "optional. Co-host account, as for the CSV import; applies to every trip in the request",
+      observedAt: "optional ISO 8601. When the pages were read, if not just now",
+      dryRun: "optional. true reports what would happen and writes nothing",
+      trips: [
+        {
+          reservationId: "required. Turo's reservation id (digits)",
+          status: "booked | ongoing | changed | cancelled | completed",
+          vehicle: "the car as Turo writes it: \"Brand Model Year\", e.g. \"Toyota Sienna 2018\"",
+          plate: "optional. If the page shows the licence plate, send it as shown: it decides the car",
+          guestName: "optional",
+          guestPhone: "optional",
+          tripStart: "ISO 8601 with offset, e.g. 2026-11-10T10:00:00-08:00",
+          tripEnd: "ISO 8601 with offset",
+          pickupLocation: "optional",
+        },
+      ],
+    },
+    notes: [
+      "At most 200 trips per request. Idempotent on reservationId.",
+      "A finished trip keeps its recorded dates: completed trips are settled by the CSV, not moved by a page read.",
+      "Returns created / updated / unchanged / pending counts, notPlaced (each trip that could not be put on one car, with how many cars matched), and unknownPlates.",
     ],
   },
 ];

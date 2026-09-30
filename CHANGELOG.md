@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.17.1 - 2026-09-29
+
+### An AI agent can push the trips it reads off Turo
+
+The second half of the agent's write access. `POST /api/agent/trips` takes trips read from Turo's trip pages -- bookings made since the last CSV export, dates changed in Turo's own interface -- with a read-write token.
+
+They go through the booking mail's path, via v1.17.0's trip snapshots: a trip is placed on a car only when exactly one car answers to the model and year, or when the plate the page showed matches one; otherwise it waits in **待分配** for a person. Amounts are never written; the CSV export settles them. Each read is kept, so the next Gmail sync does not move a newer date back to an older email's. `dryRun: true` reports what would happen and writes nothing; `ongoing` is accepted for a trip in progress.
+
+The agent page and `GET /api/agent` list the endpoint and its body.
+
+
 ## v1.17.0 - 2026-09-29
 
 ### Trips an agent reads off Turo are kept, and merged with the booking mail

@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.22.2 - 2026-09-30
+
+### Change-request notices reach every TATO account too
+
+A renter's cancel or reschedule request was emailed to the rental
+site's contact address only. It now also goes to every account in the
+workspace (the addresses people signed up to TATO with), each address
+once and each as its own message, so one bad address cannot stop the
+rest and nobody's inbox is shown in another's To line.
+
 ## v1.22.1 - 2026-09-30
 
 ### A paid online booking is cancelled through its refund

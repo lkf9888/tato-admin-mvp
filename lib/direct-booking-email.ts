@@ -437,9 +437,10 @@ export async function sendExtraChargeEmail(input: {
 /**
  * Tell the operator a renter asked for something. Without it a request
  * sat in the admin until somebody happened to open the page. Sent to
- * the site's contact address (the mailbox the operator reads), or the
- * workspace's first account. Bilingual, because the operator reads the
- * admin in either language. Never throws.
+ * the site's contact address (the mailbox renters write to) and to
+ * every TATO account in the workspace (the addresses they signed up
+ * with), each once. Bilingual, because the operator reads the admin in
+ * either language. Never throws.
  */
 export async function sendChangeRequestNotice(input: {
   workspaceId: string;
@@ -452,17 +453,24 @@ export async function sendChangeRequestNotice(input: {
   renterNote: string | null;
 }): Promise<{ ok: boolean; reason?: string }> {
   try {
-    const [site, workspace, firstUser] = await Promise.all([
+    const [site, workspace, users] = await Promise.all([
       prisma.rentalSite.findUnique({ where: { workspaceId: input.workspaceId } }),
       prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
-      prisma.user.findFirst({
+      prisma.user.findMany({
         where: { workspaceId: input.workspaceId },
         orderBy: { createdAt: "asc" },
         select: { email: true },
       }),
     ]);
-    const to = site?.contactEmail?.trim() || firstUser?.email;
-    if (!to) return { ok: false, reason: "NO_OPERATOR_EMAIL" };
+    const recipients = [
+      ...new Map(
+        [site?.contactEmail, ...users.map((user) => user.email)]
+          .map((email) => email?.trim())
+          .filter((email): email is string => Boolean(email))
+          .map((email) => [email.toLowerCase(), email] as const),
+      ).values(),
+    ];
+    if (recipients.length === 0) return { ok: false, reason: "NO_OPERATOR_EMAIL" };
     const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
     const car = `${input.vehicle.plateNumber} · ${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`;
     const trip = `${formatBookingMoment(input.order.pickupDatetime)} → ${formatBookingMoment(input.order.returnDatetime)}`;
@@ -489,22 +497,32 @@ export async function sendChangeRequestNotice(input: {
       .filter((line): line is string => line !== null)
       .join("\n");
 
-    const result = await sendMail({
-      to,
-      subject: `[${brandName}] ${isCancel ? "取消申请 Cancellation request" : "改期申请 Change request"} — ${input.vehicle.plateNumber}, ${input.order.renterName}`,
-      text,
-      html: toHtmlBody(text),
-      from: formatSiteSender(site),
-    });
+    const subject = `[${brandName}] ${isCancel ? "取消申请 Cancellation request" : "改期申请 Change request"} — ${input.vehicle.plateNumber}, ${input.order.renterName}`;
+    // One message per address, so no operator sees another's inbox in
+    // the To line and one bad address cannot sink the rest.
+    const results = await Promise.all(
+      recipients.map((to) =>
+        sendMail({ to, subject, text, html: toHtmlBody(text), from: formatSiteSender(site) }).then(
+          (result) => ({ to, ...result }),
+        ),
+      ),
+    );
+    const ok = results.some((result) => result.ok);
     await logActivity({
       workspaceId: input.workspaceId,
       actor: "direct-booking",
-      action: result.ok ? "change_request_notice_sent" : "change_request_notice_failed",
+      action: ok ? "change_request_notice_sent" : "change_request_notice_failed",
       entityType: "Order",
       entityId: input.order.id,
-      metadata: { to, kind: input.kind, reason: result.reason ?? null },
+      metadata: {
+        kind: input.kind,
+        sent: results.filter((result) => result.ok).map((result) => result.to),
+        failed: results
+          .filter((result) => !result.ok)
+          .map((result) => ({ to: result.to, reason: result.reason ?? null })),
+      },
     });
-    return result;
+    return ok ? { ok: true } : { ok: false, reason: results[0]?.reason ?? "SEND_FAILED" };
   } catch (error) {
     await logActivity({
       workspaceId: input.workspaceId,

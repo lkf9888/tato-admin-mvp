@@ -297,6 +297,24 @@ export function hasBusyWindowConflict(windows: BusyWindow[], start: Date, end: D
   );
 }
 
+/**
+ * The earliest pick-up a renter may book: now plus the fleet's notice.
+ * Checked in the browser and again at checkout, from the same rule.
+ */
+export function earliestPickupAt(noticeHours: number, now = new Date()) {
+  return new Date(now.getTime() + Math.max(0, noticeHours) * 3_600_000);
+}
+
+/**
+ * A trip's time widened by the turnaround buffer on both sides: what a
+ * new booking must stay clear of. The order itself is unchanged; only
+ * what counts as "taken" grows.
+ */
+export function padTripWindow(start: Date, end: Date, bufferHours: number) {
+  const pad = Math.max(0, bufferHours) * 3_600_000;
+  return { start: new Date(start.getTime() - pad), end: new Date(end.getTime() + pad) };
+}
+
 /** The same, against orders as loaded on the server. */
 export function hasTimedBookingConflict(orders: BookingOrderLike[], start: Date, end: Date) {
   return orders.some(

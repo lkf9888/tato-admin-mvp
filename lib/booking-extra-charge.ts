@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Vehicle } from "@prisma/client";
 import type Stripe from "stripe";
 
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
@@ -36,6 +37,8 @@ import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
  */
 
 export type ExtraChargeRecord = {
+  /** Absent on records from before v1.29.0, which were all extra days. */
+  kind?: "days" | "reschedule" | "mileage";
   days: number;
   amount: number;
   status: "paid" | "pending";
@@ -61,7 +64,7 @@ type OrderMetadata = {
   [key: string]: unknown;
 };
 
-function readMetadata(raw: string | null): OrderMetadata {
+export function readMetadata(raw: string | null): OrderMetadata {
   if (!raw) return {};
   try {
     const parsed = JSON.parse(raw);
@@ -92,7 +95,7 @@ export type ExtraChargeQuote =
     }
   | { ok: false; reason: "NOT_FOUND" | "NOT_DIRECT_BOOKING" | "NO_BOOKED_DAYS" };
 
-async function loadOrder(workspaceId: string, orderId: string) {
+export async function loadOrder(workspaceId: string, orderId: string) {
   return prisma.order.findFirst({
     where: { id: orderId, workspaceId, isArchived: false },
     include: { vehicle: true },
@@ -207,42 +210,67 @@ export type ExtraChargeResult =
   | { ok: true; outcome: "charged" | "link_sent"; amount: number; url?: string; emailed: boolean; fallbackReason?: string }
   | { ok: false; error: string };
 
+/** What a charge is for, as the bill email explains it. */
+export type ChargeReason =
+  | { kind: "days"; extraDays: number }
+  | { kind: "reschedule" }
+  | { kind: "mileage"; excessKm: number };
+
 /**
- * Bill the extra days: the saved card when asked and possible, a
- * payment link otherwise. `expectedTotal` is what the operator saw and
- * confirmed; if the numbers moved since, nothing is charged.
+ * Charge a direct booking an amount after the fact: the saved card when
+ * asked and possible, a payment link by email otherwise (no card, a
+ * decline, or the bank wanting the renter to confirm). Records the
+ * payment on the order and emails the renter the bill.
+ *
+ * The one path for every later charge -- extra days, a dearer date
+ * change, excess distance -- so they share the commission, the
+ * idempotency and the receipt.
  */
-export async function billExtraCharge(input: {
+export async function chargeOrder(input: {
   workspaceId: string;
   orderId: string;
+  lines: Array<{ label: string; amount: number }>;
+  total: number;
+  /** What the 5% commission is taken on (the total less tax). */
+  commissionBase: number;
   method: "card" | "link";
-  expectedTotal: number;
   actor: string;
+  reason: ChargeReason;
+  /** Keys the Stripe calls, so a double click cannot charge twice. */
+  idempotencyBase: string;
 }): Promise<ExtraChargeResult> {
   if (!getStripeSecretKey()) return { ok: false, error: "STRIPE_NOT_CONFIGURED" };
-  const quote = await quoteExtraCharge(input.workspaceId, input.orderId);
-  if (!quote.ok) return { ok: false, error: quote.reason };
-  if (quote.extraDays === 0 || quote.total <= 0) return { ok: false, error: "NOTHING_TO_CHARGE" };
-  if (Math.abs(quote.total - input.expectedTotal) > 0.009) return { ok: false, error: "AMOUNT_CHANGED" };
-
-  const order = (await loadOrder(input.workspaceId, input.orderId))!;
-  const vehicle = order.vehicle!;
+  if (input.total <= 0) return { ok: false, error: "NOTHING_TO_CHARGE" };
+  const order = await loadOrder(input.workspaceId, input.orderId);
+  if (!order?.vehicle) return { ok: false, error: "NOT_FOUND" };
+  const vehicle = order.vehicle;
   const metadata = readMetadata(order.sourceMetadata);
+  const renterEmail = metadata.renterEmail ?? null;
+  const hasSavedCard = Boolean(metadata.stripeCustomerId && metadata.stripePaymentMethodId);
   const connect = await getWorkspaceConnectSnapshot(input.workspaceId);
   if (!connect.accountId || !connect.chargesEnabled) return { ok: false, error: "PAYOUTS_NOT_READY" };
 
   const stripe = getStripeClient();
-  const amountCents = Math.round(quote.total * 100);
+  const total = roundMoney(input.total);
+  const amountCents = Math.round(total * 100);
   const fee = computePlatformFeeCents({
-    commissionBaseCents: Math.round(quote.commissionBase * 100),
+    commissionBaseCents: Math.round(input.commissionBase * 100),
     chargeTotalCents: amountCents,
   });
-  const description = `${vehicle.nickname} · ${quote.extraDays} extra day(s)`;
+  const describe =
+    input.reason.kind === "days"
+      ? `${input.reason.extraDays} extra day(s)`
+      : input.reason.kind === "reschedule"
+        ? "date change"
+        : `${input.reason.excessKm} km over the allowance`;
+  const description = `${vehicle.nickname} · ${describe}`;
+  const days = input.reason.kind === "days" ? input.reason.extraDays : 0;
   const chargeMetadata = {
     kind: "booking_extra_charge",
+    chargeKind: input.reason.kind,
     orderId: order.id,
     workspaceId: input.workspaceId,
-    extraDays: String(quote.extraDays),
+    extraDays: String(days),
     tato_platform_commission_cents: String(fee.commission),
     tato_stripe_fee_estimate_cents: String(fee.processing),
   };
@@ -251,12 +279,18 @@ export async function billExtraCharge(input: {
     transfer_data: { destination: connect.accountId },
     application_fee_amount: fee.total > 0 ? fee.total : undefined,
   };
-  // Keyed on what is being billed, so a double click or a retry cannot
-  // charge the same days twice.
-  const idempotencyBase = `extra:${order.id}:${quote.billedDays}:${quote.extraDays}:${amountCents}`;
+  const emailBase = {
+    workspaceId: input.workspaceId,
+    order,
+    vehicle,
+    renterEmail,
+    reason: input.reason,
+    lines: input.lines,
+    total,
+  };
 
   let fallbackReason: string | undefined;
-  if (input.method === "card" && quote.hasSavedCard) {
+  if (input.method === "card" && hasSavedCard) {
     try {
       const intent = await stripe.paymentIntents.create(
         {
@@ -270,48 +304,44 @@ export async function billExtraCharge(input: {
           metadata: chargeMetadata,
           ...destination,
         },
-        { idempotencyKey: `${idempotencyBase}:card` },
+        { idempotencyKey: `${input.idempotencyBase}:card` },
       );
       if (intent.status === "succeeded") {
         const payment = await prisma.orderPayment.create({
           data: {
             workspaceId: input.workspaceId,
             orderId: order.id,
-            amount: quote.total,
+            amount: total,
             paidAt: new Date(),
             method: "Stripe",
-            note: `Extra ${quote.extraDays} day(s) · card on file · ${intent.id}`,
+            note: `${describe} · card on file · ${intent.id}`,
             createdBy: input.actor,
           },
         });
-        await recordCharge(order.id, {
-          days: quote.extraDays,
-          amount: quote.total,
-          status: "paid",
-          method: "card",
-          paymentIntentId: intent.id,
-          paymentId: payment.id,
-          at: new Date().toISOString(),
-        }, quote.total);
-        const email = await sendExtraChargeEmail({
-          workspaceId: input.workspaceId,
-          order,
-          vehicle,
-          renterEmail: quote.renterEmail,
-          extraDays: quote.extraDays,
-          lines: quote.lines,
-          total: quote.total,
-          status: "charged",
-        });
+        await recordCharge(
+          order.id,
+          {
+            kind: input.reason.kind,
+            days,
+            amount: total,
+            status: "paid",
+            method: "card",
+            paymentIntentId: intent.id,
+            paymentId: payment.id,
+            at: new Date().toISOString(),
+          },
+          total,
+        );
+        const email = await sendExtraChargeEmail({ ...emailBase, status: "charged" });
         await logActivity({
           workspaceId: input.workspaceId,
           actor: input.actor,
           action: "direct_booking_extra_charged",
           entityType: "Order",
           entityId: order.id,
-          metadata: { amount: quote.total, extraDays: quote.extraDays, paymentIntentId: intent.id },
+          metadata: { kind: input.reason.kind, amount: total, paymentIntentId: intent.id },
         });
-        return { ok: true, outcome: "charged", amount: quote.total, emailed: email.ok };
+        return { ok: true, outcome: "charged", amount: total, emailed: email.ok };
       }
       fallbackReason = intent.status;
     } catch (error) {
@@ -333,12 +363,12 @@ export async function billExtraCharge(input: {
       mode: "payment",
       ...(metadata.stripeCustomerId
         ? { customer: metadata.stripeCustomerId }
-        : quote.renterEmail
-          ? { customer_email: quote.renterEmail }
+        : renterEmail
+          ? { customer_email: renterEmail }
           : {}),
       success_url: `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}paid=extra`,
       cancel_url: returnUrl,
-      line_items: quote.lines
+      line_items: input.lines
         .filter((line) => line.amount > 0)
         .map((line) => ({
           quantity: 1,
@@ -351,60 +381,83 @@ export async function billExtraCharge(input: {
       payment_intent_data: { description, metadata: chargeMetadata, ...destination },
       metadata: chargeMetadata,
     },
-    { idempotencyKey: `${idempotencyBase}:link` },
+    { idempotencyKey: `${input.idempotencyBase}:link` },
   );
   const payment = await prisma.orderPayment.create({
     data: {
       workspaceId: input.workspaceId,
       orderId: order.id,
-      amount: quote.total,
+      amount: total,
       dueAt: new Date(),
       method: "Stripe",
-      note: `Extra ${quote.extraDays} day(s) · payment link · ${session.id}`,
+      note: `${describe} · payment link · ${session.id}`,
       createdBy: input.actor,
     },
   });
-  await recordCharge(order.id, {
-    days: quote.extraDays,
-    amount: quote.total,
-    status: "pending",
-    method: "link",
-    sessionId: session.id,
-    url: session.url,
-    paymentId: payment.id,
-    at: new Date().toISOString(),
-  }, 0);
-  const email = await sendExtraChargeEmail({
-    workspaceId: input.workspaceId,
-    order,
-    vehicle,
-    renterEmail: quote.renterEmail,
-    extraDays: quote.extraDays,
-    lines: quote.lines,
-    total: quote.total,
-    status: "pay_link",
-    payUrl: session.url,
-  });
+  await recordCharge(
+    order.id,
+    {
+      kind: input.reason.kind,
+      days,
+      amount: total,
+      status: "pending",
+      method: "link",
+      sessionId: session.id,
+      url: session.url,
+      paymentId: payment.id,
+      at: new Date().toISOString(),
+    },
+    0,
+  );
+  const email = await sendExtraChargeEmail({ ...emailBase, status: "pay_link", payUrl: session.url });
   await logActivity({
     workspaceId: input.workspaceId,
     actor: input.actor,
     action: "direct_booking_extra_link_sent",
     entityType: "Order",
     entityId: order.id,
-    metadata: { amount: quote.total, extraDays: quote.extraDays, sessionId: session.id, fallbackReason },
+    metadata: { kind: input.reason.kind, amount: total, sessionId: session.id, fallbackReason },
   });
   return {
     ok: true,
     outcome: "link_sent",
-    amount: quote.total,
+    amount: total,
     url: session.url ?? undefined,
     emailed: email.ok,
     fallbackReason,
   };
 }
 
+/**
+ * Bill the extra days. `expectedTotal` is what the operator saw and
+ * confirmed; if the numbers moved since, nothing is charged.
+ */
+export async function billExtraCharge(input: {
+  workspaceId: string;
+  orderId: string;
+  method: "card" | "link";
+  expectedTotal: number;
+  actor: string;
+}): Promise<ExtraChargeResult> {
+  const quote = await quoteExtraCharge(input.workspaceId, input.orderId);
+  if (!quote.ok) return { ok: false, error: quote.reason };
+  if (quote.extraDays === 0 || quote.total <= 0) return { ok: false, error: "NOTHING_TO_CHARGE" };
+  if (Math.abs(quote.total - input.expectedTotal) > 0.009) return { ok: false, error: "AMOUNT_CHANGED" };
+  return chargeOrder({
+    workspaceId: input.workspaceId,
+    orderId: input.orderId,
+    lines: quote.lines,
+    total: quote.total,
+    commissionBase: quote.commissionBase,
+    method: input.method,
+    actor: input.actor,
+    reason: { kind: "days", extraDays: quote.extraDays },
+    idempotencyBase: `extra:${input.orderId}:${quote.billedDays}:${quote.extraDays}:${Math.round(quote.total * 100)}`,
+  });
+}
+
 /** Append to the order's record; a paid charge also raises its value. */
-async function recordCharge(orderId: string, charge: ExtraChargeRecord, paidAmount: number) {
+export async function recordCharge(orderId: string, charge: ExtraChargeRecord, paidAmount: number) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return;
   const metadata = readMetadata(order.sourceMetadata);
@@ -461,4 +514,85 @@ export async function completeExtraChargeFromSession(session: Stripe.Checkout.Se
     entityId: orderId,
     metadata: { amount: charge.amount, sessionId: session.id },
   });
+}
+
+/**
+ * What a whole trip on this booking costs at today's prices: rent (with
+ * the weekly rate it earns), the booking's insurance rate, its per-day
+ * extras and the taxes on them. Deposit, collection fees and one-off
+ * extras are left out -- moving the dates does not change them.
+ *
+ * Used to price a date change as the difference between two trips,
+ * both at today's prices, so a price the operator changed since the
+ * booking is never charged or refunded as if the renter had moved.
+ */
+export async function priceTrip(
+  order: { sourceMetadata: string | null; vehicle: Vehicle },
+  pickupAt: Date,
+  returnAt: Date,
+) {
+  const metadata = readMetadata(order.sourceMetadata);
+  const vehicle = order.vehicle;
+  const policy = await getBookingPolicyForVehicle(vehicle);
+  const rate = resolveVehicleDailyRate(vehicle, policy);
+  const dailyRate = rate.dailyRate ?? 0;
+  const seasonalRates =
+    rate.source === "suggested"
+      ? buildSeasonalRateMap(dailyRate, getBookingWindowDayKeys(), await getRateSeasonality(vehicle.workspaceId))
+      : {};
+  const insuranceRate =
+    metadata.insuranceDailyRate != null
+      ? Number(metadata.insuranceDailyRate)
+      : metadata.includeInsurance
+        ? policy.insuranceFee
+        : 0;
+  const perDayAddOns = (metadata.addOns ?? [])
+    .filter((addOn) => addOn.unit === "day")
+    .map((addOn, index) => ({
+      id: String(index),
+      name: addOn.name,
+      description: null,
+      price: addOn.price,
+      unit: "day" as const,
+      taxable: addOn.taxable,
+    }));
+  const taxLines =
+    metadata.taxLines && metadata.taxLines.length > 0
+      ? metadata.taxLines.map((line) => ({ name: line.name, rate: line.rate }))
+      : policy.taxLines;
+  const quote = getDirectBookingQuote({
+    pickupDate: utcToZonedDate(pickupAt),
+    returnDate: utcToZonedDate(returnAt),
+    pickupTime: utcToZonedTime(pickupAt),
+    returnTime: utcToZonedTime(returnAt),
+    graceMinutes: policy.returnGraceMinutes,
+    bookingDailyRate: dailyRate,
+    dailyRateOverrides: await loadPriceOverridesForBooking(vehicle.id),
+    seasonalRates,
+    weeklyDiscountPercent: policy.weeklyDiscountPercent,
+    bookingInsuranceFee: Math.max(0, insuranceRate),
+    taxLines,
+    addOns: perDayAddOns,
+  });
+  const beforeTax = roundMoney(quote.baseAmount + quote.insuranceAmount + quote.addOnAmount);
+  return {
+    days: quote.days,
+    beforeTax,
+    total: roundMoney(beforeTax + quote.taxAmount),
+  };
+}
+
+/**
+ * The days a booking has been paid (or billed) for: the booking's own,
+ * plus extra days charged since. What the distance allowance is counted
+ * against.
+ */
+export function paidDays(sourceMetadata: string | null): number | null {
+  const metadata = readMetadata(sourceMetadata);
+  const booked = Number(metadata.bookedDays);
+  if (!Number.isFinite(booked) || booked < 1) return null;
+  const extra = (metadata.extraCharges ?? [])
+    .filter((charge) => (charge.kind ?? "days") === "days")
+    .reduce((sum, charge) => sum + charge.days, 0);
+  return booked + extra;
 }

@@ -15,6 +15,7 @@ import {
 } from "@/lib/booking-time";
 import { cancelDirectBookingWithRefund } from "@/lib/direct-booking-cancel";
 import { sendBookingDecisionEmail } from "@/lib/direct-booking-email";
+import { settleReschedule } from "@/lib/booking-reschedule";
 
 export const runtime = "nodejs";
 
@@ -102,6 +103,14 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       where: { id: changeRequest.orderId },
       data: { pickupDatetime: pickupAt, returnDatetime: returnAt },
     });
+    // The price difference the renter was shown: charged, or refunded.
+    const settled = await settleReschedule({
+      workspaceId: workspace.id,
+      orderId: changeRequest.orderId,
+      requestId: changeRequest.id,
+      settlement: changeRequest.quotedPriceDifference,
+      actor: user.name,
+    });
     await prisma.bookingChangeRequest.update({
       where: { id: changeRequest.id },
       data: {
@@ -109,6 +118,9 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
         operatorNote: note,
         resolvedAt: new Date(),
         resolvedBy: user.name,
+        ...(settled.kind === "refunded"
+          ? { refundedAmount: settled.amount, stripeRefundId: settled.stripeRefundId }
+          : {}),
       },
     });
     await reconcileVehicleConflicts(changeRequest.order.vehicleId);
@@ -124,8 +136,23 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
         returnAt: returnAt.toISOString(),
       },
     });
-    await emailRenter(moved, workspace.id, "rescheduled", note);
-    return NextResponse.json({ ok: true });
+    // A charge sends its own bill; a refund is said in the decision email.
+    await emailRenter(
+      moved,
+      workspace.id,
+      "rescheduled",
+      note,
+      settled.kind === "refunded" ? settled.amount : undefined,
+    );
+    return NextResponse.json({
+      ok: true,
+      settlement:
+        settled.kind === "charged"
+          ? settled.result.ok
+            ? { kind: settled.result.outcome, amount: settled.result.amount }
+            : { kind: "charge_failed", error: settled.result.error }
+          : settled,
+    });
   }
 
   // Cancellation: the refund the renter was quoted when they asked,
@@ -192,6 +219,7 @@ async function emailRenter(
   workspaceId: string,
   outcome: "rescheduled" | "declined",
   note: string | null,
+  refundAmount?: number,
 ) {
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: order.vehicleId },
@@ -205,5 +233,6 @@ async function emailRenter(
     renterEmail: readDirectBookingPayment(order.sourceMetadata).renterEmail,
     outcome,
     note,
+    refundAmount,
   });
 }

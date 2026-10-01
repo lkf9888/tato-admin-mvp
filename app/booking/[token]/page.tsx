@@ -14,6 +14,7 @@ import {
 } from "@/lib/booking-access";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import { getAppUrl } from "@/lib/stripe";
 import {
   DEFAULT_BOOKING_TIME,
   formatBookingMoment,
@@ -79,6 +80,21 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
   );
   const isCancelled = order.status === OrderStatus.cancelled;
   const today = utcToZonedDate(new Date());
+  // What the renter will want to look up on the day: where to go, what
+  // they added, and the agreement they signed.
+  const extras = decodeExtras(order.sourceMetadata);
+  const envelope = await prisma.contractEnvelope.findFirst({
+    where: { orderId: order.id, status: { not: "VOIDED" } },
+    orderBy: { createdAt: "desc" },
+    include: { recipients: { orderBy: { signingOrder: "asc" }, take: 1 } },
+  });
+  const signer = envelope?.recipients[0];
+  const agreementLink =
+    envelope && signer
+      ? envelope.status === "COMPLETED" && envelope.signedPdfUrl
+        ? { href: `${envelope.signedPdfUrl}?token=${encodeURIComponent(signer.token)}`, signed: true }
+        : { href: `${getAppUrl().replace(/\/$/, "")}/sign/${signer.token}`, signed: false }
+      : null;
 
   const cancelCopy =
     quote.outcome === "free"
@@ -117,10 +133,19 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
           ...(amounts.depositAmount > 0
             ? [[copy.depositLabel, formatCurrency(amounts.depositAmount, locale)]]
             : []),
-        ].map(([label, value]) => (
+          ...(order.pickupLocation
+            ? [[copy.pickupPlaceLabel, order.pickupLocation, "wide"]]
+            : []),
+          ...(order.returnLocation && order.returnLocation !== order.pickupLocation
+            ? [[copy.returnPlaceLabel, order.returnLocation, "wide"]]
+            : []),
+          ...(extras.length > 0 ? [[copy.extrasLabel, extras.join(", "), "wide"]] : []),
+        ].map(([label, value, width]) => (
           <div
             key={label}
-            className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3"
+            className={`rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3 ${
+              width === "wide" ? "sm:col-span-2" : ""
+            }`}
           >
             <dt className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
               {label}
@@ -129,6 +154,14 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
           </div>
         ))}
       </dl>
+
+      {agreementLink ? (
+        <p className="mt-3 text-[13px]">
+          <a href={agreementLink.href} target="_blank" rel="noreferrer" className="font-medium text-[var(--brand)] underline">
+            {agreementLink.signed ? copy.agreementSignedLink : copy.agreementSignLink}
+          </a>
+        </p>
+      ) : null}
 
       {order.orderPayments.length > 1 ? (
         <section className="mt-6 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5">
@@ -222,4 +255,16 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
 
 function formatTripMoment(value: Date) {
   return formatBookingMoment(value);
+}
+
+/** The extras a booking bought, by name, from what checkout recorded. */
+function decodeExtras(sourceMetadata: string | null): string[] {
+  try {
+    const parsed = JSON.parse(sourceMetadata ?? "{}") as { addOns?: Array<{ name?: unknown }> | null };
+    return (parsed.addOns ?? [])
+      .map((item) => (typeof item?.name === "string" ? item.name : ""))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
 }

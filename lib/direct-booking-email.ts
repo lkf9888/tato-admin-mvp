@@ -224,21 +224,23 @@ export async function sendDirectBookingConfirmationEmail(input: {
     const bookingUrl = input.order.renterToken
       ? `${origin}/booking/${input.order.renterToken}`
       : null;
-    const text = [
-      renderDirectBookingEmailTemplate(template.bodyTemplate, values),
-      bookingUrl
-        ? [
-            "",
-            "At pick-up: before you drive off, open your booking page and photograph the car —",
-            "front, back, both sides, the interior and the dashboard (odometer and fuel).",
-            "Do the same when you return it. These photos protect you from charges for",
-            "damage that was already there. We will remind you an hour before pick-up.",
-            bookingUrl,
-          ].join("\n")
-        : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const body = renderDirectBookingEmailTemplate(template.bodyTemplate, values);
+    const checkIn = [
+      "At pick-up: before you drive off, open your booking page and photograph the car —",
+      "front, back, both sides, the interior and the dashboard (odometer and fuel).",
+      "Do the same when you return it. These photos protect you from charges for",
+      "damage that was already there. We will remind you an hour before pick-up.",
+    ].join("\n");
+    // Right under the booking link when the template has one, so it
+    // reads as part of the letter rather than a postscript after the
+    // sign-off; at the end, with the link, when it does not.
+    const lines = body.split("\n");
+    const linkLine = bookingUrl ? lines.findIndex((line) => line.includes(bookingUrl)) : -1;
+    const text = !bookingUrl
+      ? body
+      : linkLine >= 0
+        ? [...lines.slice(0, linkLine + 1), "", checkIn, ...lines.slice(linkLine + 1)].join("\n")
+        : [body, "", checkIn, bookingUrl].join("\n");
 
     const result = await sendMail({
       to,
@@ -379,7 +381,10 @@ export async function sendExtraChargeEmail(input: {
   order: Pick<Order, "id" | "renterName" | "pickupDatetime" | "returnDatetime">;
   vehicle: Pick<Vehicle, "brand" | "model" | "year">;
   renterEmail: string | null;
-  extraDays: number;
+  reason:
+    | { kind: "days"; extraDays: number }
+    | { kind: "reschedule" }
+    | { kind: "mileage"; excessKm: number };
   lines: Array<{ label: string; amount: number }>;
   total: number;
   status: "charged" | "pay_link";
@@ -401,7 +406,11 @@ export async function sendExtraChargeEmail(input: {
     const text = [
       `Hi ${input.order.renterName},`,
       "",
-      `Your trip in the ${car} now runs from ${when(input.order.pickupDatetime)} to ${when(input.order.returnDatetime)} (Vancouver time), ${input.extraDays} day(s) longer than the booking you paid for.`,
+      input.reason.kind === "days"
+        ? `Your trip in the ${car} now runs from ${when(input.order.pickupDatetime)} to ${when(input.order.returnDatetime)} (Vancouver time), ${input.reason.extraDays} day(s) longer than the booking you paid for.`
+        : input.reason.kind === "reschedule"
+          ? `Your trip in the ${car} has been moved to ${when(input.order.pickupDatetime)} – ${when(input.order.returnDatetime)} (Vancouver time). The new dates cost more than the booking you paid for; this is the difference.`
+          : `Your trip in the ${car} went ${input.reason.excessKm} km over the distance included in your booking, charged at the excess-distance rate in your rental agreement.`,
       "",
       ...input.lines.map((line) => `${line.label}: ${money(line.amount)}`),
       `Total: ${money(input.total)}`,
@@ -424,8 +433,8 @@ export async function sendExtraChargeEmail(input: {
       to,
       subject:
         input.status === "charged"
-          ? `${brandName} — receipt for your extended trip (${bookingReference(input.order.id)})`
-          : `${brandName} — payment due for your extended trip (${bookingReference(input.order.id)})`,
+          ? `${brandName} — receipt for your trip (${bookingReference(input.order.id)})`
+          : `${brandName} — payment due for your trip (${bookingReference(input.order.id)})`,
       text,
       html: toHtmlBody(text),
       replyTo: site?.contactEmail?.trim() || undefined,
@@ -593,7 +602,12 @@ export async function sendBookingDecisionEmail(input: {
               : "No refund is due under the cancellation policy.",
           ]
         : input.outcome === "rescheduled"
-          ? [`Your booking of the ${car} has been moved. It now runs from ${trip} (Vancouver time).`]
+          ? [
+              `Your booking of the ${car} has been moved. It now runs from ${trip} (Vancouver time).`,
+              refund > 0
+                ? `The new dates cost less: ${formatCurrency(refund, "en")} has been refunded to the card you paid with. Refunds usually appear within 5–10 business days.`
+                : null,
+            ].filter((line): line is string => line !== null)
           : [`Your request for your booking of the ${car} (${trip}) could not be accepted. Your booking stays as it was.`];
 
     const text = [
@@ -749,6 +763,172 @@ export async function sendPickupReminderEmails(input: {
       metadata: { error: error instanceof Error ? error.message : String(error) },
     }).catch(() => undefined);
     return { renter: false, operators: 0 };
+  }
+}
+
+/**
+ * An hour before return: the renter is reminded to photograph the car
+ * as they hand it back, and the workspace to record the odometer and
+ * check it over. Never throws.
+ */
+export async function sendReturnReminderEmails(input: {
+  workspaceId: string;
+  order: Pick<Order, "id" | "renterName" | "returnDatetime" | "renterToken" | "returnLocation" | "pickupLocation">;
+  vehicle: Pick<Vehicle, "brand" | "model" | "year" | "plateNumber">;
+  renterEmail: string | null;
+}): Promise<{ renter: boolean; operators: number }> {
+  try {
+    const [site, workspace, users] = await Promise.all([
+      prisma.rentalSite.findUnique({ where: { workspaceId: input.workspaceId } }),
+      prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
+      prisma.user.findMany({ where: { workspaceId: input.workspaceId }, select: { email: true } }),
+    ]);
+    const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
+    const origin = site?.domain ? `https://${site.domain}` : getAppUrl().replace(/\/$/, "");
+    const car = `${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`;
+    const when = formatBookingMoment(input.order.returnDatetime);
+    const place = input.order.returnLocation || input.order.pickupLocation;
+
+    let renterSent = false;
+    const renterTo = input.renterEmail?.trim();
+    if (renterTo && input.order.renterToken) {
+      const text = [
+        `Hi ${input.order.renterName},`,
+        "",
+        `Your ${car} is due back at ${when} (Vancouver time)${place ? `, ${place}` : ""}.`,
+        "",
+        "When you return it, open your booking page and photograph the car again: front, back, both sides,",
+        "the interior and the dashboard showing the odometer and fuel. These photos record the car's condition",
+        "at hand-back and protect you from charges for anything that happens after.",
+        `${origin}/booking/${input.order.renterToken}`,
+        "",
+        `Booking reference: ${bookingReference(input.order.id)}`,
+        site?.contactPhone ? `Running late? Call ${site.contactPhone}.` : null,
+        "",
+        brandName,
+      ]
+        .filter((line): line is string => line !== null)
+        .join("\n");
+      const result = await sendMail({
+        to: renterTo,
+        subject: `${brandName} — return in an hour: please photograph the car`,
+        text,
+        html: toHtmlBody(text),
+        replyTo: site?.contactEmail?.trim() || undefined,
+        from: formatSiteSender(site),
+      });
+      renterSent = result.ok;
+    }
+
+    const operatorText = [
+      `${input.order.renterName} 一小时后还车 / returns in about an hour.`,
+      "",
+      `车辆 Car: ${input.vehicle.plateNumber} · ${car}`,
+      `还车 Return: ${when}${place ? ` · ${place}` : ""}`,
+      "",
+      "请拍还车照片、记录公里数和油量，检查车况 / Photograph the car, record the odometer and fuel, and check it over:",
+      `${getAppUrl().replace(/\/$/, "")}/orders/${input.order.id}`,
+    ].join("\n");
+    const operatorEmails = [
+      ...new Map(users.map((user) => [user.email.trim().toLowerCase(), user.email.trim()])).values(),
+    ].filter(Boolean);
+    const results = await Promise.all(
+      operatorEmails.map((to) =>
+        sendMail({
+          to,
+          subject: `[${brandName}] 还车提醒 Return in 1 hour — ${input.vehicle.plateNumber}, ${input.order.renterName}`,
+          text: operatorText,
+          html: toHtmlBody(operatorText),
+          from: formatSiteSender(site),
+        }),
+      ),
+    );
+    const operators = results.filter((result) => result.ok).length;
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "return_reminder_sent",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { renter: renterSent, operators },
+    });
+    return { renter: renterSent, operators };
+  } catch (error) {
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "return_reminder_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => undefined);
+    return { renter: false, operators: 0 };
+  }
+}
+
+/**
+ * A week after the car came back with its deposit still held: remind
+ * every TATO account in the workspace to settle it. Settling stays a
+ * person's decision -- damage, tickets and tolls can surface late -- so
+ * this asks, it does not refund. Never throws.
+ */
+export async function sendDepositReminderEmail(input: {
+  workspaceId: string;
+  order: Pick<Order, "id" | "renterName" | "returnDatetime" | "depositAmount">;
+  vehicle: Pick<Vehicle, "plateNumber" | "brand" | "model" | "year">;
+}): Promise<number> {
+  try {
+    const [site, workspace, users] = await Promise.all([
+      prisma.rentalSite.findUnique({ where: { workspaceId: input.workspaceId } }),
+      prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
+      prisma.user.findMany({ where: { workspaceId: input.workspaceId }, select: { email: true } }),
+    ]);
+    const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
+    const deposit = formatCurrency(input.order.depositAmount ?? 0, "en");
+    const text = [
+      `${input.order.renterName} 的押金 ${deposit} 还没有退 / The ${deposit} deposit has not been settled yet.`,
+      "",
+      `车辆 Car: ${input.vehicle.plateNumber} · ${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`,
+      `还车 Returned: ${formatBookingMoment(input.order.returnDatetime)}（已超过一周 / over a week ago）`,
+      "",
+      "确认没有损伤、罚单或过路费后，在订单页退押金（可全退或扣留一部分并写明原因）/",
+      "Once you are sure there is no damage, ticket or toll to come, settle it on the order (in full, or keep part with a reason):",
+      `${getAppUrl().replace(/\/$/, "")}/orders/${input.order.id}`,
+    ].join("\n");
+    const emails = [
+      ...new Map(users.map((user) => [user.email.trim().toLowerCase(), user.email.trim()])).values(),
+    ].filter(Boolean);
+    const results = await Promise.all(
+      emails.map((to) =>
+        sendMail({
+          to,
+          subject: `[${brandName}] 押金待退 Deposit to settle — ${input.vehicle.plateNumber}, ${input.order.renterName}`,
+          text,
+          html: toHtmlBody(text),
+          from: formatSiteSender(site),
+        }),
+      ),
+    );
+    const sent = results.filter((result) => result.ok).length;
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "deposit_reminder_sent",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { sent, total: emails.length },
+    });
+    return sent;
+  } catch (error) {
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "deposit_reminder_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => undefined);
+    return 0;
   }
 }
 

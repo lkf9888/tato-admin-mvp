@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { OrderAttachmentKind } from "@prisma/client";
 
 import { CompactLanguageSwitcher } from "@/components/language-switcher";
@@ -28,6 +29,7 @@ import {
 import { listBookingLocations } from "@/lib/booking-locations";
 import { listBookingAddOns } from "@/lib/booking-add-ons-server";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
+import { isSiteLocale } from "@/lib/site-locale";
 import { getStripeSecretKey } from "@/lib/stripe";
 import { getWorkspaceConnectSnapshot } from "@/lib/stripe-connect";
 import { isImageAttachment } from "@/lib/uploads";
@@ -85,7 +87,7 @@ export default async function ReserveVehiclePage({
   searchParams,
 }: {
   params: Promise<{ vehicleId: string }>;
-  searchParams: Promise<{ checkout?: string }>;
+  searchParams: Promise<{ checkout?: string; session_id?: string }>;
 }) {
   const [{ vehicleId }, query, { locale, messages }] = await Promise.all([
     params,
@@ -149,6 +151,44 @@ export default async function ReserveVehiclePage({
     );
   }
 
+  // The renter books with the operator, not with TATO. When the
+  // operator has a published site, this link is that site's page for
+  // the car: their name, logo and colours, the same booking panel, and
+  // the visitor's language. Checkout's own return parameters ride along.
+  const ownSite = vehicle.workspaceId
+    ? await prisma.rentalSite.findFirst({
+        where: { workspaceId: vehicle.workspaceId, isPublished: true },
+      })
+    : null;
+  if (ownSite) {
+    const passOn = new URLSearchParams();
+    if (query.checkout) passOn.set("checkout", query.checkout);
+    if (query.session_id) passOn.set("session_id", query.session_id);
+    const target = getSiteUrl(
+      ownSite,
+      `/cars/${buildVehicleSlug(vehicle)}`,
+      await getRequestHost(),
+      isSiteLocale(locale) ? locale : "en",
+    );
+    redirect(passOn.size ? `${target}?${passOn}` : target);
+  }
+  // No site: the operator's own name still heads the page.
+  const brandName =
+    (vehicle.workspaceId
+      ? (
+          await prisma.rentalSite.findUnique({
+            where: { workspaceId: vehicle.workspaceId },
+            select: { brandName: true },
+          })
+        )?.brandName?.trim() ||
+        (
+          await prisma.workspace.findUnique({
+            where: { id: vehicle.workspaceId },
+            select: { name: true },
+          })
+        )?.name?.trim()
+      : null) || vehicle.nickname;
+
   const blockedDateWindows = getDateOnlyBookingWindows(vehicle.orders);
   const vehiclePhotos = vehicle.attachments
     .filter((attachment) => isImageAttachment(attachment.contentType, attachment.filename))
@@ -191,10 +231,10 @@ export default async function ReserveVehiclePage({
         <header className="flex flex-col gap-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-[var(--ink)] text-xl font-semibold text-white">
-              T
+              {brandName.slice(0, 1).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.32em] text-[var(--ink-soft)]">TATO</p>
+              <p className="text-[11px] uppercase tracking-[0.32em] text-[var(--ink-soft)]">{brandName}</p>
               <h1 className="truncate text-2xl font-semibold text-[var(--ink)] sm:text-3xl">
                 {vehicle.nickname}
               </h1>
@@ -260,6 +300,8 @@ export default async function ReserveVehiclePage({
             blockedDateWindows={blockedDateWindows}
             busyWindows={getBookingBusyWindows(vehicle.orders)}
             returnGraceMinutes={policy.returnGraceMinutes}
+            bookingNoticeHours={policy.bookingNoticeHours}
+            turnaroundBufferHours={policy.turnaroundBufferHours}
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}
             locations={locations}

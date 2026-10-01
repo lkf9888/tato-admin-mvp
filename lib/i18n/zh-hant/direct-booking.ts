@@ -20,6 +20,16 @@ export const directBookingMessages = {
       saving: "儲存中…",
       saved: "已儲存。",
       saveFailed: "儲存失敗。",
+      mileageTotal: "超公里費合計",
+      mileageChargeCard: (amount: string) => `從已存的卡收 ${amount}`,
+      mileageSendLink: "傳送付款連結",
+      mileageConfirmCard: (amount: string) => `從租客儲存的卡上收超公里費 ${amount}，併發收據郵件？`,
+      mileageConfirmLink: (amount: string) => `給租客傳送 ${amount} 的超公里費付款連結？`,
+      mileageCharged: "已扣款，收據已發給租客。",
+      mileageLinkSent: "付款連結已發給租客。",
+      mileageFailed: (error: string) => `收款失敗：${error}`,
+      mileagePaid: (amount: string) => `超公里費 ${amount} 已收。`,
+      mileagePending: (amount: string) => `超公里費 ${amount} 的付款連結已發，等待租客付款。`,
       mileage: (driven: number, allowance: number | null, excess: number, amount: string) =>
         allowance == null
           ? `本次行駛 ${driven} km。`
@@ -338,6 +348,10 @@ export const directBookingMessages = {
       policyTaxRateHint: "只按租金計稅。",
       policyTaxLinesLabel: "租金上的稅",
       policyTaxLinesHint: "每種稅在報價和收據上單獨列一行，例如 GST 5% 和 PST 7%。只對租金收。整行留空即不收。",
+      policyNoticeLabel: "最少提前預訂（小時）",
+      policyNoticeHint: "取車時間至少要在下單後多少小時。0 表示隨時可訂。",
+      policyBufferLabel: "兩單之間的緩衝（小時）",
+      policyBufferHint: "每單取車前和還車後留出的空檔，用於清潔和交接；新的預訂不能落在這段時間裡。",
       policyGraceLabel: "還車寬限（分鐘）",
       policyGraceHint: "每滿 24 小時算 1 天；超出不到這個時長不多收一天。例如 60：10 點取、第二天 11 點前還仍算 1 天。",
       policyInsuranceNonLocalLabel: "非 BC 駕照保險 / 天",

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { BOOKING_TIME_OPTIONS, zonedDateTimeToUtc } from "@/lib/booking-time";
 import { getMessages, type Locale } from "@/lib/i18n";
+import { formatCurrency } from "@/lib/utils";
 
 /**
  * The renter's cancel / reschedule form.
@@ -41,6 +42,37 @@ export function BookingChangeForm({
   const [returnDate, setReturnDate] = useState(defaultReturnDate);
   const [pickupTime, setPickupTime] = useState(defaultPickupTime);
   const [returnTime, setReturnTime] = useState(defaultReturnTime);
+  // What these dates would cost or return, asked of the server as the
+  // renter picks them, so the request they send already states it.
+  const [priceQuote, setPriceQuote] = useState<{ difference: number; settlement: number; late: boolean } | null>(null);
+  const changed =
+    pickupDate !== defaultPickupDate ||
+    returnDate !== defaultReturnDate ||
+    pickupTime !== defaultPickupTime ||
+    returnTime !== defaultReturnTime;
+  useEffect(() => {
+    setPriceQuote(null);
+    if (!changed) return;
+    const timer = window.setTimeout(async () => {
+      const response = await fetch(`/api/booking/${token}/reschedule-quote`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pickupDate, returnDate, pickupTime, returnTime }),
+      }).catch(() => null);
+      if (response?.ok) setPriceQuote(await response.json());
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [changed, token, pickupDate, returnDate, pickupTime, returnTime]);
+  const money = (value: number) => formatCurrency(Math.abs(value), locale);
+  const priceNote = !priceQuote
+    ? null
+    : priceQuote.difference === 0
+      ? copy.reschedulePriceSame
+      : priceQuote.difference > 0
+        ? copy.reschedulePriceMore(money(priceQuote.difference))
+        : priceQuote.settlement < 0
+          ? copy.reschedulePriceLess(money(priceQuote.difference))
+          : copy.reschedulePriceLessLate(money(priceQuote.difference));
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -76,7 +108,9 @@ export function BookingChangeForm({
       setError(
         payload?.error === "DATES_UNAVAILABLE"
           ? copy.rescheduleUnavailable
-          : payload?.error === "INVALID_RANGE"
+          : payload?.error === "TOO_SOON"
+            ? copy.rescheduleTooSoon
+            : payload?.error === "INVALID_RANGE"
             ? copy.invalidRange
             : payload?.error === "ALREADY_STARTED"
               ? copy.cancelStartedCopy
@@ -140,6 +174,11 @@ export function BookingChangeForm({
           ))}
         </div>
         <p className="mt-2 text-[12px] text-[var(--ink-soft)]">{copy.timeZoneNote}</p>
+        {priceNote ? (
+          <p className="mt-3 rounded-md bg-[var(--surface-muted)] px-3 py-2 text-[13px] leading-5 text-[var(--ink)]">
+            {priceNote}
+          </p>
+        ) : null}
       </div>
 
       <label className="mt-4 block">

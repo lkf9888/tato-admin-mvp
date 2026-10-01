@@ -6,9 +6,11 @@ import type Stripe from "stripe";
 import { z } from "zod";
 
 import {
+  earliestPickupAt,
   getDirectBookingInstalmentPlan,
   getDirectBookingQuote,
   hasTimedBookingConflict,
+  padTripWindow,
 } from "@/lib/direct-booking";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
@@ -288,6 +290,27 @@ export async function POST(request: Request) {
     // browser prices with the same numbers, but a discount the client
     // chose for itself would be a discount anyone could choose.
     const policy = await getBookingPolicyForVehicle(vehicle);
+    // The operator's lead time and turnaround, checked here as well as
+    // in the browser: a stale page cannot book inside either.
+    if (pickupAt < earliestPickupAt(policy.bookingNoticeHours, new Date(Date.now() - 5 * 60_000))) {
+      return NextResponse.json(
+        {
+          error: `Bookings must start at least ${policy.bookingNoticeHours} hour(s) from now. Choose a later pick-up time.`,
+        },
+        { status: 400 },
+      );
+    }
+    if (policy.turnaroundBufferHours > 0) {
+      const padded = padTripWindow(pickupAt, returnAt, policy.turnaroundBufferHours);
+      if (hasTimedBookingConflict(vehicle.orders, padded.start, padded.end)) {
+        return NextResponse.json(
+          {
+            error: `The car needs ${policy.turnaroundBufferHours} hour(s) between trips. Choose times further from the neighbouring booking.`,
+          },
+          { status: 400 },
+        );
+      }
+    }
     // Insurance by licence: the non-BC rate for a renter who said they
     // hold another licence, when the fleet charges one. A page that
     // should have asked and did not is refused rather than guessed.

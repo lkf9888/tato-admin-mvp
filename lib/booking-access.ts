@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import { BookingRequestKind, BookingRequestStatus, OrderStatus, type Prisma } from "@prisma/client";
 
 import { getCancellationQuote, type CancellationQuote } from "@/lib/booking-changes";
-import { dateToDateOnly, hasTimedBookingConflict } from "@/lib/direct-booking";
+import { dateToDateOnly, hasTimedBookingConflict, padTripWindow } from "@/lib/direct-booking";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { prisma } from "@/lib/prisma";
 import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
@@ -142,6 +142,10 @@ export async function areRequestedDatesFree(input: {
   pickupAt: Date;
   returnAt: Date;
 }) {
+  // With the fleet's turnaround buffer, as a new booking is held to.
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: input.vehicleId } });
+  const policy = vehicle ? await getBookingPolicyForVehicle(vehicle) : null;
+  const window = padTripWindow(input.pickupAt, input.returnAt, policy?.turnaroundBufferHours ?? 0);
   const orders = await prisma.order.findMany({
     where: {
       vehicleId: input.vehicleId,
@@ -152,7 +156,7 @@ export async function areRequestedDatesFree(input: {
     select: { pickupDatetime: true, returnDatetime: true, status: true, isArchived: true },
   });
 
-  return !hasTimedBookingConflict(orders, input.pickupAt, input.returnAt);
+  return !hasTimedBookingConflict(orders, window.start, window.end);
 }
 
 export function toDateOnly(value: Date) {

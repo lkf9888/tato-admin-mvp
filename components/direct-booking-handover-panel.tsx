@@ -16,6 +16,13 @@ type View = Record<Stage, { renter: Side; operator: Side }> & {
     excessRate: number;
     excessAmount: number;
   } | null;
+  mileageCharge: {
+    excessKm: number;
+    lines: Array<{ label: string; amount: number }>;
+    total: number;
+    billed: { status: "paid" | "pending"; amount: number; url: string | null } | null;
+  } | null;
+  hasSavedCard: boolean;
 };
 
 const FUEL_LEVELS = ["Full", "3/4", "1/2", "1/4", "Empty"];
@@ -63,16 +70,119 @@ export function DirectBookingHandoverPanel({ locale, orderId }: { locale: Locale
         ))}
       </div>
       {view.mileage ? (
-        <p className="mt-3 rounded-md bg-[var(--surface-muted)] px-3 py-2 text-[12px] text-[var(--ink-mid)]">
-          {copy.mileage(
-            view.mileage.driven,
-            view.mileage.allowance,
-            view.mileage.excess,
-            formatCurrency(view.mileage.excessAmount, locale),
-          )}
-        </p>
+        <div className="mt-3 rounded-md bg-[var(--surface-muted)] px-3 py-2 text-[12px] text-[var(--ink-mid)]">
+          <p>
+            {copy.mileage(
+              view.mileage.driven,
+              view.mileage.allowance,
+              view.mileage.excess,
+              formatCurrency(view.mileage.excessAmount, locale),
+            )}
+          </p>
+          {view.mileageCharge ? (
+            <MileageBill
+              base={base}
+              charge={view.mileageCharge}
+              hasSavedCard={view.hasSavedCard}
+              copy={copy}
+              money={(value) => formatCurrency(value, locale)}
+              onDone={load}
+            />
+          ) : null}
+        </div>
       ) : null}
     </section>
+  );
+}
+
+/** Bill the excess distance once both readings are in. */
+function MileageBill({
+  base,
+  charge,
+  hasSavedCard,
+  copy,
+  money,
+  onDone,
+}: {
+  base: string;
+  charge: NonNullable<View["mileageCharge"]>;
+  hasSavedCard: boolean;
+  copy: ReturnType<typeof getMessages>["directBookingHandover"];
+  money: (value: number) => string;
+  onDone: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  if (charge.billed) {
+    return (
+      <p className="mt-1.5 font-medium text-[color:var(--ink)]">
+        {charge.billed.status === "paid"
+          ? copy.mileagePaid(money(charge.billed.amount))
+          : copy.mileagePending(money(charge.billed.amount))}
+      </p>
+    );
+  }
+
+  async function bill(method: "card" | "link") {
+    const confirmText = method === "card" ? copy.mileageConfirmCard(money(charge.total)) : copy.mileageConfirmLink(money(charge.total));
+    if (!window.confirm(confirmText)) return;
+    setBusy(true);
+    setMessage(null);
+    const response = await fetch(`${base}/mileage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ method, expectedTotal: charge.total }),
+    }).catch(() => null);
+    const data = (await response?.json().catch(() => ({}))) as { outcome?: string; error?: string } | undefined;
+    setBusy(false);
+    setMessage(
+      response?.ok
+        ? { ok: true, text: data?.outcome === "charged" ? copy.mileageCharged : copy.mileageLinkSent }
+        : { ok: false, text: copy.mileageFailed(data?.error ?? "") },
+    );
+    await onDone();
+  }
+
+  return (
+    <div className="mt-2">
+      <ul className="space-y-0.5">
+        {charge.lines.map((line) => (
+          <li key={line.label} className="flex justify-between gap-3">
+            <span>{line.label}</span>
+            <span className="tabular-nums">{money(line.amount)}</span>
+          </li>
+        ))}
+        <li className="flex justify-between gap-3 border-t border-[var(--line)] pt-1 font-semibold text-[color:var(--ink)]">
+          <span>{copy.mileageTotal}</span>
+          <span className="tabular-nums">{money(charge.total)}</span>
+        </li>
+      </ul>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {hasSavedCard ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void bill("card")}
+            className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
+            style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+          >
+            {copy.mileageChargeCard(money(charge.total))}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void bill("link")}
+          className="rounded-md border border-[var(--line)] bg-white px-3 py-1.5 text-[12px] font-medium text-[var(--ink)] disabled:opacity-60"
+        >
+          {copy.mileageSendLink}
+        </button>
+      </div>
+      {message ? (
+        <p className={`mt-1.5 ${message.ok ? "text-[color:var(--ok-fg)]" : "text-[color:var(--bad-fg)]"}`}>{message.text}</p>
+      ) : null}
+    </div>
   );
 }
 

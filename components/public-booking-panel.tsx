@@ -11,11 +11,13 @@ import {
 } from "react";
 
 import {
+  earliestPickupAt,
   expandBlockedBookingDates,
   getDirectBookingInstalmentPlan,
   getDirectBookingQuote,
   hasBusyWindowConflict,
   hasDateOnlyBookingConflict,
+  padTripWindow,
   type BusyWindow,
   type DateOnlyBookingWindow,
 } from "@/lib/direct-booking";
@@ -27,6 +29,7 @@ import {
   BOOKING_TIME_OPTIONS,
   DEFAULT_BOOKING_TIME,
   isBookingTime,
+  utcToZonedDate,
   zonedDateTimeToUtc,
 } from "@/lib/booking-time";
 import { getLocaleTag, getMessages, type Locale } from "@/lib/i18n";
@@ -302,6 +305,8 @@ export function PublicBookingPanel({
   busyWindows = [],
   agreementClauses = null,
   returnGraceMinutes,
+  bookingNoticeHours = 0,
+  turnaroundBufferHours = 0,
   dailyRateOverrides,
   seasonalRates,
   locations,
@@ -333,6 +338,10 @@ export function PublicBookingPanel({
   /** When the car is out, to the minute, for checking the chosen times. */
   busyWindows?: BusyWindow[];
   returnGraceMinutes?: number;
+  /** A pick-up must be at least this many hours away. */
+  bookingNoticeHours?: number;
+  /** Hours kept clear before and after every other trip. */
+  turnaroundBufferHours?: number;
   /** `YYYY-MM-DD` → price, for days the operator priced by hand. */
   dailyRateOverrides: Record<string, number>;
   /** Model pricing per day, empty when a person set the rate. */
@@ -354,7 +363,12 @@ export function PublicBookingPanel({
   const messages = getMessages(locale);
   const reserveMessages = messages.reservePage;
   const storageKey = `${STORAGE_PREFIX}${vehicleId}`;
-  const todayDate = useMemo(() => localTodayValue(), []);
+  // The first day a pick-up can fall on, once the operator's notice is
+  // counted: with 24 hours' notice at 3 p.m., that is tomorrow.
+  const earliestPickupDate = useMemo(
+    () => utcToZonedDate(earliestPickupAt(bookingNoticeHours)),
+    [bookingNoticeHours],
+  );
   const blockedDateSet = useMemo(
     () => expandBlockedBookingDates(blockedDateWindows),
     [blockedDateWindows],
@@ -438,10 +452,10 @@ export function PublicBookingPanel({
       // -- so with the default one-night trip on screen every later day
       // was struck through, and a renter could not move their trip
       // forward at all. Picking a pickup now moves the return instead.
-      if (candidate < todayDate) return true;
+      if (candidate < earliestPickupDate) return true;
       return blockedDateSet.has(candidate);
     },
-    [blockedDateSet, todayDate],
+    [blockedDateSet, earliestPickupDate],
   );
 
   const isReturnDateDisabled = useCallback(
@@ -637,13 +651,18 @@ export function PublicBookingPanel({
   // pickup at nine on the morning another renter returns at noon.
   const pickupAt = pickupDate ? zonedDateTimeToUtc(pickupDate, pickupTime) : null;
   const returnAt = returnDate ? zonedDateTimeToUtc(returnDate, returnTime) : null;
+  const padded = pickupAt && returnAt ? padTripWindow(pickupAt, returnAt, turnaroundBufferHours) : null;
   const timeError =
-    pickupAt && returnAt
+    pickupAt && returnAt && padded
       ? returnAt <= pickupAt
         ? reserveMessages.timeOrderError
-        : hasBusyWindowConflict(busyWindows, pickupAt, returnAt)
-          ? reserveMessages.timeConflictError
-          : ""
+        : pickupAt < earliestPickupAt(bookingNoticeHours)
+          ? reserveMessages.noticeError(bookingNoticeHours)
+          : hasBusyWindowConflict(busyWindows, pickupAt, returnAt)
+            ? reserveMessages.timeConflictError
+            : hasBusyWindowConflict(busyWindows, padded.start, padded.end)
+              ? reserveMessages.bufferError(turnaroundBufferHours)
+              : ""
       : "";
 
   function handlePickupDateChange(nextValue: string) {
@@ -804,7 +823,7 @@ export function PublicBookingPanel({
           placeholder={reserveMessages.selectDatePlaceholder}
           onChange={handlePickupDateChange}
           isDateDisabled={isPickupDateDisabled}
-          minDate={todayDate}
+          minDate={earliestPickupDate}
         />
         <BookingTimeSelect
           label={reserveMessages.pickupTime}

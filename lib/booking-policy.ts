@@ -50,6 +50,10 @@ export type BookingPolicy = {
   taxLines: TaxLine[];
   /** Minutes forgiven at the end before another day is charged. */
   returnGraceMinutes: number;
+  /** A pick-up must be at least this many hours away. */
+  bookingNoticeHours: number;
+  /** Hours kept clear before and after every trip. */
+  turnaroundBufferHours: number;
 };
 
 export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
@@ -68,6 +72,8 @@ export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
   taxRate: 0,
   taxLines: [],
   returnGraceMinutes: 60,
+  bookingNoticeHours: 0,
+  turnaroundBufferHours: 0,
 };
 
 type NullablePolicy = {
@@ -84,6 +90,8 @@ type NullablePolicy = {
   /** JSON as stored, or already parsed. */
   taxLines?: string | TaxLine[] | null;
   returnGraceMinutes?: number | null;
+  bookingNoticeHours?: number | null;
+  turnaroundBufferHours?: number | null;
 };
 
 /**
@@ -149,6 +157,19 @@ export function normalizeBookingPolicy(policy?: NullablePolicy | null): BookingP
         Math.round(pick(policy?.returnGraceMinutes, BOOKING_POLICY_DEFAULTS.returnGraceMinutes)),
       ),
     ),
+    // A month's notice and two days' buffer are already more than any
+    // rental takes; anything larger is a typo that would close the car.
+    bookingNoticeHours: Math.min(
+      720,
+      Math.max(0, roundCents(pick(policy?.bookingNoticeHours, BOOKING_POLICY_DEFAULTS.bookingNoticeHours))),
+    ),
+    turnaroundBufferHours: Math.min(
+      48,
+      Math.max(
+        0,
+        roundCents(pick(policy?.turnaroundBufferHours, BOOKING_POLICY_DEFAULTS.turnaroundBufferHours)),
+      ),
+    ),
     // Clamped well clear of zero: a multiplier of 0 would suggest
     // every car be rented for nothing, and it is far likelier to be a
     // half-typed number than an intention.
@@ -197,6 +218,8 @@ export function resolveBookingPolicy(
     // Not per-car settings, so they are carried across untouched.
     suggestedRateMultiplier: fleet.suggestedRateMultiplier,
     returnGraceMinutes: fleet.returnGraceMinutes,
+    bookingNoticeHours: fleet.bookingNoticeHours,
+    turnaroundBufferHours: fleet.turnaroundBufferHours,
   });
 }
 

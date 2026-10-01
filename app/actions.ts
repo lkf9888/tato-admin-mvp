@@ -2153,6 +2153,8 @@ export async function saveBookingPolicyAction(formData: FormData) {
       : null,
     depositAmount: read("depositAmount", BOOKING_POLICY_DEFAULTS.depositAmount),
     returnGraceMinutes: read("returnGraceMinutes", BOOKING_POLICY_DEFAULTS.returnGraceMinutes),
+    bookingNoticeHours: read("bookingNoticeHours", BOOKING_POLICY_DEFAULTS.bookingNoticeHours),
+    turnaroundBufferHours: read("turnaroundBufferHours", BOOKING_POLICY_DEFAULTS.turnaroundBufferHours),
     // Up to three named taxes (GST, PST, …), each on the rent. Rows
     // left blank drop out; the single name and rate are derived.
     taxLines: [0, 1, 2].map((index) => ({

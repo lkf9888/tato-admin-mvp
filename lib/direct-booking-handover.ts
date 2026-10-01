@@ -4,7 +4,9 @@ import { createHash } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
+import { chargeOrder, paidDays, readMetadata } from "@/lib/booking-extra-charge";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
+import { computeTaxes, sumTaxes } from "@/lib/direct-booking";
 import { verifyUpload } from "@/lib/inspection-evidence";
 import { prisma } from "@/lib/prisma";
 import { makeDirectBookingDocumentPath, resolveUploadPath, sanitizeFilename } from "@/lib/uploads";
@@ -222,4 +224,69 @@ export async function summarizeMileage(input: {
     excessRate: policy.extraKmRate,
     excessAmount: Math.round(excess * policy.extraKmRate * 100) / 100,
   };
+}
+
+/**
+ * The excess-distance bill, once both odometer readings exist: the km
+ * over the allowance at the car's excess rate, with the booking's taxes
+ * on it. Billed once; a second bill for the same trip is refused.
+ */
+export async function quoteMileageCharge(workspaceId: string, orderId: string) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, workspaceId },
+    include: { vehicle: true },
+  });
+  if (!order?.vehicle) return null;
+  const metadata = readMetadata(order.sourceMetadata);
+  const view = await loadHandovers(order.id);
+  const mileage = await summarizeMileage({
+    view,
+    vehicle: order.vehicle,
+    chargedDays: paidDays(order.sourceMetadata),
+  });
+  if (!mileage || mileage.excess <= 0 || mileage.excessAmount <= 0) return null;
+  const policy = await getBookingPolicyForVehicle(order.vehicle);
+  const taxLines =
+    metadata.taxLines && metadata.taxLines.length > 0
+      ? metadata.taxLines.map((line) => ({ name: line.name, rate: line.rate }))
+      : policy.taxLines;
+  const taxes = computeTaxes(mileage.excessAmount, { taxLines }).filter((tax) => tax.amount > 0);
+  const lines = [
+    { label: `Excess distance: ${mileage.excess} km × $${mileage.excessRate.toFixed(2)}`, amount: mileage.excessAmount },
+    ...taxes.map((tax) => ({ label: `${tax.name} (${Number(tax.rate.toFixed(3))}%)`, amount: tax.amount })),
+  ];
+  const already = (metadata.extraCharges ?? []).find((charge) => charge.kind === "mileage") ?? null;
+  return {
+    excessKm: mileage.excess,
+    lines,
+    beforeTax: mileage.excessAmount,
+    total: Math.round((mileage.excessAmount + sumTaxes(taxes)) * 100) / 100,
+    billed: already ? { status: already.status, amount: already.amount, url: already.url ?? null } : null,
+  };
+}
+
+export async function billMileageCharge(input: {
+  workspaceId: string;
+  orderId: string;
+  method: "card" | "link";
+  expectedTotal: number;
+  actor: string;
+}) {
+  const quote = await quoteMileageCharge(input.workspaceId, input.orderId);
+  if (!quote) return { ok: false as const, error: "NOTHING_TO_CHARGE" };
+  if (quote.billed) return { ok: false as const, error: "ALREADY_BILLED" };
+  if (Math.abs(quote.total - input.expectedTotal) > 0.009) {
+    return { ok: false as const, error: "AMOUNT_CHANGED" };
+  }
+  return chargeOrder({
+    workspaceId: input.workspaceId,
+    orderId: input.orderId,
+    lines: quote.lines,
+    total: quote.total,
+    commissionBase: quote.beforeTax,
+    method: input.method,
+    actor: input.actor,
+    reason: { kind: "mileage", excessKm: quote.excessKm },
+    idempotencyBase: `mileage:${input.orderId}:${Math.round(quote.total * 100)}`,
+  });
 }

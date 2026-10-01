@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 
-import { sendDuePickupReminders } from "@/lib/direct-booking-reminders";
+import { runDirectBookingScan } from "@/lib/direct-booking-reminders";
 
 export const runtime = "nodejs";
 
@@ -20,12 +20,13 @@ function hasValidSecret(request: Request) {
 
 /**
  * Called every 15 minutes by `.github/workflows/booking-reminders.yml`:
- * reminds renters and operators of pick-ups in the next hour.
+ * pick-up and return reminders, the held-deposit reminder, and the
+ * clean-up of unpaid checkouts' documents (`runDirectBookingScan`).
  */
 export async function POST(request: Request) {
   if (!hasValidSecret(request)) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
-  const result = await sendDuePickupReminders();
+  const result = await runDirectBookingScan();
   return NextResponse.json({ ok: true, ...result });
 }

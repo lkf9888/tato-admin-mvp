@@ -1,5 +1,55 @@
 # Changelog
 
+## v1.29.0 - 2026-10-01
+
+### The renter books with the operator, not TATO; lead time and turnaround; date changes settle their price
+
+**Branding.** `/reserve/[id]` now redirects to the operator's own
+published site page for the car (their name, logo and colours, the
+same booking panel, the visitor's language, Stripe's return
+parameters passed on). Without a site, the page is headed with the
+operator's name instead of "TATO". Contract emails are bilingual
+(English first; renters here read either), and the operator's copy of
+a completed contract carries their brand too.
+
+**Lead time and buffer.** Two fleet settings in pricing rules:
+`bookingNoticeHours` (a pick-up must be at least this far away) and
+`turnaroundBufferHours` (kept free before and after every trip). The
+date picker, the time check, checkout and renter reschedules all
+enforce them, from the shared `earliestPickupAt` / `padTripWindow`.
+
+**Date changes settle their price.** A reschedule is priced as the
+difference between the trip as booked and as asked for, both at
+today's prices (`priceTrip`), and shown to the renter before they ask.
+Dearer: charged on approval (saved card, else a payment link). Cheaper:
+refunded on approval if asked at least 48 hours before the original
+pick-up, kept otherwise, mirroring cancellation. The quote is stored
+on the request (`quotedPriceDifference`) and shown on the requests
+page. The paid length only moves to the new trip once the difference
+is settled, so a failed charge stays billable from the extra-days
+panel, and the operator is told.
+
+**Later charges share one path.** `chargeOrder` now does what the
+extra-days bill did (card or link, commission, record, receipt) for
+extra days, date changes and excess distance alike; the bill email
+explains each.
+
+**Excess distance is billable.** With both odometer readings, the
+handover panel offers to charge the km over the allowance (counting
+extra days billed) at the car's rate plus tax, once.
+
+**The 15-minute scan** (`runDirectBookingScan`) also reminds renter and
+operator an hour before return, reminds the operator a week after
+return while a deposit is still held (returns within the last 60 days),
+and deletes licence photos and signatures left by checkouts never paid
+after 7 days.
+
+**Renter-facing fixes from walking the whole journey.** The check-in
+paragraph sits under the booking link in the confirmation, not after
+the sign-off; the booking page shows pick-up and return places, the
+extras bought and a link to the signed agreement; the licence upload
+and payment-success wording speak to the renter.
+
 ## v1.28.1 - 2026-10-01
 
 ### Handover photos and the odometer appear on the order

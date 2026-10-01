@@ -25,6 +25,15 @@ export function BookingRequestActions({
         body: JSON.stringify({ decision }),
       });
       if (response.ok) {
+        // A moved trip whose difference could not be settled is still
+        // moved; say so before the page forgets the request.
+        const payload = (await response.json().catch(() => null)) as {
+          settlement?: { kind?: string; error?: string; amount?: number };
+        } | null;
+        const kind = payload?.settlement?.kind;
+        if (kind === "charge_failed" || kind === "refund_failed") {
+          window.alert(copy.settleFailed(payload?.settlement?.error ?? ""));
+        }
         window.location.reload();
         return;
       }

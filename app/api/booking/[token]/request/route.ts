@@ -15,6 +15,9 @@ import {
   zonedDateTimeToUtc,
 } from "@/lib/booking-time";
 import { sendChangeRequestNotice } from "@/lib/direct-booking-email";
+import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
+import { earliestPickupAt } from "@/lib/direct-booking";
+import { quoteReschedule } from "@/lib/booking-reschedule";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 
@@ -60,6 +63,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
   let requestedPickupDate: Date | null = null;
   let requestedReturnDate: Date | null = null;
   let quotedRefundAmount: number | null = null;
+  let quotedPriceDifference: number | null = null;
 
   if (body.kind === "RESCHEDULE") {
     if (!body.pickupDate || !body.returnDate) {
@@ -81,6 +85,14 @@ export async function POST(request: Request, { params }: { params: Params }) {
     if (pickupAt.getTime() < Date.now() - 15 * 60_000) {
       return NextResponse.json({ error: "INVALID_RANGE" }, { status: 400 });
     }
+    // A moved trip keeps to the same lead time as a new booking.
+    const policy = await getBookingPolicyForVehicle(order.vehicle);
+    if (
+      pickupAt.getTime() !== order.pickupDatetime.getTime() &&
+      pickupAt < earliestPickupAt(policy.bookingNoticeHours, new Date(Date.now() - 5 * 60_000))
+    ) {
+      return NextResponse.json({ error: "TOO_SOON" }, { status: 400 });
+    }
 
     // Told now rather than a day later: a clash the renter could have
     // seen is not worth an email exchange to discover.
@@ -96,6 +108,9 @@ export async function POST(request: Request, { params }: { params: Params }) {
 
     requestedPickupDate = pickupAt;
     requestedReturnDate = returnAt;
+    // The price difference as the renter is shown it now; approval
+    // settles exactly this, whatever the clock says by then.
+    quotedPriceDifference = (await quoteReschedule({ orderId: order.id, pickupAt, returnAt })).settlement;
   } else {
     const quote = await quoteCancellation(order);
     if (!quote.isSelfServiceEligible) {
@@ -116,6 +131,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
       requestedReturnDate,
       renterNote: body.note?.trim() || null,
       quotedRefundAmount,
+      quotedPriceDifference,
     },
   });
 

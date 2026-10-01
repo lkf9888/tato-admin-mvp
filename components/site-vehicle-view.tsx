@@ -193,6 +193,8 @@ export function SiteVehicleView({
             blockedDateWindows={blockedDateWindows}
             busyWindows={getBookingBusyWindows(vehicle.orders)}
             returnGraceMinutes={policy.returnGraceMinutes}
+            bookingNoticeHours={policy.bookingNoticeHours}
+            turnaroundBufferHours={policy.turnaroundBufferHours}
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}
             locations={locations}

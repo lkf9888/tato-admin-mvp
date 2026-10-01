@@ -82,6 +82,16 @@ export default async function BookingRequestsPage() {
               </p>
             ) : null}
 
+            {!isCancel && request.quotedPriceDifference != null ? (
+              <p className="mt-2 text-[12px] font-medium text-[color:var(--ink)]">
+                {request.quotedPriceDifference > 0
+                  ? copy.differenceCharge(formatCurrency(request.quotedPriceDifference, locale))
+                  : request.quotedPriceDifference < 0
+                    ? copy.differenceRefund(formatCurrency(-request.quotedPriceDifference, locale))
+                    : copy.differenceNone}
+              </p>
+            ) : null}
+
             {isCancel && request.quotedRefundAmount != null ? (
               <p className="mt-2 text-[12px] text-[color:var(--ink-mid)]">
                 {copy.quotedRefundLabel}: {formatCurrency(request.quotedRefundAmount, locale)}

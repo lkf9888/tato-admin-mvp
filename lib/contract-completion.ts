@@ -235,6 +235,8 @@ export async function completeRecipientSigning(input: {
       contractTitle: fresh.title,
       signedPdfUrl: blob.url,
       signedPdfAttachment,
+      // The operator's own copy carries their brand too, not ours.
+      brandName: mailIdentity.brandName,
       from: mailIdentity.from,
     });
     if (!hostEmailResult.ok) {

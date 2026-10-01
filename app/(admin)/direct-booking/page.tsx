@@ -266,6 +266,20 @@ export default async function DirectBookingPage({
               step: "5",
             },
             {
+              name: "bookingNoticeHours",
+              label: directMessages.policyNoticeLabel,
+              hint: directMessages.policyNoticeHint,
+              value: fleetPolicy.bookingNoticeHours,
+              step: "0.5",
+            },
+            {
+              name: "turnaroundBufferHours",
+              label: directMessages.policyBufferLabel,
+              hint: directMessages.policyBufferHint,
+              value: fleetPolicy.turnaroundBufferHours,
+              step: "0.5",
+            },
+            {
               name: "suggestedRateMultiplier",
               label: directMessages.policyMultiplierLabel,
               hint: directMessages.policyMultiplierHint,

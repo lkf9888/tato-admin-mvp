@@ -24,6 +24,16 @@ export const directBookingMessages = {
       saving: "Saving…",
       saved: "Saved.",
       saveFailed: "Could not save.",
+      mileageTotal: "Excess distance total",
+      mileageChargeCard: (amount: string) => `Charge ${amount} to the saved card`,
+      mileageSendLink: "Email a payment link",
+      mileageConfirmCard: (amount: string) => `Charge the renter's saved card ${amount} for excess distance and email a receipt?`,
+      mileageConfirmLink: (amount: string) => `Email the renter a payment link for ${amount} of excess distance?`,
+      mileageCharged: "Charged; the receipt has been emailed.",
+      mileageLinkSent: "Payment link emailed to the renter.",
+      mileageFailed: (error: string) => `Could not bill: ${error}`,
+      mileagePaid: (amount: string) => `Excess distance ${amount} paid.`,
+      mileagePending: (amount: string) => `Payment link for ${amount} of excess distance sent; awaiting payment.`,
       mileage: (driven: number, allowance: number | null, excess: number, amount: string) =>
         allowance == null
           ? `Driven ${driven} km.`
@@ -351,6 +361,10 @@ export const directBookingMessages = {
       policyTaxLinesLabel: "Taxes on the rent",
       policyTaxLinesHint:
         "Each tax is its own line on the quote and the receipt, e.g. GST 5% and PST 7%. Charged on the rent only. Leave a row empty to drop it.",
+      policyNoticeLabel: "Minimum notice (hours)",
+      policyNoticeHint: "How many hours ahead a pick-up must be. 0 takes bookings up to the last minute.",
+      policyBufferLabel: "Buffer between trips (hours)",
+      policyBufferHint: "Kept free before every pick-up and after every return for cleaning and handover; a new booking cannot start or end inside it.",
       policyGraceLabel: "Return grace (minutes)",
       policyGraceHint: "Trips are charged per 24 hours; a return up to this late does not add a day. With 60, 10:00 to 11:00 next day is still one day.",
       policyInsuranceNonLocalLabel: "Insurance / day, non-BC licence",
@@ -471,6 +485,16 @@ export const directBookingMessages = {
       saving: "保存中…",
       saved: "已保存。",
       saveFailed: "保存失败。",
+      mileageTotal: "超公里费合计",
+      mileageChargeCard: (amount: string) => `从已存的卡收 ${amount}`,
+      mileageSendLink: "发送付款链接",
+      mileageConfirmCard: (amount: string) => `从租客保存的卡上收超公里费 ${amount}，并发收据邮件？`,
+      mileageConfirmLink: (amount: string) => `给租客发送 ${amount} 的超公里费付款链接？`,
+      mileageCharged: "已扣款，收据已发给租客。",
+      mileageLinkSent: "付款链接已发给租客。",
+      mileageFailed: (error: string) => `收款失败：${error}`,
+      mileagePaid: (amount: string) => `超公里费 ${amount} 已收。`,
+      mileagePending: (amount: string) => `超公里费 ${amount} 的付款链接已发，等待租客付款。`,
       mileage: (driven: number, allowance: number | null, excess: number, amount: string) =>
         allowance == null
           ? `本次行驶 ${driven} km。`
@@ -789,6 +813,10 @@ export const directBookingMessages = {
       policyTaxRateHint: "只按租金计税。",
       policyTaxLinesLabel: "租金上的税",
       policyTaxLinesHint: "每种税在报价和收据上单独列一行，例如 GST 5% 和 PST 7%。只对租金收。整行留空即不收。",
+      policyNoticeLabel: "最少提前预订（小时）",
+      policyNoticeHint: "取车时间至少要在下单后多少小时。0 表示随时可订。",
+      policyBufferLabel: "两单之间的缓冲（小时）",
+      policyBufferHint: "每单取车前和还车后留出的空档，用于清洁和交接；新的预订不能落在这段时间里。",
       policyGraceLabel: "还车宽限（分钟）",
       policyGraceHint: "每满 24 小时算 1 天；超出不到这个时长不多收一天。例如 60：10 点取、第二天 11 点前还仍算 1 天。",
       policyInsuranceNonLocalLabel: "非 BC 驾照保险 / 天",

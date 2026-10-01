@@ -2081,6 +2081,11 @@ model BookingChangeRequest {
   /// closing, so a figure computed later would answer a different
   /// question than the one the renter was shown.
   quotedRefundAmount Float?
+  /// For a RESCHEDULE: what moving the trip settles, as the renter was
+  /// shown when they asked. Positive is charged on approval, negative
+  /// refunded, 0 nothing (a cheaper trip asked for inside 48 hours of
+  /// pick-up keeps the difference, as a late cancellation would).
+  quotedPriceDifference Float?
   /// What was actually sent back, once approved.
   refundedAmount     Float?
   stripeRefundId     String?
@@ -2144,6 +2149,12 @@ model BookingPricingPolicy {
   /// Minutes a return may run past a whole number of days before
   /// another day is charged. Trips are charged per started 24 hours.
   returnGraceMinutes      Int     @default(60)
+  /// How far ahead a booking must start: a pick-up sooner than this
+  /// many hours from now is not offered. 0 takes bookings up to now.
+  bookingNoticeHours      Float   @default(0)
+  /// Hours kept free before and after every trip for cleaning and
+  /// handover; a booking may not start or end inside them.
+  turnaroundBufferHours   Float   @default(0)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

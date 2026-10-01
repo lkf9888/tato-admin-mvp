@@ -5,10 +5,12 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import {
   isHandoverStage,
   loadHandovers,
+  quoteMileageCharge,
   saveOperatorReadings,
   storeHandoverPhoto,
   summarizeMileage,
 } from "@/lib/direct-booking-handover";
+import { paidDays } from "@/lib/booking-extra-charge";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { readDirectBookingPayment } from "@/lib/stripe-refunds";
@@ -28,15 +30,6 @@ async function loadOrder(workspaceId: string, orderId: string) {
   return order;
 }
 
-function bookedDays(sourceMetadata: string | null) {
-  try {
-    const value = Number((JSON.parse(sourceMetadata ?? "{}") as { bookedDays?: unknown }).bookedDays);
-    return Number.isFinite(value) && value > 0 ? value : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Both sides of both handovers, and the distance driven once both readings exist. */
 export async function GET(_request: NextRequest, { params }: { params: Params }) {
   const { orderId } = await params;
@@ -47,9 +40,23 @@ export async function GET(_request: NextRequest, { params }: { params: Params })
   const mileage = await summarizeMileage({
     view,
     vehicle: order.vehicle!,
-    chargedDays: bookedDays(order.sourceMetadata),
+    chargedDays: paidDays(order.sourceMetadata),
   });
-  return NextResponse.json({ ...view, mileage });
+  // The excess-distance bill, when there is one to raise (or one raised).
+  const mileageCharge = mileage && mileage.excess > 0 ? await quoteMileageCharge(workspace.id, order.id) : null;
+  const metadata = (() => {
+    try {
+      return JSON.parse(order.sourceMetadata ?? "{}") as { stripeCustomerId?: string; stripePaymentMethodId?: string };
+    } catch {
+      return {};
+    }
+  })();
+  return NextResponse.json({
+    ...view,
+    mileage,
+    mileageCharge,
+    hasSavedCard: Boolean(metadata.stripeCustomerId && metadata.stripePaymentMethodId),
+  });
 }
 
 /** One operator photo. */

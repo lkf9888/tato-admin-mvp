@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { BookingRequestKind, BookingRequestStatus, OrderStatus } from "@prisma/client";
 
 import { BookingChangeForm } from "@/components/booking-change-form";
+import { BookingHandoverRenter } from "@/components/booking-handover-renter";
 import { SiteShell } from "@/components/site-shell";
 import { getLocalizedSite } from "@/lib/rental-site-page";
 import {
@@ -166,6 +167,14 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
         <p className="mt-6 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px] text-[var(--ink-mid)]">
           {copy.declinedNotice}
         </p>
+      ) : null}
+
+      {!isCancelled ? (
+        <BookingHandoverRenter
+          locale={locale}
+          token={token}
+          returnOpen={Date.now() >= order.pickupDatetime.getTime() - 60 * 60_000}
+        />
       ) : null}
 
       {!isCancelled ? (

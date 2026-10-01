@@ -2,6 +2,31 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const directBookingMessages = {
+    directBookingHandover: {
+      title: "取還車照片與公里數",
+      pickupTitle: "取車",
+      returnTitle: "還車",
+      renterPhotos: (count: number) => `租客拍的照片（${count}）`,
+      yourPhotos: (count: number) => `你拍的照片（${count}）`,
+      noRenterPhotos: "還沒有。",
+      noYourPhotos: "還沒有。",
+      upload: "上傳照片",
+      uploading: (done: number, total: number) => `正在上傳 ${done}/${total}…`,
+      uploadFailed: (count: number) => `有 ${count} 張沒有上傳成功。`,
+      odometer: "公里數（km）",
+      fuel: "油量",
+      notePlaceholder: "備註（可選）：發現的損傷、清潔情況…",
+      save: "儲存",
+      saving: "儲存中…",
+      saved: "已儲存。",
+      saveFailed: "儲存失敗。",
+      mileage: (driven: number, allowance: number | null, excess: number, amount: string) =>
+        allowance == null
+          ? `本次行駛 ${driven} km。`
+          : excess > 0
+            ? `本次行駛 ${driven} km，含 ${allowance} km，超出 ${excess} km，按超公里費約 ${amount}。`
+            : `本次行駛 ${driven} km，在包含的 ${allowance} km 以內。`,
+    },
     directBookingCancel: {
       title: "取消此訂單",
       open: "取消並退款…",

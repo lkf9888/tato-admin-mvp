@@ -6,6 +6,31 @@
  */
 export const directBookingMessages = {
   en: {
+    directBookingHandover: {
+      title: "Handover photos & odometer",
+      pickupTitle: "Pick-up",
+      returnTitle: "Return",
+      renterPhotos: (count: number) => `Renter's photos (${count})`,
+      yourPhotos: (count: number) => `Your photos (${count})`,
+      noRenterPhotos: "None yet.",
+      noYourPhotos: "None yet.",
+      upload: "Upload photos",
+      uploading: (done: number, total: number) => `Uploading ${done}/${total}…`,
+      uploadFailed: (count: number) => `${count} photo(s) did not upload.`,
+      odometer: "Odometer (km)",
+      fuel: "Fuel",
+      notePlaceholder: "Note (optional): damage seen, cleanliness…",
+      save: "Save",
+      saving: "Saving…",
+      saved: "Saved.",
+      saveFailed: "Could not save.",
+      mileage: (driven: number, allowance: number | null, excess: number, amount: string) =>
+        allowance == null
+          ? `Driven ${driven} km.`
+          : excess > 0
+            ? `Driven ${driven} km of ${allowance} km included: ${excess} km over, ${amount} at the excess rate.`
+            : `Driven ${driven} km of ${allowance} km included.`,
+    },
     directBookingCancel: {
       title: "Cancel this booking",
       open: "Cancel & refund…",
@@ -428,6 +453,31 @@ export const directBookingMessages = {
     },
   },
   zh: {
+    directBookingHandover: {
+      title: "取还车照片与公里数",
+      pickupTitle: "取车",
+      returnTitle: "还车",
+      renterPhotos: (count: number) => `租客拍的照片（${count}）`,
+      yourPhotos: (count: number) => `你拍的照片（${count}）`,
+      noRenterPhotos: "还没有。",
+      noYourPhotos: "还没有。",
+      upload: "上传照片",
+      uploading: (done: number, total: number) => `正在上传 ${done}/${total}…`,
+      uploadFailed: (count: number) => `有 ${count} 张没有上传成功。`,
+      odometer: "公里数（km）",
+      fuel: "油量",
+      notePlaceholder: "备注（可选）：发现的损伤、清洁情况…",
+      save: "保存",
+      saving: "保存中…",
+      saved: "已保存。",
+      saveFailed: "保存失败。",
+      mileage: (driven: number, allowance: number | null, excess: number, amount: string) =>
+        allowance == null
+          ? `本次行驶 ${driven} km。`
+          : excess > 0
+            ? `本次行驶 ${driven} km，含 ${allowance} km，超出 ${excess} km，按超公里费约 ${amount}。`
+            : `本次行驶 ${driven} km，在包含的 ${allowance} km 以内。`,
+    },
     directBookingCancel: {
       title: "取消此订单",
       open: "取消并退款…",

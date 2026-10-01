@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.28.0 - 2026-09-30
+
+### Check-in photos at pick-up and return, the odometer on the order, and a reminder an hour before
+
+Like Turo's check-in: both sides photograph the car when it changes
+hands, so damage found later can be placed before or after the trip.
+
+**The renter**, on their booking page (the link in the confirmation
+email), gets "Check-in photos": a set at pick-up and a set at return
+(open from an hour before pick-up), taken with the phone or picked
+from the library, with the shots to take listed. Photos are uploaded
+one at a time and kept exactly as uploaded (no recompression, so EXIF
+survives), with the capture time and location stored when the file
+carries them; Walkaround's `verifyUpload` reads them, but nothing is
+refused for lacking them, because browsers often strip location. A
+renter sees only their own photos.
+
+**The operator** gets `DirectBookingHandoverPanel` for the order:
+pick-up and return side by side, the renter's photos next to the
+operator's own, plus odometer, fuel and a note per handover. With both
+odometer readings it states the distance driven against the allowance
+(daily km x booked days) and the excess at the car's rate. Mounting it
+in the order views is 运营's, as with the other direct-booking panels.
+
+Stored in two new tables, `TripHandover` (per order, stage, party) and
+`TripHandoverPhoto`, keyed by order id without a relation; `Order` is
+unchanged.
+
+**Emails.** The confirmation email now ends with a fixed paragraph,
+outside the operator's template so an edit cannot drop it: photograph
+the car at pick-up and at return, and a reminder will come an hour
+ahead. `POST /api/direct-booking/reminders` (shared scan secret),
+called every 15 minutes by `.github/workflows/booking-reminders.yml`,
+emails each direct booking picking up within the hour once: the renter
+with their booking link, and every TATO account in the workspace with
+the order link, to photograph the car and record the odometer.
+
 ## v1.27.0 - 2026-09-30
 
 ### The renter signs the rental agreement on the booking page

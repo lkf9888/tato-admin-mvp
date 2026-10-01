@@ -218,7 +218,27 @@ export async function sendDirectBookingConfirmationEmail(input: {
     });
 
     const subject = renderDirectBookingEmailSubject(template.subjectTemplate, values);
-    const text = renderDirectBookingEmailTemplate(template.bodyTemplate, values);
+    // Fixed, after the operator's own wording, so an edited template
+    // cannot lose it: the check-in photos are the renter's protection
+    // and the business's evidence.
+    const bookingUrl = input.order.renterToken
+      ? `${origin}/booking/${input.order.renterToken}`
+      : null;
+    const text = [
+      renderDirectBookingEmailTemplate(template.bodyTemplate, values),
+      bookingUrl
+        ? [
+            "",
+            "At pick-up: before you drive off, open your booking page and photograph the car —",
+            "front, back, both sides, the interior and the dashboard (odometer and fuel).",
+            "Do the same when you return it. These photos protect you from charges for",
+            "damage that was already there. We will remind you an hour before pick-up.",
+            bookingUrl,
+          ].join("\n")
+        : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     const result = await sendMail({
       to,
@@ -629,6 +649,106 @@ export async function sendBookingDecisionEmail(input: {
       metadata: { error: error instanceof Error ? error.message : String(error) },
     }).catch(() => undefined);
     return { ok: false, reason: "SEND_FAILED" };
+  }
+}
+
+/**
+ * An hour before pick-up: the renter is reminded to photograph the car
+ * on their booking page, and every TATO account in the workspace to do
+ * the same and note the odometer on the order. Never throws.
+ */
+export async function sendPickupReminderEmails(input: {
+  workspaceId: string;
+  order: Pick<Order, "id" | "renterName" | "pickupDatetime" | "returnDatetime" | "renterToken" | "pickupLocation">;
+  vehicle: Pick<Vehicle, "brand" | "model" | "year" | "plateNumber">;
+  renterEmail: string | null;
+}): Promise<{ renter: boolean; operators: number }> {
+  try {
+    const [site, workspace, users] = await Promise.all([
+      prisma.rentalSite.findUnique({ where: { workspaceId: input.workspaceId } }),
+      prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
+      prisma.user.findMany({ where: { workspaceId: input.workspaceId }, select: { email: true } }),
+    ]);
+    const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
+    const origin = site?.domain ? `https://${site.domain}` : getAppUrl().replace(/\/$/, "");
+    const car = `${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`;
+    const when = formatBookingMoment(input.order.pickupDatetime);
+
+    let renterSent = false;
+    const renterTo = input.renterEmail?.trim();
+    if (renterTo && input.order.renterToken) {
+      const text = [
+        `Hi ${input.order.renterName},`,
+        "",
+        `Your ${car} is ready for pick-up at ${when} (Vancouver time)${input.order.pickupLocation ? `, ${input.order.pickupLocation}` : ""}.`,
+        "",
+        "Before you drive off, open your booking page and photograph the car: front, back, both sides,",
+        "the interior and the dashboard showing the odometer and fuel. It takes two minutes and protects you",
+        "from being charged for damage that was already there.",
+        `${origin}/booking/${input.order.renterToken}`,
+        "",
+        `Booking reference: ${bookingReference(input.order.id)}`,
+        site?.contactPhone ? `Questions? ${site.contactPhone}` : null,
+        "",
+        brandName,
+      ]
+        .filter((line): line is string => line !== null)
+        .join("\n");
+      const result = await sendMail({
+        to: renterTo,
+        subject: `${brandName} — pick-up in an hour: please photograph the car`,
+        text,
+        html: toHtmlBody(text),
+        replyTo: site?.contactEmail?.trim() || undefined,
+        from: formatSiteSender(site),
+      });
+      renterSent = result.ok;
+    }
+
+    const operatorText = [
+      `${input.order.renterName} 一小时后取车 / picks up in about an hour.`,
+      "",
+      `车辆 Car: ${input.vehicle.plateNumber} · ${car}`,
+      `取车 Pick-up: ${when}${input.order.pickupLocation ? ` · ${input.order.pickupLocation}` : ""}`,
+      "",
+      "请拍取车照片并记录公里数和油量 / Photograph the car and record the odometer and fuel:",
+      `${getAppUrl().replace(/\/$/, "")}/orders/${input.order.id}`,
+    ].join("\n");
+    const operatorEmails = [
+      ...new Map(users.map((user) => [user.email.trim().toLowerCase(), user.email.trim()])).values(),
+    ].filter(Boolean);
+    const results = await Promise.all(
+      operatorEmails.map((to) =>
+        sendMail({
+          to,
+          subject: `[${brandName}] 取车提醒 Pick-up in 1 hour — ${input.vehicle.plateNumber}, ${input.order.renterName}`,
+          text: operatorText,
+          html: toHtmlBody(operatorText),
+          from: formatSiteSender(site),
+        }),
+      ),
+    );
+    const operators = results.filter((result) => result.ok).length;
+
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "pickup_reminder_sent",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { renter: renterSent, operators, operatorTotal: operatorEmails.length },
+    });
+    return { renter: renterSent, operators };
+  } catch (error) {
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "pickup_reminder_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => undefined);
+    return { renter: false, operators: 0 };
   }
 }
 

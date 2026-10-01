@@ -802,6 +802,55 @@ model BookingCoupon {
   @@index([workspaceId, createdAt])
 }
 
+/// One side's record of one handover on a direct booking: the renter's
+/// or the operator's, at pickup or at return. Photos are the evidence;
+/// the operator also records the odometer (and fuel), so the distance
+/// driven -- and any excess-km charge -- is a subtraction, not a memory.
+/// Keyed by order id without a relation, like `BookingCoupon`.
+model TripHandover {
+  id          String   @id @default(cuid())
+  workspaceId String
+  orderId     String
+  /// `pickup` or `return`.
+  stage       String
+  /// `renter` or `operator`.
+  party       String
+  odometerKm  Int?
+  fuelLevel   String?
+  note        String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  photos TripHandoverPhoto[]
+
+  @@unique([orderId, stage, party])
+  @@index([workspaceId, orderId])
+}
+
+/// A handover photograph, stored as uploaded (never recompressed, so its
+/// EXIF survives) with what the server read from it.
+model TripHandoverPhoto {
+  id          String    @id @default(cuid())
+  handoverId  String
+  pathname    String
+  filename    String
+  contentType String
+  size        Int
+  /// Over the bytes that arrived, so the file can be shown to be unchanged.
+  sha256      String
+  /// From EXIF when the file carries it; browsers often strip location.
+  capturedAt  DateTime?
+  latitude    Float?
+  longitude   Float?
+  uploadedAt  DateTime  @default(now())
+  uploadedBy  String?
+
+  handover TripHandover @relation(fields: [handoverId], references: [id], onDelete: Cascade)
+
+  @@index([handoverId, uploadedAt])
+}
+
 /// Extras a renter can add to a booking: a child seat, a snow chain
 /// kit, a second driver. Priced per day or once per booking, and taxed
 /// with the rent or not, as the operator decides. Keyed by workspace

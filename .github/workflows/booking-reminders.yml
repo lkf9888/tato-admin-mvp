@@ -1,0 +1,25 @@
+name: Booking reminders
+
+# An hour before a direct booking's pick-up, the renter and the
+# operator are emailed to photograph the car (and note the odometer).
+# Every 15 minutes, so each reminder lands 50-65 minutes ahead.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send due pick-up reminders
+        run: |
+          code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
+            -X POST https://tatocar.co/api/direct-booking/reminders \
+            -H "x-tato-sync-secret: ${{ secrets.GMAIL_SYNC_SECRET }}")
+          cat /tmp/out.json
+          echo ""
+          if [ "$code" != "200" ]; then
+            echo "::error::Booking reminders returned HTTP $code"
+            exit 1
+          fi

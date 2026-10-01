@@ -121,7 +121,6 @@ export function getVehicleStatusOptions(locale: Locale) {
   return [
     { value: "available", label: getStatusLabel("available", locale) },
     { value: "maintenance", label: getStatusLabel("maintenance", locale) },
-    { value: "inactive", label: getStatusLabel("inactive", locale) },
   ] as const;
 }
 

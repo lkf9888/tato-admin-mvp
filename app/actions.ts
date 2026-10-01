@@ -1370,6 +1370,16 @@ export async function saveVehicleAction(formData: FormData) {
   const { id, ownerCommissionRate, cleaningFee, bookingTaxRate, ...vehicleData } = parsed;
   const normalizedVehicleData = {
     ...vehicleData,
+    // 停用 and 归档 are one thing now: archived. A form still carrying
+    // the old "inactive" status is read as archive, and an archived car
+    // comes off the rental site, as deactivating used to do.
+    ...(vehicleData.isArchived || vehicleData.status === "inactive"
+      ? {
+          isArchived: true,
+          status: vehicleData.status === "inactive" ? ("available" as const) : vehicleData.status,
+          directBookingEnabled: false,
+        }
+      : {}),
     ownerCommissionRate:
       ownerCommissionRate == null ? null : +(ownerCommissionRate / 100).toFixed(4),
     cleaningFee: roundCurrencyAmount(cleaningFee),
@@ -1490,10 +1500,12 @@ export async function deleteVehicleAction(formData: FormData) {
   });
   if (!vehicle) return;
 
-  const deactivated = await prisma.vehicle.update({
+  // Archive, not "deactivate": the two were merged. An archived car
+  // takes no new trips and leaves the rental site; its history stays.
+  const archived = await prisma.vehicle.update({
     where: { id: vehicle.id },
     data: {
-      status: VehicleStatus.inactive,
+      isArchived: true,
       directBookingEnabled: false,
     },
   });
@@ -1501,10 +1513,10 @@ export async function deleteVehicleAction(formData: FormData) {
   await logActivity({
     workspaceId: workspace.id,
     actor: user.name,
-    action: "vehicle_deactivated",
+    action: "vehicle_archived",
     entityType: "Vehicle",
-    entityId: deactivated.id,
-    metadata: { plateNumber: deactivated.plateNumber },
+    entityId: archived.id,
+    metadata: { plateNumber: archived.plateNumber },
   });
 
   revalidateAdminPages();

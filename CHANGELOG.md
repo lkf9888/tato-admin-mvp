@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.26.1 - 2026-09-30
+
+### 停用 is now 归档
+
+A car out of service was either deactivated (停用) or archived (归档), two states that meant nearly the same thing and behaved differently. They are one now: **archived**. An archived car takes no new trips and comes off the rental site; the trips it already ran stay where they are. The vehicles list's 停用 button is now **归档**, the edit form no longer offers an "inactive" status, and archived cars sort last with an 已归档 tag. Every car still marked inactive is moved over when the server starts. The matching side shipped in v1.26.0.
+
+### The calendar reads at a glance
+
+- **Bars** show the pickup time top-left, the return time top-right and the guest's name in the middle. A trip running past either edge of the screen keeps its name and times at the visible edge.
+- **Prices** carry the currency symbol ("$124") -- the rental-site session's change, shipped here because it lives in the same file.
+- **Cars on the rental site** have a small ticket mark next to the plate; archived cars are dimmed and tagged, below the rest.
+- **The toolbar** is one row of menus instead of eleven buttons, a filter row and a slider row: New (order, recurring order, vehicle), Prices (show, adjust), Sync (Turo, refresh), Filters (vehicle, owner, source -- and search, on a phone) and Tools (select, subscribe, download, day width). Today and the arrows stay outside; the duplicate TODAY tag and the permanent day-picking hint are gone.
+
+
 ## v1.26.0 - 2026-09-30
 
 ### An archived car keeps its trips: sync and CSV treat archived the way they treated 停用

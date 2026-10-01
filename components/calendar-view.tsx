@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Ticket } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { CalendarPricePanel } from "@/components/calendar-price-panel";
@@ -21,7 +22,7 @@ import {
   PREFETCH_LEAD_DAYS,
   toDayParam,
 } from "@/lib/calendar-window";
-import { getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
+import { getLocaleTag, getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
 import {
   applyRateSeasonality,
   type RateSeasonality,
@@ -50,6 +51,12 @@ type VehicleTimelineOption = {
    *  order" -- a car can be sold through Turo and have no trips yet,
    *  and a car can have historical Turo trips after being delisted. */
   turoLinked?: boolean;
+  /** Listed on the operator's own rental site (direct booking). */
+  directBooking?: boolean;
+  /** Archived (归档, which 停用 merged into): no new trips, history kept.
+   *  Drawn last and dimmed rather than hidden, so its past trips stay on
+   *  the calendar where they happened. */
+  archived?: boolean;
   editVehicle?: VehicleEditDialogVehicle;
 };
 
@@ -149,14 +156,16 @@ const naturalCompare = new Intl.Collator(undefined, {
 const MIN_CUSTOM_DAY_WIDTH = 30;
 const MAX_CUSTOM_DAY_WIDTH = 104;
 const DEFAULT_CUSTOM_DAY_WIDTH = 52;
-const LANE_HEIGHT = 32;
-const BAR_HEIGHT = 28;
+// Tall enough for two lines: the pickup and return times in the top
+// corners, the guest's name centred under them.
+const LANE_HEIGHT = 38;
+const BAR_HEIGHT = 34;
 // The same rows about a third shorter. Desktop heights on a phone made
 // four vehicles a full screen; at these, it is closer to nine, which
 // is the point of a timeline.
-const COMPACT_LANE_HEIGHT = 22;
-const COMPACT_BAR_HEIGHT = 20;
-const COMPACT_MIN_ROW_HEIGHT = 31;
+const COMPACT_LANE_HEIGHT = 30;
+const COMPACT_BAR_HEIGHT = 27;
+const COMPACT_MIN_ROW_HEIGHT = 36;
 const MIN_ROW_HEIGHT = 44;
 const DAY_IN_MS = CHUNK_DAY_IN_MS;
 const SCRUBBER_DAY_RANGE = 365;
@@ -360,6 +369,143 @@ function assignTimelineBars(
     bars: visibleBars,
     laneCount: laneEndTimes.length,
   };
+}
+
+type ToolbarMenuItem = {
+  key: string;
+  label: string;
+  onSelect: () => void;
+  /** A toggle: shows a check when on, and the menu stays open. */
+  checked?: boolean;
+  disabled?: boolean;
+};
+
+const TOOLBAR_MENU_TRIGGER =
+  "inline-flex h-9 items-center justify-center gap-1 whitespace-nowrap rounded-md border px-3 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
+
+/**
+ * One toolbar button that opens a short list.
+ *
+ * The calendar's toolbar had grown to eleven buttons in two rows, plus a
+ * filter row and a slider row. Related actions now share a menu. On a
+ * phone the list spans the screen under its button, so a menu on the
+ * right of the row never opens off-screen.
+ */
+function ToolbarMenu({
+  label,
+  items = [],
+  children,
+  primary = false,
+  badge,
+  align = "left",
+}: {
+  label: string;
+  items?: ToolbarMenuItem[];
+  children?: React.ReactNode;
+  primary?: boolean;
+  badge?: number;
+  align?: "left" | "right";
+}) {
+  const [open, setOpen] = useState(false);
+  const [phoneTop, setPhoneTop] = useState<number | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const toggle = () => {
+    if (!open && buttonRef.current && window.innerWidth < 640) {
+      setPhoneTop(buttonRef.current.getBoundingClientRect().bottom + 4);
+    } else {
+      setPhoneTop(null);
+    }
+    setOpen((value) => !value);
+  };
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={toggle}
+        className={cn(
+          TOOLBAR_MENU_TRIGGER,
+          primary
+            ? "border-[var(--accent)] bg-[var(--accent)] text-white hover:bg-[#4830d4]"
+            : "border-[var(--line)] bg-white text-[var(--ink)] hover:border-[rgba(17,19,24,0.22)] hover:bg-[var(--surface-muted)]",
+          open && !primary ? "border-[rgba(17,19,24,0.3)]" : "",
+        )}
+      >
+        {label}
+        {badge ? (
+          <span className="rounded-full bg-[var(--accent)] px-1.5 text-[10px] font-bold leading-[16px] text-white">
+            {badge}
+          </span>
+        ) : null}
+        <span aria-hidden className="text-[9px] opacity-70">
+          {"\u25be"}
+        </span>
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className={cn(
+            "z-[70] min-w-[13rem] rounded-lg border border-[var(--line)] bg-white p-1 shadow-[0_18px_44px_-18px_rgba(17,19,24,0.45)]",
+            phoneTop === null
+              ? cn("absolute top-full mt-1", align === "right" ? "right-0" : "left-0")
+              : "fixed inset-x-3",
+          )}
+          style={phoneTop === null ? undefined : { top: phoneTop }}
+        >
+          {items.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
+              aria-checked={item.checked}
+              disabled={item.disabled}
+              onClick={() => {
+                item.onSelect();
+                if (item.checked === undefined) setOpen(false);
+              }}
+              className="tap-compact flex min-h-9 w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-[13px] text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span>{item.label}</span>
+              {item.checked !== undefined ? (
+                <span
+                  aria-hidden
+                  className={cn("text-[13px] font-bold text-[var(--accent)]", item.checked ? "" : "invisible")}
+                >
+                  {"\u2713"}
+                </span>
+              ) : null}
+            </button>
+          ))}
+          {children ? (
+            <div className={cn("px-1.5 py-1.5", items.length > 0 && "mt-1 border-t border-[var(--line)] pt-2")}>
+              {children}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function formatWeekday(date: Date, locale: Locale, compact = false) {
@@ -654,7 +800,8 @@ export function CalendarView({
   // `lg` the search, the filters, the secondary actions and the two
   // scrubbers fold away behind one button, leaving prev / next /
   // today, which is what moving around a calendar actually needs.
-  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
+  /** Bumped to open the export dialog from the Tools menu. */
+  const [exportSignal, setExportSignal] = useState(0);
   const timelineViewportRef = useRef<HTMLDivElement | null>(null);
   // Drag-to-pan state. Refs rather than state on purpose: this runs on
   // every pointer move, and re-rendering a grid of several hundred bars
@@ -762,6 +909,20 @@ export function CalendarView({
    * on that day, then the model's price for that day, then the car's
    * flat rate. A car nobody has priced returns null and draws nothing.
    */
+  // Day prices in the cells: the currency's narrow symbol ("$", not
+  // "CA$") and whole dollars, so "$147" still fits a 34px phone column.
+  const dayPriceFormat = useMemo(
+    () =>
+      new Intl.NumberFormat(getLocaleTag(locale), {
+        style: "currency",
+        currency: "CAD",
+        currencyDisplay: "narrowSymbol",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }),
+    [locale],
+  );
+
   const resolveDayPrice = useMemo(() => {
     const seasonality = pricing?.seasonality;
     const rates = pricing?.rates ?? {};
@@ -1315,6 +1476,9 @@ export function CalendarView({
     } else {
       rows.sort((left, right) => naturalCompare(plateOf(left), plateOf(right)));
     }
+    // Archived cars after the fleet in use, whatever the sort. A stable
+    // sort, so each group keeps the order chosen above.
+    rows.sort((left, right) => Number(Boolean(left.archived)) - Number(Boolean(right.archived)));
     return rows;
   }, [filteredVehicles, rowSort]);
 
@@ -1897,6 +2061,15 @@ export function CalendarView({
   const primaryActionClass =
     "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md bg-[var(--accent)] px-3.5 text-[12px] font-semibold text-white shadow-[0_8px_22px_-10px_rgba(89,60,251,0.55)] transition hover:bg-[#4830d4] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50";
 
+  const toggleBulkMode = () => {
+    setBulkMode((on) => !on);
+    setBulkSelection(new Set());
+    setBulkNotice(null);
+    // The two selections are mutually exclusive: a click cannot mean
+    // both "pick this day" and "pick this trip".
+    clearDaySelection();
+  };
+
   const openCreateOrderDialog = () => {
     const fallbackVehicleId =
       selectedVehicleId !== "all"
@@ -2043,24 +2216,13 @@ export function CalendarView({
        * scrubber row so it doesn't double up. Kicker / legend / hint
        * badges removed — the timeline itself is self-explanatory and
        * those badges were just decorative noise. */}
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-2.5 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+      {/* Not overflow-hidden: the toolbar's menus open below it. */}
+      <section className="relative z-20 rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-2.5 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
         <div className="grid gap-2 2xl:grid-cols-[auto_minmax(42rem,1fr)] 2xl:items-center">
-          {/* Action row — flat layout instead of a glass pill. The
-           * prev/next pair gets its own tiny segment-control wrapper so
-           * the relationship reads at a glance; everything else stands
-           * on its own with the standard chip look. */}
-          {/* One row that scrolls sideways on a phone. Wrapped, the
-              44px touch targets took two rows -- a third of the screen
-              above the calendar. */}
-          <div
-            className={cn(
-              "flex flex-wrap items-center gap-1.5 2xl:flex-nowrap [&>*]:shrink-0",
-              // Collapsed, the phone row scrolls sideways; opened, the
-              // actions it reveals wrap onto the screen instead of
-              // disappearing past its right edge.
-              !mobileControlsOpen && "max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:pb-0.5 max-sm:[scrollbar-width:none]",
-            )}
-          >
+          {/* One row of grouped menus. It was eleven buttons in two
+              rows, then a filter row; related actions share a menu now,
+              and only the moves made every minute stay loose. */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <div className="inline-flex rounded-md border border-[var(--line)] bg-white p-0.5">
               <button
                 type="button"
@@ -2084,152 +2246,205 @@ export function CalendarView({
             <button type="button" onClick={() => scrollToDate(today)} className={secondaryActionClass}>
               {calendarMessages.today}
             </button>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              title={calendarMessages.refreshHint}
-              className={secondaryActionClass}
-            >
-              {isRefreshing || isLoadingChunks
-                ? calendarMessages.refreshingAction
-                : calendarMessages.refreshAction}
-            </button>
-            {pricing ? (
-              <button
-                type="button"
-                onClick={() => setShowPrices((on) => !on)}
-                title={calendarMessages.pricesToggleHint}
-                className={cn(
-                  secondaryActionClass,
-                  showPrices ? "border-[var(--accent)] text-[var(--accent)]" : "",
-                )}
-                aria-pressed={showPrices}
-              >
-                {calendarMessages.pricesToggle}
-              </button>
+
+            {!readOnly ? (
+              <ToolbarMenu
+                primary
+                label={calendarMessages.menuNew}
+                items={[
+                  {
+                    key: "order",
+                    label: calendarMessages.manualCreate,
+                    onSelect: openCreateOrderDialog,
+                    disabled: vehicleOptions.length === 0,
+                  },
+                  {
+                    key: "recurring",
+                    label: calendarMessages.recurringAction,
+                    onSelect: () => setIsRecurringOpen(true),
+                    disabled: vehicleOptions.length === 0,
+                  },
+                  {
+                    key: "vehicle",
+                    label: calendarMessages.addVehicleAction.replace(/^\+\s*/, ""),
+                    onSelect: () => setIsAddVehicleOpen(true),
+                  },
+                ]}
+              />
             ) : null}
-            {pricing && !readOnly ? (
+
+            {/* The price layer's two controls, together. Their behaviour
+                is the rental-site session's; only their place moved. */}
+            {pricing ? (
+              <ToolbarMenu
+                label={calendarMessages.menuPrices}
+                items={[
+                  {
+                    key: "show",
+                    label: calendarMessages.pricesToggle,
+                    checked: showPrices,
+                    onSelect: () => setShowPrices((on) => !on),
+                  },
+                  ...(!readOnly
+                    ? [
+                        {
+                          key: "adjust",
+                          label: messages.calendarPricePanel.openAction,
+                          onSelect: () => setPricePanel({ vehicleIds: [], days: [] }),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            ) : null}
+
+            {/* Fetching from Turo and reloading the page's own data were
+                two buttons that read as the same thing. */}
+            {!readOnly ? (
+              <ToolbarMenu
+                label={
+                  isTuroSyncing || isRefreshing || isLoadingChunks
+                    ? calendarMessages.refreshingAction
+                    : calendarMessages.menuSync
+                }
+                items={[
+                  {
+                    key: "turo",
+                    label: isTuroSyncing ? calendarMessages.turoSyncingAction : calendarMessages.turoSyncAction,
+                    onSelect: () => void handleTuroSync(),
+                    disabled: isTuroSyncing,
+                  },
+                  {
+                    key: "refresh",
+                    label: calendarMessages.refreshAction,
+                    onSelect: handleRefresh,
+                    disabled: isRefreshing,
+                  },
+                ]}
+              />
+            ) : (
               <button
                 type="button"
-                onClick={() => setPricePanel({ vehicleIds: [], days: [] })}
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                title={calendarMessages.refreshHint}
                 className={secondaryActionClass}
               >
-                {messages.calendarPricePanel.openAction}
+                {isRefreshing || isLoadingChunks
+                  ? calendarMessages.refreshingAction
+                  : calendarMessages.refreshAction}
               </button>
-            ) : null}
-            {!readOnly ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkMode((on) => !on);
-                  setBulkSelection(new Set());
-                  setBulkNotice(null);
-                  // The two selections are mutually exclusive: a click
-                  // cannot mean both "pick this day" and "pick this
-                  // trip".
-                  clearDaySelection();
-                }}
-                className={cn(
-                  secondaryActionClass,
-                  bulkMode ? "border-[var(--accent)] text-[var(--accent)]" : "",
-                )}
-                aria-pressed={bulkMode}
-              >
-                {bulkMode ? calendarMessages.bulkModeExit : calendarMessages.bulkModeEnter}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setMobileControlsOpen((open) => !open)}
-              className={cn(secondaryActionClass, "lg:hidden")}
-              aria-expanded={mobileControlsOpen}
-            >
-              {mobileControlsOpen ? calendarMessages.hideControls : calendarMessages.showControls}
-            </button>
-            {!readOnly ? (
-              <button
-                type="button"
-                onClick={handleTuroSync}
-                disabled={isTuroSyncing}
-                className={cn(secondaryActionClass, mobileControlsOpen ? "" : "max-lg:hidden")}
-              >
-                {isTuroSyncing ? calendarMessages.turoSyncingAction : calendarMessages.turoSyncAction}
-              </button>
-            ) : null}
-            {!readOnly ? (
-              <button
-                type="button"
-                onClick={openCreateOrderDialog}
-                disabled={vehicleOptions.length === 0}
-                className={cn(primaryActionClass, mobileControlsOpen ? "" : "max-lg:hidden")}
-              >
-                {calendarMessages.manualCreate}
-              </button>
-            ) : null}
-            {!readOnly ? (
-              <button
-                type="button"
-                onClick={() => setIsFeedOpen(true)}
-                className={cn(secondaryActionClass, mobileControlsOpen ? "" : "max-lg:hidden")}
-              >
-                {calendarMessages.feedAction}
-              </button>
-            ) : null}
-            {!readOnly ? (
-              <button
-                type="button"
-                onClick={() => setIsRecurringOpen(true)}
-                disabled={vehicleOptions.length === 0}
-                className={cn(secondaryActionClass, mobileControlsOpen ? "" : "max-lg:hidden")}
-              >
-                {calendarMessages.recurringAction}
-              </button>
-            ) : null}
-            {!readOnly ? (
-              <VehicleEditDialog
-                locale={locale}
-                owners={ownerOptions}
-                open={isAddVehicleOpen}
-                onOpenChange={setIsAddVehicleOpen}
-                // An empty id is what tells the save action to create
-                // rather than update.
-                vehicle={{
-                  id: "",
-                  ownerId: null,
-                  plateNumber: "",
-                  nickname: "",
-                  brand: "",
-                  model: "",
-                  year: new Date().getFullYear(),
-                  status: "available",
-                }}
-                trigger={calendarMessages.addVehicleAction}
-                triggerClassName={cn(
-                  secondaryActionClass,
-                  mobileControlsOpen ? "" : "max-lg:hidden",
-                )}
-              />
-            ) : null}
-            {!readOnly ? (
-              <VehicleOrdersExportButton
-                className={mobileControlsOpen ? undefined : "max-lg:hidden"}
-                locale={locale}
-                vehicleOptions={vehicleOptions}
-                preferredVehicleId={selectedVehicleId !== "all" ? selectedVehicleId : filteredVehicles[0]?.id}
-                rangeStart={visibleRangeStart.toISOString()}
-                rangeEnd={visibleRangeEndInclusive.toISOString()}
-              />
-            ) : null}
-          </div>
-
-          <div
-            className={cn(
-              "grid min-w-0 gap-1.5 sm:grid-cols-2 xl:grid-cols-[minmax(17rem,1.45fr)_minmax(9.5rem,1fr)_minmax(9.5rem,1fr)_minmax(9.5rem,1fr)]",
-              mobileControlsOpen ? "" : "max-lg:hidden",
             )}
-          >
-            <label className="relative min-w-0">
+
+            <ToolbarMenu
+              label={calendarMessages.menuFilters}
+              badge={
+                [selectedVehicleId, readOnly ? "all" : selectedOwnerId, selectedSource].filter(
+                  (value) => value !== "all",
+                ).length || undefined
+              }
+            >
+              <div className="grid w-full gap-1.5 sm:w-72">
+                {/* On a phone the search lives here; a laptop shows it
+                    in the row. */}
+                <label className="relative min-w-0 lg:hidden">
+                  <span className="sr-only">{calendarMessages.timelineSearch}</span>
+                  <input
+                    type="search"
+                    value={calendarSearchQuery}
+                    onChange={(event) => setCalendarSearchQuery(event.target.value)}
+                    placeholder={calendarMessages.timelineSearchPlaceholder}
+                    className="h-9 w-full rounded-md border border-[var(--line)] bg-white px-3 text-[12px] text-[var(--ink)] outline-none focus:border-[rgba(17,19,24,0.3)]"
+                  />
+                </label>
+                <SearchableFilterDropdown
+                  value={selectedVehicleId}
+                  query={vehicleFilterQuery}
+                  allLabel={calendarMessages.allVehicles}
+                  searchPlaceholder={calendarMessages.searchVehiclesPlaceholder}
+                  options={vehicleFilterOptions}
+                  onValueChange={setSelectedVehicleId}
+                  onQueryChange={setVehicleFilterQuery}
+                />
+                {!readOnly ? (
+                  <SearchableFilterDropdown
+                    value={selectedOwnerId}
+                    query={ownerFilterQuery}
+                    allLabel={calendarMessages.allOwners}
+                    searchPlaceholder={calendarMessages.searchOwnersPlaceholder}
+                    options={ownerFilterOptions}
+                    onValueChange={setSelectedOwnerId}
+                    onQueryChange={setOwnerFilterQuery}
+                  />
+                ) : null}
+                <SearchableFilterDropdown
+                  value={selectedSource}
+                  query={sourceFilterQuery}
+                  allLabel={calendarMessages.allSources}
+                  searchPlaceholder={calendarMessages.searchSourcesPlaceholder}
+                  options={sourceFilterOptions}
+                  onValueChange={setSelectedSource}
+                  onQueryChange={setSourceFilterQuery}
+                />
+              </div>
+            </ToolbarMenu>
+
+            {!readOnly ? (
+              <ToolbarMenu
+                label={calendarMessages.menuTools}
+                align="right"
+                items={[
+                  {
+                    key: "bulk",
+                    label: calendarMessages.bulkModeEnter,
+                    checked: bulkMode,
+                    onSelect: toggleBulkMode,
+                  },
+                  {
+                    key: "feed",
+                    label: calendarMessages.feedAction,
+                    onSelect: () => setIsFeedOpen(true),
+                  },
+                  {
+                    key: "export",
+                    label: calendarMessages.downloadOrders,
+                    onSelect: () => setExportSignal((value) => value + 1),
+                    disabled: vehicleOptions.length === 0,
+                  },
+                ]}
+              >
+                {/* A phone fits seven days to its width and never reads
+                    this, so there it is not offered. */}
+                {!compact ? (
+                  <label className="flex items-center gap-2 text-[12px] text-[color:var(--ink-soft)]">
+                    <span className="shrink-0">{calendarMessages.dayWidthMenuLabel}</span>
+                    <input
+                      type="range"
+                      min={MIN_CUSTOM_DAY_WIDTH}
+                      max={MAX_CUSTOM_DAY_WIDTH}
+                      step={2}
+                      value={customDayWidth}
+                      onChange={(event) => setCustomDayWidth(Number(event.target.value))}
+                      className="min-w-0 flex-1 cursor-pointer accent-[var(--accent)]"
+                    />
+                    <span className="w-10 text-right tabular-nums">{customDayWidth}px</span>
+                  </label>
+                ) : null}
+              </ToolbarMenu>
+            ) : null}
+
+            {/* Bulk mode needs a way out that is not hidden in a menu. */}
+            {bulkMode ? (
+              <button
+                type="button"
+                onClick={toggleBulkMode}
+                className={cn(secondaryActionClass, "border-[var(--accent)] text-[var(--accent)]")}
+              >
+                {calendarMessages.bulkModeExit}
+              </button>
+            ) : null}
+
+            <label className="relative ml-auto hidden min-w-0 lg:block lg:w-72">
               <span className="sr-only">{calendarMessages.timelineSearch}</span>
               <input
                 type="search"
@@ -2239,46 +2454,40 @@ export function CalendarView({
                 className="h-9 w-full rounded-full border border-[var(--line)] bg-white px-3 text-[12px] font-medium text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-soft)]/70 hover:border-[rgba(17,19,24,0.22)] focus:border-[rgba(17,19,24,0.3)] focus:ring-2 focus:ring-[rgba(89,60,251,0.12)]"
               />
             </label>
-
-            <SearchableFilterDropdown
-              value={selectedVehicleId}
-              query={vehicleFilterQuery}
-              allLabel={calendarMessages.allVehicles}
-              searchPlaceholder={calendarMessages.searchVehiclesPlaceholder}
-              options={vehicleFilterOptions}
-              onValueChange={setSelectedVehicleId}
-              onQueryChange={setVehicleFilterQuery}
-            />
-
-            {!readOnly ? (
-              <SearchableFilterDropdown
-                value={selectedOwnerId}
-                query={ownerFilterQuery}
-                allLabel={calendarMessages.allOwners}
-                searchPlaceholder={calendarMessages.searchOwnersPlaceholder}
-                options={ownerFilterOptions}
-                onValueChange={setSelectedOwnerId}
-                onQueryChange={setOwnerFilterQuery}
-              />
-            ) : null}
-
-            <SearchableFilterDropdown
-              value={selectedSource}
-              query={sourceFilterQuery}
-              allLabel={calendarMessages.allSources}
-              searchPlaceholder={calendarMessages.searchSourcesPlaceholder}
-              options={sourceFilterOptions}
-              onValueChange={setSelectedSource}
-              onQueryChange={setSourceFilterQuery}
-            />
           </div>
 
-          {/* The Week / Month / 6-week segmented pill that used to live
-           * here was removed in v0.22.1 — it overlapped 1-for-1 with
-           * the day-width slider just below the toolbar. The toolbar
-           * keeps the prev/next/today actions, the filter selects, and
-           * the create + export buttons; range zoom now happens
-           * exclusively through the slider. */}
+          {/* Opened from the menus above; neither has a button of its own. */}
+          {!readOnly ? (
+            <VehicleEditDialog
+              locale={locale}
+              owners={ownerOptions}
+              open={isAddVehicleOpen}
+              onOpenChange={setIsAddVehicleOpen}
+              // An empty id is what tells the save action to create
+              // rather than update.
+              vehicle={{
+                id: "",
+                ownerId: null,
+                plateNumber: "",
+                nickname: "",
+                brand: "",
+                model: "",
+                year: new Date().getFullYear(),
+                status: "available",
+              }}
+            />
+          ) : null}
+          {!readOnly ? (
+            <VehicleOrdersExportButton
+              hideTrigger
+              openSignal={exportSignal}
+              locale={locale}
+              vehicleOptions={vehicleOptions}
+              preferredVehicleId={selectedVehicleId !== "all" ? selectedVehicleId : filteredVehicles[0]?.id}
+              rangeStart={visibleRangeStart.toISOString()}
+              rangeEnd={visibleRangeEndInclusive.toISOString()}
+            />
+          ) : null}
         </div>
 
         {turoSyncNotice ? (
@@ -2415,7 +2624,9 @@ export function CalendarView({
         <div
           className={cn(
             "mt-2 rounded-lg border border-[rgba(17,19,24,0.06)] bg-[rgba(255,255,255,0.78)] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]",
-            mobileControlsOpen ? "" : "max-lg:hidden",
+            // A phone pages with ‹ › and Today; the two-year slider is a
+            // desktop control.
+            "max-lg:hidden",
           )}
         >
           <div className="grid gap-x-3 gap-y-1.5 xl:grid-cols-[minmax(18rem,auto)_minmax(24rem,1fr)_minmax(14rem,auto)] xl:items-center">
@@ -2450,41 +2661,12 @@ export function CalendarView({
             </div>
 
             <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 xl:justify-end">
-              {/* A phone fits seven days to its width and never reads
-                  this, so the slider moved nothing there. */}
-              <label
-                className={cn(
-                  "flex min-w-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]/80",
-                  compact && "hidden",
-                )}
-              >
-                <span>{calendarMessages.dayWidthLabel}</span>
-                <input
-                  type="range"
-                  min={MIN_CUSTOM_DAY_WIDTH}
-                  max={MAX_CUSTOM_DAY_WIDTH}
-                  step={2}
-                  value={customDayWidth}
-                  onChange={(event) => setCustomDayWidth(Number(event.target.value))}
-                  className="w-28 cursor-pointer accent-[var(--accent)]"
-                />
-                <span className="tabular-nums">{customDayWidth}px</span>
-              </label>
               {normalizedCalendarSearchQuery ? (
                 <span className="rounded-full bg-[rgba(255,231,122,0.58)] px-2.5 py-0.5 text-[11px] font-semibold text-[color:var(--ink)]">
                   {calendarMessages.summary(sortedVehicles.length, visibleOrders.length)}
                 </span>
               ) : null}
             </div>
-          </div>
-          {/* Only TODAY survives from the tick row. The four dates
-              around it labelled the ends of a two-year scrubber -- a
-              bound nobody navigates to, printed permanently above a
-              calendar that already shows where it is. */}
-          <div className="mt-1.5 flex items-center justify-center">
-            <span className="rounded-full bg-[rgba(89,60,251,0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink)]">
-              {calendarMessages.today}
-            </span>
           </div>
         </div>
       </section>
@@ -2497,16 +2679,12 @@ export function CalendarView({
           second click of "click the first day, click the last" landed
           on the row above the one you were aiming at. A hint that
           breaks the gesture it is explaining is worse than no hint. */}
-      {!readOnly ? (
-        <p
-          className={cn(
-            "mt-2 text-[11px] lg:block",
-            bulkMode
-              ? "rounded-md border border-[rgba(89,60,251,0.25)] bg-[rgba(89,60,251,0.06)] px-3 py-1.5 text-[12px] text-[color:var(--ink-soft)]"
-              : "hidden text-[color:var(--ink-soft)]/80",
-          )}
-        >
-          {bulkMode ? calendarMessages.bulkModeHint : calendarMessages.selectionHint}
+      {/* Only bulk mode explains itself now. The day-picking line sat
+          under the toolbar permanently, one more row of text above the
+          grid; picking a day shows its own bar with what to do next. */}
+      {!readOnly && bulkMode ? (
+        <p className="mt-2 rounded-md border border-[rgba(89,60,251,0.25)] bg-[rgba(89,60,251,0.06)] px-3 py-1.5 text-[12px] text-[color:var(--ink-soft)]">
+          {calendarMessages.bulkModeHint}
         </p>
       ) : null}
 
@@ -2707,7 +2885,9 @@ export function CalendarView({
         </div>
       ) : null}
 
-      <section className="calendar-dense overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+      {/* `isolate` keeps the grid's sticky header (z-40/50) stacking
+          inside this card, so the toolbar's menus open over it. */}
+      <section className="calendar-dense isolate overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
         {sortedVehicles.length === 0 ? (
           <div className="rounded-lg bg-[rgba(255,255,255,0.72)] px-4 py-10 text-sm text-[color:var(--ink-soft)]">
             {calendarMessages.noVehicles}
@@ -2863,7 +3043,12 @@ export function CalendarView({
                     >
                       {/* On a phone the two badges drop under the plate
                           rather than squeezing it to "DJ…". */}
-                      <span className="flex min-w-0 items-center gap-1 max-sm:flex-wrap max-sm:gap-y-0.5">
+                      <span
+                        className={cn(
+                          "flex min-w-0 items-center gap-1 max-sm:flex-wrap max-sm:gap-y-0.5",
+                          vehicle.archived && "opacity-60",
+                        )}
+                      >
                       {!readOnly && vehicle.editVehicle ? (
                         <VehicleEditDialog
                           locale={locale}
@@ -2902,6 +3087,22 @@ export function CalendarView({
                           className="shrink-0 rounded-[3px] bg-[rgba(52,86,223,0.12)] px-1 text-[9px] font-bold leading-[14px] text-[#3456df]"
                         >
                           T
+                        </span>
+                      ) : null}
+                      {/* Bookable on the operator's own site, the badge
+                          next to Turo's "T": where else this car sells. */}
+                      {vehicle.directBooking && !vehicle.archived ? (
+                        <span
+                          title={calendarMessages.directBookingHint}
+                          aria-label={calendarMessages.directBookingHint}
+                          className="inline-flex shrink-0 items-center rounded-[3px] bg-[rgba(89,60,251,0.12)] px-0.5 leading-[14px] text-[var(--accent)]"
+                        >
+                          <Ticket className="h-[11px] w-[11px]" aria-hidden />
+                        </span>
+                      ) : null}
+                      {vehicle.archived ? (
+                        <span className="shrink-0 rounded-[3px] bg-[var(--surface-muted)] px-1 text-[9px] font-semibold leading-[14px] text-[color:var(--ink-soft)]">
+                          {calendarMessages.archivedBadge}
                         </span>
                       ) : null}
                       </span>
@@ -3005,7 +3206,15 @@ export function CalendarView({
                                 )}
                                 style={{ left: index * dayColumnWidth, width: dayColumnWidth }}
                               >
-                                {Math.round(resolved.price)}
+                                {dayPriceFormat.formatToParts(resolved.price).map((part, partIndex) =>
+                                  part.type === "currency" ? (
+                                    <span key={partIndex} className="text-[7px]">
+                                      {part.value}
+                                    </span>
+                                  ) : (
+                                    part.value
+                                  ),
+                                )}
                               </span>
                             );
                           })
@@ -3107,33 +3316,40 @@ export function CalendarView({
 
                       {bars.map((bar) => {
                         const startTime = formatTime(bar.order.pickupDatetime);
-                        // A trip that began before the visible days has
-                        // its label off-screen to the left -- a month-long
-                        // stay read as a bare coloured strip. The label
-                        // follows the left edge of what is visible, and
-                        // stops short of the bar's own end.
+                        const endTime = formatTime(bar.order.returnDatetime);
+                        // What of the bar is on screen. A trip that began
+                        // before the visible days, or runs past them, keeps
+                        // its name and times at the visible edges instead of
+                        // off-screen -- a month-long stay otherwise read as
+                        // a bare coloured strip.
+                        const visibleTimelineWidth = Math.max(
+                          (timelineViewportWidth ?? 0) - vehicleColumnWidth,
+                          0,
+                        );
                         const labelInset = Math.max(
                           0,
                           Math.min(scrollLeft - bar.left, bar.width - 56),
                         );
-                        // Too narrow even for a time: "14:00" truncated
-                        // to a lone "1", which read as a count. A bare
-                        // block says "something is here"; the tap and
-                        // the tooltip say what.
-                        const visibleBarWidth = bar.width - labelInset;
-                        const shortLabel =
-                          visibleBarWidth < 40
-                            ? ""
-                            : visibleBarWidth < 96
-                              ? startTime
-                              : `${startTime} ${bar.order.renterName}`;
+                        const rightInset = Math.max(
+                          0,
+                          Math.min(
+                            bar.left + bar.width - (scrollLeft + visibleTimelineWidth),
+                            bar.width - labelInset - 56,
+                          ),
+                        );
+                        const visibleBarWidth = bar.width - labelInset - rightInset;
+                        // Too narrow for anything readable: a bare block
+                        // says "something is here"; tap and tooltip say
+                        // what. Times need room for both corners.
+                        const showName = visibleBarWidth >= 32;
+                        const showTimes = visibleBarWidth >= (compact ? 64 : 84);
 
                         return (
                           <button
                             key={bar.order.id}
                             type="button"
                             data-calendar-order-bar="true"
-                            title={`${startTime} · ${bar.order.vehicleName} · ${bar.order.renterName}`}
+                            title={`${startTime} → ${endTime} · ${bar.order.vehicleName} · ${bar.order.renterName}`}
                             onClick={() => {
                               if (bulkMode) {
                                 // In bulk mode a bar is a checkbox, not
@@ -3165,12 +3381,39 @@ export function CalendarView({
                               height: barHeight,
                             }}
                           >
-                            <span
-                              className="truncate"
-                              style={labelInset > 0 ? { marginLeft: labelInset } : undefined}
-                            >
-                              {shortLabel ? highlightText(shortLabel, calendarSearchQuery) : null}
-                            </span>
+                            {showTimes ? (
+                              <>
+                                <span
+                                  className={cn(
+                                    "pointer-events-none absolute top-[1px] font-medium tabular-nums leading-none opacity-85",
+                                    compact ? "text-[8px]" : "text-[9.5px]",
+                                  )}
+                                  style={{ left: (compact ? 4 : 7) + labelInset }}
+                                >
+                                  {startTime}
+                                </span>
+                                <span
+                                  className={cn(
+                                    "pointer-events-none absolute top-[1px] font-medium tabular-nums leading-none opacity-85",
+                                    compact ? "text-[8px]" : "text-[9.5px]",
+                                  )}
+                                  style={{ right: (compact ? 4 : 7) + rightInset }}
+                                >
+                                  {endTime}
+                                </span>
+                              </>
+                            ) : null}
+                            {showName ? (
+                              <span
+                                className={cn(
+                                  "block w-full truncate text-center",
+                                  showTimes ? (compact ? "pt-[9px]" : "pt-[10px]") : "",
+                                )}
+                                style={{ paddingLeft: labelInset, paddingRight: rightInset }}
+                              >
+                                {highlightText(bar.order.renterName, calendarSearchQuery)}
+                              </span>
+                            ) : null}
                           </button>
                         );
                       })}

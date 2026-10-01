@@ -152,6 +152,8 @@ export default async function CalendarPage() {
         // Either identifier means somebody has actually connected this
         // car to a Turo listing. Having Turo orders does not.
         turoLinked: Boolean(vehicle.turoVehicleCode || vehicle.turoListingName),
+        directBooking: vehicle.directBookingEnabled,
+        archived: vehicle.isArchived,
         editVehicle: {
           id: vehicle.id,
           ownerId: vehicle.ownerId,

@@ -53,7 +53,7 @@ export async function GET(request: Request) {
         method: "GET",
         summary: "The fleet. Plate, model, owner, status, current cleaning fee.",
         query: {
-          status: "available | maintenance | inactive",
+          status: "available | maintenance (a car out of service is archived instead: see includeArchived)",
           includeArchived: "true to include retired cars (default false)",
           ownerId: "only this owner's cars",
           q: "match plate, nickname, brand, model, VIN or Turo listing name",

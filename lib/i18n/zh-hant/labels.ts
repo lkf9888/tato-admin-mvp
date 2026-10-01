@@ -32,6 +32,7 @@ export const activityLabelsBase = {
     vehicle_updated: "已更新車輛",
     vehicle_deleted: "已刪除車輛",
     vehicle_deactivated: "已停用車輛",
+    vehicle_archived: "已歸檔車輛",
     vehicle_purchase_price_updated: "已更新車輛購買價",
     vehicle_direct_booking_updated: "已更新車輛線上預訂設定",
     vehicle_auto_created_from_csv: "CSV 自動建檔車輛",

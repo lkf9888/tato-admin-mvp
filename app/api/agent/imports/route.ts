@@ -76,8 +76,6 @@ export async function POST(request: Request) {
       totalRows: result.totalRows,
       imported: result.successRows,
       failed: result.failedRows,
-      /** Rows skipped because their car is archived. */
-      archivedRows: result.archivedRows,
       /** Rows Turo marked cancelled. Recorded as cancelled -- they stay
        *  on the calendar as a thin bar -- not deleted. */
       cancelled: result.deletedCancelledRows,

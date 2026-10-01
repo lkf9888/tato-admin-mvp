@@ -6,7 +6,7 @@
 export const fleetMessages = {
   en: {
     vehicles: {
-      deleteError: "Vehicle records are preserved for data safety. Use inactive status to remove a vehicle from active operations.",
+      deleteError: "Vehicle records are preserved for data safety. Archive a vehicle to take it out of operation.",
       plateTaken: (plate: string) =>
         `${plate} is already in your fleet — search for it above rather than adding it again. If you cannot see it, the plate may be stored under a slightly different spelling; the search folds look-alike letters, so try the plate exactly as Turo writes it.`,
       plateTakenElsewhere: (plate: string) =>
@@ -44,7 +44,8 @@ export const fleetMessages = {
       commissionPrefix: "TATO commission",
       editVehicle: "Edit vehicle",
       saveChanges: "Save changes",
-      deleteVehicle: "Deactivate vehicle",
+      deleteVehicle: "Archive vehicle",
+      archivedBadge: "Archived",
       orderCount: (count: number) => `${count} order(s)`,
       listVehicle: "Vehicle",
       listOrders: "Orders",
@@ -89,7 +90,7 @@ export const fleetMessages = {
   },
   zh: {
     vehicles: {
-      deleteError: "为保护车辆数据，系统会保留车辆记录。需要退出运营时请停用车辆。",
+      deleteError: "为保护车辆数据，系统会保留车辆记录。需要退出运营时请归档车辆。",
       plateTaken: (plate: string) =>
         `${plate} 已经在你的车队里了 —— 用上面的搜索找它,不用重复添加。如果搜不到,可能是存的写法略有不同;搜索会自动折叠同形字母,试试按 Turo 上的原样输入车牌。`,
       plateTakenElsewhere: (plate: string) =>
@@ -127,7 +128,8 @@ export const fleetMessages = {
       commissionPrefix: "TATO 佣金",
       editVehicle: "编辑车辆",
       saveChanges: "保存修改",
-      deleteVehicle: "停用车辆",
+      deleteVehicle: "归档车辆",
+      archivedBadge: "已归档",
       orderCount: (count: number) => `${count} 个订单`,
       listVehicle: "车辆",
       listOrders: "订单",

@@ -58,7 +58,8 @@ export default async function VehiclesPage({
           select: { orders: { where: { isArchived: false, status: { not: "cancelled" } } } },
         },
       },
-      orderBy: { createdAt: "desc" },
+      // Archived cars last: they are history, not the fleet in use.
+      orderBy: [{ isArchived: "asc" }, { createdAt: "desc" }],
     }),
     prisma.owner.findMany({
       where: { workspaceId: workspace.id },
@@ -368,7 +369,13 @@ export default async function VehiclesPage({
                     )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
-                    <StatusBadge value={vehicle.status} locale={locale} />
+                    {vehicle.isArchived ? (
+                      <span className="inline-flex rounded-full border border-[var(--line)] bg-[var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--ink-soft)]">
+                        {vehicleMessages.archivedBadge}
+                      </span>
+                    ) : (
+                      <StatusBadge value={vehicle.status} locale={locale} />
+                    )}
                   </td>
                   <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-[var(--ink)] sm:table-cell">
                     {vehicle._count.orders}
@@ -420,12 +427,14 @@ export default async function VehiclesPage({
                       />
                       {/* Hidden on a phone: the edit dialog sets the same
                           status, and two buttons per row did not fit. */}
+                      {vehicle.isArchived ? null : (
                       <form action={deleteVehicleAction} className="hidden sm:block">
                         <input type="hidden" name="id" value={vehicle.id} />
                         <button className="inline-flex h-8 items-center justify-center rounded-md border border-rose-200 bg-white px-2.5 text-[11.5px] font-semibold text-rose-700 transition hover:bg-rose-50">
                           {vehicleMessages.deleteVehicle}
                         </button>
                       </form>
+                      )}
                     </div>
                   </td>
                 </tr>

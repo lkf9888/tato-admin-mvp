@@ -8,7 +8,8 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-const STATUSES = ["available", "maintenance", "inactive"] as const;
+// "inactive" is gone: a car out of service is archived (isArchived).
+const STATUSES = ["available", "maintenance"] as const;
 
 /**
  * The fleet.

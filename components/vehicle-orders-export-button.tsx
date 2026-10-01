@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { SearchableSelect } from "@/components/searchable-select";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,10 @@ type VehicleOrdersExportButtonProps = {
   rangeEnd: string;
   /** Extra classes for the trigger, e.g. hiding it on a phone. */
   className?: string;
+  /** Opened from elsewhere -- the calendar's menu -- with no button of
+   *  its own. Each increment opens the dialog once. */
+  openSignal?: number;
+  hideTrigger?: boolean;
 };
 
 function padNumber(value: number) {
@@ -51,6 +55,8 @@ export function VehicleOrdersExportButton({
   rangeStart,
   rangeEnd,
   className,
+  openSignal,
+  hideTrigger = false,
 }: VehicleOrdersExportButtonProps) {
   const calendarMessages = getMessages(locale).calendar;
   const [isOpen, setIsOpen] = useState(false);
@@ -72,6 +78,17 @@ export function VehicleOrdersExportButton({
     setError(null);
     setIsOpen(true);
   };
+
+  // An increment from the parent opens the dialog, with the same
+  // defaults the button would have used. The first value is the
+  // starting point, not a request.
+  const lastSignal = useRef(openSignal);
+  useEffect(() => {
+    if (openSignal === undefined || openSignal === lastSignal.current) return;
+    lastSignal.current = openSignal;
+    openDialog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal]);
 
   const closeDialog = () => {
     if (isDownloading) return;
@@ -136,14 +153,16 @@ export function VehicleOrdersExportButton({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openDialog}
-        disabled={vehicleOptions.length === 0}
-        className={cn(triggerClass, className)}
-      >
-        {calendarMessages.downloadOrders}
-      </button>
+      {hideTrigger ? null : (
+        <button
+          type="button"
+          onClick={openDialog}
+          disabled={vehicleOptions.length === 0}
+          className={cn(triggerClass, className)}
+        >
+          {calendarMessages.downloadOrders}
+        </button>
+      )}
 
       {isOpen ? (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-[var(--ink)]/35 p-4">

@@ -39,13 +39,18 @@
 #
 #   shareToken / OrderAttachment_shareToken_key -- added v0.89.1
 #   renterToken / Order_renterToken_key -- added v0.95.0
+#   Vehicle inactive -> isArchived -- added v1.26.1. Not DDL: 停用 and 归档 were
+#   merged into one state, and this moves cars still marked inactive over. It
+#   is idempotent (it matches nothing once run) and safe before db push, which
+#   leaves the enum value in place so old rows never fail to read.
 set -eu
 
 for statement in \
   'ALTER TABLE "OrderAttachment" ADD COLUMN "shareToken" TEXT;' \
   'CREATE UNIQUE INDEX "OrderAttachment_shareToken_key" ON "OrderAttachment"("shareToken");' \
   'ALTER TABLE "Order" ADD COLUMN "renterToken" TEXT;' \
-  'CREATE UNIQUE INDEX "Order_renterToken_key" ON "Order"("renterToken");'
+  'CREATE UNIQUE INDEX "Order_renterToken_key" ON "Order"("renterToken");' \
+  'UPDATE "Vehicle" SET "isArchived" = 1, "status" = '"'"'available'"'"' WHERE "status" = '"'"'inactive'"'"';'
 do
   if echo "$statement" | npx prisma db execute --stdin --schema=prisma/schema.prisma >/dev/null 2>&1; then
     echo "[schema-predeploy] applied: $statement"

@@ -3,7 +3,7 @@
 
 export const fleetMessages = {
     vehicles: {
-      deleteError: "為保護車輛資料，系統會保留車輛記錄。需要退出運營時請停用車輛。",
+      deleteError: "為保護車輛資料，系統會保留車輛記錄。需要退出運營時請歸檔車輛。",
       plateTaken: (plate: string) =>
         `${plate} 已經在你的車隊裡了 —— 用上面的搜尋找它,不用重複新增。如果搜不到,可能是存的寫法略有不同;搜尋會自動摺疊同形字母,試試按 Turo 上的原樣輸入車牌。`,
       plateTakenElsewhere: (plate: string) =>
@@ -41,7 +41,8 @@ export const fleetMessages = {
       commissionPrefix: "TATO 佣金",
       editVehicle: "編輯車輛",
       saveChanges: "儲存修改",
-      deleteVehicle: "停用車輛",
+      deleteVehicle: "歸檔車輛",
+      archivedBadge: "已歸檔",
       orderCount: (count: number) => `${count} 個訂單`,
       listVehicle: "車輛",
       listOrders: "訂單",

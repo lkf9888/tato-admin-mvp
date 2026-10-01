@@ -23,7 +23,6 @@ export const orderStatusOptions = [
 export const vehicleStatusOptions = [
   { value: "available", label: "Available" },
   { value: "maintenance", label: "Maintenance" },
-  { value: "inactive", label: "Inactive" },
 ] as const;
 
 export const shareVisibilityOptions = [

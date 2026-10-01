@@ -1344,9 +1344,6 @@ export async function importTuroOrders(input: {
     deletedCancelledRows,
     deletedStaleOrders,
     reclaimedIdentifiers,
-    /** Always 0: rows for archived cars are imported now. Kept only
-     *  until /api/agent/imports stops returning it; then removed. */
-    archivedRows: 0,
     failures,
   };
 }

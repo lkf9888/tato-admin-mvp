@@ -32,10 +32,11 @@ export type PendingVehicleOption = {
   id: string;
   label: string;
   searchText: string;
-  /** 停用 (`VehicleStatus.inactive`). Sync never files a booking on one
-   *  by itself, so the picker keeps it reachable -- a trip it really
-   *  took before it was switched off still belongs to it -- but never
-   *  recommends it. Optional so the panel reads the same without it. */
+  /** Archived (归档, which 停用 was folded into). Sync never files a
+   *  booking on one by itself, so the picker keeps it reachable -- a
+   *  trip it really took before it was archived still belongs to it --
+   *  but never recommends it. Optional so the panel reads the same
+   *  without it. */
   deactivated?: boolean;
 };
 
@@ -47,11 +48,11 @@ function copy(locale: Locale) {
         intro:
           "预订邮件里只写车型、从来没有车牌,所以车队里有多台同款同年份时,系统无法判断是哪一台 —— 挂错车比不挂更糟,所以它先停在这里。行程本身是真的,下面的信息都来自 Turo 的邮件。",
         resolveHint:
-          "你可以直接指定车辆;也可以什么都不做 —— 下次导入覆盖这段时间的 CSV 时,车牌会自动把它挂到正确的车上。\n\n停用的车不会被自动分配订单:同步只在它停用之后的行程上把它排除。它停用前确实跑过的行程仍然算它一份,所以这类订单会继续留在这里等你判断。",
+          "你可以直接指定车辆;也可以什么都不做 —— 下次导入覆盖这段时间的 CSV 时,车牌会自动把它挂到正确的车上。\n\n归档的车不会被自动分配新订单:同步只在它最后一笔订单之后的行程上把它排除。它归档前确实跑过的行程仍然算它一份,所以这类订单会继续留在这里等你判断。",
         several: (count: number) => `车队里有 ${count} 台同款同年份,无法区分`,
         none: "车队里没有能对上这个车型的车",
-        allDeactivated: "对得上的车都已停用,默认不会自动挂上去",
-        deactivatedTag: "停用",
+        allDeactivated: "对得上的车都已归档,默认不会自动挂上去",
+        deactivatedTag: "已归档",
         reservation: "预订号",
         guest: "客人",
         trip: "行程",
@@ -77,11 +78,11 @@ function copy(locale: Locale) {
         intro:
           "Booking email names a model and never a plate, so when the fleet runs several of one model and year there is nothing to tell them apart — and the wrong car is worse than no car, so these wait here. The trips are real; everything below came from Turo's own mail.",
         resolveHint:
-          "Pick the car yourself, or do nothing — the next CSV import covering these dates names the plate and files them automatically.\n\nDeactivated cars are never given bookings automatically: sync rules one out only for trips after it was switched off. Trips it really took before then still count as possibly its, so those stay here for you to decide.",
+          "Pick the car yourself, or do nothing — the next CSV import covering these dates names the plate and files them automatically.\n\nArchived cars are never given new bookings automatically: sync rules one out only for trips after its last booking. Trips it really took before it was archived still count as possibly its, so those stay here for you to decide.",
         several: (count: number) => `${count} cars in the fleet share this model and year`,
         none: "No car in the fleet answers to this model",
-        allDeactivated: "Every car that answers to this model is deactivated, so none is chosen by default",
-        deactivatedTag: "deactivated",
+        allDeactivated: "Every car that answers to this model is archived, so none is chosen by default",
+        deactivatedTag: "archived",
         reservation: "Reservation",
         guest: "Guest",
         trip: "Trip",
@@ -136,7 +137,7 @@ function isUnderway(row: PendingOrderRow, now: number) {
 /**
  * The picker for one group. Active cars that match the model go to the
  * top, starred. Deactivated matches follow, tagged and unstarred: sync
- * will not choose them, but a trip one took before it was switched off
+ * will not choose them, but a trip one took before it was archived
  * is still its. Everything else stays reachable, because a mis-named
  * vehicle is exactly the case where the match found nothing.
  */

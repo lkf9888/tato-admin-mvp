@@ -268,11 +268,13 @@ export type BookingPlacement =
     };
 
 /**
- * Which car a booking email's trip goes on, with deactivated cars
- * (`VehicleStatus.inactive`, shown as 停用) taken into account.
+ * Which car a booking email's trip goes on, with archived cars taken
+ * into account. "Deactivated" below means archived (`isArchived`, 归档):
+ * 停用 (`VehicleStatus.inactive`) was folded into archiving, and the
+ * rule here is the one both used to share.
  *
- * A deactivated car is never placed automatically: an operator who
- * switches a car off is saying it should stop receiving trips, and a
+ * An archived car is never placed automatically: an operator who
+ * retires a car is saying it should stop receiving trips, and a
  * booking filed against it would land on the calendar and in its
  * owner's ledger regardless.
  *

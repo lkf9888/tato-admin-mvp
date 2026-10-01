@@ -404,9 +404,12 @@ export async function runGmailSync(input: {
   // Loaded once and reused for every message: the fleet is ~100 rows
   // and does not change during a sync.
   const fleet = await prisma.vehicle.findMany({
-    // Archived cars are excluded, or booking mail would keep filing
-    // new trips against a car retired precisely to stop receiving them.
-    where: { workspaceId: input.workspaceId, isArchived: false },
+    // Archived cars included: a guest writing about a trip the car ran
+    // before it was archived has to find that trip, and with the car
+    // left out a twin would answer to the model instead. New bookings
+    // are kept off archived cars where they are placed, in
+    // `applyTuroEmailsToOrders`.
+    where: { workspaceId: input.workspaceId },
     select: {
       id: true,
       brand: true,

@@ -115,8 +115,6 @@ export const importsMessages = {
           skippedRows = 0,
         ) =>
           `已匯入 ${successRows} 行，自動建立 ${createdVehicles} 台車輛，跳過 ${skippedRows} 行，另有 ${failedRows} 行待人工檢查。可重新整理下方日誌檢視新批次。`,
-        archivedRows: (count: number) =>
-          `已跳過 ${count} 行歸檔車輛的資料 —— 歸檔的作用就是讓它們不再被更新。`,
         reclaimedIdentifiers: (pairs: string) =>
           `已從錯誤的車輛上收回 VIN / Turo 車輛 ID:${pairs}。這兩個標識在匯入時優先順序高於車牌,在收回之前行程一直被歸到錯誤的車上。`,
         selectedVehiclesSummary: (selected: number, max: number) =>

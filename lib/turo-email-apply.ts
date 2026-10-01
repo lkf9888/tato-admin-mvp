@@ -95,9 +95,9 @@ export type ApplyOutcome = {
      *  cars may simply not be in the fleet table yet. */
     turoAccount: string | null;
   }[];
-  /** Bookings placed on a car only because a deactivated (停用) twin
-   *  was ruled out. Listed, not just counted: this is the one way a
-   *  deactivation changes where trips land, so a dry run should show
+  /** Bookings placed on a car only because an archived (归档) twin
+   *  was ruled out. Listed, not just counted: this is the one way
+   *  archiving changes where trips land, so a dry run should show
    *  exactly which ones it would move. */
   placedPastDeactivated: { reservationId: string; vehicleId: string }[];
   /** How many reservations each account contributed, so a co-hosted
@@ -371,9 +371,12 @@ export async function applyTuroOrderFacts(input: {
       },
     }),
     prisma.vehicle.findMany({
-      // Archived cars are excluded, or booking mail would keep filing
-      // new trips against a car retired precisely to stop receiving them.
-      where: { workspaceId: input.workspaceId, isArchived: false },
+      // Archived cars included. Excluding them looked like the way to
+      // stop new trips landing on a retired car, but it also made a
+      // trip it really ran before being archived match its twin
+      // instead -- the archived car was simply not there to be found.
+      // `placeBooking` keeps them off new trips; see below.
+      where: { workspaceId: input.workspaceId },
       select: {
         id: true,
         brand: true,
@@ -384,16 +387,21 @@ export async function applyTuroOrderFacts(input: {
         turoAccount: true,
         plateNumber: true,
         status: true,
+        isArchived: true,
       },
     }),
   ]);
 
-  // Deactivated cars stay in the fleet -- a plate typed by an operator
-  // still resolves to one -- but are never chosen from a model match.
-  // Each one's latest booking decides which trips it can be ruled out
-  // for; see `placeBooking`.
+  // Archived cars (归档; 停用 was folded into it) stay in the fleet -- a
+  // plate typed by an operator or read off a trip page still resolves to
+  // one -- but are never chosen from a model match. Each one's latest
+  // booking decides which trips it can be ruled out for; see
+  // `placeBooking`. `inactive` is still read for rows from before the
+  // merge, until the predeploy migration has archived them.
   const deactivatedIds = new Set(
-    fleet.filter((vehicle) => vehicle.status === VehicleStatus.inactive).map((vehicle) => vehicle.id),
+    fleet
+      .filter((vehicle) => vehicle.isArchived || vehicle.status === VehicleStatus.inactive)
+      .map((vehicle) => vehicle.id),
   );
   const lastBookedAt = new Map<string, Date>();
   if (deactivatedIds.size > 0) {

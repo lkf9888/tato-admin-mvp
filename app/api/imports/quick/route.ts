@@ -52,7 +52,6 @@ export async function POST(request: Request) {
       imported: result.successRows,
       failed: result.failedRows,
       cancelled: result.deletedCancelledRows,
-      archivedRows: result.archivedRows,
       newerObservationsApplied: result.newerObservationsApplied,
       missingVehicles,
       otherFailures: result.failures.filter((failure) => !failure.reason.startsWith("Vehicle not found"))

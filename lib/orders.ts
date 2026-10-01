@@ -1032,8 +1032,6 @@ export async function importTuroOrders(input: {
   const syncedVehicleIds = new Set<string>();
   let createdVehicles = 0;
   let updatedVehicles = 0;
-  /** Rows declined because their car is archived. */
-  let archivedRows = 0;
   /** VIN / vehicle-id pairs taken back from a car that was not theirs. */
   const reclaimedIdentifiers: Array<{ plateNumber: string; takenFrom: string }> = [];
   let deletedCancelledRows = 0;
@@ -1107,18 +1105,14 @@ export async function importTuroOrders(input: {
         continue;
       }
 
-      // Archived means "stop writing to this car". Skipped before any
-      // of the writes below -- the order upsert, the vehicle field
-      // sync, the identifier reclaim -- so an archived car absorbs
-      // nothing from an import, which is the whole point of archiving
-      // one. Counted rather than failed: there is nothing wrong with
-      // the row, we are declining it.
-      if (vehicle.isArchived) {
-        archivedRows += 1;
-        continue;
-      }
-
-      if (!syncedVehicleIds.has(vehicle.id)) {
+      // An archived car (归档, which 停用 was folded into) takes no new
+      // trips, but keeps its history -- and a CSV row names the car by
+      // its plate, so the trip really ran on it. The row is imported
+      // like any other. What is skipped is writing the export back onto
+      // the car itself: its listing fields and the identifier reclaim
+      // below. A retired car's listing may since have been handed to
+      // another vehicle, and its record should stay as it was archived.
+      if (!vehicle.isArchived && !syncedVehicleIds.has(vehicle.id)) {
         // Take back identifiers another car is holding.
         //
         // The row named this plate, and Turo states one VIN and one
@@ -1350,7 +1344,9 @@ export async function importTuroOrders(input: {
     deletedCancelledRows,
     deletedStaleOrders,
     reclaimedIdentifiers,
-    archivedRows,
+    /** Always 0: rows for archived cars are imported now. Kept only
+     *  until /api/agent/imports stops returning it; then removed. */
+    archivedRows: 0,
     failures,
   };
 }

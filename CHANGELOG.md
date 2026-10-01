@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.26.0 - 2026-09-30
+
+### An archived car keeps its trips: sync and CSV treat archived the way they treated 停用
+
+Archiving and 停用 are now one thing. An archived car takes no new trips but keeps its history. The Turo sync and the CSV import now follow that rule.
+
+- **Booking mail and agent reads still see archived cars.** Leaving them out entirely meant a trip an archived car really ran could match its twin instead. Archived cars are now treated the way 停用 cars were: never chosen for a trip that starts after their last booking, still a candidate for trips from while they were taking bookings (those wait in the unassigned basket rather than being guessed), and always reachable by a plate. Cars still marked 停用 from before the merge are treated the same way until the migration archives them.
+- **Guest messages about an archived car's trips still find the trip.** Previously the car was missing from the fleet that messages are matched against.
+- **A CSV row for an archived car is imported.** The plate names the car, so the trip happened on it, and the row updates the order and the owner ledger. The export is no longer written back onto the archived car's own listing fields, and identifiers are not reclaimed from it.
+
+The imports page's "skipped rows for archived vehicles" note is gone. The CSV result's `archivedRows` is now always 0 and will be removed once the agent API stops returning it.
+
+
 ## v1.25.1 - 2026-09-30
 
 ### The calendar works on a phone

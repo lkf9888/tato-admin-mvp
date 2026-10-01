@@ -129,6 +129,11 @@ export const shareMessages = {
       agreementTitle: "Rental agreement terms",
       agreementIntro: "Read the terms below before continuing to card checkout.",
       agreementCheckbox: "I have read and agree to the rental agreement terms.",
+      signatureLabel: (name: string) => (name ? `Signature of ${name}` : "Your signature"),
+      signatureClear: "Clear",
+      signatureNote:
+        "Sign with your finger or mouse. This signs the rental agreement; a signed copy is emailed to you once payment goes through.",
+      signatureMissingError: "Sign the rental agreement in the box before paying.",
       agreementShow: "Read the terms",
       agreementHide: "Hide the terms",
       agreementSections: [
@@ -304,6 +309,10 @@ export const shareMessages = {
       agreementTitle: "租车协议条款",
       agreementIntro: "继续支付前，请先阅读以下租车协议条款。",
       agreementCheckbox: "我已阅读并同意以上租车协议条款。",
+      signatureLabel: (name: string) => (name ? `${name} 签名` : "你的签名"),
+      signatureClear: "清除重签",
+      signatureNote: "用手指或鼠标在框内签名。这就是租车协议的签名，付款成功后会把签好的合同发到你的邮箱。",
+      signatureMissingError: "请先在签名框内签名，再付款。",
       agreementShow: "查看协议条款",
       agreementHide: "收起协议条款",
       agreementSections: [

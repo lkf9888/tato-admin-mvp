@@ -21,6 +21,7 @@ import {
 } from "@/lib/direct-booking";
 import { renterDailyPrice, type TaxLine } from "@/lib/booking-policy";
 import { normalizeCouponCode, type CouponDiscount } from "@/lib/booking-coupons";
+import { SignaturePad } from "@/components/signature-pad";
 import type { BookingAddOnOption } from "@/lib/booking-add-ons";
 import {
   BOOKING_TIME_OPTIONS,
@@ -421,6 +422,10 @@ export function PublicBookingPanel({
   const [licenseFront, setLicenseFront] = useState<File | null>(null);
   const [licenseBack, setLicenseBack] = useState<File | null>(null);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
+  // The renter's drawn signature; the agreement is signed with it once
+  // the booking is paid. Not saved across reloads -- a signature is
+  // given, not restored.
+  const [signature, setSignature] = useState("");
   // Phones only: the clauses fold behind a toggle so the page stays short.
   const [showClauses, setShowClauses] = useState(false);
   const [error, setError] = useState("");
@@ -709,6 +714,11 @@ export function PublicBookingPanel({
       return;
     }
 
+    if (!signature) {
+      setError(reserveMessages.signatureMissingError);
+      return;
+    }
+
     // The funnel step between "looked at a car" and "paid", valued the
     // way the purchase will be so the two can be compared. A no-op on
     // pages without a Google tag.
@@ -741,6 +751,7 @@ export function PublicBookingPanel({
       if (asksLicenceRegion) formData.set("hasLocalLicence", hasLocalLicence);
       if (appliedCoupon) formData.set("couponCode", appliedCoupon.code);
       for (const addOn of selectedAddOns) formData.append("addOnId", addOn.id);
+      formData.set("signature", signature);
       formData.set("licenseFront", licenseFront);
       formData.set("licenseBack", licenseBack);
 
@@ -1261,6 +1272,22 @@ export function PublicBookingPanel({
             {reserveMessages.agreementCheckbox}
           </span>
         </label>
+        <div className="mt-2 sm:mt-3">
+          <p className="text-xs font-medium text-[var(--ink)] sm:text-sm">
+            {reserveMessages.signatureLabel(renterName || "")}
+          </p>
+          <SignaturePad
+            value={signature}
+            onChange={(value) => {
+              setError("");
+              setSignature(value);
+            }}
+            clearLabel={reserveMessages.signatureClear}
+          />
+          <p className="mt-1 text-[11px] leading-4 text-[var(--ink-soft)] sm:text-xs sm:leading-5">
+            {reserveMessages.signatureNote}
+          </p>
+        </div>
       </div>
 
       <div

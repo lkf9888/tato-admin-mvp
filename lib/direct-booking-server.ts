@@ -1,5 +1,7 @@
 import "server-only";
 
+import { readFile } from "fs/promises";
+
 import { OrderAttachmentKind } from "@prisma/client";
 import type Stripe from "stripe";
 
@@ -30,6 +32,7 @@ import { getAppUrl, getStripeClient } from "@/lib/stripe";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { refundDirectBookingCharge } from "@/lib/stripe-refunds";
+import { resolveUploadPath } from "@/lib/uploads";
 import { formatCurrency, roundCurrencyAmount } from "@/lib/utils";
 
 type DirectBookingMetadata = {
@@ -70,6 +73,10 @@ type DirectBookingMetadata = {
   addOnAmount?: string;
   licenseDraftId?: string;
   agreementAccepted?: string;
+  /** Set when the renter signed on the booking page (v1.26.0). */
+  agreementSignedAt?: string;
+  signerIp?: string;
+  signerUserAgent?: string;
 };
 
 function readMetadata(raw: Stripe.Metadata | null | undefined): DirectBookingMetadata {
@@ -469,12 +476,18 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
     },
   });
 
-  const licenseDocuments = await prisma.directBookingDocument.findMany({
+  const sessionDocuments = await prisma.directBookingDocument.findMany({
     where: { checkoutSessionId: session.id },
     orderBy: { createdAt: "asc" },
   });
+  // The licence photos go on the order; the drawn signature goes into
+  // the agreement, below, rather than sitting among the attachments.
+  const licenseDocuments = sessionDocuments.filter(
+    (document) => document.kind === "driver_license_front" || document.kind === "driver_license_back",
+  );
+  const signatureDocument = sessionDocuments.find((document) => document.kind === "renter_signature");
 
-  if (licenseDocuments.length > 0) {
+  if (sessionDocuments.length > 0) {
     await prisma.orderAttachment.createMany({
       data: licenseDocuments.map((document) => ({
         workspaceId: vehicle.workspaceId,
@@ -545,7 +558,12 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
   // The fleet's insurance rate unless this car overrides it -- the same
   // resolution checkout priced the booking with.
   const vehiclePolicy = await getBookingPolicyForVehicle(vehicle);
+  // Signed on the booking page: that signature completes the agreement
+  // now, so the renter is emailed the signed copy instead of a link to
+  // sign it again.
+  const presigned = await readPresignature(signatureDocument, metadata);
   await createRentalAgreementEnvelope({
+    presigned,
     workspaceId: vehicle.workspaceId,
     orderId: order.id,
     renterName,
@@ -588,6 +606,25 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
       totalPrice,
     },
   });
+}
+
+async function readPresignature(
+  document: { pathname: string; contentType: string | null } | undefined,
+  metadata: DirectBookingMetadata,
+) {
+  if (!document) return null;
+  try {
+    const bytes = await readFile(resolveUploadPath(document.pathname));
+    const signedAt = metadata.agreementSignedAt ? new Date(metadata.agreementSignedAt) : new Date();
+    return {
+      signatureDataUrl: `data:${document.contentType || "image/png"};base64,${bytes.toString("base64")}`,
+      signedAt: Number.isNaN(signedAt.getTime()) ? new Date() : signedAt,
+      client: { ip: metadata.signerIp || null, userAgent: metadata.signerUserAgent || null },
+    };
+  } catch {
+    // Without the file the agreement is sent to sign the usual way.
+    return null;
+  }
 }
 
 function readTaxLinesMetadata(raw: string | undefined) {

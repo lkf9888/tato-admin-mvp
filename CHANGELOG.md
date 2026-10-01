@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.27.0 - 2026-09-30
+
+### The renter signs the rental agreement on the booking page
+
+The booking panel now asks for a drawn signature under the agreement
+terms, and checkout refuses a request without one. The signature is
+saved with the licence photos (`DirectBookingDocument`, kind
+`renter_signature`), and when and from where it was given travel in the
+Stripe metadata (`agreementSignedAt`, `signerIp`, `signerUserAgent`).
+
+After payment the webhook applies that signature to the agreement
+instead of emailing a link to sign: `createRentalAgreementEnvelope`
+takes `presigned`, and the envelope is completed on the spot. The
+signed PDF is rendered, filed on the order and emailed to the renter
+and the workspace, and the audit log records the signer's IP and
+browser from checkout. Sessions without a signature (older pages)
+still get the signing email.
+
+Signing now goes through one function, `completeRecipientSigning`
+(`lib/contract-completion.ts`), which the `/sign/[token]` route also
+calls: recording the values, marking the signer, and on the last
+signature rendering, filing and emailing the PDF. The signature pad is
+one shared component (`components/signature-pad.tsx`), used by the
+signing page and the booking panel.
+
 ## v1.26.1 - 2026-09-30
 
 ### 停用 is now 归档

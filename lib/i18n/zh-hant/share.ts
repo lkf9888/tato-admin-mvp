@@ -116,6 +116,10 @@ export const shareMessages = {
       agreementTitle: "租車協議條款",
       agreementIntro: "繼續支付前，請先閱讀以下租車協議條款。",
       agreementCheckbox: "我已閱讀並同意以上租車協議條款。",
+      signatureLabel: (name: string) => (name ? `${name} 簽名` : "你的簽名"),
+      signatureClear: "清除重籤",
+      signatureNote: "用手指或滑鼠在框內簽名。這就是租車協議的簽名，付款成功後會把簽好的合同發到你的郵箱。",
+      signatureMissingError: "請先在簽名框內簽名，再付款。",
       agreementShow: "檢視協議條款",
       agreementHide: "收起協議條款",
       agreementSections: [

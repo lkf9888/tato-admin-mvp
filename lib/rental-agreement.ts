@@ -20,6 +20,7 @@ import {
   type RentalAgreementClause,
 } from "@/lib/rental-agreement-text";
 import { formatBookingMoment, utcToZonedDate, utcToZonedTime } from "@/lib/booking-time";
+import { completeRecipientSigning } from "@/lib/contract-completion";
 import { sendContractSigningEmail } from "@/lib/contract-email";
 import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { getWorkspaceSender } from "@/lib/site-sender";
@@ -284,6 +285,16 @@ export async function createRentalAgreementEnvelope(input: {
   appUrl: string;
   /** The operator's own name, for the renter-facing email. */
   brandName?: string | null;
+  /**
+   * The renter already signed on the booking page (v1.26.0): apply that
+   * signature and finish the envelope -- signed PDF filed and emailed --
+   * instead of emailing a link to sign again.
+   */
+  presigned?: {
+    signatureDataUrl: string;
+    signedAt: Date;
+    client: { ip: string | null; userAgent: string | null };
+  } | null;
 }) {
   try {
     const to = input.renterEmail?.trim();
@@ -337,6 +348,63 @@ export async function createRentalAgreementEnvelope(input: {
     }
 
     const recipient = envelope.recipients[0];
+
+    if (input.presigned) {
+      await writeContractAuditLog({
+        workspaceId: input.workspaceId,
+        envelopeId: envelope.id,
+        recipientId: recipient.id,
+        event: "CREATED",
+        metadata: { reason: "direct_booking_presigned" },
+      });
+      const signatureField = template.fields.find(
+        (field) => field.type === "SIGNATURE" && field.recipientIndex == null,
+      );
+      const dateField = template.fields.find(
+        (field) => field.type === "DATE" && field.recipientIndex == null,
+      );
+      if (signatureField) {
+        await completeRecipientSigning({
+          recipientId: recipient.id,
+          values: [
+            {
+              fieldId: signatureField.id,
+              value: null,
+              signature: input.presigned.signatureDataUrl,
+              checked: null,
+            },
+            ...(dateField
+              ? [
+                  {
+                    fieldId: dateField.id,
+                    value: toDisplayDate(input.presigned.signedAt),
+                    signature: null,
+                    checked: null,
+                  },
+                ]
+              : []),
+          ],
+          client: input.presigned.client,
+          publicBase: input.appUrl.replace(/\/$/, ""),
+          auditMetadata: {
+            reason: "signed_on_booking_page",
+            signedAt: input.presigned.signedAt.toISOString(),
+          },
+        });
+        await logActivity({
+          workspaceId: input.workspaceId,
+          actor: "direct-booking",
+          action: "rental_agreement_signed_at_booking",
+          entityType: "ContractEnvelope",
+          entityId: envelope.id,
+          metadata: { orderId: input.orderId, to },
+        });
+        return envelope;
+      }
+      // A template without a signature box cannot take the signature;
+      // fall through and ask for one the usual way.
+    }
+
     const result = await sendContractSigningEmail({
       to,
       recipientName: input.renterName,

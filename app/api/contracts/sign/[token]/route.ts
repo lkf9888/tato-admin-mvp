@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendContractCompletedEmail, sendContractSigningEmail } from "@/lib/contract-email";
-import {
-  renderSignedContractPdf,
-  uploadSignedContractPdf,
-  writeContractAuditLog,
-  type ContractPdfField,
-  type ContractPdfFieldValue,
-} from "@/lib/contract-signing";
+import { completeRecipientSigning } from "@/lib/contract-completion";
+import { writeContractAuditLog } from "@/lib/contract-signing";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceMailIdentity } from "@/lib/site-sender";
 
 type Params = Promise<{ token: string }>;
 
@@ -105,221 +98,20 @@ export async function POST(
   const error = validateRequiredFields(allowedFields, values);
   if (error) return NextResponse.json({ error }, { status: 400 });
 
-  await prisma.$transaction(async (tx) => {
-    for (const value of values) {
-      await tx.contractFieldValue.upsert({
-        where: {
-          envelopeId_fieldId: {
-            envelopeId: recipient.envelope.id,
-            fieldId: value.fieldId,
-          },
-        },
-        create: {
-          envelopeId: recipient.envelope.id,
-          fieldId: value.fieldId,
-          recipientId: recipient.id,
-          value: value.value,
-          signature: value.signature,
-          checked: value.checked,
-        },
-        update: {
-          recipientId: recipient.id,
-          value: value.value,
-          signature: value.signature,
-          checked: value.checked,
-        },
-      });
-    }
-    await tx.contractRecipient.update({
-      where: { id: recipient.id },
-      data: { status: "SIGNED", signedAt: new Date() },
-    });
-  });
-
-  await writeContractAuditLog({
-    workspaceId: recipient.envelope.workspaceId,
-    envelopeId: recipient.envelope.id,
+  const result = await completeRecipientSigning({
     recipientId: recipient.id,
-    event: "SIGNED",
+    values,
     req,
+    publicBase: getPublicBase(req),
   });
-
-  const fresh = await prisma.contractEnvelope.findUnique({
-    where: { id: recipient.envelope.id },
-    include: {
-      workspace: { select: { users: { select: { email: true, name: true } } } },
-      order: { select: { id: true, vehicleId: true, workspaceId: true } },
-      template: { include: { fields: { orderBy: [{ page: "asc" }, { sortOrder: "asc" }] } } },
-      recipients: { orderBy: { signingOrder: "asc" } },
-      values: true,
-    },
-  });
-  if (!fresh) return NextResponse.json({ ok: true });
-
-  const allSigned = fresh.recipients.every((item) => item.status === "SIGNED");
-  if (!allSigned) {
-    await prisma.contractEnvelope.update({
-      where: { id: fresh.id },
-      data: { status: "PARTIALLY_SIGNED" },
-    });
-    const nextRecipient = fresh.recipients.find((item) => item.status !== "SIGNED");
-    const emailFailures: { email: string; error: string }[] = [];
-    if (nextRecipient) {
-      const origin = req.headers.get("origin") || new URL(req.url).origin;
-      const publicBase = (process.env.APP_URL || origin).replace(/\/$/, "");
-      const identity = await getWorkspaceMailIdentity(fresh.workspaceId);
-      const result = await sendContractSigningEmail({
-        to: nextRecipient.email,
-        recipientName: nextRecipient.name,
-        contractTitle: fresh.title,
-        senderName: identity.brandName ?? "TATO",
-        brandName: identity.brandName,
-        from: identity.from,
-        signingUrl: `${publicBase}/sign/${nextRecipient.token}`,
-        message: fresh.message,
-      });
-      if (result.ok) {
-        await writeContractAuditLog({
-          workspaceId: fresh.workspaceId,
-          envelopeId: fresh.id,
-          recipientId: nextRecipient.id,
-          event: "SENT",
-          req,
-          metadata: { reason: "previous_signer_completed" },
-        });
-      } else {
-        emailFailures.push({
-          email: nextRecipient.email,
-          error: result.error || result.status,
-        });
-        await writeContractAuditLog({
-          workspaceId: fresh.workspaceId,
-          envelopeId: fresh.id,
-          recipientId: nextRecipient.id,
-          event: "EMAIL_FAILED",
-          req,
-          metadata: result,
-        });
-      }
-    }
-    return NextResponse.json({ ok: true, completed: false, emailFailures });
+  if (!result.completed) {
+    return NextResponse.json({ ok: true, completed: false, emailFailures: result.emailFailures });
   }
-
-  const rendered = await renderSignedContractPdf({
-    templatePdfUrl: fresh.template.pdfPathname,
-    fields: fresh.template.fields.map(toPdfField),
-    values: fresh.values.map(toPdfValue),
-  });
-  const blob = await uploadSignedContractPdf({
-    envelopeId: fresh.id,
-    title: fresh.title,
-    buffer: rendered.buffer,
-    baseUrl: getPublicBase(req),
-  });
-  const completedAt = new Date();
-  const completed = await prisma.contractEnvelope.update({
-    where: { id: fresh.id },
-    data: {
-      status: "COMPLETED",
-      completedAt,
-      signedPdfUrl: blob.url,
-      signedPdfPathname: blob.pathname,
-      signedPdfFilename: `${fresh.title} - signed.pdf`,
-      signedPdfContentType: "application/pdf",
-      signedPdfSize: rendered.buffer.length,
-      signedPdfSha256: rendered.sha256,
-    },
-  });
-
-  if (completed.orderId) {
-    await prisma.orderAttachment.create({
-      data: {
-        workspaceId: fresh.workspaceId,
-        orderId: completed.orderId,
-        vehicleId: fresh.order?.vehicleId ?? null,
-        kind: "document",
-        url: blob.url,
-        pathname: blob.pathname,
-        filename: `${fresh.title} - signed.pdf`,
-        contentType: "application/pdf",
-        size: rendered.buffer.length,
-      },
-    });
-  }
-
-  await writeContractAuditLog({
-    workspaceId: fresh.workspaceId,
-    envelopeId: fresh.id,
-    event: "PDF_GENERATED",
-    req,
-    metadata: { sha256: rendered.sha256, size: rendered.buffer.length },
-  });
-  await writeContractAuditLog({
-    workspaceId: fresh.workspaceId,
-    envelopeId: fresh.id,
-    event: "COMPLETED",
-    req,
-  });
-
-  const signedPdfAttachment = {
-    filename: `${fresh.title} - signed.pdf`,
-    content: rendered.buffer,
-    contentType: "application/pdf",
-  };
-  const mailIdentity = await getWorkspaceMailIdentity(fresh.workspaceId);
-  for (const item of fresh.recipients) {
-    // The signed-PDF route requires either an admin session or a valid
-    // recipient token (see that route's header comment). Signers have
-    // neither a session nor the bare URL, so carry their own token on
-    // the link — it is the same secret that gated the signing page.
-    const recipientPdfUrl = blob.url
-      ? `${blob.url}?token=${encodeURIComponent(item.token)}`
-      : blob.url;
-    const result = await sendContractCompletedEmail({
-      to: item.email,
-      recipientName: item.name,
-      contractTitle: fresh.title,
-      signedPdfUrl: recipientPdfUrl,
-      signedPdfAttachment,
-      brandName: mailIdentity.brandName,
-      from: mailIdentity.from,
-    });
-    if (!result.ok) {
-      await writeContractAuditLog({
-        workspaceId: fresh.workspaceId,
-        envelopeId: fresh.id,
-        recipientId: item.id,
-        event: "EMAIL_FAILED",
-        req,
-        metadata: { email: item.email, status: result.status, error: result.error },
-      });
-    }
-  }
-  for (const admin of fresh.workspace?.users || []) {
-    const hostEmailResult = await sendContractCompletedEmail({
-      to: admin.email,
-      recipientName: admin.name || "Admin",
-      contractTitle: fresh.title,
-      signedPdfUrl: blob.url,
-      signedPdfAttachment,
-      from: mailIdentity.from,
-    });
-    if (!hostEmailResult.ok) {
-      await writeContractAuditLog({
-        workspaceId: fresh.workspaceId,
-        envelopeId: fresh.id,
-        event: "EMAIL_FAILED",
-        req,
-        metadata: { email: admin.email, status: hostEmailResult.status, error: hostEmailResult.error },
-      });
-    }
-  }
-
   return NextResponse.json({
     ok: true,
     completed: true,
-    signedPdfUrl: blob.url,
-    sha256: rendered.sha256,
+    signedPdfUrl: result.signedPdfUrl,
+    sha256: result.sha256,
   });
 }
 
@@ -418,30 +210,6 @@ function validateRequiredFields(
     }
   }
   return null;
-}
-
-function toPdfField(field: {
-  id: string;
-  type: "SIGNATURE" | "TEXT" | "DATE" | "CHECKBOX" | "REDACTION";
-  label: string;
-  page: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  fontSize: number | null;
-  defaultValue: string | null;
-}): ContractPdfField {
-  return field;
-}
-
-function toPdfValue(value: {
-  fieldId: string;
-  value: string | null;
-  signature: string | null;
-  checked: boolean | null;
-}): ContractPdfFieldValue {
-  return value;
 }
 
 function getPublicBase(req: NextRequest) {

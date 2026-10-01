@@ -41,6 +41,7 @@ import {
   reserveCoupon,
 } from "@/lib/booking-coupons-server";
 import { getStripeCheckoutLocale, isSiteLocale } from "@/lib/site-locale";
+import { clientIp } from "@/lib/contract-signing";
 import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
 import {
   computePlatformFeeCents,
@@ -91,6 +92,12 @@ const checkoutSchema = z.object({
   couponCode: z.string().trim().max(40).optional(),
   addOnIds: z.array(z.string().trim().min(1).max(60)).max(MAX_ADD_ONS_PER_BOOKING).default([]),
 });
+
+/** The renter's signature, drawn on the booking page. */
+const RENTER_SIGNATURE_KIND = "renter_signature";
+const SIGNATURE_DATA_URL = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/;
+/** A drawn signature is a few tens of KB; this is generous. */
+const MAX_SIGNATURE_CHARS = 600_000;
 
 type LicenseDocumentKind = (typeof LICENSE_DOCUMENT_KINDS)[keyof typeof LICENSE_DOCUMENT_KINDS];
 
@@ -172,6 +179,14 @@ async function readCheckoutRequest(request: Request) {
     throw new Error("Upload both the front and back of the driver's license.");
   }
 
+  // The renter's signature from the booking page, as a PNG data URL.
+  // It is the agreement's signature, so a page that sends none is
+  // refused rather than booked unsigned.
+  const signature = readFormString(formData, "signature");
+  if (!SIGNATURE_DATA_URL.test(signature) || signature.length > MAX_SIGNATURE_CHARS) {
+    throw new Error("Please sign the rental agreement before paying.");
+  }
+
   const parsed = checkoutSchema.parse({
     vehicleId: readFormString(formData, "vehicleId"),
     pickupDate: readFormString(formData, "pickupDate"),
@@ -194,7 +209,7 @@ async function readCheckoutRequest(request: Request) {
   const rawLocale = formData.get("locale");
   const siteLocale = isSiteLocale(rawLocale) ? rawLocale : "en";
 
-  return { parsed, licenseFront, licenseBack, siteLocale };
+  return { parsed, licenseFront, licenseBack, siteLocale, signature };
 }
 
 export async function POST(request: Request) {
@@ -203,7 +218,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Stripe is not configured." }, { status: 400 });
     }
 
-    const { parsed, licenseFront, licenseBack, siteLocale } = await readCheckoutRequest(request);
+    const { parsed, licenseFront, licenseBack, siteLocale, signature } =
+      await readCheckoutRequest(request);
+    // When and from where the renter signed, for the agreement's audit
+    // trail; the webhook applies the signature after payment.
+    const signedAt = new Date();
+    const signerIp = clientIp(request);
+    const signerUserAgent = (request.headers.get("user-agent") ?? "").slice(0, 300);
     // The trip as two moments on the operator's clock. Same-day trips
     // are fine now that there are times; a return before the pickup is
     // not.
@@ -432,8 +453,26 @@ export async function POST(request: Request) {
       }),
     ]);
 
+    const signatureBytes = Buffer.from(signature.slice(signature.indexOf(",") + 1), "base64");
+    const signaturePath = makeDirectBookingDocumentPath(
+      licenseDraftId,
+      RENTER_SIGNATURE_KIND,
+      "signature.png",
+    );
+    await mkdir(path.dirname(resolveUploadPath(signaturePath)), { recursive: true });
+    await writeFile(resolveUploadPath(signaturePath), signatureBytes);
+
     await prisma.directBookingDocument.createMany({
-      data: licenseDocuments.map((document) => ({
+      data: [
+        ...licenseDocuments,
+        {
+          kind: RENTER_SIGNATURE_KIND,
+          pathname: signaturePath,
+          filename: "signature.png",
+          contentType: "image/png",
+          size: signatureBytes.length,
+        },
+      ].map((document) => ({
         workspaceId: vehicle.workspaceId,
         vehicleId: vehicle.id,
         draftId: licenseDraftId,
@@ -632,6 +671,9 @@ export async function POST(request: Request) {
         ...encodeAddOnsMetadata(quote.addOnLines),
         licenseDraftId,
         agreementAccepted: "true",
+        agreementSignedAt: signedAt.toISOString(),
+        signerIp: signerIp ?? "",
+        signerUserAgent,
         connectAccountId: connectSnapshot.accountId!,
         applicationFeeAmount: String(applicationFeeAmount),
       },

@@ -155,6 +155,7 @@ export async function writeContractAuditLog({
   recipientId,
   event,
   req,
+  client,
   metadata,
 }: {
   workspaceId: string | null | undefined;
@@ -170,6 +171,9 @@ export async function writeContractAuditLog({
     | "PDF_GENERATED"
     | "EMAIL_FAILED";
   req?: Request;
+  /** Who signed, when there is no request to read it from -- a
+   *  signature captured at booking and applied later by the webhook. */
+  client?: { ip: string | null; userAgent: string | null };
   metadata?: unknown;
 }) {
   await prisma.contractAuditLog.create({
@@ -178,8 +182,8 @@ export async function writeContractAuditLog({
       envelopeId,
       recipientId: recipientId ?? null,
       event,
-      ip: req ? clientIp(req) : null,
-      userAgent: req?.headers.get("user-agent") || null,
+      ip: client ? client.ip : req ? clientIp(req) : null,
+      userAgent: client ? client.userAgent : req?.headers.get("user-agent") || null,
       metadata: metadata == null ? undefined : metadata,
     },
   });
@@ -303,7 +307,7 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
   return lines.length ? lines : [text.slice(0, 120)];
 }
 
-function clientIp(req: Request) {
+export function clientIp(req: Request) {
   return (
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     req.headers.get("x-real-ip") ||

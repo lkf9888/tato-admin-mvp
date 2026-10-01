@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { BookingExtraChargePanel } from "@/components/booking-extra-charge-panel";
 import { DirectBookingCancelPanel } from "@/components/direct-booking-cancel-panel";
+import { DirectBookingHandoverPanel } from "@/components/direct-booking-handover-panel";
 import { DepositSettlementPanel } from "@/components/deposit-settlement-panel";
 import { DirectBookingOrderEmails } from "@/components/direct-booking-order-emails";
 import { requireCurrentAdminContext } from "@/lib/auth";
@@ -300,6 +301,13 @@ export default async function OrderDetailPage({
           </section>
         </aside>
       </div>
+
+      {/* Pick-up and return photos with the odometer, under both
+          columns: two photo grids side by side do not fit the 320px
+          sidebar the other direct-booking panels share. */}
+      {directPayment.isDirectBooking ? (
+        <DirectBookingHandoverPanel locale={locale} orderId={order.id} />
+      ) : null}
     </div>
   );
 }

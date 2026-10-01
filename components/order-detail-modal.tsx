@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { BookingExtraChargePanel } from "@/components/booking-extra-charge-panel";
 import { DirectBookingCancelPanel } from "@/components/direct-booking-cancel-panel";
+import { DirectBookingHandoverPanel } from "@/components/direct-booking-handover-panel";
 import { OrderAttachments } from "@/components/order-attachments";
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
@@ -1124,6 +1125,15 @@ export function OrderDetailModal({
                     onClose();
                   }}
                 />
+              </div>
+            ) : null}
+
+            {/* Pick-up and return photos and the odometer. Full width: two
+                photo grids side by side. Renders nothing for an order that
+                is not a direct booking. */}
+            {currentOrder.source !== "turo" ? (
+              <div className="empty:hidden sm:col-span-2 lg:col-span-4">
+                <DirectBookingHandoverPanel locale={locale} orderId={currentOrder.id} />
               </div>
             ) : null}
 

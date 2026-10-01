@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.28.1 - 2026-10-01
+
+### Handover photos and the odometer appear on the order
+
+v1.28.0 added pick-up and return photos and odometer readings for direct bookings. They now show where an operator works: on the order's own page, full width under the trip and its side panels -- the two photo grids do not fit the sidebar -- and in the calendar's order popup, after Cancel and refund. Each side shows the renter's photos and yours, with an upload button, and the odometer, fuel and a note; with both readings in, the kilometres driven and any excess are worked out underneath. Direct bookings only.
+
+
 ## v1.28.0 - 2026-09-30
 
 ### Check-in photos at pick-up and return, the odometer on the order, and a reminder an hour before

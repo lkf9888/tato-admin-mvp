@@ -2258,3 +2258,30 @@ model GuestMessageAlertSetting {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
+
+/// Standing instructions the operator gives the AI once ("replies short",
+/// "pickup is in lot B2"). Added to every assistant answer and every
+/// guest-reply draft.
+model AssistantMemory {
+  id          String   @id @default(cuid())
+  workspaceId String
+  content     String
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+}
+
+/// What the AI may tell a guest about one car: where it parks, how the
+/// charging cable works. Never the pickup code -- that stays with the
+/// operator. One row per car; no relation to Vehicle so this domain does
+/// not add fields to a model it does not own.
+model VehicleReplyKnowledge {
+  id          String   @id @default(cuid())
+  workspaceId String
+  vehicleId   String   @unique
+  content     String
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+}

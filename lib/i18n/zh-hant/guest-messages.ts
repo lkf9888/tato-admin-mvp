@@ -19,6 +19,13 @@ export const guestMessagesMessages = {
       templatesButton: "訊息模板",
       alertsButton: "推送到手機",
       templatesShort: "模板",
+      carNotesTitle: "這台車給 AI 的說明",
+      carNotesHint: "可以告訴客人的事：停在哪、怎麼充電、要注意什麼。AI 起草回覆時會用上。別寫取車密碼，密碼從不交給 AI。",
+      carNotesPlaceholder: "例如：停在 P3 12 號位，充電線在後備箱。",
+      carNotesSave: "儲存說明",
+      carNotesSaving: "儲存中…",
+      carNotesSaved: "已儲存",
+      carNotesFailed: "儲存失敗。",
       tripTitle: "匹配到的訂單",
       tripNone: "未匹配到訂單",
       tripNoneCopy:

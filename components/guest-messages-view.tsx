@@ -879,6 +879,9 @@ export function GuestMessagesView({
                       >
                         {t.tripOpen}
                       </Link>
+                      {selected.vehicleId ? (
+                        <CarNotesEditor key={selected.vehicleId} vehicleId={selected.vehicleId} t={t} />
+                      ) : null}
                     </>
                   ) : (
                     <div className="grid gap-2 text-[12px] leading-5">
@@ -1058,5 +1061,80 @@ export function GuestMessagesView({
       </div>
       {templatesPanel}
     </>
+  );
+}
+
+/**
+ * What the AI may tell guests about this car, edited where it is needed:
+ * beside a conversation about it. Loaded on first open, one car at a time.
+ */
+function CarNotesEditor({ vehicleId, t }: { vehicleId: string; t: Copy }) {
+  const [content, setContent] = useState<string | null>(null);
+  const [saved, setSaved] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/messages/vehicle-knowledge?vehicleId=${encodeURIComponent(vehicleId)}`)
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((data: { content: string }) => {
+        if (!alive) return;
+        setContent(data.content);
+        setSaved(data.content);
+      })
+      .catch(() => alive && setFailed(true));
+    return () => {
+      alive = false;
+    };
+  }, [vehicleId]);
+
+  async function save() {
+    if (content == null) return;
+    setBusy(true);
+    setFailed(false);
+    try {
+      const response = await fetch("/api/messages/vehicle-knowledge", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vehicleId, content }),
+      });
+      if (!response.ok) throw new Error();
+      setSaved(content);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 grid gap-1.5 border-t border-[var(--line)] pt-2.5">
+      <label htmlFor={`car-notes-${vehicleId}`} className="text-[12px] font-bold text-[var(--ink)]">
+        {t.carNotesTitle}
+      </label>
+      <p className="text-[11.5px] leading-4 text-[var(--ink-soft)]">{t.carNotesHint}</p>
+      <textarea
+        id={`car-notes-${vehicleId}`}
+        value={content ?? ""}
+        disabled={content == null}
+        onChange={(event) => setContent(event.target.value)}
+        rows={3}
+        maxLength={1500}
+        placeholder={t.carNotesPlaceholder}
+        className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-2 text-[13px] leading-5 outline-none focus:border-[var(--line-strong)]"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={busy || content == null || content === saved}
+          className="tap-press h-8 rounded-full bg-[var(--ink)] px-3.5 text-[12px] font-bold text-white transition hover:opacity-90 disabled:opacity-40"
+        >
+          {busy ? t.carNotesSaving : content != null && content === saved && saved ? t.carNotesSaved : t.carNotesSave}
+        </button>
+        {failed ? <span className="text-[12px] text-rose-600">{t.carNotesFailed}</span> : null}
+      </div>
+    </div>
   );
 }

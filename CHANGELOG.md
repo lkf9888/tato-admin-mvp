@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.35.0 - 2026-10-05
+
+### The AI remembers standing instructions, and drafts guest replies the way this host answers
+
+- **What the AI remembers.** The assistant page has a list of standing instructions, such as "keep guest replies to two sentences" or "pickup is in lot B2". Each is said once and then added to every assistant answer and every guest-reply draft. The list holds up to 30, of up to 300 characters each.
+- **Past answers as examples.** A draft is now shown the host's own replies to similar questions. These come from recorded conversations as pairs of guest message and the reply that followed, ranked by shared words, with the same car first, three at most. The model is told to match their tone, and never to copy a code, address, time or price from them: only the trip facts and car notes are current.
+- **Car notes.** Opening a trip's details in a conversation shows "这台车给 AI 的说明": what a guest may be told about this car, such as where it parks or how charging works. Drafts use these notes. The pickup code is never given to the AI.
+- **Both sides of the thread.** When the conversation has been recorded, the draft reads it instead of the guest's emails alone, so it sees what was already said and does not repeat an answer from an hour ago.
+
+
 ## v1.34.0 - 2026-10-05
 
 ### Message templates fill themselves in for the guest you are answering

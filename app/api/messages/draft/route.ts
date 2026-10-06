@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { assistantMemoryPrompt } from "@/lib/assistant-memory";
 import { requireCurrentAdminContext } from "@/lib/auth";
+import { findSimilarPastReplies, getVehicleReplyKnowledge } from "@/lib/guest-reply-context";
 import { isKimiConfigured, kimiChat } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -38,6 +40,8 @@ const SYSTEM_PROMPT = [
   "Keep it to 1–3 short sentences. Answer only what the guest actually asked. No greeting, no sign-off, no restating their question.",
   "Never invent details you were not given: pickup addresses, lockbox codes, prices, or times. If the guest asks for something not in the context, say you will confirm shortly.",
   "The trip facts you are given are the only facts you have. Do not add to them.",
+  "You may be shown how this host answered similar questions before. Match their tone and what they usually say, but never copy a code, address, time or price from those answers -- only the trip facts and car notes are current.",
+  "Car notes are written by the host for guests; you may use them.",
   "Output only the reply text — no preamble, no quotes, no explanation.",
   // These models reason before answering and the reasoning dominates
   // the wait: measured at 14.4s for a 70-character reply. The reply is
@@ -116,7 +120,19 @@ export async function POST(request: Request) {
     ? emails.find((email) => email.id === parsed.data.emailId)
     : null;
 
-  const transcript = [...emails]
+  // The recorded conversation, when there is one, is the better
+  // transcript: it has both sides, including what we already said, so
+  // the draft does not repeat an answer given an hour ago.
+  const recorded = order?.externalOrderId
+    ? await prisma.turoConversationMessage.findMany({
+        where: { workspaceId: context.workspace.id, reservationId: order.externalOrderId },
+        orderBy: { sentAt: "desc" },
+        take: 8,
+        select: { direction: true, body: true, sentAt: true },
+      })
+    : [];
+
+  const emailTranscript = [...emails]
     .reverse()
     .map((email) => {
       const summary = (() => {
@@ -137,6 +153,30 @@ export async function POST(request: Request) {
     })
     .join("\n---\n");
 
+  const transcript =
+    recorded.length > 0
+      ? [...recorded]
+          .reverse()
+          .map(
+            (message) =>
+              `[${message.sentAt.toISOString().slice(0, 16).replace("T", " ")}] ${message.direction === "outbound" ? "Host" : "Guest"}: ${message.body.slice(0, 400)}`,
+          )
+          .join("\n")
+      : emailTranscript;
+
+  const question = (target ?? emails[0]).bodyText;
+  const vehicleId = parsed.data.vehicleId ?? order?.vehicleId ?? null;
+  const [memory, carNotes, pastReplies] = await Promise.all([
+    assistantMemoryPrompt(context.workspace.id),
+    getVehicleReplyKnowledge(context.workspace.id, vehicleId),
+    findSimilarPastReplies({
+      workspaceId: context.workspace.id,
+      question: question.slice(0, 600),
+      vehicleId,
+      excludeReservationId: order?.externalOrderId ?? null,
+    }),
+  ]);
+
   const facts = [
     `Guest: ${parsed.data.guestName}`,
     vehicle ? `Vehicle: ${vehicle.year} ${vehicle.brand} ${vehicle.model}` : "",
@@ -145,9 +185,16 @@ export async function POST(request: Request) {
       : "No matching trip on file — do not state any dates.",
     order?.pickupLocation ? `Pickup: ${order.pickupLocation}` : "",
     parsed.data.instruction ? `The host wants you to convey: ${parsed.data.instruction}` : "",
+    carNotes ? `Car notes from the host:\n${carNotes}` : "",
   ]
     .filter(Boolean)
     .join("\n");
+
+  const examples = pastReplies.length
+    ? `\n\nHow this host answered similar questions before (tone only; facts may be out of date):\n${pastReplies
+        .map((pair) => `Guest: ${pair.asked}\nHost: ${pair.answered}`)
+        .join("\n---\n")}`
+    : "";
 
   const focus = target
     ? `\n\nReply to this message specifically:\n${target.bodyText.slice(0, 600)}`
@@ -155,10 +202,10 @@ export async function POST(request: Request) {
 
   const result = await kimiChat({
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: memory ? `${SYSTEM_PROMPT}\n\n${memory}` : SYSTEM_PROMPT },
       {
         role: "user",
-        content: `Trip facts:\n${facts}\n\nConversation:\n${transcript}${focus}`,
+        content: `Trip facts:\n${facts}${examples}\n\nConversation:\n${transcript}${focus}`,
       },
     ],
     // 1200 was tried and was wrong. The budget bounds reasoning *and*

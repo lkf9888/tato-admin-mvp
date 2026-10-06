@@ -1,7 +1,9 @@
 import { AssistantAlertsPanel } from "@/components/assistant-alerts-panel";
 import { AssistantChat } from "@/components/assistant-chat";
 import { TuroInboxPanel } from "@/components/turo-inbox-panel";
+import { AssistantMemoryPanel } from "@/components/assistant-memory-panel";
 import { listActiveAlerts } from "@/lib/assistant-alerts";
+import { listAssistantMemory } from "@/lib/assistant-memory";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { isGmailInboxConfigured } from "@/lib/gmail-inbox";
 import { getI18n } from "@/lib/i18n-server";
@@ -18,7 +20,7 @@ export default async function AssistantPage() {
   // Resume the operator's most recent conversation rather than opening
   // a blank one every visit — an assistant you have to re-brief on each
   // page load is a worse tool than one that remembers this morning.
-  const [thread, inboundEmails, alerts] = await Promise.all([
+  const [thread, inboundEmails, alerts, memory] = await Promise.all([
     prisma.assistantThread.findFirst({
       where: { workspaceId: workspace.id, userId: user.id },
       orderBy: { updatedAt: "desc" },
@@ -42,6 +44,7 @@ export default async function AssistantPage() {
       },
     }),
     listActiveAlerts(workspace.id),
+    listAssistantMemory(workspace.id),
   ]);
 
   return (
@@ -74,6 +77,11 @@ export default async function AssistantPage() {
           }))}
         />
 
+        <div className="grid content-start gap-3">
+        <AssistantMemoryPanel
+          locale={locale}
+          initialItems={memory.map((item) => ({ id: item.id, content: item.content }))}
+        />
         <TuroInboxPanel
           locale={locale}
           configured={isGmailInboxConfigured()}
@@ -102,6 +110,7 @@ export default async function AssistantPage() {
             })(),
           }))}
         />
+        </div>
       </div>
     </div>
   );

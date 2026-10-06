@@ -31,6 +31,7 @@ const taskSchema = z.object({
   sortOrder: z.coerce.number().int().optional(),
   /** Pay for this one task; null falls back to the staff member's rate. */
   payRate: z.number().nonnegative().nullable().optional(),
+  complained: z.boolean().optional(),
 });
 
 function nullable(value?: string | null) {
@@ -226,6 +227,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
           : parsed.payRate === null
             ? null
             : Math.round(parsed.payRate * 100) / 100,
+      complained: parsed.complained ?? existing.complained,
       completedAt,
     },
     include: taskInclude,

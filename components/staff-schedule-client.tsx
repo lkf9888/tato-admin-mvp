@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import {
   Bell,
   CheckCircle2,
@@ -20,6 +20,7 @@ import {
 
 import type { Locale } from "@/lib/i18n";
 import { compressImageFiles } from "@/lib/client-image-compression";
+import { findSameDayPickups } from "@/lib/staff-same-day";
 import {
   STAFF_TASK_TEMPLATE_VARIABLES,
   normalizeStaffTaskNotificationTemplate,
@@ -79,7 +80,24 @@ type StaffTask = {
     returnDatetime: string;
   } | null;
   attachments: TaskAttachment[];
+  complained: boolean;
 };
+
+/**
+ * What the task cards need to know beyond the task itself: whether the
+ * same car is picked up again later that day (the turnaround is urgent),
+ * and how to flip the guest-complaint tag from a row that has no edit
+ * button. Context rather than props through three lists.
+ */
+type TaskFlags = {
+  sameDayPickups: Map<string, { time: string; renterName: string }>;
+  toggleComplaint: (task: StaffTask) => void;
+};
+
+const TaskFlagsContext = createContext<TaskFlags>({
+  sameDayPickups: new Map(),
+  toggleComplaint: () => {},
+});
 
 type TaskAttachment = {
   id: string;
@@ -272,6 +290,9 @@ function getStaffScheduleCopy(locale: Locale) {
         none: "不关联",
         created: "已保存",
         failed: "保存失败，请稍后再试。",
+        complained: "客人投诉",
+        markComplained: "客人投诉了这次工作",
+        sameDayPickup: (time: string) => `当天 ${time} 再取车`,
         statusLabels: {
           todo: "待办",
           in_progress: "进行中",
@@ -394,6 +415,9 @@ function getStaffScheduleCopy(locale: Locale) {
         none: "None",
         created: "Saved",
         failed: "Could not save. Please try again.",
+        complained: "Guest complaint",
+        markComplained: "A guest complained about this job",
+        sameDayPickup: (time: string) => `Out again ${time}`,
         statusLabels: {
           todo: "To do",
           in_progress: "In progress",
@@ -537,6 +561,33 @@ export function StaffScheduleClient({
       return copyList;
     });
   }
+
+  async function toggleComplaint(task: StaffTask) {
+    const response = await fetch(`/api/staff-schedule/tasks/${task.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ complained: !task.complained }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.task) {
+      setNotice(c.failed);
+      return;
+    }
+    upsertTask(normalizeTask(payload.task));
+  }
+
+  // A car coming back and going out again the same day: the job between
+  // the two cannot slip. Read from the orders the page already has
+  // (yesterday to five days out), which covers every task the schedule
+  // is about to hand out.
+  const sameDayPickups = useMemo(() => {
+    const found = findSameDayPickups(tasks, upcomingOrders, toLocalDateInput);
+    const map = new Map<string, { time: string; renterName: string }>();
+    for (const [taskId, pickup] of found) {
+      map.set(taskId, { time: formatOrderEventTime(pickup.pickupDatetime, locale), renterName: pickup.renterName });
+    }
+    return map;
+  }, [locale, tasks, upcomingOrders]);
 
   function upsertTask(next: StaffTask) {
     setTasks((current) => {
@@ -850,6 +901,7 @@ export function StaffScheduleClient({
   }
 
   return (
+    <TaskFlagsContext.Provider value={{ sameDayPickups, toggleComplaint: (task) => void toggleComplaint(task) }}>
     <div className="staff-schedule-surface mx-auto max-w-7xl space-y-4">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-end">
         <h1 className="sr-only">{c.title}</h1>
@@ -1284,6 +1336,7 @@ export function StaffScheduleClient({
         />
       ) : null}
     </div>
+    </TaskFlagsContext.Provider>
   );
 }
 
@@ -1589,6 +1642,7 @@ function TaskListItem({
 }) {
   const contextText = getTaskContextText(task, copy);
   const detailsText = getTaskDetailsText(task);
+  const sameDayPickup = useContext(TaskFlagsContext).sameDayPickups.get(task.id);
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const canAddSubtask = task.status !== "done" && task.status !== "cancelled" && showCompleteAction;
@@ -1640,6 +1694,19 @@ function TaskListItem({
               ) : task.status !== "done" && task.status !== "cancelled" && isTaskDueTomorrow(task.dueDatetime) ? (
                 <span className="shrink-0 rounded bg-amber-300 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-amber-950">
                   {copy.tomorrowBadge}
+                </span>
+              ) : null}
+              {sameDayPickup ? (
+                <span
+                  className="shrink-0 rounded bg-red-700 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white"
+                  title={sameDayPickup.renterName}
+                >
+                  {copy.sameDayPickup(sameDayPickup.time)}
+                </span>
+              ) : null}
+              {task.complained ? (
+                <span className="shrink-0 rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-red-700">
+                  {copy.complained}
                 </span>
               ) : null}
               {task.attachments.length > 0 ? (
@@ -1916,6 +1983,7 @@ function ArchivedTaskRow({
 }) {
   const contextText = getTaskContextText(task, copy);
   const detailsText = getTaskDetailsText(task);
+  const { toggleComplaint } = useContext(TaskFlagsContext);
 
   return (
     <div className="py-2">
@@ -1926,6 +1994,22 @@ function ArchivedTaskRow({
               {copy.statusLabels[task.status]}
             </span>
             <p className="truncate text-sm font-semibold text-[var(--ink)]">{getDisplayTaskTitle(task, copy)}</p>
+            {task.status === "done" ? (
+              <button
+                type="button"
+                onClick={() => toggleComplaint(task)}
+                aria-pressed={task.complained}
+                title={copy.markComplained}
+                className={cn(
+                  "shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold leading-4",
+                  task.complained
+                    ? "border-red-300 bg-red-50 text-red-700"
+                    : "border-dashed border-[var(--line)] text-[var(--ink-soft)] hover:text-red-700",
+                )}
+              >
+                {copy.complained}
+              </button>
+            ) : null}
           </div>
           <p className="mt-0.5 text-xs leading-4 text-[var(--ink-soft)]">
             {formatTaskDue(task.dueDatetime, locale, copy.noDue)}
@@ -2207,6 +2291,7 @@ function TaskModal({
       : taskFormWithInitialStaff(initialStaffId, staffOptions),
   );
   const [attachments, setAttachments] = useState<TaskAttachment[]>(task?.attachments ?? []);
+  const [complained, setComplained] = useState(task?.complained ?? false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -2298,6 +2383,7 @@ function TaskModal({
       dueDatetime: form.dueDatetime,
       timeWindow: form.timeWindow,
       ...(task?.parentTaskId && form.staffId !== (task.staffId ?? "") ? { parentTaskId: "" } : {}),
+      ...(task ? { complained } : {}),
     };
 
     try {
@@ -2372,6 +2458,18 @@ function TaskModal({
         <Field label={copy.taskDetails}>
           <textarea className="input min-h-24" value={form.details} onChange={(event) => setForm({ ...form, details: event.target.value })} />
         </Field>
+
+        {task ? (
+          <label className="flex items-center gap-2 text-sm text-[var(--ink-mid)]">
+            <input
+              type="checkbox"
+              checked={complained}
+              onChange={(event) => setComplained(event.target.checked)}
+              className="h-4 w-4"
+            />
+            {copy.markComplained}
+          </label>
+        ) : null}
 
         <div>
           <span className="label">{copy.photos}</span>
@@ -2951,6 +3049,7 @@ function normalizeTask(raw: StaffTask): StaffTask {
     ...raw,
     parentTaskId: raw.parentTaskId ?? null,
     sortOrder: raw.sortOrder ?? 0,
+    complained: Boolean(raw.complained),
     dueDatetime: raw.dueDatetime ? new Date(raw.dueDatetime).toISOString() : null,
     completedAt: raw.completedAt ? new Date(raw.completedAt).toISOString() : null,
     attachments: (raw.attachments ?? []).map((attachment) => normalizeTaskAttachment(raw.id, attachment)),

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.45.0 - 2026-10-06
+
+### Same-day turnarounds are flagged, and a job can carry a guest complaint
+
+- **Out again the same day.** A return task, or any open task on a car, whose car is picked up by another guest later that day now shows a red "当天 15:00 再取车" badge. Hovering it shows the next guest's name. The badge appears on the staff schedule and on the staff member's own link. The rule is written once (`lib/staff-same-day.ts`). The schedule applies it to the orders already on the page, using local dates; the staff link applies it on the server, using the fleet's clock.
+- **Guest complaint.** A task can be marked as complained about. This is a checkbox in the task editor. Finished tasks, where complaints usually arrive, also have a 客人投诉 toggle in the history list. A marked task shows a red 客人投诉 tag on the schedule and on the staff link.
+- Return tasks created by the order sync now read "Return" on the staff link in English, as they already did on the schedule.
+
 ## v1.44.0 - 2026-10-06
 
 ### The navigation shows what is waiting

@@ -739,6 +739,9 @@ model StaffTask {
   /// What this one task pays; null falls back to the staff member's
   /// `defaultTaskRate` (lib/staff-payout.ts).
   payRate      Float?
+  /// A guest complained about this job (the car was not clean, say).
+  /// Shown as a tag wherever the task is listed.
+  complained   Boolean               @default(false)
   createdAt    DateTime              @default(now())
   updatedAt    DateTime              @updatedAt
   workspace    Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

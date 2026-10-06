@@ -137,6 +137,7 @@ export default async function StaffSchedulePage() {
         category: task.category,
         sortOrder: task.sortOrder,
         completedAt: task.completedAt ? task.completedAt.toISOString() : null,
+        complained: task.complained,
         staff: task.staff
           ? {
               id: task.staff.id,

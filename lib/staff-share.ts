@@ -80,6 +80,7 @@ export function serializeStaffShareTask(token: string, task: StaffShareTaskRecor
     category: task.category,
     sortOrder: task.sortOrder,
     completedAt: task.completedAt ? task.completedAt.toISOString() : null,
+    complained: task.complained,
     vehicle: task.vehicle,
     order: task.order
       ? {

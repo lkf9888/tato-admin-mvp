@@ -48,6 +48,7 @@ export type StaffShareTask = {
     returnDatetime: string;
   } | null;
   attachments: StaffShareAttachment[];
+  complained: boolean;
 };
 
 type StaffShareAttachment = {
@@ -92,6 +93,9 @@ function copy(locale: Locale) {
         reopen: "重开",
         edit: "编辑",
         delivery: "送车",
+        returnCar: "还车",
+        complained: "客人投诉",
+        sameDayPickup: (time: string) => `当天 ${time} 再取车`,
         delete: "删除",
         unassign: "放回未分配",
         confirmDelete: "确定删除这个任务吗？",
@@ -140,6 +144,9 @@ function copy(locale: Locale) {
         reopen: "Reopen",
         edit: "Edit",
         delivery: "Delivery",
+        returnCar: "Return",
+        complained: "Guest complaint",
+        sameDayPickup: (time: string) => `Out again ${time}`,
         delete: "Delete",
         unassign: "Move to unassigned",
         confirmDelete: "Delete this task?",
@@ -174,6 +181,7 @@ export function StaffShareClient({
   staff,
   initialTasks,
   income,
+  sameDayPickups,
 }: {
   locale: Locale;
   token: string;
@@ -181,6 +189,8 @@ export function StaffShareClient({
   initialTasks: StaffShareTask[];
   /** What this person has earned and been paid, read-only. */
   income?: StaffPayoutDetail;
+  /** Task id -> the same car's next pick-up that day (lib/staff-same-day.ts). */
+  sameDayPickups?: Record<string, { time: string; renterName: string }>;
 }) {
   const [activeLocale, setActiveLocale] = useState<Locale>("en");
   const [view, setView] = useState<"tasks" | "income">("tasks");
@@ -428,6 +438,7 @@ export function StaffShareClient({
           <TaskDateGroup key={`active-${group.key}`} label={group.label}>
             {group.tasks.map((task) => (
               <TaskCard
+                sameDayPickup={sameDayPickups?.[task.id]}
                 key={task.id}
                 labels={labels}
                 locale={activeLocale}
@@ -472,6 +483,7 @@ export function StaffShareClient({
                   <TaskDateGroup key={`history-${group.key}`} label={group.label}>
                     {group.tasks.map((task) => (
                       <TaskCard
+                        sameDayPickup={sameDayPickups?.[task.id]}
                         key={task.id}
                         labels={labels}
                         locale={activeLocale}
@@ -563,6 +575,7 @@ function TaskCard({
   labels,
   locale,
   task,
+  sameDayPickup,
   subtasks,
   onEdit,
   onComplete,
@@ -573,6 +586,7 @@ function TaskCard({
   labels: ReturnType<typeof copy>;
   locale: Locale;
   task: StaffShareTask;
+  sameDayPickup?: { time: string; renterName: string };
   subtasks: StaffShareTask[];
   onEdit: (task: StaffShareTask) => void;
   onComplete: (task: StaffShareTask) => void;
@@ -589,6 +603,19 @@ function TaskCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <DueBadge labels={labels} task={task} />
+            {sameDayPickup && !closed ? (
+              <span
+                className="rounded bg-red-700 px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white"
+                title={sameDayPickup.renterName}
+              >
+                {labels.sameDayPickup(sameDayPickup.time)}
+              </span>
+            ) : null}
+            {task.complained ? (
+              <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-red-700">
+                {labels.complained}
+              </span>
+            ) : null}
             <h3 className="min-w-0 flex-1 break-words text-base font-semibold leading-snug">
               {getDisplayTaskTitle(task, labels)}
             </h3>
@@ -1165,8 +1192,14 @@ function getOrderLabel(labels: ReturnType<typeof copy>, task: StaffShareTask) {
 }
 
 function getDisplayTaskTitle(task: StaffShareTask, labels: ReturnType<typeof copy>) {
-  if (task.category !== "order_pickup") return task.title;
-  return task.title.replace(/^(取车|Pickup|Delivery)(\s*·\s*)/i, `${labels.delivery}$2`);
+  if (task.category === "order_pickup") {
+    return task.title.replace(/^(取车|Pickup|Delivery)(\s*·\s*)/i, `${labels.delivery}$2`);
+  }
+  // Return tasks made by the order sync are titled in Chinese.
+  if (task.category === "order_return") {
+    return task.title.replace(/^(还车|Return)(\s*·\s*)/i, `${labels.returnCar}$2`);
+  }
+  return task.title;
 }
 
 function isPhotoFile(file: File) {

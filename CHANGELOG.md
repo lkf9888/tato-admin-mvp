@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.51.0 - 2026-10-06
+
+### An offline order can be filled from a pasted message
+
+The create-offline-order form has a "从消息填写" box. Paste a guest's WeChat or text message and press Read. The AI (`lib/kimi.ts`) reads out the guest, phone, car, pick-up and return times, total, deposit, payment method, places and notes. The results are listed first. "Fill the form" puts them into the fields, and nothing is saved until Create is pressed.
+
+- **The car is never guessed.** A plate in the message decides the car. A model alone selects a car only when exactly one car in the fleet fits it, and a year can narrow that down. Otherwise the candidates are flagged and the car is left for you to choose.
+- **Dates are read against today in Vancouver**, so "tomorrow", "next Friday" and "10/12" resolve. A daily rate times the number of days gives the total.
+- The form became a client component so it can be refilled. Its fields and the action it submits to are unchanged.
+
 ## v1.50.0 - 2026-10-06
 
 ### Invoices and receipts

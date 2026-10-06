@@ -3,6 +3,7 @@ import Link from "next/link";
 import { deleteOrderAction, saveOfflineOrderAction, updateOrderStatusAction } from "@/app/actions";
 import { DateTimeField } from "@/components/date-time-field";
 import { requireCurrentWorkspace } from "@/lib/auth";
+import { OfflineOrderCreateForm } from "@/components/offline-order-create-form";
 import { OrdersRowList } from "@/components/orders-row-list";
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
@@ -322,70 +323,14 @@ export default async function OrdersPage({
             {orderMessages.createHint}
           </p>
 
-          <form action={saveOfflineOrderAction} className="mt-3 grid gap-2 sm:gap-2.5 md:grid-cols-2 xl:grid-cols-4">
-          <SearchableSelect
-            name="vehicleId"
-            defaultValue={vehicles[0]?.id ?? ""}
-            options={vehicleSelectOptions}
-            placeholder={orderMessages.filters.vehicleLabel}
-            searchPlaceholder={orderMessages.filters.vehicleLabel}
-            className={inputClass}
+          <OfflineOrderCreateForm
+            locale={locale}
+            vehicleOptions={vehicleSelectOptions}
+            statusOptions={statusSelectOptions}
+            defaultVehicleId={vehicles[0]?.id ?? ""}
+            inputClass={inputClass}
+            primaryButtonClass={primaryButtonClass}
           />
-          <input name="renterName" placeholder={orderMessages.placeholders.renterName} className={inputClass} />
-          <input name="renterPhone" placeholder={orderMessages.placeholders.phone} className={inputClass} />
-          <SearchableSelect
-            name="status"
-            defaultValue="booked"
-            options={statusSelectOptions}
-            placeholder={orderMessages.filters.statusLabel}
-            searchPlaceholder={orderMessages.filters.statusLabel}
-            className={inputClass}
-          />
-          <DateTimeField name="pickupDatetime" className="min-w-0 xl:col-span-2" />
-          <DateTimeField name="returnDatetime" className="min-w-0 xl:col-span-2" />
-          <input
-            name="totalPrice"
-            type="number"
-            step="0.01"
-            placeholder={orderMessages.placeholders.totalPrice}
-            className={inputClass}
-          />
-          <input
-            name="depositAmount"
-            type="number"
-            step="0.01"
-            placeholder={orderMessages.placeholders.deposit}
-            className={inputClass}
-          />
-          <input
-            name="pickupLocation"
-            placeholder={orderMessages.placeholders.pickupLocation}
-            className={inputClass}
-          />
-          <input
-            name="returnLocation"
-            placeholder={orderMessages.placeholders.returnLocation}
-            className={inputClass}
-          />
-          <input
-            name="paymentMethod"
-            placeholder={orderMessages.placeholders.paymentMethod}
-            className={inputClass}
-          />
-          <input
-            name="contractNumber"
-            placeholder={orderMessages.placeholders.contractNumber}
-            className={inputClass}
-          />
-          <input
-            name="notes"
-            placeholder={orderMessages.placeholders.notes}
-            className={cn(inputClass, "xl:col-span-4")}
-          />
-            <div className="flex items-center xl:col-span-4">
-              <button className={primaryButtonClass}>{orderMessages.createOfflineOrder}</button>
-            </div>
-          </form>
         </div>
       </details>
 

@@ -17,6 +17,7 @@ export const guestMessagesMessages = {
       searchPlaceholder: "搜尋客人、車型、車牌或訊息內容",
       searchCount: (count: number) => `${count} 個會話`,
       templatesButton: "訊息模板",
+      alertsButton: "推送到手機",
       tripTitle: "匹配到的訂單",
       tripNone: "未匹配到訂單",
       tripNoneCopy:

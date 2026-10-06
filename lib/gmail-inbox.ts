@@ -9,6 +9,7 @@ import { kimiExtractJson, isKimiConfigured,
   getExtractionModel,
 } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
+import { pushNewGuestMessages } from "@/lib/guest-message-push";
 import { applyTuroEmailsToOrders, type ApplyOutcome } from "@/lib/turo-email-apply";
 import {
   classifyTuroSubject,
@@ -261,6 +262,8 @@ export type GmailSyncResult = {
   parseFailed: number;
   /** Historical rows healed by the subject classifier this run. */
   reclassified: number;
+  /** Guest messages pushed to the operator's phone this run. */
+  guestMessagesPushed?: number;
   /** What the booking mail did to orders on this run. */
   orders?: ApplyOutcome;
   /** Messages still waiting for a summary after this run's budget ran
@@ -460,6 +463,11 @@ export async function runGmailSync(input: {
   // -- report an empty fleet while guests were waiting. Needs no
   // network and no model, so it runs even when no new mail arrived.
   result.reclassified = await reclassifyBySubject(input.workspaceId, fleet);
+
+  // The moment a guest message is filed, tell the operator's phone.
+  // After the subject pass, because that is what marks a row as a guest
+  // message without waiting for the model. Never throws.
+  result.guestMessagesPushed = (await pushNewGuestMessages({ workspaceId: input.workspaceId })).pushed;
 
   if (mode !== "ingest") {
     await enrichPendingEmails(

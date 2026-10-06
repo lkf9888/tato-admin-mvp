@@ -76,16 +76,31 @@ function buildTaskSms(input: StaffTaskSmsInput) {
 }
 
 export async function sendStaffTaskSms(input: StaffTaskSmsInput): Promise<SmsResult> {
+  return sendSms({
+    to: input.to,
+    body: input.renderedBody?.trim() || buildTaskSms(input),
+    kind: "staff task",
+  });
+}
+
+/**
+ * One text message, through Twilio. Never throws: an SMS is always the
+ * last thing a caller does and never worth failing its work over.
+ */
+export async function sendSms(input: {
+  to: string | null | undefined;
+  body: string;
+  /** For the log line only. */
+  kind?: string;
+}): Promise<SmsResult> {
+  const kind = input.kind ?? "plain";
   const config = getTwilioConfig();
   if (!config) return { ok: false, reason: "sms_not_configured" };
 
   const to = normalizePhoneNumber(input.to);
   if (!to) return { ok: false, reason: "invalid_phone" };
 
-  const params = new URLSearchParams({
-    To: to,
-    Body: input.renderedBody?.trim() || buildTaskSms(input),
-  });
+  const params = new URLSearchParams({ To: to, Body: input.body });
   if (config.messagingServiceSid) {
     params.set("MessagingServiceSid", config.messagingServiceSid);
   } else if (config.fromPhone) {
@@ -111,7 +126,7 @@ export async function sendStaffTaskSms(input: StaffTaskSmsInput): Promise<SmsRes
     };
 
     if (!response.ok) {
-      console.error("[sms] staff task SMS failed", {
+      console.error(`[sms] ${kind} SMS failed`, {
         to,
         status: response.status,
         reason: payload.message ?? response.statusText,
@@ -119,11 +134,21 @@ export async function sendStaffTaskSms(input: StaffTaskSmsInput): Promise<SmsRes
       return { ok: false, reason: payload.message ?? `twilio_${response.status}` };
     }
 
-    console.log("[sms] staff task SMS sent", { to, messageSid: payload.sid });
+    console.log(`[sms] ${kind} SMS sent`, { to, messageSid: payload.sid });
     return { ok: true, messageSid: payload.sid };
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown_error";
-    console.error("[sms] staff task SMS failed", { to, reason });
+    console.error(`[sms] ${kind} SMS failed`, { to, reason });
     return { ok: false, reason };
   }
+}
+
+/** Whether Twilio is configured at all, for settings screens. */
+export function isSmsConfigured() {
+  return getTwilioConfig() !== null;
+}
+
+/** The number as it will be dialled, or null when it cannot be. */
+export function normalizeSmsPhone(value: string | null | undefined) {
+  return normalizePhoneNumber(value);
 }

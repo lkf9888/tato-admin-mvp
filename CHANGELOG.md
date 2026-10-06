@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.31.0 - 2026-10-05
+
+### New guest messages reach the operator's phone
+
+Turo measures how quickly a host replies, and nobody watches the mailbox. Now, as soon as the Gmail sync files a guest message, TATO pushes one line to the operator: who wrote, about which car, and how the message starts, in Chinese when a translation is already available.
+
+- **WeChat first, SMS as the fallback.** Pushes go to a "TATO 客人消息" channel in the mini program, joined with a bind code. A WeChat subscribe message costs one authorisation per send, and authorisations are only topped up when the mini program is opened. So when nobody is bound, or the balance has hit zero, the same line is sent by SMS to the number in the settings.
+- **Batched, never replayed.** Pushes are at least fifteen minutes apart, and everything that arrives in between goes out as one ("2 条新客人消息：Cy、Ben", plus the newest message). Nothing received before pushing was switched on, more than 24 hours ago, or already marked handled is pushed. A message that could not be delivered is still marked as pushed, so a channel that is down does not build a backlog that floods out once it is fixed.
+- **Set up from the messages page.** A bell next to Templates opens the settings: the on/off switch, the bind code with how many accounts are bound and how many pushes are left, the SMS number, and a test send.
+
+WeChat delivery needs the mini program's `alert` template registered, and SMS needs Twilio configured on the server. The panel says which of the two is missing.
+
+
 ## v1.30.0 - 2026-10-05
 
 ### The operator chooses a cancellation policy; renters and operators get a privacy policy and terms

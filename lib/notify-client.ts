@@ -265,3 +265,57 @@ export async function getStaffChannelStatus(
 
   return result;
 }
+
+/** The workspace's guest-message channel: everyone who should hear when
+ *  a guest writes. Shared rather than per person -- an operator and a
+ *  partner can both bind to it. */
+export function guestMessageChannelKey(workspaceId: string) {
+  return `guest-messages:${workspaceId}`;
+}
+
+export type AlertChannelStatus = {
+  bindCode: string;
+  subscribers: number;
+  /** Unspent `alert` authorisations across the channel's subscribers. */
+  remaining: number;
+  /** False when the mini program has no `alert` template, so nothing on
+   *  this channel can be delivered over WeChat at all. */
+  templateConfigured: boolean;
+};
+
+/**
+ * Bind code, subscribers and alert quota for one channel, creating the
+ * channel on first look. Null when the hub is remote or unprovisioned:
+ * the settings panel then offers SMS alone.
+ */
+export async function getAlertChannelStatus(input: {
+  key: string;
+  name: string;
+}): Promise<AlertChannelStatus | null> {
+  const app = await resolveLocalApp();
+  if (!app) return null;
+
+  const { ensureChannel } = await import("@/lib/notify-hub/channels");
+  const channel = await ensureChannel({ appId: app.id, key: input.key, name: input.name });
+  const [subscriptions, template] = await Promise.all([
+    prisma.notifySubscription.findMany({ where: { channelId: channel.id }, select: { openId: true } }),
+    prisma.notifyTemplate.findUnique({
+      where: { miniProgramId_key: { miniProgramId: app.miniProgramId, key: "alert" } },
+      select: { isActive: true },
+    }),
+  ]);
+  const openIds = subscriptions.map((subscription) => subscription.openId);
+  const quotas = openIds.length
+    ? await prisma.notifySubscribeQuota.findMany({
+        where: { miniProgramId: app.miniProgramId, templateKey: "alert", openId: { in: openIds } },
+        select: { remaining: true },
+      })
+    : [];
+
+  return {
+    bindCode: channel.bindCode,
+    subscribers: openIds.length,
+    remaining: quotas.reduce((sum, row) => sum + row.remaining, 0),
+    templateConfigured: Boolean(template?.isActive),
+  };
+}

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, ChevronLeft, ExternalLink, LayoutTemplate, Search } from "lucide-react";
+import { Bell, ChevronDown, ChevronLeft, ExternalLink, LayoutTemplate, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { GuestMessageAlertPanel } from "@/components/guest-message-alert-panel";
 import {
   MessageTemplatePanel,
   type MessageTemplateRow,
@@ -253,6 +254,7 @@ export function GuestMessagesView({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "open">("all");
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
   const [tripOpen, setTripOpen] = useState(false);
   // Whether the open thread put an entry on the history stack, so "back"
   // can pop it rather than stack another.
@@ -503,14 +505,19 @@ export function GuestMessagesView({
     }
   }
 
-  const templatesPanel = templatesOpen ? (
-    <MessageTemplatePanel
-      locale={locale}
-      templates={messageTemplates}
-      vehicleOptions={templateVehicleOptions}
-      onClose={() => setTemplatesOpen(false)}
-    />
-  ) : null;
+  const templatesPanel = (
+    <>
+      {templatesOpen ? (
+        <MessageTemplatePanel
+          locale={locale}
+          templates={messageTemplates}
+          vehicleOptions={templateVehicleOptions}
+          onClose={() => setTemplatesOpen(false)}
+        />
+      ) : null}
+      {alertsOpen ? <GuestMessageAlertPanel locale={locale} onClose={() => setAlertsOpen(false)} /> : null}
+    </>
+  );
 
   if (threads.length === 0) {
     return (
@@ -635,6 +642,15 @@ export function GuestMessagesView({
                 className="tap-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] lg:h-9 lg:w-9"
               >
                 <LayoutTemplate className="h-4 w-4" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => setAlertsOpen(true)}
+                title={t.alertsButton}
+                aria-label={t.alertsButton}
+                className="tap-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] lg:h-9 lg:w-9"
+              >
+                <Bell className="h-4 w-4" aria-hidden />
               </button>
             </div>
 

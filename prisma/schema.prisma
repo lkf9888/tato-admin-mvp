@@ -1221,6 +1221,11 @@ model InboundEmail {
   parsed         String?
   // Set once the assistant has surfaced this to the operator.
   acknowledgedAt DateTime?
+  /// When this message was pushed to the operator's phone (WeChat or
+  /// SMS). Per row rather than a time cursor, because a message only
+  /// becomes a guest message once it is classified, which can be after
+  /// later mail has already been pushed.
+  pushedAt       DateTime?
 
   // Read straight off the subject, which Turo generates from a fixed
   // template. Present long before the model pass runs, so a message is
@@ -2226,4 +2231,23 @@ model BookingLocation {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, isActive, sortOrder])
+}
+
+/// Whether new guest messages are pushed to the operator's phone.
+/// One row per workspace. No relation to Workspace, deliberately: that
+/// would put a field on a model this domain does not own.
+model GuestMessageAlertSetting {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  enabled     Boolean   @default(false)
+  /// SMS fallback, used when no WeChat subscriber has quota left.
+  smsPhone    String?
+  /// When pushing was last switched on. Mail received before it is
+  /// never pushed, so turning this on does not replay the backlog.
+  enabledAt   DateTime?
+  /// When the last push went out, for batching: pushes are at least
+  /// fifteen minutes apart, and anything newer waits for the next one.
+  lastSentAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }

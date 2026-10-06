@@ -1,6 +1,6 @@
 {
   "name": "turo-admin-mvp",
-  "version": "1.29.0",
+  "version": "1.29.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -28,6 +28,7 @@
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "fontkit": "^2.0.4",
     "imapflow": "^1.7.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.511.0",
@@ -47,6 +48,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.7",
     "@types/bcryptjs": "^2.4.6",
+    "@types/fontkit": "^2.0.9",
     "@types/mailparser": "^3.4.6",
     "@types/node": "^22.15.24",
     "@types/nodemailer": "^8.0.0",

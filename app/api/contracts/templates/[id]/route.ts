@@ -10,6 +10,7 @@ import {
   renderUploadedContractDocumentPdf,
   uploadGeneratedTemplatePdf,
 } from "@/lib/contract-documents";
+import { DOCUMENT_EDIT_BLOCKING_STATUSES, planFieldEdit } from "@/lib/contract-template-edit";
 import { prisma } from "@/lib/prisma";
 import { resolveUploadPathWithin } from "@/lib/uploads";
 
@@ -58,12 +59,41 @@ export async function PATCH(
       sourceType: true,
       workspaceId: true,
       pdfPathname: true,
+      fields: {
+        select: {
+          id: true,
+          type: true,
+          // What each field holds. ContractFieldValue cascades off its
+          // field, so deleting a field deletes what was signed into it.
+          _count: { select: { values: true } },
+        },
+      },
     },
   });
   if (!template) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
-  const fields = Array.isArray(body?.fields) ? body.fields : null;
+  const fields = Array.isArray(body?.fields) ? (body.fields as Array<{ id?: unknown; type?: unknown }>) : null;
+  const plan = fields
+    ? planFieldEdit(
+        template.fields.map((field) => ({ id: field.id, type: field.type, valueCount: field._count.values })),
+        fields,
+      )
+    : null;
+  if (plan && !plan.ok) {
+    return NextResponse.json(
+      {
+        error:
+          plan.reason === "would_delete_signed_fields"
+            ? `不能删除已经有人填写或签署的字段（共 ${plan.valueCount} 处内容）。可以移动、改大小、改名，或新增字段。`
+            : `不能修改已经有人填写或签署的字段的类型（共 ${plan.valueCount} 处内容）。`,
+        reason: plan.reason,
+        valueCount: plan.valueCount,
+        fieldIds: plan.fieldIds,
+      },
+      { status: 409 },
+    );
+  }
   const recipients = Array.isArray(body?.recipients) ? parseTemplateRecipients(body.recipients) : null;
   const updateData: {
     name?: string;
@@ -93,6 +123,28 @@ export async function PATCH(
     updateData.description = body.description.trim() || null;
   }
   if (typeof body?.active === "boolean") updateData.active = body.active;
+
+  // Anything that replaces the document waits for envelopes out for
+  // signature: they render onto this template's PDF when they complete.
+  const replacesDocument =
+    (template.sourceType === "WORD" && typeof body?.editableContent === "string") ||
+    (body?.appendDocument != null && typeof body.appendDocument === "object");
+  if (replacesDocument) {
+    const inFlight = await prisma.contractEnvelope.count({
+      where: { templateId: id, status: { in: [...DOCUMENT_EDIT_BLOCKING_STATUSES] } },
+    });
+    if (inFlight > 0) {
+      return NextResponse.json(
+        {
+          error: `有 ${inFlight} 份用这个模板发出的合同还在等待签署，现在改正文会让签名落在对方没看过的文件上。请等签完或先作废，再修改。`,
+          reason: "envelopes_in_flight",
+          count: inFlight,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   if (template.sourceType === "WORD" && typeof body?.editableContent === "string") {
     const nextName = updateData.name || template.name;
     const editableContent = normalizeEditableContent(body.editableContent);
@@ -157,14 +209,21 @@ export async function PATCH(
   let updated;
   try {
     updated = await prisma.$transaction(async (tx) => {
-      if (fields) {
-        await tx.contractTemplateField.deleteMany({ where: { templateId: id } });
-        if (fields.length) {
-          await tx.contractTemplateField.createMany({
-            data: fields.map((field: unknown, index: number) =>
-              normalizeField(field, id, updateData.pageCount || template.pageCount, index),
-            ),
-          });
+      if (fields && plan?.ok) {
+        // In place, by id: a value follows its field through a move or a
+        // resize. Only fields holding nothing are ever deleted.
+        const pageCount = updateData.pageCount || template.pageCount;
+        const updateIds = new Set(plan.updateIds);
+        if (plan.deleteIds.length) {
+          await tx.contractTemplateField.deleteMany({ where: { templateId: id, id: { in: plan.deleteIds } } });
+        }
+        for (const [index, field] of fields.entries()) {
+          const data = normalizeField(field, id, pageCount, index);
+          if (typeof field.id === "string" && updateIds.has(field.id)) {
+            await tx.contractTemplateField.update({ where: { id: field.id }, data });
+          } else {
+            await tx.contractTemplateField.create({ data });
+          }
         }
       }
       if (recipients) {

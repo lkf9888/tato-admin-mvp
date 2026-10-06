@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.29.1 - 2026-10-05
+
+### Editing a contract template keeps the signatures already collected; contracts with Chinese in them finish
+
+**Template edits.** Saving the field editor deleted every field and
+recreated it with a new id, and `ContractFieldValue` cascades off its
+field -- so moving one box on a template deleted every signature and
+answer collected on envelopes still out for signature. Fields are now
+updated in place by id (`planFieldEdit`, `lib/contract-template-edit.ts`):
+move, resize, rename and add freely; deleting a field that holds a
+value, or changing its type, is refused with a 409 and a message. And
+replacing the document itself (Word text edit, appending a file) waits
+while any envelope from the template is SENT or PARTIALLY_SIGNED, since
+those render onto the template's PDF when they complete.
+
+**Chinese in PDFs.** pdf-lib's Helvetica cannot encode Chinese and
+throws, so a renter named in Chinese, a Chinese address, or a ticked
+checkbox ("✓") stopped the signed PDF from being made; Word contracts
+and agreement clauses in Chinese printed as "?", and a Chinese brand
+name would have stopped the rental agreement template being built.
+Text is now drawn per run (`lib/contract-pdf-text.ts`): Latin in
+Helvetica, Chinese in an embedded, subsetted Noto Sans SC
+(`server/fonts/`, through fontkit v2), loaded only when needed. English
+still wraps between words; Chinese between characters. The tick is
+drawn as two strokes. An unfilled date field uses the fleet's date, not
+UTC's. Both fixes come from HostHub, which hit them first.
+
 ## v1.29.0 - 2026-10-01
 
 ### The renter books with the operator, not TATO; lead time and turnaround; date changes settle their price

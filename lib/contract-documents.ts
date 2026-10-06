@@ -6,8 +6,15 @@ import {
   PDFDocument,
   StandardFonts,
   rgb,
-  type PDFFont,
 } from "pdf-lib";
+import {
+  drawSegments,
+  layoutLines,
+  loadCjkFont,
+  needsCjkFont,
+  type PdfFontPair,
+  type Segment,
+} from "@/lib/contract-pdf-text";
 import type { ContractPageSize } from "@/lib/contract-signing";
 import {
   makeContractTemplatePdfPath,
@@ -122,8 +129,12 @@ export async function renderEditableContractPdf({
   content: string;
 }): Promise<{ buffer: Buffer; pageSizes: ContractPageSize[]; sha256: string }> {
   const pdf = await PDFDocument.create();
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  // Chinese wording used to print as "?": Helvetica cannot encode it.
+  const cjk = needsCjkFont(title, content) ? await loadCjkFont(pdf) : null;
+  const latin = await pdf.embedFont(StandardFonts.Helvetica);
+  const regular: PdfFontPair = { latin, cjk: cjk ?? latin };
+  const boldLatin = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const bold: PdfFontPair = { latin: boldLatin, cjk: cjk ?? boldLatin };
   const pageSizes: ContractPageSize[] = [];
   let page = pdf.addPage([LETTER_WIDTH, LETTER_HEIGHT]);
   pageSizes.push({ page: 1, width: LETTER_WIDTH, height: LETTER_HEIGHT });
@@ -135,19 +146,14 @@ export async function renderEditableContractPdf({
     y = LETTER_HEIGHT - MARGIN_Y;
   }
 
-  function drawLine(text: string, font: PDFFont, size: number, lineGap = 4) {
+  function drawLine(segments: Segment[], size: number, lineGap = 4) {
     if (y < MARGIN_Y + size + lineGap) addPage();
-    page.drawText(toWinAnsi(text), {
-      x: MARGIN_X,
-      y,
-      size,
-      font,
-      color: rgb(0.06, 0.06, 0.06),
-    });
+    drawSegments(page, segments, MARGIN_X, y, size, rgb(0.06, 0.06, 0.06));
     y -= size + lineGap;
   }
 
-  drawLine(title, bold, 16, 8);
+  const maxWidth = LETTER_WIDTH - MARGIN_X * 2;
+  for (const line of layoutLines(title, bold, 16, maxWidth)) drawLine(line, 16, 8);
   y -= 8;
 
   const paragraphs = normalizeEditableContent(content).split(/\n{2,}/);
@@ -157,9 +163,8 @@ export async function renderEditableContractPdf({
       y -= 8;
       continue;
     }
-    const lines = wrapPdfText(trimmed.replace(/\s*\n\s*/g, " "), regular, 10.5, LETTER_WIDTH - MARGIN_X * 2);
-    for (const line of lines) {
-      drawLine(line, regular, 10.5, 4.5);
+    for (const line of layoutLines(trimmed.replace(/\s*\n\s*/g, " "), regular, 10.5, maxWidth)) {
+      drawLine(line, 10.5, 4.5);
     }
     y -= 6;
   }
@@ -209,24 +214,6 @@ export function normalizeEditableContent(value: string) {
     .trim();
 }
 
-function wrapPdfText(text: string, font: PDFFont, size: number, maxWidth: number) {
-  const words = text.split(/\s+/).filter(Boolean);
-  if (!words.length) return [""];
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (font.widthOfTextAtSize(toWinAnsi(candidate), size) <= maxWidth) {
-      current = candidate;
-      continue;
-    }
-    if (current) lines.push(current);
-    current = word;
-  }
-  if (current) lines.push(current);
-  return lines;
-}
-
 function decodeXml(value: string) {
   return value
     .replace(/&lt;/g, "<")
@@ -236,6 +223,3 @@ function decodeXml(value: string) {
     .replace(/&apos;/g, "'");
 }
 
-function toWinAnsi(value: string) {
-  return value.replace(/[^\x09\x0A\x0D\x20-\x7E\u00A0-\u00FF]/g, "?");
-}

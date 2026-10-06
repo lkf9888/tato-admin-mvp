@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 import { mergeContractPdfBuffers, renderEditableContractPdf } from "@/lib/contract-documents";
+import { drawSegments, layoutLines, loadCjkFont, needsCjkFont } from "@/lib/contract-pdf-text";
 import type { ContractPageSize } from "@/lib/contract-signing";
 import {
   RENTAL_AGREEMENT_CLAUSES,
@@ -153,6 +154,22 @@ const RENTER_EDITABLE = new Set<RentalAgreementFieldKey>([
   "signedDate",
 ]);
 
+/**
+ * One line of the operator's own wording -- a brand name or address that
+ * may well be Chinese, which Helvetica alone would throw on.
+ */
+async function drawOperatorLine(
+  pdf: PDFDocument,
+  page: PDFPage,
+  latin: PDFFont,
+  text: string,
+  topPt: number,
+) {
+  const cjk = needsCjkFont(text) ? await loadCjkFont(pdf) : latin;
+  const [segments = []] = layoutLines(text, { latin, cjk }, 10, LETTER_WIDTH - MARGIN * 2);
+  drawSegments(page, segments, MARGIN, LETTER_HEIGHT - topPt - 10, 10, rgb(0.18, 0.18, 0.2));
+}
+
 async function renderDetailsPage(input: { ownerName: string; ownerAddress: string }) {
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([LETTER_WIDTH, LETTER_HEIGHT]);
@@ -169,13 +186,7 @@ async function renderDetailsPage(input: { ownerName: string; ownerAddress: strin
 
   let top = MARGIN + 34;
   for (const line of [`Owner: ${input.ownerName}`, `Owner's Address: ${input.ownerAddress}`]) {
-    page.drawText(line, {
-      x: MARGIN,
-      y: LETTER_HEIGHT - top - 10,
-      size: 10,
-      font: regular,
-      color: rgb(0.18, 0.18, 0.2),
-    });
+    await drawOperatorLine(pdf, page, regular, line, top);
     top += 15;
   }
 
@@ -263,13 +274,7 @@ async function renderSignaturePage(pageNumber: number, ownerName: string) {
 
   // The owner's side is signed once, by the business, not per booking.
   const ownerTop = signatureTop + signatureHeight + LABEL_SIZE + 4 + 30;
-  page.drawText(`Owner: ${ownerName} (Director)`, {
-    x: MARGIN,
-    y: LETTER_HEIGHT - ownerTop - 10,
-    size: 10,
-    font: regular,
-    color: rgb(0.18, 0.18, 0.2),
-  });
+  await drawOperatorLine(pdf, page, regular, `Owner: ${ownerName} (Director)`, ownerTop);
 
   const placements = new Map<RentalAgreementFieldKey, Placement>([
     [

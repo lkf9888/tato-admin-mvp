@@ -6,8 +6,14 @@ import {
   StandardFonts,
   rgb,
   type PDFPage,
-  type PDFFont,
 } from "pdf-lib";
+import {
+  drawSegments,
+  layoutLines,
+  loadCjkFont,
+  needsCjkFont,
+  type PdfFontPair,
+} from "@/lib/contract-pdf-text";
 import { prisma } from "@/lib/prisma";
 import {
   makeContractEnvelopeSignedPdfPath,
@@ -66,8 +72,17 @@ export async function renderSignedContractPdf({
 }) {
   const bytes = await fetchPdfBytes(templatePdfUrl);
   const pdf = await PDFDocument.load(bytes);
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  // Latin through Helvetica; the embedded CJK face only for the runs
+  // Helvetica cannot encode, and only loaded when some value has one.
+  const latin = await pdf.embedFont(StandardFonts.Helvetica);
+  const cjk = needsCjkFont(
+    ...values.map((value) => value.value),
+    ...fields.map((field) => field.defaultValue),
+  )
+    ? await loadCjkFont(pdf)
+    : latin;
+  const regular: PdfFontPair = { latin, cjk };
+  const bold: PdfFontPair = { latin: await pdf.embedFont(StandardFonts.HelveticaBold), cjk };
   const valuesByField = new Map(values.map((value) => [value.fieldId, value]));
 
   for (const field of fields) {
@@ -82,7 +97,7 @@ export async function renderSignedContractPdf({
     drawFieldBorder(page, box);
 
     if (field.type === "CHECKBOX") {
-      drawCheckbox(page, box, value?.checked === true || value?.value === "true", bold);
+      drawCheckbox(page, box, value?.checked === true || value?.value === "true");
       continue;
     }
 
@@ -98,7 +113,7 @@ export async function renderSignedContractPdf({
     const text =
       value?.value ||
       field.defaultValue ||
-      (field.type === "DATE" ? new Date().toISOString().slice(0, 10) : "");
+      (field.type === "DATE" ? localIsoDate(new Date()) : "");
     if (text) drawText(page, text, box, regular, field.fontSize ?? 10);
   }
 
@@ -211,24 +226,24 @@ function drawFieldBorder(
   });
 }
 
+/** The date on the server's clock (the fleet's timezone), not UTC's. */
+function localIsoDate(value: Date) {
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
 function drawText(
   page: PDFPage,
   text: string,
   box: { x: number; y: number; width: number; height: number },
-  font: PDFFont,
+  fonts: PdfFontPair,
   preferredSize: number,
 ) {
   const size = Math.max(7, Math.min(preferredSize, box.height * 0.65));
-  const lines = wrapText(text, font, size, box.width - 8);
+  const lines = layoutLines(text, fonts, size, box.width - 8);
   const startY = box.y + box.height - size - 4;
-  for (const [index, line] of lines.slice(0, 4).entries()) {
-    page.drawText(line, {
-      x: box.x + 4,
-      y: startY - index * (size + 3),
-      size,
-      font,
-      color: rgb(0.05, 0.05, 0.05),
-    });
+  for (const [index, segments] of lines.slice(0, 4).entries()) {
+    drawSegments(page, segments, box.x + 4, startY - index * (size + 3), size, rgb(0.05, 0.05, 0.05));
   }
 }
 
@@ -236,7 +251,6 @@ function drawCheckbox(
   page: PDFPage,
   box: { x: number; y: number; width: number; height: number },
   checked: boolean,
-  font: PDFFont,
 ) {
   const size = Math.min(box.width, box.height, 16);
   const x = box.x + 4;
@@ -250,12 +264,21 @@ function drawCheckbox(
     borderWidth: 1,
   });
   if (checked) {
-    page.drawText("✓", {
-      x: x + 2.5,
-      y: y + 1.5,
-      size: size - 2,
-      font,
-      color: rgb(0, 0.45, 0.25),
+    // Two strokes, not a glyph: "✓" is outside WinAnsi, and drawing it
+    // threw -- so any ticked box stopped the signed PDF being made.
+    const tick = rgb(0, 0.45, 0.25);
+    const thickness = Math.max(1, size * 0.12);
+    page.drawLine({
+      start: { x: x + size * 0.22, y: y + size * 0.52 },
+      end: { x: x + size * 0.42, y: y + size * 0.28 },
+      thickness,
+      color: tick,
+    });
+    page.drawLine({
+      start: { x: x + size * 0.42, y: y + size * 0.28 },
+      end: { x: x + size * 0.8, y: y + size * 0.75 },
+      thickness,
+      color: tick,
     });
   }
 }
@@ -288,23 +311,6 @@ async function fetchPdfBytes(url: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch PDF: ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
-}
-
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
-  const words = text.replace(/\s+/g, " ").trim().split(" ");
-  const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    const next = line ? `${line} ${word}` : word;
-    if (font.widthOfTextAtSize(next, size) <= maxWidth || !line) {
-      line = next;
-    } else {
-      lines.push(line);
-      line = word;
-    }
-  }
-  if (line) lines.push(line);
-  return lines.length ? lines : [text.slice(0, 120)];
 }
 
 export function clientIp(req: Request) {

@@ -368,6 +368,13 @@ model Order {
   depositRefundedAmount  Float?
   depositStripeRefundId  String?
   depositSettlementNote  String?
+  /// How a deposit taken outside the site was collected: "cash",
+  /// "etransfer", "card" or "other". Null on site bookings, whose
+  /// deposit is part of the Stripe charge.
+  depositCollectedVia    String?
+  depositCollectedAt     DateTime?
+  /// Where it goes back to: the renter's e-transfer address, or a note.
+  depositRefundTo        String?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   workspace              Workspace?              @relation(fields: [workspaceId], references: [id], onDelete: SetNull)

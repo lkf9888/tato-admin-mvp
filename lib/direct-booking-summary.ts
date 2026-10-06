@@ -2,6 +2,7 @@ import "server-only";
 
 import type { BookingPolicy } from "@/lib/booking-policy";
 import { listBookingLocations } from "@/lib/booking-locations";
+import { countHeldDeposits } from "@/lib/direct-booking-deposits";
 import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
 import { prisma } from "@/lib/prisma";
 import { getStripeSecretKey } from "@/lib/stripe";
@@ -64,7 +65,7 @@ export async function getDirectBookingSummary(workspaceId: string) {
  * confirmation email is on, and whether the site is published.
  */
 export async function getDirectBookingTabBadges(workspaceId: string) {
-  const [vehicleCount, locations, emailTemplate, site, agreementSets, pendingRequests] =
+  const [vehicleCount, locations, emailTemplate, site, agreementSets, pendingRequests, heldDeposits] =
     await Promise.all([
     prisma.vehicle.count({ where: { workspaceId, isArchived: false } }),
     listBookingLocations(workspaceId),
@@ -75,6 +76,7 @@ export async function getDirectBookingTabBadges(workspaceId: string) {
     prisma.rentalSite.findUnique({ where: { workspaceId }, select: { isPublished: true } }),
     prisma.rentalAgreementClauseSet.count({ where: { workspaceId } }),
     prisma.bookingChangeRequest.count({ where: { workspaceId, status: "PENDING" } }),
+    countHeldDeposits(workspaceId),
   ]);
   return {
     vehicleCount,
@@ -83,6 +85,7 @@ export async function getDirectBookingTabBadges(workspaceId: string) {
     siteState: siteState(site),
     agreementCustom: agreementSets > 0,
     pendingRequests,
+    heldDeposits,
   };
 }
 

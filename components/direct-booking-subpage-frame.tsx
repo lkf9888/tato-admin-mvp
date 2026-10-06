@@ -59,6 +59,12 @@ export async function DirectBookingSubpageFrame({
             badge: badges.pendingRequests || null,
           },
           {
+            key: "deposits",
+            label: messages.directBookingDeposits.tab,
+            badge: badges.heldDeposits || null,
+          },
+          { key: "ads", label: messages.directBookingAds.tab },
+          {
             key: "site",
             label: directMessages.tabSite,
             badge: directMessages.siteStateLabels[badges.siteState],

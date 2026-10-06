@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 
 import { saveBookingPolicyAction } from "@/app/actions";
 import { listBookingLocations } from "@/lib/booking-locations";
+import { countHeldDeposits } from "@/lib/direct-booking-deposits";
 import { getRateSeasonality } from "@/lib/rental-estimate/rate-seasonality-server";
 import { normalizeBookingPolicy } from "@/lib/booking-policy";
 import { CANCELLATION_POLICY_KEYS } from "@/lib/booking-changes";
@@ -66,6 +67,7 @@ export default async function DirectBookingPage({
     rentalSite,
     agreement,
     pendingRequests,
+    heldDeposits,
     coupons,
     addOns,
     vehicles,
@@ -83,6 +85,7 @@ export default async function DirectBookingPage({
     }),
     getWorkspaceAgreementClauses(workspace.id),
     prisma.bookingChangeRequest.count({ where: { workspaceId: workspace.id, status: "PENDING" } }),
+    countHeldDeposits(workspace.id),
     prisma.bookingCoupon.findMany({
       where: { workspaceId: workspace.id },
       orderBy: { createdAt: "desc" },
@@ -560,6 +563,17 @@ export default async function DirectBookingPage({
             label: directMessages.tabRequests,
             href: directBookingSectionHref("requests"),
             badge: pendingRequests || null,
+          },
+          {
+            key: "deposits",
+            label: messages.directBookingDeposits.tab,
+            href: directBookingSectionHref("deposits"),
+            badge: heldDeposits || null,
+          },
+          {
+            key: "ads",
+            label: messages.directBookingAds.tab,
+            href: directBookingSectionHref("ads"),
           },
           {
             key: "site",

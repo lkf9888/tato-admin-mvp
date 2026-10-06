@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.32.0 - 2026-10-05
+
+### Every held deposit on one page, and classified ads for a car in one click
+
+**Deposits** (`/direct-booking/deposits`). Every deposit held, from site
+bookings and from rentals taken in person: the amount, how and when it
+was collected, when it is due back (14 days after the return, as the
+default agreement says), and where it goes back to. Site bookings refund
+to the card through the existing deposit endpoint; deposits taken in
+person are marked returned, with nothing sent. Keeping any part needs a
+reason. Returned deposits move to a history view; search by name, phone,
+email, plate or note, and filter by car. Three nullable `Order` columns
+record in-person deposits: `depositCollectedVia`, `depositCollectedAt`,
+`depositRefundTo`.
+
+**Ads** (`/direct-booking/ads`). VanPeople (Chinese), Facebook and
+Craigslist drafts for a car, built by a pure function (`lib/site-ad-copy.ts`)
+from what the booking page shows -- price with insurance, discounts,
+kilometres, deposit, pick-up place, features -- each within the site's
+title limit and linking to the car's page. Missing price, site listing or
+photos are flagged as blocking. An optional AI rewrite (Kimi) is kept
+only if every number and the link are exactly the draft's; otherwise the
+draft stays. Ported in shape from HostHub's listing adapters.
+
 ## v1.31.0 - 2026-10-05
 
 ### New guest messages reach the operator's phone

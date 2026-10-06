@@ -684,27 +684,31 @@ model DirectBookingDocument {
 
 model StaffMember {
   workspaceId               String?
-  id                        String              @id @default(cuid())
+  id                        String               @id @default(cuid())
   name                      String
   phone                     String?
   email                     String?
   role                      String?
-  color                     String              @default("#3456df")
+  color                     String               @default("#3456df")
   notes                     String?
   pinnedMessage             String?
-  isActive                  Boolean             @default(true)
-  sortOrder                 Int                 @default(0)
+  isActive                  Boolean              @default(true)
+  sortOrder                 Int                  @default(0)
   shareToken                String?
-  miniProgramCode           String?             @unique
-  wechatOpenId              String?             @unique
-  wechatNotificationEnabled Boolean             @default(false)
+  miniProgramCode           String?              @unique
+  wechatOpenId              String?              @unique
+  wechatNotificationEnabled Boolean              @default(false)
   wechatSubscribedAt        DateTime?
   wechatBoundAt             DateTime?
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
-  workspace                 Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  /// Pay per task when the task names no amount of its own. Null is 0.
+  defaultTaskRate           Float?
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+  workspace                 Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks                     StaffTask[]
   inspectionSessions        InspectionSession[]
+  payments                  StaffPayment[]
+  reimbursements            StaffReimbursement[]
 
   @@index([workspaceId, isActive])
   @@index([workspaceId, isActive, sortOrder])
@@ -732,6 +736,9 @@ model StaffTask {
   category     String?
   sortOrder    Int                   @default(0)
   completedAt  DateTime?
+  /// What this one task pays; null falls back to the staff member's
+  /// `defaultTaskRate` (lib/staff-payout.ts).
+  payRate      Float?
   createdAt    DateTime              @default(now())
   updatedAt    DateTime              @updatedAt
   workspace    Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -784,6 +791,66 @@ model StaffTaskSuppression {
 
   @@id([orderId, category])
   @@index([workspaceId])
+}
+
+/// Money paid to a staff member: wages for tasks, or the settling of
+/// reimbursements. Positive; it comes off what they are owed.
+model StaffPayment {
+  workspaceId String
+  id          String      @id @default(cuid())
+  staffId     String
+  amount      Float
+  /// The calendar day paid, at noon UTC.
+  paidAt      DateTime
+  /// TASK or REIMBURSEMENT: which of the two balances it settles.
+  purpose     String      @default("TASK")
+  method      String?
+  reference   String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  staff       StaffMember @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([staffId, paidAt])
+}
+
+/// Something a staff member paid for and is owed back. Tied to a car, it
+/// is also written to that car's owner ledger as an expense
+/// (`ownerLedgerItemId`), so the owner carries it.
+model StaffReimbursement {
+  workspaceId       String
+  id                String                      @id @default(cuid())
+  staffId           String
+  /// Plain column: the car may be archived, never removed.
+  vehicleId         String?
+  amount            Float
+  /// The calendar day of the expense, at noon UTC.
+  occurredAt        DateTime
+  note              String
+  ownerLedgerItemId String?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  staff             StaffMember                 @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  receipts          StaffReimbursementReceipt[]
+
+  @@index([workspaceId])
+  @@index([staffId, occurredAt])
+  @@index([vehicleId])
+}
+
+model StaffReimbursementReceipt {
+  workspaceId     String
+  id              String             @id @default(cuid())
+  reimbursementId String
+  pathname        String
+  filename        String?
+  contentType     String?
+  size            Int?
+  uploadedAt      DateTime           @default(now())
+  reimbursement   StaffReimbursement @relation(fields: [reimbursementId], references: [id], onDelete: Cascade)
+
+  @@index([reimbursementId])
 }
 
 model StaffTaskNotificationTemplate {

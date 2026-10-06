@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   Bell,
@@ -13,6 +14,7 @@ import {
   Plus,
   Trash2,
   UserPlus,
+  Wallet,
   X,
 } from "lucide-react";
 
@@ -164,6 +166,7 @@ function getStaffScheduleCopy(locale: Locale) {
         title: "线下员工排班",
         addStaff: "新增员工",
         notificationTemplates: "通知模板",
+        payouts: "员工结算",
         notificationTemplateTitle: "任务通知模板",
         notificationTemplateHint:
           "用于 admin 创建、修改、删除员工任务时发送的 email 和短信。可以使用下方变量。",
@@ -285,6 +288,7 @@ function getStaffScheduleCopy(locale: Locale) {
         title: "Offline staff schedule",
         addStaff: "Add staff",
         notificationTemplates: "Templates",
+        payouts: "Staff pay",
         notificationTemplateTitle: "Task notification templates",
         notificationTemplateHint:
           "Used when admins create, update, remove, or delete staff tasks. You can use the variables below.",
@@ -850,6 +854,10 @@ export function StaffScheduleClient({
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-end">
         <h1 className="sr-only">{c.title}</h1>
         <div className="flex flex-wrap gap-2">
+          <Link href="/staff-schedule/payouts" className="btn-secondary min-h-11 px-4 py-2 text-sm">
+            <Wallet className="h-4 w-4" />
+            {c.payouts}
+          </Link>
           <button className="btn-secondary min-h-11 px-4 py-2 text-sm" onClick={() => setNotificationTemplateOpen(true)}>
             <Bell className="h-4 w-4" />
             {c.notificationTemplates}

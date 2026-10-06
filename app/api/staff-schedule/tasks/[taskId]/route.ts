@@ -29,6 +29,8 @@ const taskSchema = z.object({
   priority: z.nativeEnum(StaffTaskPriority).optional(),
   category: z.string().trim().optional().nullable().or(z.literal("")),
   sortOrder: z.coerce.number().int().optional(),
+  /** Pay for this one task; null falls back to the staff member's rate. */
+  payRate: z.number().nonnegative().nullable().optional(),
 });
 
 function nullable(value?: string | null) {
@@ -218,6 +220,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
       priority: parsed.priority ?? existing.priority,
       category: parsed.category === undefined ? existing.category : nullable(parsed.category),
       sortOrder: parsed.sortOrder ?? existing.sortOrder,
+      payRate:
+        parsed.payRate === undefined
+          ? existing.payRate
+          : parsed.payRate === null
+            ? null
+            : Math.round(parsed.payRate * 100) / 100,
       completedAt,
     },
     include: taskInclude,

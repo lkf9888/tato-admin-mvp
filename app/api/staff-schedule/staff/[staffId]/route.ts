@@ -17,6 +17,8 @@ const staffSchema = z.object({
   pinnedMessage: z.string().trim().optional().or(z.literal("")),
   isActive: z.boolean().optional(),
   sortOrder: z.coerce.number().int().optional(),
+  /** Pay per task; null clears it. */
+  defaultTaskRate: z.number().nonnegative().nullable().optional(),
 });
 
 function nullable(value?: string) {
@@ -70,6 +72,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
           : nullable(parsed.pinnedMessage),
       isActive: parsed.isActive ?? existing.isActive,
       sortOrder: parsed.sortOrder ?? existing.sortOrder,
+      defaultTaskRate:
+        parsed.defaultTaskRate === undefined
+          ? existing.defaultTaskRate
+          : parsed.defaultTaskRate === null
+            ? null
+            : Math.round(parsed.defaultTaskRate * 100) / 100,
     },
   });
 

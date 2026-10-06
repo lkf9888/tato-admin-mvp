@@ -171,6 +171,12 @@ export function makeOwnerLedgerReceiptPath(itemId: string, filename: string) {
   return path.posix.join("owner-ledger", itemId, "receipts", `${stamp}${ext}`);
 }
 
+export function makeStaffReimbursementReceiptPath(reimbursementId: string, filename: string) {
+  const ext = extensionFromFilename(filename);
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return path.posix.join("staff-reimbursements", reimbursementId, `${stamp}${ext}`);
+}
+
 export function makeContractTemplateSourcePath(workspaceId: string, filename: string) {
   const ext = extensionFromFilename(filename);
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;

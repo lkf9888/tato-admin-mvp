@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.42.0 - 2026-10-06
+
+### Staff pay: per-task rates, what each person is owed, and reimbursements that reach the owner
+
+The schedule now records what work is worth and what has been paid for it. The new 员工结算 button on the staff schedule opens it.
+
+- **Rates.** Each staff member has a default pay per task, and any single task can carry its own amount, edited in that person's task list. Only top-level tasks are paid; subtasks are a checklist inside one.
+- **Earned when the day arrives.** A task counts as earned once its date has come, whether or not anyone ticked it done. A task that did not happen should be cancelled, which is how an absence is recorded. Tasks still ahead are shown separately and are not counted as owed. An undated task counts on the day it was completed.
+- **What is owed.** The overview lists every staff member with tasks due, earned, paid and owed. A person's page shows that summary with three tabs: tasks (with the pay box), payments, and reimbursements. All three can be filtered by date.
+- **Payments.** A payment records the amount, date, method and reference, and whether it covers task pay or reimbursements. The two balances are kept apart.
+- **Reimbursements.** A reimbursement has an amount, date, purpose and receipts. When it is tied to a car with an owner, it is also written to that owner's ledger as an expense with the same receipts. Editing, moving or deleting it updates that ledger line too.
+
 ## v1.41.1 - 2026-10-06
 
 ### Dynamic pricing and deposits read properly on a phone

@@ -37,6 +37,7 @@ import { rentalEstimateMessages } from "@/lib/i18n/messages/rental-estimate";
 import { rentalSiteMessages } from "@/lib/i18n/messages/rental-site";
 import { shareMessages } from "@/lib/i18n/messages/share";
 import { shellMessages } from "@/lib/i18n/messages/shell";
+import { staffPayoutsMessages } from "@/lib/i18n/messages/staff-payouts";
 
 export const LOCALE_COOKIE = "turo-locale";
 
@@ -201,6 +202,7 @@ const messages = {
     ...calendarMessages.en,
     ...shareMessages.en,
     ...legalMessages.en,
+    ...staffPayoutsMessages.en,
   },
   zh: {
     ...shellMessages.zh,
@@ -225,6 +227,7 @@ const messages = {
     ...calendarMessages.zh,
     ...shareMessages.zh,
     ...legalMessages.zh,
+    ...staffPayoutsMessages.zh,
   },
 } as const;
 
@@ -259,6 +262,7 @@ const traditionalMessages = {
   ...zhHant.calendarMessages,
   ...zhHant.shareMessages,
   ...zhHant.legalMessages,
+  ...zhHant.staffPayoutsMessages,
 } as unknown as Messages;
 
 // Cast through `unknown` because messages.en / messages.zh have different

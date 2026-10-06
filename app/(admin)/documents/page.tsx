@@ -1,6 +1,8 @@
+import { AttachmentsZipButton } from "@/components/attachments-zip-button";
 import { SearchableSelect } from "@/components/searchable-select";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
+import { attachmentListWhere } from "@/lib/attachment-list";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 
@@ -31,39 +33,7 @@ export default async function DocumentsPage({
       select: { id: true, plateNumber: true, nickname: true },
     }),
     prisma.orderAttachment.findMany({
-      where: {
-        workspaceId: workspace.id,
-        isArchived: false,
-        kind: "document",
-        OR: [{ orderId: { not: null } }, { vehicleId: { not: null } }],
-        ...(selectedVehicleIds.length
-          ? {
-              OR: [
-                { vehicleId: { in: selectedVehicleIds } },
-                { order: { vehicleId: { in: selectedVehicleIds } } },
-              ],
-            }
-          : {}),
-        ...(q
-          ? {
-              AND: [
-                {
-                  OR: [
-                    { filename: { contains: q } },
-                    { order: { renterName: { contains: q } } },
-                    { order: { renterPhone: { contains: q } } },
-                    { order: { contractNumber: { contains: q } } },
-                    { order: { notes: { contains: q } } },
-                    { order: { vehicle: { plateNumber: { contains: q } } } },
-                    { order: { vehicle: { nickname: { contains: q } } } },
-                    { vehicle: { plateNumber: { contains: q } } },
-                    { vehicle: { nickname: { contains: q } } },
-                  ],
-                },
-              ],
-            }
-          : {}),
-      },
+      where: attachmentListWhere(workspace.id, { kind: "document", vehicleIds: selectedVehicleIds, q }),
       include: {
         vehicle: { include: { owner: true } },
         order: {
@@ -138,6 +108,13 @@ export default async function DocumentsPage({
         </label>
         <button className="btn-primary self-end">{copy.apply}</button>
       </form>
+      <AttachmentsZipButton
+        kind="document"
+        vehicle={params.vehicle ?? ""}
+        q={q}
+        locale={locale}
+        filename={`tato-documents-${new Date().toISOString().slice(0, 10)}.zip`}
+      />
 
       {attachments.length === 0 ? (
         <div className="card border-dashed p-10 text-center text-sm text-[var(--ink-soft)]">

@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.49.0 - 2026-10-06
+
+### Photos and documents download as one ZIP
+
+"打包下载 ZIP" on the photos and documents pages downloads everything the current car filter and search show.
+
+- **Folders.** Files are grouped by plate, then by trip (pick-up date on the fleet's clock, plus the guest's name). A car's own files go in a vehicle-files folder. Files with the same name in one folder are numbered.
+- **Built in the browser.** The server only lists the files (`/api/exports/attachments`). The browser fetches each one through the route the page already links to, so the same access check applies, and zips them without recompressing; photos and videos are already compressed. The button shows progress. Archives over 1.5 GB ask before starting. A file that fails to download is listed in `_failed.txt` and does not sink the archive.
+- **Fix.** The photos and documents pages built their filter with two `OR` keys, so choosing a car dropped the "attached to a trip or a car" condition. Both pages and the ZIP now share one filter (`lib/attachment-list.ts`).
+
 ## v1.48.0 - 2026-10-06
 
 ### All of a trip's photos behind one link

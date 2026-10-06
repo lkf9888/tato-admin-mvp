@@ -713,3 +713,39 @@ export async function sendOwnerStatementEmail(input: {
     ...(input.replyTo ? { replyTo: input.replyTo } : {}),
   });
 }
+
+/** An invitation to join a workspace's team, with the link to accept it. */
+export async function sendTeamInviteEmail(input: {
+  to: string;
+  locale: "zh" | "en";
+  inviterName: string;
+  workspaceName: string;
+  acceptUrl: string;
+  replyTo?: string | null;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const workspaceName = input.workspaceName.replace(/\s+/g, " ").trim() || "TATO";
+  const inviterName = input.inviterName.replace(/\s+/g, " ").trim();
+  const copy =
+    input.locale === "en"
+      ? {
+          subject: `${inviterName} invited you to ${workspaceName} on TATO`,
+          body: `${inviterName} has invited you to join ${workspaceName}'s team on TATO. Open the link to set your password; it works for 7 days.`,
+          button: "Accept the invitation",
+        }
+      : {
+          subject: `${inviterName} 邀请你加入 ${workspaceName} 的 TATO 团队`,
+          body: `${inviterName} 邀请你加入 ${workspaceName} 在 TATO 上的团队。打开链接设置密码即可，链接 7 天内有效。`,
+          button: "接受邀请",
+        };
+  const href = escapeHtml(input.acceptUrl).replace(/"/g, "&quot;");
+  return sendMail({
+    to: input.to,
+    subject: copy.subject,
+    text: `${copy.body}\n\n${input.acceptUrl}`,
+    html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;color:#111;line-height:1.6">
+      <p style="margin:0 0 20px">${escapeHtml(copy.body)}</p>
+      <p><a href="${href}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-size:14px">${escapeHtml(copy.button)}</a></p>
+    </div>`,
+    ...(input.replyTo ? { replyTo: input.replyTo } : {}),
+  });
+}

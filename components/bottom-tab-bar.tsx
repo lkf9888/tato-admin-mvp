@@ -112,7 +112,11 @@ export function BottomTabBar({
     },
   ];
 
-  const isMoreActive = !tabs.some((tab) =>
+  // A team member's navigation is already cut to their pages; the fixed
+  // tabs follow it rather than leading to a page they cannot open.
+  const visibleTabs = tabs.filter((tab) => moreItems.some((item) => item.href === tab.href));
+
+  const isMoreActive = !visibleTabs.some((tab) =>
     tab.matchPrefixes.some((prefix) => pathname.startsWith(prefix)),
   );
 
@@ -120,7 +124,7 @@ export function BottomTabBar({
   // has no tab of its own, so a reply to answer is visible from the bar.
   const badges = useNavBadges();
   const moreCount = moreItems
-    .filter((item) => !tabs.some((tab) => tab.href === item.href))
+    .filter((item) => !visibleTabs.some((tab) => tab.href === item.href))
     .reduce((sum, item) => sum + (badges[item.href] ?? 0), 0);
 
   return (
@@ -133,7 +137,7 @@ export function BottomTabBar({
         className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[var(--surface)]/95 pb-safe backdrop-blur lg:hidden"
       >
         <div className="mx-auto grid max-w-2xl grid-cols-5">
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const active = tab.matchPrefixes.some((prefix) =>
               pathname.startsWith(prefix),
             );

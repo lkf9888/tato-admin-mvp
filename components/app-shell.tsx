@@ -7,6 +7,7 @@ import { NavigationOptimizer } from "@/components/navigation-optimizer";
 import { SessionExpiryRedirect } from "@/components/session-expiry-redirect";
 import { SidebarNav } from "@/components/sidebar-nav";
 import type { NavIconName } from "@/components/nav-icons";
+import { canOpenPath, type AccessUser } from "@/lib/access";
 import { BrandMark } from "@/components/brand-mark";
 import { getMessages, type Locale } from "@/lib/i18n";
 import { APP_VERSION_LABEL } from "@/lib/version";
@@ -16,6 +17,7 @@ export function AppShell({
   localePreference,
   currentUserName,
   currentUserEmail,
+  access,
   children,
 }: {
   locale: Locale;
@@ -25,6 +27,8 @@ export function AppShell({
    *  upstream, so these are always present. */
   currentUserName: string;
   currentUserEmail: string;
+  /** The member's role and pages: the navigation shows only what they may open. */
+  access?: AccessUser;
   children: React.ReactNode;
 }) {
   const messages = getMessages(locale);
@@ -107,7 +111,13 @@ export function AppShell({
   // already in the bar — so the More sheet works as a complete site
   // map and visitors who learn the app this way can find anything in
   // one place.
-  const moreItems = navGroups.flatMap((group) => group.items);
+  // A team member sees the pages they were given and no others.
+  const visibleGroups = access
+    ? navGroups
+        .map((group) => ({ ...group, items: group.items.filter((item) => canOpenPath(access, item.href)) }))
+        .filter((group) => group.items.length > 0)
+    : navGroups;
+  const moreItems = visibleGroups.flatMap((group) => group.items);
   const navHrefs = moreItems.map((item) => item.href);
 
   // The non-nav controls (language switcher, sign out, version chip)
@@ -146,7 +156,7 @@ export function AppShell({
         </div>
       </div>
 
-      <SidebarNav groups={navGroups} />
+      <SidebarNav groups={visibleGroups} />
 
       <div className="border-t border-[var(--line)] p-3 pb-16">
         <div

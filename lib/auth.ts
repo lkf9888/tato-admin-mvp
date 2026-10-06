@@ -2,10 +2,12 @@ import "server-only";
 
 import bcrypt from "bcryptjs";
 import { createHmac, timingSafeEqual } from "crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { canMakeRequest } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
+import { normalizeEmail } from "@/lib/utils";
 import { ensureUserWorkspace } from "@/lib/workspaces";
 
 const ADMIN_COOKIE = "turo-admin-session";
@@ -49,9 +51,7 @@ function getSignedPayloadValue(payload?: string) {
   return value ?? null;
 }
 
-export function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
-}
+export { normalizeEmail };
 
 export async function setAdminSession(value = "admin") {
   const store = await cookies();
@@ -82,7 +82,38 @@ export async function getAdminSessionValue() {
   return getSignedPayloadValue(store.get(ADMIN_COOKIE)?.value);
 }
 
+/**
+ * This request's path and method, as middleware stamped them. Null
+ * outside a request (a script), where there is nothing to check.
+ */
+async function currentRequest() {
+  try {
+    const store = await headers();
+    const path = store.get("x-tato-path");
+    return path ? { path, method: store.get("x-tato-method") ?? "GET" } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether the signed-in member's role and pages allow this request. */
+async function requestAllowed(user: { role: string; pageAccess: string | null }) {
+  const request = await currentRequest();
+  return !request || canMakeRequest(user, request.path, request.method);
+}
+
+/**
+ * The signed-in admin, or null -- also null when their role or pages do
+ * not cover this request, so every API route that answers a missing
+ * user with 401 refuses a member who is not allowed there, unchanged.
+ */
 export async function getCurrentAdminUser() {
+  const user = await loadSessionUser();
+  if (!user) return null;
+  return (await requestAllowed(user)) ? user : null;
+}
+
+async function loadSessionUser() {
   const sessionValue = await getAdminSessionValue();
   if (!sessionValue) return null;
 
@@ -112,10 +143,27 @@ export async function requireAdminAuth() {
 }
 
 export async function requireCurrentAdminUser() {
-  const user = await getCurrentAdminUser();
+  const user = await loadSessionUser();
   if (!user) {
     redirect("/login");
   }
+  if (!(await requestAllowed(user))) {
+    // A page goes to a page that says so; an API call or server action
+    // must fail rather than follow a redirect to HTML and look like it
+    // worked.
+    const request = await currentRequest();
+    if (request?.path.startsWith("/api/") || (request && request.method !== "GET" && request.method !== "HEAD")) {
+      throw new Error("ACCESS_DENIED");
+    }
+    redirect("/no-access");
+  }
+  return user;
+}
+
+/** The signed-in member without the per-request check: for the shell. */
+export async function requireSessionUser() {
+  const user = await loadSessionUser();
+  if (!user) redirect("/login");
   return user;
 }
 

@@ -10,7 +10,10 @@ import {
   updateStripePayoutBindingAction,
 } from "@/lib/account-settings-actions";
 import { ANDROID_RELEASE, formatBytes } from "@/lib/android-release";
+import { TeamSettings } from "@/components/team-settings";
+import { ASSIGNABLE_SECTIONS, canManageTeam, parsePageAccess } from "@/lib/access";
 import { requireCurrentAdminContext } from "@/lib/auth";
+import { listTeam } from "@/lib/team";
 import { getMessages } from "@/lib/i18n";
 import { getI18n, getLocalePreference } from "@/lib/i18n-server";
 import {
@@ -35,6 +38,30 @@ export default async function AccountSettingsPage({
     ]);
 
   const t = messages.accountSettingsPage;
+  const isOwner = canManageTeam(user);
+  const team = isOwner ? await listTeam(workspace.id) : null;
+  const navLabels: Record<string, string> = {
+    "/dashboard": messages.shell.nav.dashboard,
+    "/assistant": messages.shell.nav.assistant,
+    "/messages": messages.shell.nav.guestMessages,
+    "/updates": messages.shell.nav.turoUpdates,
+    "/calendar": messages.shell.nav.calendar,
+    "/orders": messages.shell.nav.orders,
+    "/imports": messages.shell.nav.imports,
+    "/vehicles": messages.shell.nav.vehicles,
+    "/vehicle-roi": messages.shell.nav.vehicleRoi,
+    "/owners": messages.shell.nav.owners,
+    "/direct-booking": messages.shell.nav.directBooking,
+    "/staff-schedule": messages.shell.nav.staffSchedule,
+    "/contracts": messages.shell.nav.contracts,
+    "/inspections": messages.shell.nav.inspections,
+    "/photos": messages.shell.nav.photos,
+    "/documents": messages.shell.nav.documents,
+    "/activity": messages.shell.nav.activity,
+    "/trash": messages.shell.nav.trash,
+    "/invoices": messages.shell.nav.invoices,
+  };
+  const appBase = (process.env.NEXT_PUBLIC_APP_URL?.trim() || "").replace(/\/$/, "");
   const connectSnapshot = await getWorkspaceConnectSnapshot(workspace.id);
   const connectStatus = summarizeConnectStatus(connectSnapshot);
   const isStripeConfigured = isStripeConnectConfigured();
@@ -196,6 +223,7 @@ export default async function AccountSettingsPage({
           </form>
         </SettingsCard>
 
+        {isOwner ? (
         <SettingsCard title={t.stripeTitle} copy={t.stripeCopy}>
           <div className="mb-3 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[12px] text-[var(--ink-soft)]">
             {isStripeConfigured ? t.stripeConfigured : t.stripeNotConfigured}
@@ -255,6 +283,7 @@ export default async function AccountSettingsPage({
             </div>
           </form>
         </SettingsCard>
+        ) : null}
       </div>
 
       <section className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
@@ -355,6 +384,34 @@ export default async function AccountSettingsPage({
         )}
       </section>
 
+      {team ? (
+        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">{t.team.title}</p>
+          <p className="mb-3 mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">{t.team.copy}</p>
+          <TeamSettings
+            locale={locale}
+            currentUserId={user.id}
+            members={team.members.map((member) => ({
+              id: member.id,
+              name: member.name,
+              email: member.email,
+              role: member.role,
+              pageAccess: parsePageAccess(member.pageAccess),
+            }))}
+            invites={team.invites.map((invite) => ({
+              id: invite.id,
+              email: invite.email,
+              name: invite.name,
+              role: invite.role,
+              expiresAt: invite.expiresAt.toISOString(),
+              acceptUrl: `${appBase}/invite/${invite.token}`,
+            }))}
+            pages={ASSIGNABLE_SECTIONS.map((key) => ({ key, label: navLabels[key] ?? key }))}
+          />
+        </section>
+      ) : null}
+
+      {isOwner ? (
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
           {t.ledgerTitle}
@@ -414,6 +471,7 @@ export default async function AccountSettingsPage({
           </button>
         </form>
       </section>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.52.0 - 2026-10-06
+
+### Team members sign in with their own accounts
+
+Account settings has a new Team card, which only the account's owner can see. The owner can add partners and staff with their own sign-in.
+
+- **Adding someone.** Enter a name and email, choose a role, and tick the pages they can open. Then either email an invitation, so they set their own password through a link valid for 7 days, or set a password now and pass it on. An invitation whose email cannot be sent shows its link to copy. Members can be changed or removed, and invitations withdrawn. The owner can never be changed or removed from here.
+- **Roles.** Admin sees and changes everything on the pages ticked. View only sees the pages ticked and changes nothing, apart from their own account settings. The team, buying quota, payouts, the Stripe payout binding and the owner revenue-split policy stay with the owner.
+- **Pages.** Pages are the sidebar's own entries, and each covers its sub-pages and the APIs it calls (`lib/access.ts`). A page that is not ticked is missing from the sidebar and the bottom tabs. Opening it directly lands on a "no access" page, and its APIs answer 401.
+- **Enforcement.** Access is checked once, where the signed-in user is looked up (`lib/auth.ts`), so every route and form follows it. Middleware stamps each request with its path and method, replacing any client-supplied value. Members inherit the inviter's billing exemption. Every existing account is an owner, and nothing changes for them.
+
 ## v1.51.0 - 2026-10-06
 
 ### An offline order can be filled from a pasted message

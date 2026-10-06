@@ -448,3 +448,8 @@ export function getDisplayOrderNote(
 
   return normalized;
 }
+
+/** An email as accounts are keyed by it: trimmed, lower-case. */
+export function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}

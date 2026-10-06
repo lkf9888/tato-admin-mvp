@@ -32,17 +32,23 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  const requestHeaders = new Headers(request.headers);
+  // The path and method of this request, for the team-access check in
+  // lib/auth.ts, which runs where neither is otherwise visible (a server
+  // action, a layout). Set, not appended: whatever a client sent under
+  // these names is replaced.
+  requestHeaders.set("x-tato-path", pathname);
+  requestHeaders.set("x-tato-method", request.method);
+
   // A public rental-site page carries its language in the path. The
   // root layout prints `<html lang>` and cannot see the path, so the
   // answer is handed to it as a request header.
   const siteLocale = getSiteLocaleFromPath(pathname);
   if (siteLocale) {
-    const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-site-lang", getSiteHreflang(siteLocale));
-    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
-  return NextResponse.next();
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { LedgerShareTarget } from "@prisma/client";
 
+import { canManageTeam } from "@/lib/access";
 import { normalizeEmail, requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
@@ -173,7 +174,14 @@ const stripeSchema = z.object({
   clearStripeConnect: z.string().optional(),
 });
 
+/** Workspace-wide settings belong to the account's owner, not its team. */
+async function requireOwner() {
+  const { user } = await requireCurrentAdminContext();
+  if (!canManageTeam(user)) throw new Error("ACCESS_DENIED");
+}
+
 export async function updateStripePayoutBindingAction(formData: FormData) {
+  await requireOwner();
   const parsed = stripeSchema.safeParse({
     accountId: formData.get("stripeConnectAccountId"),
     country: formData.get("stripeConnectCountry") || "CA",
@@ -308,6 +316,7 @@ const ledgerPolicySchema = z.object({
  * you have agreed the change with that owner.
  */
 export async function updateLedgerPolicyAction(formData: FormData) {
+  await requireOwner();
   const parsed = ledgerPolicySchema.safeParse({
     reimbursementShare: formData.get("reimbursementShare"),
     serviceShare: formData.get("serviceShare"),

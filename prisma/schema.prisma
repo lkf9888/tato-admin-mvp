@@ -214,9 +214,33 @@ model User {
   email           String     @unique
   passwordHash    String
   isBillingExempt Boolean    @default(false)
+  /// OWNER (manages the team and billing), ADMIN (everything else, on the
+  /// pages allowed) or VIEWER (looks, never changes). lib/access.ts.
+  role            String     @default("OWNER")
+  /// JSON array of section keys this account may open; null is all.
+  pageAccess      String?
+  invitedBy       String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+}
+
+/// An invitation to join a workspace's team. The link carries the token;
+/// accepting it creates the account with this role and these pages.
+model UserInvite {
+  id          String    @id @default(cuid())
+  workspaceId String
+  email       String
+  name        String?
+  role        String    @default("ADMIN")
+  pageAccess  String?
+  token       String    @unique
+  expiresAt   DateTime
+  createdBy   String
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
 
   @@index([workspaceId])
 }

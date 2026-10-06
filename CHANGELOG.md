@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.33.0 - 2026-10-05
+
+### The assistant points out idle cars, pickups missing something, and money nobody is collecting
+
+Five new alerts, all in the assistant's alert list. The WARNING ones also go out in the daily email.
+
+- **Idle cars** (INFO). One alert lists every available car with five or more days free that start within the next two weeks, for example "IDLE1：10/02 还车后，之后暂无订单". The fix happens on Turo's price or the direct site, so the alert only points. Every line is written in dates that do not move, so the alert is not raised again each morning just because a day has passed.
+- **Short gaps** (INFO). Gaps of one to two days between two trips on the same car, which Turo's minimum trip length and turnaround tend to leave unrented.
+- **Pickups missing something** (one alert per trip, WARNING inside 24 hours). Checks pickups in the next three days for two things: the car has no pickup code, and no wash, clean or inspection task falls between its previous return and this pickup. Each check runs only where the operator evidently relies on it: codes when at least half the fleet has one, prep tasks when any were created in the last 30 days. A fleet that uses neither is not nagged.
+- **Overdue instalments** (WARNING, one per order). Unpaid instalments more than a day past their due date. They already had due dates in TATO, but nothing read them.
+- **Long rentals ending** (INFO). A repeating booking whose last booked period ends within seven days, with nothing booked after it.
+
+Free time is measured from the later of two overlapping trips, so a long rental with a short one inside it does not make its car look idle.
+
+
 ## v1.32.0 - 2026-10-05
 
 ### Every held deposit on one page, and classified ads for a car in one click

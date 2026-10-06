@@ -6,6 +6,8 @@ import {
   BookingRequestStatus,
   OrderSource,
   OrderStatus,
+  StaffTaskStatus,
+  VehicleStatus,
 } from "@prisma/client";
 
 import { formatBytes, getDiskUsage } from "@/lib/disk";
@@ -644,6 +646,338 @@ async function detectUnsettledDeposits(workspaceId: string): Promise<AlertDraft[
   }));
 }
 
+function daysFromNow(days: number) {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+}
+
+function vehicleLabel(vehicle: { plateNumber: string | null; nickname: string }) {
+  return vehicle.plateNumber ? `${vehicle.plateNumber} · ${vehicle.nickname}` : vehicle.nickname;
+}
+
+/** A stretch this long with no booking is worth a look... */
+const IDLE_MIN_DAYS = 5;
+/** ...if it starts within this many days. Further out, it may still fill. */
+const IDLE_LOOKAHEAD_DAYS = 14;
+/** How far ahead bookings are read to decide where a stretch ends. */
+const IDLE_HORIZON_DAYS = 30;
+/** How far back to look for the trip a stretch began after. */
+const IDLE_HISTORY_DAYS = 60;
+/** A gap between two trips this short is hard to rent: Turo's minimum
+ *  trip length and the turnaround eat it. */
+const SHORT_GAP_MIN_HOURS = 24;
+const SHORT_GAP_MAX_HOURS = 72;
+const IDLE_SAMPLE = 15;
+
+/**
+ * Cars with nothing booked, and gaps too short to rent.
+ *
+ * An idle car costs money every day it sits, and nothing in TATO said
+ * so: the calendar shows it, but only to someone already looking for
+ * it. Two alerts, both INFO -- they are opportunities, not failures --
+ * one for long empty stretches starting soon, one for the one-to-two
+ * day gaps between trips. The fix for both happens elsewhere (a price
+ * on Turo, a push on the direct site), so this only points.
+ *
+ * Every line is written in dates that do not move: a stretch "from the
+ * 3rd's return" reads the same tomorrow, so the alert is not re-raised
+ * every morning just because a day passed.
+ */
+async function detectIdleCars(workspaceId: string): Promise<AlertDraft[]> {
+  const now = new Date();
+  const horizon = daysFromNow(IDLE_HORIZON_DAYS);
+  const [vehicles, orders] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: { workspaceId, isArchived: false, status: VehicleStatus.available },
+      select: { id: true, plateNumber: true, nickname: true },
+    }),
+    prisma.order.findMany({
+      where: {
+        workspaceId,
+        isArchived: false,
+        status: { not: OrderStatus.cancelled },
+        returnDatetime: { gte: daysAgo(IDLE_HISTORY_DAYS) },
+        pickupDatetime: { lte: horizon },
+      },
+      select: { vehicleId: true, pickupDatetime: true, returnDatetime: true },
+      orderBy: { pickupDatetime: "asc" },
+    }),
+  ]);
+
+  const byVehicle = new Map<string, typeof orders>();
+  for (const order of orders) {
+    const list = byVehicle.get(order.vehicleId) ?? [];
+    list.push(order);
+    byVehicle.set(order.vehicleId, list);
+  }
+
+  const idle: { label: string; from: string; to: string; startsAt: number }[] = [];
+  const shortGaps: { label: string; line: string; at: number }[] = [];
+  const day = 24 * 60 * 60 * 1000;
+
+  for (const vehicle of vehicles) {
+    const trips = byVehicle.get(vehicle.id) ?? [];
+    // Free from the end of whatever is running or last ran.
+    const past = trips.filter((trip) => trip.pickupDatetime <= now);
+    let freeFrom: Date | null = past.length
+      ? new Date(Math.max(...past.map((trip) => trip.returnDatetime.getTime())))
+      : null;
+    const future = trips.filter((trip) => trip.pickupDatetime > now);
+
+    let reportedIdle = false;
+    for (let i = 0; i <= future.length; i += 1) {
+      const next = future[i] ?? null;
+      const start = new Date(Math.max(freeFrom?.getTime() ?? now.getTime(), now.getTime()));
+      const end = next ? next.pickupDatetime : horizon;
+      const length = end.getTime() - start.getTime();
+
+      if (!reportedIdle && start <= daysFromNow(IDLE_LOOKAHEAD_DAYS) && length >= IDLE_MIN_DAYS * day) {
+        idle.push({
+          label: vehicleLabel(vehicle),
+          from: freeFrom ? `${formatDateOnly(freeFrom)} 还车后` : `近 ${IDLE_HISTORY_DAYS} 天没有订单`,
+          to: next ? `${formatDateOnly(next.pickupDatetime)} 才有下一单` : "之后暂无订单",
+          startsAt: start.getTime(),
+        });
+        reportedIdle = true;
+      }
+
+      // Between two trips only: a gap before the first future trip is
+      // just "free until then", not a hole in the calendar.
+      if (next && freeFrom && freeFrom > now) {
+        const gapHours = (next.pickupDatetime.getTime() - freeFrom.getTime()) / 3_600_000;
+        if (gapHours >= SHORT_GAP_MIN_HOURS && gapHours < SHORT_GAP_MAX_HOURS) {
+          shortGaps.push({
+            label: vehicleLabel(vehicle),
+            line: `${formatDateTime(freeFrom)} 还车 → ${formatDateTime(next.pickupDatetime)} 取车（空 ${Math.round(gapHours / 24 * 10) / 10} 天）`,
+            at: freeFrom.getTime(),
+          });
+        }
+      }
+      if (!next) break;
+      // Overlapping trips (a conflict, or a long rental with a short one
+      // inside it): the car is free only when the later of the two ends.
+      freeFrom =
+        freeFrom && freeFrom > next.returnDatetime ? freeFrom : next.returnDatetime;
+    }
+  }
+
+  const drafts: AlertDraft[] = [];
+  if (idle.length > 0) {
+    idle.sort((a, b) => a.startsAt - b.startsAt || a.label.localeCompare(b.label));
+    const lines = idle.slice(0, IDLE_SAMPLE).map((row) => `${row.label}：${row.from}，${row.to}`);
+    if (idle.length > IDLE_SAMPLE) lines.push(`…还有 ${idle.length - IDLE_SAMPLE} 台`);
+    lines.push("可以在 Turo 上调价，或在自有网站上推这几台车。");
+    drafts.push({
+      dedupeKey: "idle_cars",
+      severity: AssistantAlertSeverity.INFO,
+      title: `${idle.length} 台车未来两周内有 ${IDLE_MIN_DAYS} 天以上没有订单`,
+      body: lines.join("\n"),
+      href: "/calendar",
+    });
+  }
+  if (shortGaps.length > 0) {
+    shortGaps.sort((a, b) => a.at - b.at);
+    const lines = shortGaps.slice(0, IDLE_SAMPLE).map((gap) => `${gap.label}：${gap.line}`);
+    if (shortGaps.length > IDLE_SAMPLE) lines.push(`…还有 ${shortGaps.length - IDLE_SAMPLE} 处`);
+    lines.push("Turo 的最短租期和整备时间可能让这些空档租不出去；可以缩短最短租期，或给相邻订单延期优惠。");
+    drafts.push({
+      dedupeKey: "short_gaps",
+      severity: AssistantAlertSeverity.INFO,
+      title: `${shortGaps.length} 处订单之间只空 1–2 天`,
+      body: lines.join("\n"),
+      href: "/calendar",
+    });
+  }
+  return drafts;
+}
+
+/** Pickups this close are checked for what they still need. */
+const PREP_LOOKAHEAD_DAYS = 3;
+/** Inside this, a gap is urgent rather than informational. */
+const PREP_URGENT_HOURS = 24;
+
+/**
+ * Pickups in the next three days that are missing something.
+ *
+ * Two checks, each applied only where the operator evidently relies on
+ * it, so a fleet that does not use lockbox codes or prep tasks is not
+ * nagged about every trip:
+ *
+ * - no pickup code on the car, when most of the fleet has one;
+ * - no prep task (wash, clean, inspection) on the car between its
+ *   previous return and this pickup, when prep tasks are in use.
+ *
+ * One alert per trip, WARNING inside 24 hours so it reaches email.
+ */
+async function detectPickupsMissingPrep(workspaceId: string): Promise<AlertDraft[]> {
+  const now = new Date();
+  const [upcoming, fleetSize, withCode, recentTasks] = await Promise.all([
+    prisma.order.findMany({
+      where: {
+        workspaceId,
+        isArchived: false,
+        status: { not: OrderStatus.cancelled },
+        pickupDatetime: { gt: now, lte: daysFromNow(PREP_LOOKAHEAD_DAYS) },
+      },
+      select: {
+        id: true,
+        renterName: true,
+        pickupDatetime: true,
+        vehicleId: true,
+        vehicle: { select: { plateNumber: true, nickname: true, pickupPassword: true } },
+      },
+      orderBy: { pickupDatetime: "asc" },
+      take: 60,
+    }),
+    prisma.vehicle.count({ where: { workspaceId, isArchived: false } }),
+    prisma.vehicle.count({ where: { workspaceId, isArchived: false, pickupPassword: { not: null } } }),
+    prisma.staffTask.count({
+      where: { workspaceId, vehicleId: { not: null }, createdAt: { gte: daysAgo(30) } },
+    }),
+  ]);
+  if (upcoming.length === 0) return [];
+
+  const usesCodes = fleetSize > 0 && withCode * 2 >= fleetSize;
+  const usesPrepTasks = recentTasks > 0;
+  if (!usesCodes && !usesPrepTasks) return [];
+
+  const drafts: AlertDraft[] = [];
+  for (const order of upcoming) {
+    const missing: string[] = [];
+    if (usesCodes && !order.vehicle.pickupPassword?.trim()) missing.push("这台车没有设取车密码");
+
+    if (usesPrepTasks) {
+      const previous = await prisma.order.findFirst({
+        where: {
+          workspaceId,
+          vehicleId: order.vehicleId,
+          id: { not: order.id },
+          isArchived: false,
+          status: { not: OrderStatus.cancelled },
+          returnDatetime: { lte: order.pickupDatetime },
+        },
+        orderBy: { returnDatetime: "desc" },
+        select: { returnDatetime: true },
+      });
+      const windowStart = previous?.returnDatetime ?? daysAgo(2);
+      const prep = await prisma.staffTask.count({
+        where: {
+          workspaceId,
+          vehicleId: order.vehicleId,
+          status: { not: StaffTaskStatus.cancelled },
+          dueDatetime: { gte: new Date(windowStart.getTime() - 6 * 3_600_000), lte: order.pickupDatetime },
+        },
+      });
+      if (prep === 0) missing.push("取车前没有安排整备或清洁任务");
+    }
+
+    if (missing.length === 0) continue;
+    const urgent = order.pickupDatetime.getTime() - now.getTime() <= PREP_URGENT_HOURS * 3_600_000;
+    drafts.push({
+      dedupeKey: `pickup_prep:${order.id}`,
+      severity: urgent ? AssistantAlertSeverity.WARNING : AssistantAlertSeverity.INFO,
+      title: `${order.renterName} ${formatDateTime(order.pickupDatetime)} 取 ${vehicleLabel(order.vehicle)}，还缺：${missing.join("、")}`,
+      body: missing.map((item) => `· ${item}`).join("\n"),
+      href: `/orders/${order.id}`,
+    });
+  }
+  return drafts;
+}
+
+/** A day's grace: an instalment due today is not yet late. */
+const PAYMENT_OVERDUE_GRACE_DAYS = 1;
+/** A repeating booking ending this soon with nothing after it is asked about. */
+const SERIES_ENDING_DAYS = 7;
+
+/**
+ * Money and terms nobody is watching.
+ *
+ * Instalments past their due date and still unpaid, one alert per
+ * order -- the instalments are already in TATO with due dates, nothing
+ * read them. And monthly renters whose last booked month ends within a
+ * week with no next month booked: renew or let go, but decide.
+ */
+async function detectOverduePaymentsAndEndingSeries(workspaceId: string): Promise<AlertDraft[]> {
+  const now = new Date();
+  const [payments, seriesOrders] = await Promise.all([
+    prisma.orderPayment.findMany({
+      where: {
+        paidAt: null,
+        dueAt: { lt: daysAgo(PAYMENT_OVERDUE_GRACE_DAYS) },
+        order: { workspaceId, isArchived: false, status: { not: OrderStatus.cancelled } },
+      },
+      select: {
+        amount: true,
+        dueAt: true,
+        order: { select: { id: true, renterName: true, vehicle: { select: { plateNumber: true, nickname: true } } } },
+      },
+      orderBy: { dueAt: "asc" },
+      take: 200,
+    }),
+    prisma.order.findMany({
+      where: {
+        workspaceId,
+        isArchived: false,
+        status: { not: OrderStatus.cancelled },
+        recurringSeriesId: { not: null },
+        returnDatetime: { gt: now },
+      },
+      select: {
+        id: true,
+        recurringSeriesId: true,
+        renterName: true,
+        returnDatetime: true,
+        vehicle: { select: { plateNumber: true, nickname: true } },
+      },
+    }),
+  ]);
+
+  const drafts: AlertDraft[] = [];
+  const byOrder = new Map<string, typeof payments>();
+  for (const payment of payments) {
+    const list = byOrder.get(payment.order.id) ?? [];
+    list.push(payment);
+    byOrder.set(payment.order.id, list);
+  }
+  for (const [orderId, list] of byOrder) {
+    const order = list[0].order;
+    const total = list.reduce((sum, payment) => sum + payment.amount, 0);
+    drafts.push({
+      dedupeKey: `payment_overdue:${orderId}`,
+      severity: AssistantAlertSeverity.WARNING,
+      title: `${order.renterName} 有 ${list.length} 笔分期款逾期未收，共 $${total.toFixed(2)}`,
+      body: [
+        `${vehicleLabel(order.vehicle)}`,
+        ...list.map((payment) => `${formatDateOnly(payment.dueAt as Date)} 应收 $${payment.amount.toFixed(2)}`),
+        "收到后在订单页标记已收款，这条提醒会自动消失。",
+      ].join("\n"),
+      href: `/orders/${orderId}`,
+    });
+  }
+
+  // The last booked month of each series that still has one ahead.
+  const lastBySeries = new Map<string, (typeof seriesOrders)[number]>();
+  for (const order of seriesOrders) {
+    const current = lastBySeries.get(order.recurringSeriesId as string);
+    if (!current || order.returnDatetime > current.returnDatetime) {
+      lastBySeries.set(order.recurringSeriesId as string, order);
+    }
+  }
+  for (const [seriesId, last] of lastBySeries) {
+    if (last.returnDatetime > daysFromNow(SERIES_ENDING_DAYS)) continue;
+    drafts.push({
+      dedupeKey: `series_ending:${seriesId}`,
+      severity: AssistantAlertSeverity.INFO,
+      title: `${last.renterName} 的长租 ${formatDateOnly(last.returnDatetime)} 到期，之后没有续`,
+      body: [
+        `${vehicleLabel(last.vehicle)} 这一系列的最后一笔订单在 ${formatDateTime(last.returnDatetime)} 还车。`,
+        "要续租就在订单页再加一期；不续的话，这台车之后就空出来了。",
+      ].join("\n"),
+      href: `/orders/${last.id}`,
+    });
+  }
+  return drafts;
+}
+
 /**
  * Run every detector and reconcile the alert table against reality.
  *
@@ -663,6 +997,9 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
       detectUnblockedTuroDates(workspaceId),
       detectPendingBookingRequests(workspaceId),
       detectUnsettledDeposits(workspaceId),
+      detectIdleCars(workspaceId),
+      detectPickupsMissingPrep(workspaceId),
+      detectOverduePaymentsAndEndingSeries(workspaceId),
       detectDiskPressure(),
     ])
   ).flat();

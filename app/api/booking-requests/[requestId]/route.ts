@@ -118,6 +118,10 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
         operatorNote: note,
         resolvedAt: new Date(),
         resolvedBy: user.name,
+        // Where the trip was before the move -- the order now only knows
+        // where it is, and the Turo block still sits on the old days.
+        previousPickupDate: changeRequest.order.pickupDatetime,
+        previousReturnDate: changeRequest.order.returnDatetime,
         ...(settled.kind === "refunded"
           ? { refundedAmount: settled.amount, stripeRefundId: settled.stripeRefundId }
           : {}),

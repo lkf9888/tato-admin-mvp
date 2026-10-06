@@ -105,6 +105,8 @@ export const bookingMessages = {
       approveAction: "同意",
       declineAction: "拒絕",
       approvedLabel: "已同意",
+      turoReleaseHint: (trip: string) => `請到 Turo 解除這單擋掉的日期：${trip}。`,
+      turoMoveHint: (from: string, to: string) => `請到 Turo 把這輛車擋的日期從 ${from} 改到 ${to}。`,
       declinedLabel: "已拒絕",
       refundedLabel: "已退款",
       refundFailed: "退款沒能發出，請到 Stripe 檢視後重試。",

@@ -2098,6 +2098,11 @@ model BookingChangeRequest {
   /// Requested dates, for a RESCHEDULE. Null on a cancellation.
   requestedPickupDate DateTime?
   requestedReturnDate DateTime?
+  /// The trip's dates before an approved move, set on approval: the
+  /// order then only holds the new ones, and the Turo block a person
+  /// made still sits on these.
+  previousPickupDate  DateTime?
+  previousReturnDate  DateTime?
 
   renterNote   String?
   operatorNote String?

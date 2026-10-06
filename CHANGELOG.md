@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.40.1 - 2026-10-06
+
+### An approved cancellation or date change says what to do on Turo
+
+The Turo block a person made for a site booking has to be released or
+moved by a person too. While the trip is still ahead, an approved
+request on the requests page now says so: release the blocked dates for
+a cancellation, move the block from the old dates to the new ones for a
+date change. The old dates are recorded on approval
+(`BookingChangeRequest.previousPickupDate` / `previousReturnDate`),
+since the order itself then only holds the new ones; requests approved
+before this show the new dates on both sides.
+
 ## v1.40.0 - 2026-10-06
 
 ### The operator hears about every site booking, with a reminder to block it on Turo

@@ -117,6 +117,22 @@ export default async function BookingRequestsPage() {
                 {request.resolvedBy ? ` · ${request.resolvedBy}` : ""}
               </p>
             )}
+
+            {/* Turo cannot be written to: the block a person made there
+                has to be released or moved by a person too. Only while
+                the trip is still ahead, after that it no longer matters. */}
+            {request.status === BookingRequestStatus.APPROVED && request.order.returnDatetime > new Date() ? (
+              <p className="mt-1.5 rounded-md bg-[var(--warn-bg)] px-2 py-1.5 text-[12px] text-[color:var(--warn-fg)]">
+                {isCancel
+                  ? copy.turoReleaseHint(
+                      `${formatBookingMoment(request.order.pickupDatetime)} – ${formatBookingMoment(request.order.returnDatetime)}`,
+                    )
+                  : copy.turoMoveHint(
+                      `${formatBookingMoment(request.previousPickupDate ?? request.order.pickupDatetime)} – ${formatBookingMoment(request.previousReturnDate ?? request.order.returnDatetime)}`,
+                      `${formatBookingMoment(request.order.pickupDatetime)} – ${formatBookingMoment(request.order.returnDatetime)}`,
+                    )}
+              </p>
+            ) : null}
           </article>
         );
       })}

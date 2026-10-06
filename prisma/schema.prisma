@@ -662,6 +662,20 @@ model OwnerLedgerReceipt {
   @@index([itemId])
 }
 
+/// One link that opens every photo of one trip, no account needed --
+/// for an adjuster, the renter or the owner. The token is the whole
+/// authorisation; deleting the row revokes it.
+model OrderPhotoShare {
+  id          String   @id @default(cuid())
+  workspaceId String
+  orderId     String   @unique
+  token       String   @unique
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId])
+}
+
 model OrderAttachment {
   workspaceId String?
   id          String              @id @default(cuid())

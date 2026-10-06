@@ -41,6 +41,11 @@ function labels(locale: Locale) {
         shareRevoke: "取消分享",
         shareRevokeConfirm: "取消分享后，已经发出去的链接会立即失效。确定吗？",
         shareHint: "任何拿到链接的人都能打开这个文件，不需要登录。",
+        shareAllPhotos: "分享全部照片",
+        copyAllPhotosLink: "复制全部照片链接",
+        allPhotosShared: "全部照片已分享：拿到链接的人不用登录就能看这个行程的所有照片，之后新传的也会出现。",
+        revokeAllPhotos: "取消分享全部照片",
+        revokeAllPhotosConfirm: "取消后，已经发出去的「全部照片」链接会立即失效。确定吗？",
       }
     : {
         title: "Photos, videos, and contract files",
@@ -51,6 +56,12 @@ function labels(locale: Locale) {
         shareRevokeConfirm:
           "Stop sharing this file? Any link already sent stops working immediately.",
         shareHint: "Anyone with the link can open this file, without signing in.",
+        shareAllPhotos: "Share all photos",
+        copyAllPhotosLink: "Copy all-photos link",
+        allPhotosShared:
+          "All photos are shared: anyone with the link can see every photo of this trip without signing in, including ones added later.",
+        revokeAllPhotos: "Stop sharing all photos",
+        revokeAllPhotosConfirm: "Stop sharing? Any all-photos link already sent stops working immediately.",
         photos: "Photos / videos",
         documents: "Contract files",
         uploadPhotos: "Upload photos or videos",
@@ -98,6 +109,46 @@ export function OrderAttachments({
   const docInputRef = useRef<HTMLInputElement | null>(null);
   const [attachments, setAttachments] = useState<OrderAttachment[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [tripPhotoToken, setTripPhotoToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/orders/${orderId}/photo-share`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { token?: string | null } | null) => {
+        if (!cancelled) setTripPhotoToken(data?.token ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId]);
+
+  /** One link for every photo of this trip; the same link if it exists. */
+  async function shareAllPhotos() {
+    const response = await fetch(`/api/orders/${orderId}/photo-share`, { method: "POST" }).catch(() => null);
+    const data = response?.ok ? ((await response.json()) as { token?: string }) : null;
+    if (!data?.token) return;
+    setTripPhotoToken(data.token);
+    await copyTripPhotosLink(data.token);
+  }
+
+  async function copyTripPhotosLink(token: string) {
+    const url = `${window.location.origin}/trip-photos/${token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId("trip-photos");
+      window.setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      window.prompt(copy.shareCopy, url);
+    }
+  }
+
+  async function revokeAllPhotos() {
+    if (!window.confirm(copy.revokeAllPhotosConfirm)) return;
+    const response = await fetch(`/api/orders/${orderId}/photo-share`, { method: "DELETE" }).catch(() => null);
+    if (response?.ok) setTripPhotoToken(null);
+  }
 
   /** Mint a link, or hand back the one this file already has. */
   async function shareAttachment(attachment: OrderAttachment) {
@@ -272,6 +323,25 @@ export function OrderAttachments({
       ) : null}
 
       <div className={cn("mt-3 grid gap-3", compact ? "xl:grid-cols-1" : "xl:grid-cols-2")}>
+        {photos.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            {tripPhotoToken ? (
+              <>
+                <button type="button" className="btn-secondary min-h-7 px-2 text-[11px]" onClick={() => void copyTripPhotosLink(tripPhotoToken)}>
+                  {copiedId === "trip-photos" ? copy.shareCopied : copy.copyAllPhotosLink}
+                </button>
+                <button type="button" className="text-[11px] text-rose-600 underline" onClick={() => void revokeAllPhotos()}>
+                  {copy.revokeAllPhotos}
+                </button>
+                <span className="w-full text-[var(--ink-soft)]">{copy.allPhotosShared}</span>
+              </>
+            ) : (
+              <button type="button" className="btn-secondary min-h-7 px-2 text-[11px]" onClick={() => void shareAllPhotos()}>
+                {copiedId === "trip-photos" ? copy.shareCopied : copy.shareAllPhotos}
+              </button>
+            )}
+          </div>
+        ) : null}
         <AttachmentGroup
           title={copy.photos}
           empty={copy.emptyPhotos}

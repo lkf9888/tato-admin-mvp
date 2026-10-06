@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.48.0 - 2026-10-06
+
+### All of a trip's photos behind one link
+
+"分享全部照片" in an order's attachments creates one link, `/trip-photos/…`, that opens every photo and video of that trip without signing in. It is meant for an adjuster, the renter or the car's owner. The page shows the car, the trip dates and the pictures, and nothing about the renter or the money. It reads the photos live, so pictures added later appear on it and deleted ones disappear.
+
+- Asking again returns the same link, so links already sent keep working. "取消分享全部照片" revokes it, and every copy stops working at once.
+- The 256-bit token is the only authorisation. A wrong token, a revoked token and a deleted order all return the same 404. A photo is served only if it belongs to that trip. The page is marked noindex.
+- Sharing a single file works as before.
+
 ## v1.47.0 - 2026-10-06
 
 ### The orders list totals what a filter selects, exports it, and marks hand-entered orders paid in bulk

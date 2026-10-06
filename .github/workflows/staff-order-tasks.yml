@@ -1,0 +1,26 @@
+name: Staff order tasks
+
+# Every upcoming return becomes a staff task (wash and ready the car),
+# and every task tied to an order follows it when the trip moves or is
+# cancelled. Orders saved in the admin sync at once; this catches the
+# ones that arrive by CSV, booking mail or the rental site.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync order tasks
+        run: |
+          code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
+            -X POST https://tatocar.co/api/staff-schedule/order-tasks \
+            -H "x-tato-sync-secret: ${{ secrets.GMAIL_SYNC_SECRET }}")
+          cat /tmp/out.json
+          echo ""
+          if [ "$code" != "200" ]; then
+            echo "::error::Staff order tasks returned HTTP $code"
+            exit 1
+          fi

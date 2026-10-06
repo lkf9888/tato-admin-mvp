@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.37.0 - 2026-10-05
+
+### Every return becomes a staff task, and order tasks follow their trip
+
+Washing and readying the car happens after every trip, and until now it only existed on the schedule once someone dragged a return onto a person. A task made that way also stayed where it was when the trip moved.
+
+- **Made for you.** Each return due today or in the next three days becomes a task, "还车 · plate · guest", unassigned and linked to the order. This is the same window as the schedule's upcoming panel, so that panel now lists pick-ups and the returns appear as tasks. Returns further out become tasks as they come within three days. A workspace with no active staff gets none.
+- **Follows the trip.** When an order moves to another day, time or car, every open pick-up or return task tied to it moves too. The person it is assigned to and its notes stay, and that person is told it changed. A title someone rewrote is left alone.
+- **Cancelled with the trip.** Cancelling or deleting the order cancels its open tasks. Restoring it from the trash, or setting it back from cancelled, reopens them. A task cancelled by hand is not reopened by a later edit, and a task already done is never touched.
+- **Deleted stays deleted.** A return task deleted by hand is not made again for that trip (`StaffTaskSuppression`).
+- **When it runs.** Orders saved in the admin sync immediately. Orders from the CSV, booking mail and the rental site are picked up every 15 minutes (`.github/workflows/staff-order-tasks.yml`, `POST /api/staff-schedule/order-tasks`) and whenever the schedule page opens.
+- **Past trips** get no tasks. Only returns from today on do, so the board does not fill with overdue to-dos and pay calculations are not affected.
+
 ## v1.36.0 - 2026-10-05
 
 ### Scheduled guest messages: rules decide what is due, and a queue holds it ready to send

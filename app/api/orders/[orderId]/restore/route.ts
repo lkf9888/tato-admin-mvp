@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
+import { syncOrderStaffTasks } from "@/lib/staff-order-tasks";
 import { prisma } from "@/lib/prisma";
 
 type Params = Promise<{ orderId: string }>;
@@ -59,6 +60,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
   });
 
   await syncOrderOwnerLedger(restored.id);
+  await syncOrderStaffTasks(restored.id, { origin: new URL(request.url).origin, reinstate: true });
   await reconcileVehicleConflicts(existing.vehicleId);
   await logActivity({
     workspaceId: workspace.id,

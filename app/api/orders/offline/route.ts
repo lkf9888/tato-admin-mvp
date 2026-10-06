@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
+import { syncOrderStaffTasks } from "@/lib/staff-order-tasks";
 import { findConflictingOrders, logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { blocksPlainCancel, PAID_DIRECT_BOOKING } from "@/lib/orders-cancel-guard";
 import { prisma } from "@/lib/prisma";
@@ -113,6 +114,7 @@ export async function POST(request: Request) {
     });
 
     await reconcileVehicleConflicts(order.vehicleId);
+    await syncOrderStaffTasks(order.id, { origin: new URL(request.url).origin });
     await logActivity({
       workspaceId: workspace.id,
       actor: user.name,
@@ -215,6 +217,7 @@ export async function PATCH(request: Request) {
     if (existing.vehicleId !== order.vehicleId) {
       await reconcileVehicleConflicts(existing.vehicleId);
     }
+    await syncOrderStaffTasks(order.id, { origin: new URL(request.url).origin });
 
     await logActivity({
       workspaceId: workspace.id,
@@ -294,6 +297,7 @@ export async function DELETE(request: Request) {
     });
 
     await syncOrderOwnerLedger(archivedOrder.id);
+    await syncOrderStaffTasks(archivedOrder.id, { origin: new URL(request.url).origin });
     await reconcileVehicleConflicts(existing.vehicleId);
     await logActivity({
       workspaceId: workspace.id,

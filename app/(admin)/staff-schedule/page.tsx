@@ -5,10 +5,15 @@ import { prisma } from "@/lib/prisma";
 import { ensureStaffShareTokens } from "@/lib/staff-share";
 import { getStaffChannelStatus } from "@/lib/notify-client";
 import { ensureStaffMiniProgramCodes } from "@/lib/staff-mini-program";
+import { reconcileWorkspaceOrderTasks } from "@/lib/staff-order-tasks";
 import { normalizeStaffTaskNotificationTemplate } from "@/lib/staff-task-notification-template";
 
 export default async function StaffSchedulePage() {
   const workspace = await requireCurrentWorkspace();
+  // Before the tasks are read, so a return that arrived by CSV or mail a
+  // minute ago is already on the board rather than waiting for the
+  // scheduled run.
+  await reconcileWorkspaceOrderTasks(workspace.id);
   const now = new Date();
   const orderWindowStart = new Date(now);
   orderWindowStart.setDate(orderWindowStart.getDate() - 1);

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { suppressDeletedOrderTask } from "@/lib/staff-order-tasks";
 import {
   notifyStaffTaskAssignment,
   notifyStaffTaskChange,
@@ -268,6 +269,9 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
       where: { id: existing.id },
     }),
   ]);
+  // Deleting a return task is a decision about that trip; without this
+  // the order-task sync would make it again within fifteen minutes.
+  await suppressDeletedOrderTask(existing);
 
   await logActivity({
     workspaceId: workspace.id,

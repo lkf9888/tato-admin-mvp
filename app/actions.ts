@@ -36,6 +36,7 @@ import {
   syncOwnerLedger,
   syncVehicleOwnerLedger,
 } from "@/lib/owner-ledger";
+import { syncOrderStaffTasks } from "@/lib/staff-order-tasks";
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { blocksPlainCancel } from "@/lib/orders-cancel-guard";
 import {
@@ -1098,6 +1099,7 @@ export async function assignPendingOrderAction(formData: FormData) {
   await prisma.pendingOrder.delete({ where: { id: pending.id } });
   await reconcileVehicleConflicts(vehicle.id);
   await syncOrderOwnerLedger(order.id);
+  await syncOrderStaffTasks(order.id);
 
   await logActivity({
     workspaceId: workspace.id,
@@ -1587,6 +1589,9 @@ export async function saveOfflineOrderAction(formData: FormData) {
 
   await reconcileVehicleConflicts(parsed.vehicleId);
   await syncOrderOwnerLedger(order.id);
+  await syncOrderStaffTasks(order.id, {
+    reinstate: existingOrder?.status === OrderStatus.cancelled && order.status !== OrderStatus.cancelled,
+  });
 
   await logActivity({
     workspaceId: workspace.id,
@@ -1627,6 +1632,9 @@ export async function updateOrderStatusAction(formData: FormData) {
 
   await reconcileVehicleConflicts(order.vehicleId);
   await syncOrderOwnerLedger(order.id);
+  await syncOrderStaffTasks(order.id, {
+    reinstate: existingOrder.status === OrderStatus.cancelled && order.status !== OrderStatus.cancelled,
+  });
   await logActivity({
     workspaceId: workspace.id,
     actor: user.name,
@@ -1665,6 +1673,7 @@ export async function deleteOrderAction(formData: FormData) {
     },
   });
   await syncOrderOwnerLedger(archivedOrder.id);
+  await syncOrderStaffTasks(archivedOrder.id);
   await reconcileVehicleConflicts(existing.vehicleId);
 
   await logActivity({

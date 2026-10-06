@@ -772,6 +772,20 @@ model StaffTaskAttachment {
   @@index([uploadedAt])
 }
 
+/// A return task someone deleted on purpose. The order-task sync makes a
+/// task for every upcoming return; this row is what stops it making this
+/// one again. Plain columns, no relations: an order is only ever
+/// archived, and a row left behind by a hard delete holds nothing back.
+model StaffTaskSuppression {
+  workspaceId String
+  orderId     String
+  category    String
+  createdAt   DateTime @default(now())
+
+  @@id([orderId, category])
+  @@index([workspaceId])
+}
+
 model StaffTaskNotificationTemplate {
   workspaceId          String    @unique
   id                   String    @id @default(cuid())

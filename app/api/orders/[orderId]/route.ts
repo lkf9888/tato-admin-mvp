@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
+import { syncOrderStaffTasks } from "@/lib/staff-order-tasks";
 import { resolveOrderCleaningFees } from "@/lib/owner-commission";
 import { getOrderFeeLines } from "@/lib/ledger-policy";
 import { findConflictingOrders, logActivity, reconcileVehicleConflicts } from "@/lib/orders";
@@ -226,6 +227,10 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
     }
 
     await syncOrderOwnerLedger(order.id);
+    await syncOrderStaffTasks(order.id, {
+      origin: new URL(request.url).origin,
+      reinstate: existing.status === OrderStatus.cancelled && order.status !== OrderStatus.cancelled,
+    });
     await reconcileVehicleConflicts(order.vehicleId);
     if (existing.vehicleId !== order.vehicleId) {
       await reconcileVehicleConflicts(existing.vehicleId);
@@ -298,6 +303,7 @@ export async function DELETE(_request: Request, { params }: { params: Params }) 
     });
 
     await syncOrderOwnerLedger(archivedOrder.id);
+    await syncOrderStaffTasks(archivedOrder.id, { origin: new URL(_request.url).origin });
     await reconcileVehicleConflicts(existing.vehicleId);
     await logActivity({
       workspaceId: workspace.id,

@@ -2779,8 +2779,15 @@ function getTaskDetailsText(task: StaffTask) {
 }
 
 function getDisplayTaskTitle(task: StaffTask, copy: ReturnType<typeof getStaffScheduleCopy>) {
-  if (task.category !== "order_pickup") return task.title;
-  return task.title.replace(/^(取车|Pickup|Delivery)(\s*·\s*)/i, `${copy.pickup}$2`);
+  if (task.category === "order_pickup") {
+    return task.title.replace(/^(取车|Pickup|Delivery)(\s*·\s*)/i, `${copy.pickup}$2`);
+  }
+  // Return tasks the order sync creates are titled in Chinese on the
+  // server, which has no reader's language to go by.
+  if (task.category === "order_return") {
+    return task.title.replace(/^(还车|Return)(\s*·\s*)/i, `${copy.returnCar}$2`);
+  }
+  return task.title;
 }
 
 function formatOrderEventTime(value: string, locale: Locale) {

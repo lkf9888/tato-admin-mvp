@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.44.0 - 2026-10-06
+
+### The navigation shows what is waiting
+
+Messages and Orders now show a count in the navigation, in the sidebar, on the bottom tabs and in the More sheet.
+
+- **Messages** shows conversations waiting for a reply plus scheduled messages due to go out. **Orders** shows Turo bookings that are not yet on a car. Both come from `/api/messages/counts`.
+- **The More tab** shows the total of everything inside it that has no tab of its own, so an unanswered guest is visible from the bar on a phone.
+- **When it updates.** Every minute while the app is open and visible, and again when the app comes back to the foreground, but not more than once in 15 seconds. Moving between pages does not reload or clear the counts, because they belong to the shell that stays mounted.
+
 ## v1.43.0 - 2026-10-06
 
 ### Staff see their own pay on their task link

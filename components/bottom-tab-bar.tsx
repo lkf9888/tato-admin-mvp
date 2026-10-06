@@ -1,5 +1,6 @@
 "use client";
 
+import { CountPill, NavBadge, useNavBadges } from "@/components/nav-badges";
 import { NAV_ICONS, type NavIconName } from "@/components/nav-icons";
 import {
   CalendarDays,
@@ -115,6 +116,13 @@ export function BottomTabBar({
     tab.matchPrefixes.some((prefix) => pathname.startsWith(prefix)),
   );
 
+  // What is waiting behind "More": the counts of every destination that
+  // has no tab of its own, so a reply to answer is visible from the bar.
+  const badges = useNavBadges();
+  const moreCount = moreItems
+    .filter((item) => !tabs.some((tab) => tab.href === item.href))
+    .reduce((sum, item) => sum + (badges[item.href] ?? 0), 0);
+
   return (
     <>
       {/* Bar itself — fixed to the bottom, full width, sits above
@@ -142,12 +150,15 @@ export function BottomTabBar({
                     : "text-[var(--ink-soft)] hover:text-[var(--ink)]",
                 )}
               >
-                <tab.Icon
-                  className={cn(
-                    "h-[22px] w-[22px]",
-                    active ? "stroke-[2.4]" : "stroke-[1.8]",
-                  )}
-                />
+                <span className="relative">
+                  <tab.Icon
+                    className={cn(
+                      "h-[22px] w-[22px]",
+                      active ? "stroke-[2.4]" : "stroke-[1.8]",
+                    )}
+                  />
+                  <NavBadge href={tab.href} className="absolute -right-2.5 -top-1.5" />
+                </span>
                 <span className="leading-none">{tab.label}</span>
               </Link>
             );
@@ -165,12 +176,15 @@ export function BottomTabBar({
                 : "text-[var(--ink-soft)] hover:text-[var(--ink)]",
             )}
           >
-            <MoreHorizontal
-              className={cn(
-                "h-[22px] w-[22px]",
-                isMoreActive || moreOpen ? "stroke-[2.4]" : "stroke-[1.8]",
-              )}
-            />
+            <span className="relative">
+              <MoreHorizontal
+                className={cn(
+                  "h-[22px] w-[22px]",
+                  isMoreActive || moreOpen ? "stroke-[2.4]" : "stroke-[1.8]",
+                )}
+              />
+              <CountPill count={moreCount} className="absolute -right-2.5 -top-1.5" />
+            </span>
             <span className="leading-none">{labels.more}</span>
           </button>
         </div>
@@ -236,6 +250,7 @@ export function BottomTabBar({
                         />
                       ) : null}
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      <NavBadge href={item.href} />
                       <ChevronRight
                         aria-hidden
                         className="size-4 shrink-0 text-[var(--ink-soft)]"

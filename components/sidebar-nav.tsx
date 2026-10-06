@@ -1,5 +1,6 @@
 "use client";
 
+import { NavBadge } from "@/components/nav-badges";
 import { NAV_ICONS, type NavIconName } from "@/components/nav-icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -49,7 +50,8 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
                     strokeWidth={active ? 2.25 : 1.75}
                     aria-hidden
                   />
-                  <span className="min-w-0 truncate">{item.label}</span>
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <NavBadge href={item.href} />
                 </Link>
               );
             })}

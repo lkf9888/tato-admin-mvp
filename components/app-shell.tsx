@@ -2,6 +2,7 @@ import { logoutAction } from "@/app/actions";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { ContactButton } from "@/components/contact-button";
 import { MobileNav } from "@/components/mobile-nav";
+import { NavBadgeProvider } from "@/components/nav-badges";
 import { NavigationOptimizer } from "@/components/navigation-optimizer";
 import { SessionExpiryRedirect } from "@/components/session-expiry-redirect";
 import { SidebarNav } from "@/components/sidebar-nav";
@@ -166,6 +167,7 @@ export function AppShell({
   );
 
   return (
+    <NavBadgeProvider>
     <div className="min-h-screen bg-[var(--surface-muted)] text-[var(--ink)]">
       <MobileNav
         brandTitle={messages.shell.brandTitle}
@@ -207,5 +209,6 @@ export function AppShell({
       <NavigationOptimizer hrefs={navHrefs} />
       <SessionExpiryRedirect />
     </div>
+    </NavBadgeProvider>
   );
 }

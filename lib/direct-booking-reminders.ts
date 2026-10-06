@@ -10,7 +10,7 @@ import {
   sendReturnReminderEmails,
   sendRuleMessageEmail,
 } from "@/lib/direct-booking-email";
-import { listDueMessages } from "@/lib/message-rules";
+import { claimRuleSend, listDueMessages, releaseRuleSend } from "@/lib/message-rules";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { resolveUploadPath } from "@/lib/uploads";
@@ -181,8 +181,7 @@ async function sendDueRuleEmails(now: Date) {
   for (const { workspaceId } of workspaces) {
     const due = (await listDueMessages(workspaceId, now)).filter(
       (item) =>
-        // Read defensively: the rule's switch is added on the rules side.
-        (item as typeof item & { autoEmail?: boolean }).autoEmail === true &&
+        item.autoEmail &&
         new Date(item.dueAt).getTime() <= now.getTime() &&
         item.missing.length === 0,
     );
@@ -204,13 +203,8 @@ async function sendDueRuleEmails(now: Date) {
       const renterEmail = metadata.renterEmail?.trim();
       if (!order || metadata.channel !== "direct-booking" || !renterEmail) continue;
 
-      const claimed = await prisma.messageRuleSend
-        .create({
-          data: { workspaceId, ruleId: item.ruleId, orderId: order.id, status: "sent", text: item.text.slice(0, 4000), actor: "auto-email" },
-        })
-        .then(() => true)
-        .catch(() => false);
-      if (!claimed) continue;
+      const claim = { workspaceId, ruleId: item.ruleId, orderId: order.id, actor: "auto-email" };
+      if (!(await claimRuleSend({ ...claim, text: item.text }))) continue;
 
       const result = await sendRuleMessageEmail({ workspaceId, order, renterEmail, text: item.text }).catch(
         (error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }),
@@ -220,7 +214,7 @@ async function sendDueRuleEmails(now: Date) {
         continue;
       }
       failed += 1;
-      await prisma.messageRuleSend.deleteMany({ where: { ruleId: item.ruleId, orderId: order.id, actor: "auto-email" } });
+      await releaseRuleSend(claim);
       await logActivity({
         workspaceId,
         actor: "auto-email",

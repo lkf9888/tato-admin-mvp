@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.39.1 - 2026-10-06
+
+### Scheduled-message emails claim their send through the rules module
+
+The site-renter emails (v1.38.0) wrote and released their MessageRuleSend
+row directly. They now use `claimRuleSend` / `releaseRuleSend` from
+lib/message-rules.ts (v1.39.0), so the table has one writer and a change
+to it cannot quietly break the emails. Behaviour is unchanged: claimed
+before sending, released back to the manual queue if the email fails.
+
 ## v1.39.0 - 2026-10-06
 
 ### A scheduled message rule can email site renters directly

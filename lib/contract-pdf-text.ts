@@ -108,6 +108,14 @@ function breakableTokens(text: string) {
   return tokens;
 }
 
+/** One string as alternating Latin / CJK segments, each in its face and measured. */
+export function splitRuns(text: string, fonts: PdfFontPair, size: number): Segment[] {
+  return splitByScript(text).map((run) => {
+    const font = run.latin ? fonts.latin : fonts.cjk;
+    return { text: run.text, font, width: safeWidth(font, run.text, size) };
+  });
+}
+
 function splitByScript(text: string) {
   const runs: Array<{ text: string; latin: boolean }> = [];
   for (const ch of text) {

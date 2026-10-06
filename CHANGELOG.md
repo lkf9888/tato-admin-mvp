@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.38.1 - 2026-10-06
+
+### Word contracts keep their clause numbers, tables and bold text
+
+An uploaded .docx was turned into a PDF from its plain text, which drops
+everything a contract is built from: Word keeps list numbers in
+numbering.xml, never in the text, so every numbered clause lost its
+number (and "subject to clause 4.2" pointed at nothing); party tables came
+out as loose lines; headings and bold read like body text. The document is
+now read as structure (`lib/contract-docx-blocks.ts`, from HostHub):
+headings, numbered and indented paragraphs with their markers, tables
+with their column widths, bold runs and page breaks, drawn with the
+Chinese-capable text from v1.29.1. A file that cannot be read that way
+falls back to the plain-text render. Editing a Word template's text in
+the editor still re-renders it as plain text.
+
 ## v1.38.0 - 2026-10-06
 
 ### Dynamic pricing for the rental site, and scheduled messages reach site renters by email

@@ -23,7 +23,7 @@ import {
   getRateSeasonality,
 } from "@/lib/rental-estimate/rate-seasonality-server";
 import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
-import { sendDirectBookingConfirmationEmail } from "@/lib/direct-booking-email";
+import { sendDirectBookingConfirmationEmail, sendNewBookingNotice } from "@/lib/direct-booking-email";
 import {
   buildRentalAgreementValues,
   createRentalAgreementEnvelope,
@@ -545,6 +545,14 @@ export async function persistDirectBookingFromCheckoutSession(session: Stripe.Ch
   const confirmationEmail = renterEmail ?? session.customer_details?.email ?? null;
 
   await sendDirectBookingConfirmationEmail({
+    workspaceId: vehicle.workspaceId,
+    order,
+    vehicle,
+    renterEmail: confirmationEmail,
+  });
+
+  // And the operator: above all, to block these dates on Turo.
+  await sendNewBookingNotice({
     workspaceId: vehicle.workspaceId,
     order,
     vehicle,

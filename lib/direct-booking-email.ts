@@ -471,6 +471,102 @@ export async function sendExtraChargeEmail(input: {
  * with), each once. Bilingual, because the operator reads the admin in
  * either language. Never throws.
  */
+/**
+ * Who hears about a booking on the operator's side: the site's contact
+ * address and every user of the workspace, each address once.
+ */
+async function loadOperatorRecipients(workspaceId: string) {
+  const [site, workspace, users] = await Promise.all([
+    prisma.rentalSite.findUnique({ where: { workspaceId } }),
+    prisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } }),
+    prisma.user.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: "asc" },
+      select: { email: true },
+    }),
+  ]);
+  const recipients = [
+    ...new Map(
+      [site?.contactEmail, ...users.map((user) => user.email)]
+        .map((email) => email?.trim())
+        .filter((email): email is string => Boolean(email))
+        .map((email) => [email.toLowerCase(), email] as const),
+    ).values(),
+  ];
+  return { site, brandName: site?.brandName?.trim() || workspace?.name?.trim() || "TATO", recipients };
+}
+
+/**
+ * Tell the operator a booking came in on the site -- and, above all,
+ * to block its dates on Turo. Turo cannot be written to (no API, no
+ * calendar import), so until a person blocks them, the same car can be
+ * booked twice for the same days.
+ */
+export async function sendNewBookingNotice(input: {
+  workspaceId: string;
+  order: Pick<Order, "id" | "renterName" | "renterPhone" | "pickupDatetime" | "returnDatetime" | "totalPrice">;
+  vehicle: Pick<Vehicle, "plateNumber" | "brand" | "model" | "year" | "turoListingName">;
+  renterEmail: string | null;
+}): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const { site, brandName, recipients } = await loadOperatorRecipients(input.workspaceId);
+    if (recipients.length === 0) return { ok: false, reason: "NO_OPERATOR_EMAIL" };
+    const car = `${input.vehicle.plateNumber} · ${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`;
+    const trip = `${formatBookingMoment(input.order.pickupDatetime)} → ${formatBookingMoment(input.order.returnDatetime)}`;
+    const text = [
+      `网站新订单 / New booking on your site: ${input.order.renterName}`,
+      "",
+      `车辆 Car: ${car}`,
+      `行程 Trip: ${trip}`,
+      input.order.totalPrice != null ? `已付 Paid: ${formatCurrency(input.order.totalPrice, "en")}` : null,
+      [input.order.renterPhone, input.renterEmail].filter(Boolean).length
+        ? `租客 Renter: ${[input.order.renterPhone, input.renterEmail].filter(Boolean).join(" · ")}`
+        : null,
+      "",
+      "⚠️ 请到 Turo 把这辆车的这几天挡掉，否则可能被重复预订。",
+      "   Block these dates for this car on Turo, or it can be booked twice.",
+      input.vehicle.turoListingName ? `   Turo 车辆 Listing: ${input.vehicle.turoListingName}` : null,
+      `   ${trip}`,
+      "",
+      `订单 Order: ${getAppUrl().replace(/\/$/, "")}/orders/${input.order.id}`,
+      `订单号 Reference: ${bookingReference(input.order.id)}`,
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n");
+    const subject = `[${brandName}] 新订单 New booking — ${input.vehicle.plateNumber}, ${formatBookingMoment(input.order.pickupDatetime)} · 记得挡 Turo / block Turo`;
+    const results = await Promise.all(
+      recipients.map((to) =>
+        sendMail({ to, subject, text, html: toHtmlBody(text), from: formatSiteSender(site) }).then(
+          (result) => ({ to, ...result }),
+        ),
+      ),
+    );
+    const ok = results.some((result) => result.ok);
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: ok ? "new_booking_notice_sent" : "new_booking_notice_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: {
+        sent: results.filter((result) => result.ok).map((result) => result.to),
+        failed: results.filter((result) => !result.ok).map((result) => ({ to: result.to, reason: result.reason ?? null })),
+      },
+    });
+    return ok ? { ok: true } : { ok: false, reason: results[0]?.reason ?? "SEND_FAILED" };
+  } catch (error) {
+    await logActivity({
+      workspaceId: input.workspaceId,
+      actor: "direct-booking",
+      action: "new_booking_notice_failed",
+      entityType: "Order",
+      entityId: input.order.id,
+      metadata: { error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => undefined);
+    return { ok: false, reason: "SEND_FAILED" };
+  }
+}
+
 export async function sendChangeRequestNotice(input: {
   workspaceId: string;
   order: Pick<Order, "id" | "renterName" | "pickupDatetime" | "returnDatetime">;
@@ -482,25 +578,8 @@ export async function sendChangeRequestNotice(input: {
   renterNote: string | null;
 }): Promise<{ ok: boolean; reason?: string }> {
   try {
-    const [site, workspace, users] = await Promise.all([
-      prisma.rentalSite.findUnique({ where: { workspaceId: input.workspaceId } }),
-      prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
-      prisma.user.findMany({
-        where: { workspaceId: input.workspaceId },
-        orderBy: { createdAt: "asc" },
-        select: { email: true },
-      }),
-    ]);
-    const recipients = [
-      ...new Map(
-        [site?.contactEmail, ...users.map((user) => user.email)]
-          .map((email) => email?.trim())
-          .filter((email): email is string => Boolean(email))
-          .map((email) => [email.toLowerCase(), email] as const),
-      ).values(),
-    ];
+    const { site, brandName, recipients } = await loadOperatorRecipients(input.workspaceId);
     if (recipients.length === 0) return { ok: false, reason: "NO_OPERATOR_EMAIL" };
-    const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
     const car = `${input.vehicle.plateNumber} · ${input.vehicle.year} ${input.vehicle.brand} ${input.vehicle.model}`;
     const trip = `${formatBookingMoment(input.order.pickupDatetime)} → ${formatBookingMoment(input.order.returnDatetime)}`;
     const isCancel = input.kind === "CANCEL";

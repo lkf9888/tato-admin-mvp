@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.40.0 - 2026-10-06
+
+### The operator hears about every site booking, with a reminder to block it on Turo
+
+A paid site booking emailed only the renter; nothing told the operator,
+and nothing reminded them that the same car is still open on Turo for
+those days. Turo cannot be written to (no API, no calendar import), so
+the one safeguard against a double booking is a person blocking the
+dates. Now, right after the renter's confirmation, the site's contact
+address and every workspace user get a bilingual email: car, trip,
+amount paid, the renter's contact, a link to the order, and above all
+"block these dates on Turo" with the car's Turo listing name. The
+recipient list is shared with the change-request notice
+(`loadOperatorRecipients`).
+
 ## v1.39.1 - 2026-10-06
 
 ### Scheduled-message emails claim their send through the rules module

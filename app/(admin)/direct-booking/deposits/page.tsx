@@ -70,7 +70,7 @@ export default async function DepositsPage({ searchParams }: { searchParams: Sea
               <Link
                 key={String(toHistory)}
                 href={tabHref(toHistory)}
-                className={`rounded px-3 py-1 text-[12px] font-medium ${
+                className={`rounded px-3 py-1.5 text-[12px] font-medium ${
                   toHistory === history ? "bg-white text-[color:var(--ink)] shadow-sm" : "text-[color:var(--ink-soft)]"
                 }`}
               >
@@ -130,7 +130,7 @@ export default async function DepositsPage({ searchParams }: { searchParams: Sea
               </div>
               <div className="text-right">
                 <p className="text-[15px] font-semibold tabular-nums text-[color:var(--ink)]">{money(row.amount)}</p>
-                <Link href={`/orders/${row.orderId}`} className="text-[11px] text-[color:var(--ink-soft)] underline">
+                <Link href={`/orders/${row.orderId}`} className="inline-block py-1.5 text-[12px] text-[color:var(--ink-soft)] underline">
                   {copy.openOrder}
                 </Link>
               </div>

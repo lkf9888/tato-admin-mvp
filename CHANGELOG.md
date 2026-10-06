@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.41.1 - 2026-10-06
+
+### Dynamic pricing and deposits read properly on a phone
+
+Checked at 375px. Dynamic pricing's suggestions were a 544px table in a
+329px card, so the reasons for each price sat off the right edge behind a
+sideways scroll; on a phone each day is now two lines (the day with
+now → suggested, then why), and the four-column table stays from `sm` up.
+Its on/off checkboxes were squeezed to 12px by their labels. On the
+deposits page the Held/Returned toggle (25px) and the Order link (17px)
+were too small to tap; both are taller now.
+
 ## v1.41.0 - 2026-10-06
 
 ### One call for the navigation's badge counts

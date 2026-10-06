@@ -179,7 +179,7 @@ export function DynamicPricingPanel({
             { checked: autoApply && enabled, set: setAutoApply, label: copy.autoApplyLabel, hint: copy.autoApplyHint, disabled: !enabled },
           ].map((toggle) => (
             <label key={toggle.label} className={`flex gap-2 rounded-md border border-[color:var(--line)] bg-white p-2 ${toggle.disabled ? "opacity-50" : ""}`}>
-              <input type="checkbox" checked={toggle.checked} disabled={toggle.disabled} onChange={(event) => toggle.set(event.target.checked)} className="mt-0.5" />
+              <input type="checkbox" checked={toggle.checked} disabled={toggle.disabled} onChange={(event) => toggle.set(event.target.checked)} className="mt-0.5 shrink-0" />
               <span>
                 <span className="block text-[12px] font-semibold text-[color:var(--ink)]">{toggle.label}</span>
                 <span className="block text-[11px] leading-4 text-[color:var(--ink-soft)]">{toggle.hint}</span>
@@ -222,6 +222,7 @@ export function DynamicPricingPanel({
               <label key={vehicle.id} className="flex items-center gap-2 text-[12px] text-[color:var(--ink)]">
                 <input
                   type="checkbox"
+                  className="shrink-0"
                   checked={!excluded.has(vehicle.id)}
                   onChange={(event) =>
                     setExcluded((prev) => {
@@ -294,32 +295,37 @@ export function DynamicPricingPanel({
               <span className="text-[13px] font-semibold text-[color:var(--ink)]">{vehicle?.label ?? vehicleId}</span>
               <span className="text-[12px] text-[color:var(--ink-soft)]">{copy.carSummary(rows.length, up, rows.length - up)}</span>
             </summary>
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full min-w-[34rem] text-[12px]">
-                <thead>
-                  <tr className="text-left text-[11px] text-[color:var(--ink-soft)]">
-                    <th className="py-1 pr-2 font-medium">{copy.colDate}</th>
-                    <th className="py-1 pr-2 text-right font-medium">{copy.colNow}</th>
-                    <th className="py-1 pr-2 text-right font-medium">{copy.colSuggested}</th>
-                    <th className="py-1 font-medium">{copy.colWhy}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => {
-                    const change = row.current > 0 ? Math.round(((row.suggested - row.current) / row.current) * 100) : 0;
-                    return (
-                      <tr key={row.day} className="border-t border-[color:var(--line)]">
-                        <td className="py-1 pr-2 tabular-nums">{row.day}</td>
-                        <td className="py-1 pr-2 text-right tabular-nums text-[color:var(--ink-soft)]">{money(row.current)}</td>
-                        <td className={`py-1 pr-2 text-right font-semibold tabular-nums ${change > 0 ? "text-[color:var(--ok-fg)]" : "text-[color:var(--bad-fg)]"}`}>
-                          {money(row.suggested)} <span className="font-normal">({change > 0 ? "+" : ""}{change}%)</span>
-                        </td>
-                        <td className="py-1 text-[11px] text-[color:var(--ink-mid)]">{factorText(row.factors)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* Two lines per day on a phone -- the reasons are the point,
+                and a table there hid them off the right edge. */}
+            <div className="mt-2 text-[12px]">
+              <div className="hidden grid-cols-[6.5rem_5rem_8rem_1fr] gap-2 py-1 text-[11px] text-[color:var(--ink-soft)] sm:grid">
+                <span>{copy.colDate}</span>
+                <span className="text-right">{copy.colNow}</span>
+                <span className="text-right">{copy.colSuggested}</span>
+                <span>{copy.colWhy}</span>
+              </div>
+              {rows.map((row) => {
+                const change = row.current > 0 ? Math.round(((row.suggested - row.current) / row.current) * 100) : 0;
+                return (
+                  <div
+                    key={row.day}
+                    className="grid grid-cols-[1fr_auto] gap-x-2 border-t border-[color:var(--line)] py-1.5 sm:grid-cols-[6.5rem_5rem_8rem_1fr] sm:items-baseline"
+                  >
+                    <span className="tabular-nums text-[color:var(--ink)]">{row.day}</span>
+                    <span className="text-right tabular-nums sm:order-none">
+                      <span className="text-[color:var(--ink-soft)] sm:hidden">{money(row.current)} → </span>
+                      <span className={`font-semibold sm:hidden ${change > 0 ? "text-[color:var(--ok-fg)]" : "text-[color:var(--bad-fg)]"}`}>
+                        {money(row.suggested)} ({change > 0 ? "+" : ""}{change}%)
+                      </span>
+                      <span className="hidden text-[color:var(--ink-soft)] sm:inline">{money(row.current)}</span>
+                    </span>
+                    <span className={`hidden text-right font-semibold tabular-nums sm:block ${change > 0 ? "text-[color:var(--ok-fg)]" : "text-[color:var(--bad-fg)]"}`}>
+                      {money(row.suggested)} <span className="font-normal">({change > 0 ? "+" : ""}{change}%)</span>
+                    </span>
+                    <span className="col-span-2 text-[11px] text-[color:var(--ink-mid)] sm:col-span-1">{factorText(row.factors)}</span>
+                  </div>
+                );
+              })}
             </div>
             <button
               type="button"

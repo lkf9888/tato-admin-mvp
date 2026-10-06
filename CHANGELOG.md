@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.42.2 - 2026-10-06
+
+### The signing page carries the operator's name, and can be filled in on a phone
+
+`/sign/<token>` said "TATO eSignature" and its tab fell back to the root
+layout's title; it now shows the site's brand (else the workspace name),
+in the header and the tab, and is kept out of search results. On a phone
+the document is about 300px wide and its boxes with it -- an address box
+11px tall, a signature box 117×31 -- so below `sm` a "Fill in here"
+section repeats the recipient's fields at full size, sharing their state
+with the boxes on the document. Those boxes now opt out of the touch
+minimum (`tap-compact`) so they stay inside the lines drawn for them, and
+the consent checkbox is no longer squeezed. Desktop is unchanged.
+
 ## v1.42.1 - 2026-10-06
 
 ### The renter's pages are easier to tap on a phone

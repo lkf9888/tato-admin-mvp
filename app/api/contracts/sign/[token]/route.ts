@@ -36,7 +36,18 @@ export async function GET(
     });
   }
 
+  // The renter signs with the operator, not with TATO: the site's brand,
+  // else the workspace's name.
+  const workspaceId = recipient.envelope.workspaceId;
+  const [site, workspace] = workspaceId
+    ? await Promise.all([
+        prisma.rentalSite.findUnique({ where: { workspaceId }, select: { brandName: true } }),
+        prisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } }),
+      ])
+    : [null, null];
+
   return NextResponse.json({
+    brandName: site?.brandName?.trim() || workspace?.name?.trim() || null,
     recipient: {
       id: recipient.id,
       name: recipient.name,

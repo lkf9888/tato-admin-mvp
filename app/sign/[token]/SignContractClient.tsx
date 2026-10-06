@@ -25,6 +25,7 @@ type Field = {
 type PageSize = { page: number; width: number; height: number };
 
 type SignPayload = {
+  brandName: string | null;
   recipient: {
     id: string;
     name: string;
@@ -96,6 +97,9 @@ const SIGN_COPY: Record<
     checkboxDefault: string;
     language: string;
     pageSuffix: string;
+    eSignature: string;
+    fillHere: string;
+    fillHereHint: string;
   }
 > = {
   en: {
@@ -117,6 +121,9 @@ const SIGN_COPY: Record<
     checkboxDefault: "I agree",
     language: "Language",
     pageSuffix: "",
+    eSignature: "eSignature",
+    fillHere: "Fill in here",
+    fillHereHint: "The same fields as highlighted on the document above, at a size that is easier to fill on a phone.",
   },
   "zh-CN": {
     loading: "正在加载签署请求...",
@@ -136,6 +143,9 @@ const SIGN_COPY: Record<
     checkboxDefault: "我同意",
     language: "语言",
     pageSuffix: "页",
+    eSignature: "电子签名",
+    fillHere: "在这里填写",
+    fillHereHint: "和上面文件里的高亮字段相同，在这里填写更方便。",
   },
   "zh-TW": {
     loading: "正在載入簽署請求...",
@@ -155,6 +165,9 @@ const SIGN_COPY: Record<
     checkboxDefault: "我同意",
     language: "語言",
     pageSuffix: "頁",
+    eSignature: "電子簽名",
+    fillHere: "在這裡填寫",
+    fillHereHint: "和上面文件裡的高亮欄位相同，在這裡填寫更方便。",
   },
 };
 
@@ -178,6 +191,11 @@ export default function SignContractClient({ token }: { token: string }) {
   const [measuredPageSizes, setMeasuredPageSizes] = useState<Record<number, PageSize>>({});
 
   const copy = SIGN_COPY[locale];
+
+  // The operator's name in the tab, not TATO's.
+  useEffect(() => {
+    if (data) document.title = data.brandName ? `${data.envelope.title} · ${data.brandName}` : data.envelope.title;
+  }, [data]);
 
   useEffect(() => {
     let cancelled = false;
@@ -308,7 +326,9 @@ export default function SignContractClient({ token }: { token: string }) {
         <section className="rounded-lg border bg-white p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--ink)]">TATO eSignature</div>
+              <div className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--ink)]">
+                {data.brandName ? `${data.brandName} · ${copy.eSignature}` : copy.eSignature}
+              </div>
               <h1 className="mt-2 text-2xl font-semibold">{data.envelope.title}</h1>
               <p className="mt-1 text-sm text-[var(--ink-soft)]">
                 {copy.document}: {data.template.name} · {copy.signer} {data.recipient.signingOrder}:{" "}
@@ -407,12 +427,74 @@ export default function SignContractClient({ token }: { token: string }) {
           </div>
         </section>
 
+        {/* On a phone the document is a few hundred pixels wide, and its
+            boxes with it: an address box 11px tall, a signature box the
+            size of a thumbnail. The same fields at full size, sharing
+            their state with the boxes above. */}
+        {!alreadySigned && data.template.fields.length > 0 ? (
+          <section className="rounded-lg border bg-white p-4 sm:hidden">
+            <h2 className="text-base font-semibold">{copy.fillHere}</h2>
+            <p className="mt-1 text-xs text-[var(--ink-soft)]">{copy.fillHereHint}</p>
+            <div className="mt-3 space-y-4">
+              {data.template.fields.map((field) => {
+                const state = values[field.id] || { value: "", signature: "", checked: false };
+                const update = (next: Partial<FieldState>) =>
+                  setValues((current) => ({
+                    ...current,
+                    [field.id]: { ...(current[field.id] || { value: "", signature: "", checked: false }), ...next },
+                  }));
+                const label = `${field.label}${field.required && field.type !== "CHECKBOX" ? " *" : ""}`;
+                if (field.type === "SIGNATURE") {
+                  return (
+                    <div key={field.id}>
+                      <div className="text-sm font-medium">{label}</div>
+                      <SignaturePad
+                        disabled={submitting}
+                        clearLabel={copy.clear}
+                        value={state.signature}
+                        onChange={(signature) => update({ signature })}
+                      />
+                    </div>
+                  );
+                }
+                if (field.type === "CHECKBOX") {
+                  return (
+                    <label key={field.id} className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1 shrink-0"
+                        disabled={submitting}
+                        checked={state.checked}
+                        onChange={(event) => update({ checked: event.target.checked })}
+                      />
+                      <span>{field.placeholder || field.label || copy.checkboxDefault}</span>
+                    </label>
+                  );
+                }
+                return (
+                  <label key={field.id} className="block text-sm">
+                    <span className="font-medium">{label}</span>
+                    <input
+                      className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2"
+                      type={field.type === "DATE" ? "date" : "text"}
+                      disabled={submitting}
+                      value={state.value}
+                      placeholder={field.placeholder || ""}
+                      onChange={(event) => update({ value: event.target.value })}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
         {!alreadySigned && (
           <section className="sticky bottom-3 z-20 rounded-lg border bg-white p-4 shadow-lg">
             <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <input
                 type="checkbox"
-                className="mt-1"
+                className="mt-1 shrink-0"
                 checked={consent}
                 onChange={(event) => setConsent(event.target.checked)}
               />
@@ -487,8 +569,10 @@ function DocumentField({
           {field.placeholder || checkboxLabel}
         </label>
       ) : (
+        // tap-compact: it must stay inside the box drawn for it on the
+        // document; on a phone the full-size field below takes the taps.
         <input
-          className="h-full w-full rounded-[3px] border-0 bg-white/95 px-1.5 text-sm outline-none disabled:bg-[var(--surface-muted)]"
+          className="tap-compact h-full w-full rounded-[3px] border-0 bg-white/95 px-1.5 text-sm outline-none disabled:bg-[var(--surface-muted)]"
           style={inputStyle}
           type={field.type === "DATE" ? "date" : "text"}
           disabled={disabled}

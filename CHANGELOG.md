@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.39.0 - 2026-10-06
+
+### A scheduled message rule can email site renters directly
+
+Each scheduled-message rule now has an "email site renters automatically" switch. With it on, a due message for a direct-booking order is emailed to the renter by the rental site, in the site's brand. It is not put on the manual queue. Turo trips still go to the queue, because Turo cannot be written to.
+
+The switch is off by default. A rule written for Turo guests therefore never starts mailing site renters on its own. It is not offered on a rule limited to Turo trips. A message with a placeholder that could not be filled is never emailed, and stays on the queue for a person to finish.
+
+Automatic senders claim a message before sending it (`claimRuleSend`), using the rule-and-order unique key, so two overlapping scans cannot both send it. A failed send releases the claim (`releaseRuleSend`), which puts the message back on the queue.
+
+
 ## v1.38.2 - 2026-10-06
 
 ### The calendar shows which day prices dynamic pricing set

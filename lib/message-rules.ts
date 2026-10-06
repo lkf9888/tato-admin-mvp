@@ -42,6 +42,9 @@ export type RuleInput = {
   offsetHours: number;
   source: RuleSource;
   vehicleIds: string[] | null;
+  /** Site orders are emailed by the rental site's reminder scan
+   *  instead of queued. Off by default. */
+  autoEmail: boolean;
 };
 
 export type RuleRow = RuleInput & { id: string };
@@ -65,6 +68,7 @@ function toRow(rule: {
   offsetHours: number;
   source: string;
   vehicleIds: string | null;
+  autoEmail: boolean;
 }): RuleRow {
   return {
     id: rule.id,
@@ -75,6 +79,7 @@ function toRow(rule: {
     offsetHours: rule.offsetHours,
     source: (RULE_SOURCES as readonly string[]).includes(rule.source) ? (rule.source as RuleSource) : "all",
     vehicleIds: parseVehicleIds(rule.vehicleIds),
+    autoEmail: rule.autoEmail,
   };
 }
 
@@ -103,6 +108,7 @@ export async function saveMessageRule(workspaceId: string, input: RuleInput) {
     offsetHours,
     source: input.source,
     vehicleIds: input.vehicleIds && input.vehicleIds.length > 0 ? JSON.stringify(input.vehicleIds) : null,
+    autoEmail: input.autoEmail,
   };
   if (input.id) {
     const existing = await prisma.messageRule.findFirst({ where: { id: input.id, workspaceId }, select: { id: true } });
@@ -148,6 +154,8 @@ export type DueMessage = {
   /** Where to send it: the reservation's messages on turo.com. */
   turoUrl: string | null;
   overdue: boolean;
+  /** The rule asks for site orders to be emailed (see RuleInput). */
+  autoEmail: boolean;
 };
 
 /**
@@ -239,6 +247,7 @@ export async function listDueMessages(workspaceId: string, now = new Date()): Pr
         missing,
         turoUrl: turoReservationUrl(order, "messages"),
         overdue: at.getTime() < now.getTime(),
+        autoEmail: rule.autoEmail,
       });
     }
   }
@@ -271,4 +280,41 @@ export async function recordRuleSend(input: {
     update: { status: input.status, text: input.text?.slice(0, 4000) ?? null, actor: input.actor ?? null },
   });
   return { ok: true as const };
+}
+
+/**
+ * Take a due message for sending, atomically: the (rule, order) unique
+ * key means two overlapping scans cannot both claim it. For senders that
+ * deliver on their own -- the rental site's emailer -- and must not send
+ * twice. Returns false when someone already sent, skipped or claimed it.
+ */
+export async function claimRuleSend(input: {
+  workspaceId: string;
+  ruleId: string;
+  orderId: string;
+  text: string;
+  actor: string;
+}) {
+  try {
+    await prisma.messageRuleSend.create({
+      data: {
+        workspaceId: input.workspaceId,
+        ruleId: input.ruleId,
+        orderId: input.orderId,
+        status: "sent",
+        text: input.text.slice(0, 4000),
+        actor: input.actor,
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Undo a claim whose send failed, so the message returns to the queue. */
+export async function releaseRuleSend(input: { workspaceId: string; ruleId: string; orderId: string; actor: string }) {
+  await prisma.messageRuleSend.deleteMany({
+    where: { workspaceId: input.workspaceId, ruleId: input.ruleId, orderId: input.orderId, actor: input.actor },
+  });
 }

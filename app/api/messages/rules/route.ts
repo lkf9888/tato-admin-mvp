@@ -28,13 +28,18 @@ const ruleSchema = z.object({
   offsetHours: z.number().int().min(0).max(MAX_OFFSET_HOURS),
   source: z.enum(RULE_SOURCES),
   vehicleIds: z.array(z.string().trim().min(1)).max(500).nullish(),
+  autoEmail: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
   const { workspace } = await requireCurrentAdminContext();
   const parsed = ruleSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
-  const saved = await saveMessageRule(workspace.id, { ...parsed.data, vehicleIds: parsed.data.vehicleIds ?? null });
+  const saved = await saveMessageRule(workspace.id, {
+    ...parsed.data,
+    vehicleIds: parsed.data.vehicleIds ?? null,
+    autoEmail: parsed.data.autoEmail ?? false,
+  });
   if (!saved.ok) return NextResponse.json({ error: saved.error }, { status: 400 });
   return NextResponse.json({ rules: await listMessageRules(workspace.id) });
 }

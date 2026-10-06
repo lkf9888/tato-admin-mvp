@@ -19,6 +19,7 @@ type Rule = {
   offsetHours: number;
   source: Source;
   vehicleIds: string[] | null;
+  autoEmail: boolean;
 };
 
 const TRIGGERS: Trigger[] = ["before_pickup", "after_pickup", "before_return", "after_return", "booked"];
@@ -57,6 +58,8 @@ function copy(locale: Locale) {
         remove: "删除",
         removeConfirm: "删除这条规则？已经发过的记录会保留。",
         off: "已停用",
+        autoEmail: "自有网站订单直接发邮件给租客（Turo 订单仍进定时清单）",
+        autoEmailTag: "自动邮件",
         failed: "保存失败。",
         describe: (rule: Rule, templateLabel: string, vehicleLabel: string | null) =>
           `${templateLabel} · ${describeWhen(rule, "zh")} · ${
@@ -95,6 +98,8 @@ function copy(locale: Locale) {
         remove: "Delete",
         removeConfirm: "Delete this rule? Messages already sent stay on record.",
         off: "Off",
+        autoEmail: "Email site renters automatically (site orders only; Turo trips still go to the queue)",
+        autoEmailTag: "auto-email",
         failed: "Could not save.",
         describe: (rule: Rule, templateLabel: string, vehicleLabel: string | null) =>
           `${templateLabel} · ${describeWhen(rule, "en")} · ${
@@ -119,6 +124,7 @@ const emptyForm = {
   offsetHours: 24,
   source: "all" as Source,
   vehicleId: "",
+  autoEmail: false,
 };
 
 /** Rules for scheduled guest messages. See lib/message-rules. */
@@ -193,6 +199,7 @@ export function MessageRulesPanel({
         offsetHours: Number.isFinite(form.offsetHours) ? form.offsetHours : 0,
         source: form.source,
         vehicleIds: form.vehicleId ? [form.vehicleId] : null,
+        autoEmail: form.source === "turo" ? false : form.autoEmail,
       }),
     });
     if (ok) setForm(emptyForm);
@@ -266,6 +273,11 @@ export function MessageRulesPanel({
                       <p className="font-semibold text-[var(--ink)]">
                         {rule.name}
                         {!rule.enabled ? <span className="ml-1.5 text-[11px] font-normal text-[var(--ink-soft)]">{t.off}</span> : null}
+                        {rule.autoEmail ? (
+                          <span className="ml-1.5 rounded-full bg-[var(--brand-soft)] px-1.5 py-px text-[10.5px] font-semibold text-[var(--brand)]">
+                            {t.autoEmailTag}
+                          </span>
+                        ) : null}
                       </p>
                       <p className="mt-0.5 text-[12px] text-[var(--ink-soft)]">
                         {t.describe(rule, template?.label ?? "—", vehicle?.label ?? null)}
@@ -283,6 +295,7 @@ export function MessageRulesPanel({
                           offsetHours: rule.offsetHours,
                           source: rule.source,
                           vehicleId: rule.vehicleIds?.[0] ?? "",
+                          autoEmail: rule.autoEmail,
                         })
                       }
                       aria-label={t.edit}
@@ -403,6 +416,18 @@ export function MessageRulesPanel({
                   />
                 </label>
               </div>
+              {form.source !== "turo" ? (
+                <label className="flex items-start gap-2 text-[12.5px] text-[var(--ink-mid)]">
+                  <input
+                    id="rule-auto-email"
+                    type="checkbox"
+                    checked={form.autoEmail}
+                    onChange={(event) => setForm((current) => ({ ...current, autoEmail: event.target.checked }))}
+                    className="tap-compact mt-0.5 h-4 w-4 accent-[var(--brand)]"
+                  />
+                  <span>{t.autoEmail}</span>
+                </label>
+              ) : null}
               {error ? <p className="text-[12px] text-rose-600">{error}</p> : null}
               <div className="flex items-center gap-2">
                 <button

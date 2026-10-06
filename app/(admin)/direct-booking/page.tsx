@@ -571,6 +571,11 @@ export default async function DirectBookingPage({
             badge: heldDeposits || null,
           },
           {
+            key: "pricing",
+            label: messages.directBookingPricing.tab,
+            href: directBookingSectionHref("pricing"),
+          },
+          {
             key: "ads",
             label: messages.directBookingAds.tab,
             href: directBookingSectionHref("ads"),

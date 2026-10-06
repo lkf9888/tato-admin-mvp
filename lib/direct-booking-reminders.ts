@@ -8,10 +8,13 @@ import {
   sendDepositReminderEmail,
   sendPickupReminderEmails,
   sendReturnReminderEmails,
+  sendRuleMessageEmail,
 } from "@/lib/direct-booking-email";
+import { listDueMessages } from "@/lib/message-rules";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { resolveUploadPath } from "@/lib/uploads";
+import { runAutoDynamicPricing } from "@/lib/vehicle-pricing-dynamic-run";
 
 /** How far ahead a hand-over is reminded: an hour, plus the scan's own interval. */
 export const HANDOVER_REMINDER_LEAD_MINUTES = 65;
@@ -56,7 +59,10 @@ const VEHICLE_FIELDS = { brand: true, model: true, year: true, plateNumber: true
  * - a week after return with the deposit still held, remind the
  *   workspace to settle it;
  * - delete the licence photos and signatures left by checkouts that
- *   were never paid, once they are a week old.
+ *   were never paid, once they are a week old;
+ * - once a day, recompute and apply dynamic prices for workspaces that
+ *   turned on auto-apply;
+ * - email site renters the scheduled messages whose rule says so.
  */
 export async function runDirectBookingScan(now = new Date()) {
   const horizon = new Date(now.getTime() + HANDOVER_REMINDER_LEAD_MINUTES * 60_000);
@@ -139,5 +145,91 @@ export async function runDirectBookingScan(now = new Date()) {
     });
   }
 
-  return { pickups, returns, deposits, abandonedDeleted: abandoned.length };
+  const ruleEmails = await sendDueRuleEmails(now).catch((error) => ({
+    error: error instanceof Error ? error.message : String(error),
+  }));
+
+  // Last, and on its own: a pricing failure must not cost a reminder.
+  const dynamicPricing = await runAutoDynamicPricing(now).catch((error) => ({
+    error: error instanceof Error ? error.message : String(error),
+  }));
+
+  return { pickups, returns, deposits, abandonedDeleted: abandoned.length, ruleEmails, dynamicPricing };
+}
+
+/**
+ * Scheduled guest messages that can go by email rather than through the
+ * copy-and-paste queue: a site booking (Turo gives us no way to message
+ * its guests), a rule the operator marked for automatic email, the
+ * renter's address on file, every placeholder filled -- a message that
+ * still says {{pickup_code}} waits for a person -- and the moment
+ * actually reached, not the hour of warning the queue shows.
+ *
+ * Claimed before sending: the send record is created first, and the
+ * (rule, trip) uniqueness means an overlapping scan cannot send it
+ * twice. If the email fails the claim is removed, so the message is
+ * back in the queue for a person.
+ */
+async function sendDueRuleEmails(now: Date) {
+  const workspaces = await prisma.messageRule.findMany({
+    where: { enabled: true },
+    distinct: ["workspaceId"],
+    select: { workspaceId: true },
+  });
+  let sent = 0;
+  let failed = 0;
+  for (const { workspaceId } of workspaces) {
+    const due = (await listDueMessages(workspaceId, now)).filter(
+      (item) =>
+        // Read defensively: the rule's switch is added on the rules side.
+        (item as typeof item & { autoEmail?: boolean }).autoEmail === true &&
+        new Date(item.dueAt).getTime() <= now.getTime() &&
+        item.missing.length === 0,
+    );
+    if (due.length === 0) continue;
+    const orders = await prisma.order.findMany({
+      where: { workspaceId, id: { in: due.map((item) => item.orderId) } },
+      select: { id: true, sourceMetadata: true, renterToken: true },
+    });
+    const orderById = new Map(orders.map((order) => [order.id, order]));
+
+    for (const item of due) {
+      const order = orderById.get(item.orderId);
+      let metadata: { channel?: string; renterEmail?: string } = {};
+      try {
+        metadata = JSON.parse(order?.sourceMetadata ?? "{}");
+      } catch {
+        continue;
+      }
+      const renterEmail = metadata.renterEmail?.trim();
+      if (!order || metadata.channel !== "direct-booking" || !renterEmail) continue;
+
+      const claimed = await prisma.messageRuleSend
+        .create({
+          data: { workspaceId, ruleId: item.ruleId, orderId: order.id, status: "sent", text: item.text.slice(0, 4000), actor: "auto-email" },
+        })
+        .then(() => true)
+        .catch(() => false);
+      if (!claimed) continue;
+
+      const result = await sendRuleMessageEmail({ workspaceId, order, renterEmail, text: item.text }).catch(
+        (error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }),
+      );
+      if (result.ok) {
+        sent += 1;
+        continue;
+      }
+      failed += 1;
+      await prisma.messageRuleSend.deleteMany({ where: { ruleId: item.ruleId, orderId: order.id, actor: "auto-email" } });
+      await logActivity({
+        workspaceId,
+        actor: "auto-email",
+        action: "rule_message_email_failed",
+        entityType: "Order",
+        entityId: order.id,
+        metadata: { ruleId: item.ruleId, ruleName: item.ruleName, error: result.error ?? null },
+      });
+    }
+  }
+  return { sent, failed };
 }

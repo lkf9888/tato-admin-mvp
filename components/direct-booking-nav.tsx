@@ -34,6 +34,7 @@ export type DirectBookingSection =
   | "requests"
   | "deposits"
   | "ads"
+  | "pricing"
   | "site";
 
 export function directBookingSectionHref(section: DirectBookingSection) {
@@ -42,6 +43,7 @@ export function directBookingSectionHref(section: DirectBookingSection) {
   if (section === "requests") return "/direct-booking/requests";
   if (section === "deposits") return "/direct-booking/deposits";
   if (section === "ads") return "/direct-booking/ads";
+  if (section === "pricing") return "/direct-booking/pricing";
   return `/direct-booking?tab=${section}`;
 }
 

@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.38.0 - 2026-10-06
+
+### Dynamic pricing for the rental site, and scheduled messages reach site renters by email
+
+**Dynamic pricing** (`/direct-booking/pricing`, off by default). For every
+unbooked day of the cars on the site, a suggested price: the car's rate ×
+season × weekday (the fleet's own trip history, the indices that already
+price model-rated cars) × lead time (last-minute discount, far-ahead
+premium) × fleet occupancy versus what is normal that far out (within 45
+days, ×0.9–1.2) × short gaps between trips × BC holidays and long weekends
+or the operator's own events; then a floor and ceiling as shares of the
+rate and a cap on how far one run moves a day. Every suggestion keeps its
+factor breakdown. The operator applies per car or all at once, or turns on
+a daily auto-apply (run from the 15-minute scan, isolated from the
+reminders). Applied prices are ordinary per-day prices with
+`createdBy = "dynamic-pricing"`: days priced by hand are skipped, a later
+hand price takes a day over for good, and switching the feature off takes
+the dynamic prices back off. New tables `DynamicPricingSettings` and
+`DynamicPriceSuggestion`, no relations. Engine ported in shape from HostHub.
+
+**Scheduled messages by email.** The message rules' queue (v1.36.0) now
+emails a site renter the messages whose rule has `autoEmail` on, once due,
+with every placeholder filled, in the site's brand with the booking link.
+The send is claimed on the (rule, trip) row first so overlapping scans
+cannot both send; a failed send releases the claim and the message stays
+in the manual queue. Turo and in-person trips always stay in the queue.
+
 ## v1.37.0 - 2026-10-05
 
 ### Every return becomes a staff task, and order tasks follow their trip

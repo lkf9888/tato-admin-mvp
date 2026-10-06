@@ -932,4 +932,44 @@ export async function sendDepositReminderEmail(input: {
   }
 }
 
+/**
+ * A scheduled guest message (the operator's message rules, lib/message-rules.ts)
+ * sent to a site renter as an email, in the site's own name. The rule's
+ * text is the operator's, already filled in; this only frames it with the
+ * booking link and reference so the renter can find their trip.
+ */
+export async function sendRuleMessageEmail(input: {
+  workspaceId: string;
+  order: Pick<Order, "id" | "renterToken">;
+  renterEmail: string;
+  text: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const [site, workspace] = await Promise.all([
+    prisma.rentalSite.findUnique({ where: { workspaceId: input.workspaceId } }),
+    prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { name: true } }),
+  ]);
+  const brandName = site?.brandName?.trim() || workspace?.name?.trim() || "TATO";
+  const origin = site?.domain ? `https://${site.domain}` : getAppUrl().replace(/\/$/, "");
+  const reference = bookingReference(input.order.id);
+  const text = [
+    input.text.trim(),
+    "",
+    "—",
+    input.order.renterToken ? `Your booking: ${origin}/booking/${input.order.renterToken}` : null,
+    `Booking reference: ${reference}`,
+    brandName,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+  const result = await sendMail({
+    to: input.renterEmail,
+    subject: `${brandName} — about your booking ${reference}`,
+    text,
+    html: toHtmlBody(text),
+    replyTo: site?.contactEmail?.trim() || undefined,
+    from: formatSiteSender(site),
+  });
+  return result.ok ? { ok: true } : { ok: false, error: result.reason ?? "send_failed" };
+}
+
 export { DIRECT_BOOKING_EMAIL_VARIABLES };

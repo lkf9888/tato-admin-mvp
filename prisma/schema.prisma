@@ -2192,6 +2192,73 @@ model BookingPricingPolicy {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
+/// How the fleet's dynamic pricing behaves (lib/vehicle-pricing-dynamic.ts).
+///
+/// One row per workspace. Off until the operator turns it on; even then
+/// it only suggests, and applies on its own only with `autoApply`. Every
+/// percentage is a fraction (0.1 = 10%). Applied prices are ordinary
+/// VehiclePriceOverride rows with `createdBy = "dynamic-pricing"`, so a
+/// price set by hand on the same day replaces one and is never touched
+/// again by a recompute.
+model DynamicPricingSettings {
+  id                  String    @id @default(cuid())
+  workspaceId         String    @unique
+  enabled             Boolean   @default(false)
+  autoApply           Boolean   @default(false)
+  /// How many days ahead are priced.
+  horizonDays         Int       @default(90)
+  /// Never below / above the car's own rate times these.
+  minPct              Float     @default(0.7)
+  maxPct              Float     @default(1.6)
+  /// How far one recompute may move a day from its current price.
+  maxDailyChangePct   Float     @default(0.25)
+  /// Fri and Sat uplift, used only where the fleet's own trips say
+  /// nothing about weekdays.
+  weekendPct          Float     @default(0.1)
+  /// BC holidays and their long weekends, and Christmas to New Year.
+  holidayPct          Float     @default(0.15)
+  /// An unbooked day this close is discounted.
+  lastMinuteDays      Int       @default(3)
+  lastMinutePct       Float     @default(-0.1)
+  /// A day this far out carries a small premium; it can still come down.
+  farOutDays          Int       @default(60)
+  farOutPct           Float     @default(0.05)
+  /// Fleet occupancy around a day versus what is expected that far out.
+  targetOccupancy     Float     @default(0.7)
+  occupancyStrength   Float     @default(0.5)
+  /// A free stretch this short between two trips is hard to sell.
+  gapMaxDays          Int       @default(2)
+  gapPct              Float     @default(-0.15)
+  /// `[{ "from": "YYYY-MM-DD", "to": "YYYY-MM-DD", "pct": 0.2, "label": "…" }]`
+  eventsJson          String?
+  /// Cars left out, as a JSON array of vehicle ids.
+  excludedVehicleIds  String?
+  lastRunAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([workspaceId])
+}
+
+/// A suggested price for one unbooked day, waiting to be applied or
+/// dismissed. Rebuilt whole on every recompute; plain columns, no
+/// relations, like the suggestions it holds.
+model DynamicPriceSuggestion {
+  id          String   @id @default(cuid())
+  workspaceId String
+  vehicleId   String
+  /// UTC midday of the calendar day, as VehiclePriceOverride stores it.
+  date        DateTime
+  current     Float
+  suggested   Float
+  /// The factor breakdown, JSON (`PriceFactors`).
+  factors     String
+  createdAt   DateTime @default(now())
+
+  @@unique([vehicleId, date])
+  @@index([workspaceId, vehicleId])
+}
+
 /// One day of one car, priced by hand.
 ///
 /// The last word in the chain: a day with a row here is charged this,

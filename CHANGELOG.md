@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.41.0 - 2026-10-06
+
+### One call for the navigation's badge counts
+
+`GET /api/messages/counts` returns three numbers, for the navigation to poll and show as badges:
+
+- `needsReply`: guest conversations waiting for an answer.
+- `pendingOrders`: Turo bookings not yet on a car.
+- `scheduledDue`: scheduled guest messages due now and not yet sent.
+
+`needsReply` is the same number as the messages page's "Needs reply". The page's thread loading moved into `lib/guest-thread-state.ts`, and both the page and the endpoint call it, so the badge and the page cannot disagree. Nothing changes on the page itself.
+
+
 ## v1.40.1 - 2026-10-06
 
 ### An approved cancellation or date change says what to do on Turo

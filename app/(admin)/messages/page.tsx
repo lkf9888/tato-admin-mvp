@@ -1,6 +1,6 @@
 import { GuestMessagesView } from "@/components/guest-messages-view";
 import { requireCurrentAdminContext } from "@/lib/auth";
-import { groupIntoThreads } from "@/lib/guest-threads";
+import { loadGuestThreads } from "@/lib/guest-thread-state";
 import { getI18n } from "@/lib/i18n-server";
 import { isKimiConfigured } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
@@ -114,127 +114,10 @@ export default async function GuestMessagesPage() {
     return { kind: "noTripInWindow", vehicleText };
   }
 
-  const emails = await prisma.inboundEmail.findMany({
-    where: {
-      workspaceId: workspace.id,
-      kind: { in: ["GUEST_MESSAGE", "SUPPORT"] },
-    },
-    orderBy: { receivedAt: "desc" },
-    // A quarter's worth of conversation is plenty to work from, and
-    // bounds the page against a mailbox that only grows.
-    take: 400,
-    select: {
-      id: true,
-      subject: true,
-      guestName: true,
-      vehicleId: true,
-      receivedAt: true,
-      acknowledgedAt: true,
-      turoLink: true,
-      orderId: true,
-      parsed: true,
-      guestText: true,
-      guestTextZh: true,
-      summaryZh: true,
-      avatarUrl: true,
-      vehicle: { select: { brand: true, model: true, year: true, plateNumber: true } },
-      // The order knows exactly which car; the subject only knows the
-      // model. Three Honda Odysseys in this fleet means "Honda Odyssey"
-      // identifies none of them, and the message showed "car not
-      // identified" while its own matched trip named the plate.
-      order: {
-        select: {
-          vehicleId: true,
-          vehicle: { select: { brand: true, model: true, year: true, plateNumber: true } },
-        },
-      },
-    },
-  });
-
-  // What we said. Turo sends no notification when the host replies, so
-  // these exist only where the browser agent has read the conversation
-  // back off the site. Keyed by reservation, which is how Turo threads
-  // a conversation and how the order already joins.
-  const reservationIds = [
-    ...new Set(
-      emails
-        .map((email) => {
-          if (!email.parsed) return null;
-          try {
-            return (JSON.parse(email.parsed) as { reservationId?: string }).reservationId ?? null;
-          } catch {
-            return null;
-          }
-        })
-        .filter((id): id is string => !!id),
-    ),
-  ];
-
-  const scraped = reservationIds.length
-    ? await prisma.turoConversationMessage.findMany({
-        where: { workspaceId: workspace.id, reservationId: { in: reservationIds } },
-        orderBy: { sentAt: "desc" },
-        take: 400,
-      })
-    : [];
-
-  // When our last word came after theirs, the thread is answered --
-  // whatever anyone did or did not tick in TATO. Only meaningful for
-  // reservations the reader has reached; the rest keep the
-  // acknowledgement rule, which is all the mailbox alone can support.
-  const lastReplyAt = new Map<string, Date>();
-  for (const message of scraped) {
-    if (message.direction !== "outbound") continue;
-    const current = lastReplyAt.get(message.reservationId);
-    if (!current || message.sentAt > current) lastReplyAt.set(message.reservationId, message.sentAt);
-  }
-
-  const reservationByOrderId = new Map<string, string>();
-
-  const threads = groupIntoThreads(
-    emails.map((email) => {
-      const extracted = (() => {
-        if (!email.parsed) return null;
-        try {
-          return JSON.parse(email.parsed) as { summary?: string; summaryZh?: string; needsAction?: boolean };
-        } catch {
-          return null;
-        }
-      })();
-
-      // The subject names a model; the trip names a car. Prefer the
-      // trip -- it is an exact join on the reservation id, where the
-      // subject match is a model that several cars share.
-      const vehicle = email.vehicle ?? email.order?.vehicle ?? null;
-      const vehicleId = email.vehicleId ?? email.order?.vehicleId ?? null;
-
-      return {
-        id: email.id,
-        subject: email.subject,
-        guestName: email.guestName,
-        vehicleId,
-        vehicleLabel: vehicle ? `${vehicle.year} ${vehicle.brand} ${vehicle.model}` : null,
-        vehiclePlate: vehicle?.plateNumber ?? null,
-        avatarUrl: email.avatarUrl,
-        receivedAt: email.receivedAt,
-        acknowledgedAt: email.acknowledgedAt,
-        turoLink: email.turoLink,
-        orderId: email.orderId,
-        guestText: email.guestText,
-        summary: extracted?.summary ?? null,
-        // Both readings travel to the client, which picks one. A
-        // literal translation is what you need to answer someone; a
-        // summary is what you need to decide whether to. Neither is
-        // the right default for both jobs, so the operator chooses.
-        //
-        // The literal falls back to nothing rather than to the
-        // summary: a summary shown where a translation was asked for
-        // is a paraphrase wearing the wrong label.
-        summaryZh: email.guestText ? email.guestTextZh : email.summaryZh,
-        summaryZhBrief: email.summaryZh ?? extracted?.summaryZh ?? null,
-        needsAction: extracted?.needsAction === true,
-      };
-    }),
+  // Threads and which are already answered, from the same function the
+  // nav badge counts with, so the two numbers cannot disagree.
+  const { threads, scraped, reservationIds, answeredKeys: answeredThreads } = await loadGuestThreads(
+    workspace.id,
   );
 
   // Trips for the threads that matched one, fetched in a single query
@@ -261,27 +144,6 @@ export default async function GuestMessagesPage() {
         },
       })
     : [];
-
-  for (const order of orders) {
-    if (order.externalOrderId) reservationByOrderId.set(order.id, order.externalOrderId);
-  }
-
-  // Threads whose last inbound message predates our last reply are
-  // answered. Recomputed here rather than inside `groupIntoThreads`,
-  // which is pure and has no business knowing about scraped data.
-  const answeredThreads = new Set(
-    threads
-      .filter((thread) => {
-        const reservationId = thread.orderId
-          ? reservationByOrderId.get(thread.orderId)
-          : undefined;
-        if (!reservationId) return false;
-        const repliedAt = lastReplyAt.get(reservationId);
-        if (!repliedAt) return false;
-        return thread.messages.every((message) => message.receivedAt < repliedAt);
-      })
-      .map((thread) => thread.key),
-  );
 
   return (
     <div>

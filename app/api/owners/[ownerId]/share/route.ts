@@ -1,10 +1,9 @@
-import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { ShareVisibility } from "@prisma/client";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
+import { ensureOwnerShareLink } from "@/lib/owner-share-link";
 import { prisma } from "@/lib/prisma";
 
 type Params = Promise<{ ownerId: string }>;
@@ -32,39 +31,14 @@ export async function POST(_request: Request, { params }: { params: Params }) {
     return NextResponse.json({ error: context.error }, { status: context.status });
   }
 
-  const existing = await prisma.shareLink.findFirst({
-    where: {
-      workspaceId: context.workspace.id,
-      ownerId: context.owner.id,
-      isActive: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
-  if (existing) {
-    return NextResponse.json({ shareToken: existing.token });
-  }
-
-  const shareLink = await prisma.shareLink.create({
-    data: {
-      workspaceId: context.workspace.id,
-      ownerId: context.owner.id,
-      token: randomBytes(18).toString("hex"),
-      visibility: ShareVisibility.standard,
-      createdBy: context.user.name,
-    },
-  });
-
-  await logActivity({
+  const { token } = await ensureOwnerShareLink({
     workspaceId: context.workspace.id,
-    actor: context.user.name,
-    action: "share_link_created",
-    entityType: "ShareLink",
-    entityId: shareLink.id,
-    metadata: { ownerId: context.owner.id, visibility: shareLink.visibility },
+    ownerId: context.owner.id,
+    createdBy: context.user.name,
   });
 
   revalidateOwnerSurfaces(context.owner.id);
-  return NextResponse.json({ shareToken: shareLink.token });
+  return NextResponse.json({ shareToken: token });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Params }) {

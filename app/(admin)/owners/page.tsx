@@ -4,6 +4,7 @@ import { OwnersSearchInput } from "@/components/owners-search-input";
 import { QuickVehicleReimbursementButton } from "@/components/quick-vehicle-reimbursement-button";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
+import { materializeRecurringExpenses } from "@/lib/owner-ledger-recurring";
 import { prisma } from "@/lib/prisma";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -53,6 +54,8 @@ export default async function OwnersPage({
   searchParams: SearchParams;
 }) {
   const workspace = await requireCurrentWorkspace();
+  // Balances below include recurring charges that came due today.
+  await materializeRecurringExpenses({ workspaceId: workspace.id });
   const [{ locale }, params] = await Promise.all([getI18n(), searchParams]);
   const labels = copy(locale);
   const q = params.q?.trim() ?? "";

@@ -3,7 +3,13 @@ import { OwnerLedgerKind } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 import { getCurrentAdminUser } from "@/lib/auth";
+import { utcToZonedDate } from "@/lib/booking-time";
 import { logActivity } from "@/lib/orders";
+import {
+  createRecurringExpense,
+  isRecurringInterval,
+  recurringItemId,
+} from "@/lib/owner-ledger-recurring";
 import { prisma } from "@/lib/prisma";
 
 const MANUAL_KINDS = new Set<OwnerLedgerKind>([
@@ -70,6 +76,38 @@ export async function POST(request: NextRequest, { params }: { params: Params })
       return NextResponse.json({ error: "Vehicle not found for this owner" }, { status: 400 });
     }
     vehicleId = vehicle.id;
+  }
+
+  // A reimbursement entered as "every week" or "every month": this charge
+  // is the first occurrence of a rule that writes the rest.
+  if (isRecurringInterval(body.recurrence)) {
+    if (kind !== OwnerLedgerKind.EXPENSE_REIMBURSEMENT) {
+      return NextResponse.json({ error: "Only reimbursements can repeat" }, { status: 400 });
+    }
+    const startOn = utcToZonedDate(occurredAt);
+    const note = typeof body.note === "string" && body.note.trim() ? body.note.trim() : null;
+    const rule = await createRecurringExpense({
+      workspaceId: context.workspaceId,
+      ownerId: context.owner.id,
+      vehicleId,
+      amount: +amount.toFixed(2),
+      note: note ?? "Recurring expense",
+      interval: body.recurrence,
+      startOn,
+      createdBy: context.user.name,
+    });
+    await logActivity({
+      workspaceId: context.workspaceId,
+      actor: context.user.name,
+      action: "owner_recurring_expense_created",
+      entityType: "OwnerLedgerRecurringExpense",
+      entityId: rule.id,
+      metadata: { ownerId: context.owner.id, amount: rule.amount, interval: rule.interval, startOn },
+    });
+    revalidateOwnerLedgerSurfaces(context.owner.id);
+    // The first row, for receipts to attach to; none yet if it starts later.
+    const first = await prisma.ownerLedgerItem.findUnique({ where: { id: recurringItemId(rule.id, startOn) } });
+    return NextResponse.json({ item: first, rule });
   }
 
   const item = await prisma.ownerLedgerItem.create({

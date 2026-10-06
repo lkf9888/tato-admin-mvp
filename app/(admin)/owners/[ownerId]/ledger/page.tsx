@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 import { OwnerLedgerManager } from "@/components/owner-ledger-manager";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
+import {
+  isRecurringInterval,
+  materializeRecurringExpenses,
+  nextOccurrence,
+} from "@/lib/owner-ledger-recurring";
 import { prisma } from "@/lib/prisma";
 import {
   getManagerRetentionByFee,
@@ -44,6 +49,12 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
     }),
   ]);
   if (!owner) notFound();
+
+  await materializeRecurringExpenses({ ownerId: owner.id });
+  const recurringRules = await prisma.ownerLedgerRecurringExpense.findMany({
+    where: { workspaceId: workspace.id, ownerId: owner.id },
+    orderBy: [{ stoppedAt: "asc" }, { createdAt: "desc" }],
+  });
 
   const ledgerItems = await prisma.ownerLedgerItem.findMany({
     where: {
@@ -119,6 +130,19 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
       }))}
       shareToken={owner.shareLinks[0]?.token ?? null}
       ownerSelectRoute="ledger"
+      ownerEmail={owner.email?.trim() || null}
+      recurringRules={recurringRules.map((rule) => ({
+        id: rule.id,
+        amount: rule.amount,
+        note: rule.note,
+        interval: rule.interval,
+        startOn: rule.startOn,
+        nextOn: !rule.stoppedAt && isRecurringInterval(rule.interval) ? nextOccurrence({ ...rule, interval: rule.interval }) : null,
+        vehicleLabel:
+          owner.vehicles.find((vehicle) => vehicle.id === rule.vehicleId)?.plateNumber ?? null,
+        stopped: Boolean(rule.stoppedAt),
+        stoppedReason: rule.stoppedReason,
+      }))}
       items={ledgerItems.map((item) => ({
         id: item.id,
         ownerId: item.ownerId,
@@ -129,6 +153,7 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
         occurredAt: item.occurredAt.toISOString(),
         note: item.note,
         isAuto: item.isAuto,
+        recurringExpenseId: item.recurringExpenseId,
         createdAt: item.createdAt.toISOString(),
         receipts: item.receipts.map((receipt) => ({
           id: receipt.id,

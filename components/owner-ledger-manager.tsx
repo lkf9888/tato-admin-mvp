@@ -49,6 +49,8 @@ type LedgerItem = {
   occurredAt: string;
   note: string | null;
   isAuto: boolean;
+  /** Set when a recurring expense wrote this row. */
+  recurringExpenseId?: string | null;
   createdAt: string;
   receipts?: LedgerReceipt[];
   vehicle: {
@@ -66,6 +68,25 @@ type LedgerItem = {
     returnDatetime: string;
   } | null;
 };
+
+type RecurringRule = {
+  id: string;
+  amount: number;
+  note: string;
+  interval: string;
+  startOn: string;
+  /** The next charge; null once stopped. */
+  nextOn: string | null;
+  vehicleLabel: string | null;
+  stopped: boolean;
+  stoppedReason: string | null;
+};
+
+type Recurrence = "" | "WEEKLY" | "MONTHLY";
+
+/** What people most often put on a schedule; one tap fills the note. */
+const RECURRING_PRESETS_ZH = ["GPS 月费", "保险", "停车", "贷款/租赁", "牌照"];
+const RECURRING_PRESETS_EN = ["GPS subscription", "Insurance", "Parking", "Loan / lease", "Plates"];
 
 type ModalState =
   | null
@@ -106,6 +127,34 @@ function copy(locale: Locale, operatorName: string) {
         edit: "修改",
         delete: "删除",
         confirmDelete: "确定删除这条账目吗？",
+        notifyOwner: "通知车主对账单已出",
+        notifyTitle: "邮件通知车主",
+        notifyIntro: "邮件里只有车主的只读账本链接，不含任何金额。车主还没有链接的话会自动建一个。",
+        sendTo: (email: string) => `收件人：${email}`,
+        noOwnerEmail: "这位车主还没有邮箱，先在车主资料里填上。",
+        editOwner: "去填写",
+        notifyNote: "附言（可选）",
+        notifyNotePlaceholder: "比如：9 月的 GPS 费已经扣了。",
+        emailLanguage: "邮件语言",
+        send: "发送",
+        sending: "发送中…",
+        sent: (email: string) => `已发送到 ${email}`,
+        sendFailed: "发送失败，请稍后再试。",
+        emailNotConfigured: "邮件服务还没有配置。",
+        confirmDeleteRecurring: "这一笔是固定扣款写的。删除后这条固定扣款会停止，以后不再自动记账。确定删除？",
+        repeat: "重复",
+        repeatNone: "不重复",
+        repeatWeekly: "每周",
+        repeatMonthly: "每月",
+        repeatHint: "这一笔是第一期，之后每期自动记一笔，直到停止。",
+        recurringTitle: "固定扣款",
+        recurringBadge: "固定",
+        nextCharge: (date: string) => `下次 ${date}`,
+        startedOn: (date: string) => `从 ${date} 起`,
+        stopRecurring: "停止",
+        confirmStop: "停止这条固定扣款？已经记的账保留，以后不再自动记。",
+        stoppedManual: "已停止",
+        stoppedByDelete: "已停止（删除了其中一笔）",
         save: "保存",
         saving: "保存中...",
         cancel: "取消",
@@ -168,6 +217,36 @@ function copy(locale: Locale, operatorName: string) {
         edit: "Edit",
         delete: "Delete",
         confirmDelete: "Delete this ledger item?",
+        notifyOwner: "Tell the owner the statement is ready",
+        notifyTitle: "Email the owner",
+        notifyIntro:
+          "The email carries only the owner's read-only ledger link, no amounts. A link is created if the owner has none.",
+        sendTo: (email: string) => `To: ${email}`,
+        noOwnerEmail: "This owner has no email yet. Add one to the owner's details first.",
+        editOwner: "Add it",
+        notifyNote: "Note (optional)",
+        notifyNotePlaceholder: "For example: September's GPS fee has been charged.",
+        emailLanguage: "Email language",
+        send: "Send",
+        sending: "Sending…",
+        sent: (email: string) => `Sent to ${email}`,
+        sendFailed: "Could not send. Try again later.",
+        emailNotConfigured: "Email is not set up.",
+        confirmDeleteRecurring:
+          "A recurring expense wrote this charge. Deleting it stops the recurring expense, so no more charges are written. Delete it?",
+        repeat: "Repeat",
+        repeatNone: "Does not repeat",
+        repeatWeekly: "Every week",
+        repeatMonthly: "Every month",
+        repeatHint: "This is the first charge; one more is written each period until it is stopped.",
+        recurringTitle: "Recurring expenses",
+        recurringBadge: "Recurring",
+        nextCharge: (date: string) => `Next ${date}`,
+        startedOn: (date: string) => `since ${date}`,
+        stopRecurring: "Stop",
+        confirmStop: "Stop this recurring expense? Charges already written stay; no more are written.",
+        stoppedManual: "Stopped",
+        stoppedByDelete: "Stopped (a charge was deleted)",
         save: "Save",
         saving: "Saving...",
         cancel: "Cancel",
@@ -233,6 +312,8 @@ export function OwnerLedgerManager({
   operatorName,
   shareToken,
   ownerSelectRoute = "query",
+  recurringRules = [],
+  ownerEmail = null,
 }: {
   locale: Locale;
   owners: OwnerOption[];
@@ -245,10 +326,14 @@ export function OwnerLedgerManager({
   operatorName: string;
   shareToken?: string | null;
   ownerSelectRoute?: "query" | "ledger";
+  recurringRules?: RecurringRule[];
+  /** Where the statement email goes; null when the owner has none. */
+  ownerEmail?: string | null;
 }) {
   const labels = copy(locale, operatorName);
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
+  const [notifyOpen, setNotifyOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -268,8 +353,18 @@ export function OwnerLedgerManager({
   const periodSubtotal = filteredItems.reduce((sum, item) => sum + item.amount, 0);
 
   async function deleteItem(item: LedgerItem) {
-    if (!confirm(labels.confirmDelete)) return;
+    if (!confirm(item.recurringExpenseId ? labels.confirmDeleteRecurring : labels.confirmDelete)) return;
     const response = await fetch(`/api/owners/${selectedOwner.id}/ledger/${item.id}`, {
+      method: "DELETE",
+    });
+    if (response.ok) {
+      startTransition(() => router.refresh());
+    }
+  }
+
+  async function stopRule(rule: RecurringRule) {
+    if (!confirm(labels.confirmStop)) return;
+    const response = await fetch(`/api/owners/${selectedOwner.id}/ledger/recurring/${rule.id}`, {
       method: "DELETE",
     });
     if (response.ok) {
@@ -305,6 +400,9 @@ export function OwnerLedgerManager({
               {labels.viewAsOwner} ↗
             </a>
           ) : null}
+          <button type="button" className="btn-secondary text-sm" onClick={() => setNotifyOpen(true)}>
+            ✉ {labels.notifyOwner}
+          </button>
         </div>
       </div>
 
@@ -366,6 +464,38 @@ export function OwnerLedgerManager({
         </div>
       </section>
 
+      {recurringRules.length > 0 ? (
+        <section className="card mb-4 p-4">
+          <h2 className="text-sm font-semibold text-[var(--ink)]">{labels.recurringTitle}</h2>
+          <ul className="mt-2 divide-y divide-[var(--line)]">
+            {recurringRules.map((rule) => (
+              <li key={rule.id} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm", rule.stopped ? "opacity-60" : "")}>
+                <span className="min-w-0 flex-1 truncate text-[var(--ink)]">
+                  {rule.note}
+                  {rule.vehicleLabel ? <span className="ml-1.5 text-xs text-[var(--ink-soft)]">{rule.vehicleLabel}</span> : null}
+                </span>
+                <span className="text-xs text-[var(--ink-soft)]">
+                  {rule.interval === "WEEKLY" ? labels.repeatWeekly : labels.repeatMonthly} · {labels.startedOn(rule.startOn)}
+                </span>
+                <span className="font-semibold tabular-nums">{formatCurrency(Math.abs(rule.amount), locale)}</span>
+                {rule.stopped ? (
+                  <span className="text-xs text-[var(--ink-soft)]">
+                    {rule.stoppedReason === "occurrence_deleted" ? labels.stoppedByDelete : labels.stoppedManual}
+                  </span>
+                ) : (
+                  <>
+                    {rule.nextOn ? <span className="text-xs text-[var(--ink-mid)]">{labels.nextCharge(rule.nextOn)}</span> : null}
+                    <button type="button" className="btn-secondary min-h-8 px-2 text-xs" onClick={() => void stopRule(rule)}>
+                      {labels.stopRecurring}
+                    </button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <section className="card mb-4 grid grid-cols-2 gap-2 p-2 sm:flex sm:flex-wrap sm:items-center">
         <label className="inline-flex flex-col gap-1 text-xs text-[var(--ink-soft)] sm:flex-row sm:items-center sm:gap-2">
           {labels.dateFrom}
@@ -421,6 +551,16 @@ export function OwnerLedgerManager({
         onEdit={(item) => setModal({ mode: "edit", item })}
         onDelete={deleteItem}
       />
+
+      {notifyOpen ? (
+        <StatementEmailDialog
+          labels={labels}
+          locale={locale}
+          ownerId={selectedOwner.id}
+          ownerEmail={ownerEmail}
+          onClose={() => setNotifyOpen(false)}
+        />
+      ) : null}
 
       {modal ? (
         <LedgerModal
@@ -581,11 +721,129 @@ function LedgerRows({
   );
 }
 
+function StatementEmailDialog({
+  labels,
+  locale,
+  ownerId,
+  ownerEmail,
+  onClose,
+}: {
+  labels: ReturnType<typeof copy>;
+  locale: Locale;
+  ownerId: string;
+  ownerEmail: string | null;
+  onClose: () => void;
+}) {
+  const [note, setNote] = useState("");
+  const [emailLocale, setEmailLocale] = useState<"zh" | "en">(locale === "en" ? "en" : "zh");
+  const [state, setState] = useState<{ kind: "idle" | "sending" | "sent" | "error"; message?: string }>({
+    kind: "idle",
+  });
+
+  async function send() {
+    setState({ kind: "sending" });
+    const response = await fetch(`/api/owners/${ownerId}/statement-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note, locale: emailLocale }),
+    }).catch(() => null);
+    const payload = response ? await response.json().catch(() => ({})) : {};
+    if (response?.ok) {
+      setState({ kind: "sent", message: labels.sent(payload.sentTo ?? ownerEmail ?? "") });
+      return;
+    }
+    setState({
+      kind: "error",
+      message:
+        payload.error === "NO_RECIPIENT"
+          ? labels.noOwnerEmail
+          : payload.error === "EMAIL_NOT_CONFIGURED"
+            ? labels.emailNotConfigured
+            : labels.sendFailed,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <h3 className="text-lg font-semibold">{labels.notifyTitle}</h3>
+          <button
+            type="button"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-2xl leading-none text-[var(--ink-soft)] hover:bg-[var(--surface-muted)]"
+            onClick={onClose}
+            aria-label={labels.cancel}
+          >
+            x
+          </button>
+        </div>
+        <p className="text-xs leading-5 text-[var(--ink-soft)]">{labels.notifyIntro}</p>
+
+        {ownerEmail ? (
+          <div className="mt-3 space-y-3">
+            <p className="text-sm text-[var(--ink-mid)]">{labels.sendTo(ownerEmail)}</p>
+            <div>
+              <label className="label">{labels.notifyNote}</label>
+              <textarea
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                rows={3}
+                className="input"
+                placeholder={labels.notifyNotePlaceholder}
+              />
+            </div>
+            <div>
+              <label className="label">{labels.emailLanguage}</label>
+              <select
+                value={emailLocale}
+                onChange={(event) => setEmailLocale(event.target.value === "en" ? "en" : "zh")}
+                className="input"
+              >
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {labels.noOwnerEmail}{" "}
+            <Link href={`/owners/${ownerId}`} className="font-semibold underline">
+              {labels.editOwner}
+            </Link>
+          </p>
+        )}
+
+        {state.message ? (
+          <p className={cn("mt-3 text-sm", state.kind === "sent" ? "text-emerald-700" : "text-rose-600")}>
+            {state.message}
+          </p>
+        ) : null}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="btn-secondary" onClick={onClose}>
+            {labels.cancel}
+          </button>
+          {ownerEmail && state.kind !== "sent" ? (
+            <button className="btn-primary" onClick={() => void send()} disabled={state.kind === "sending"}>
+              {state.kind === "sending" ? labels.sending : labels.send}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function KindBadge({ labels, item }: { labels: ReturnType<typeof copy>; item: LedgerItem }) {
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1.5">
       <span className="rounded bg-[var(--surface-muted)] px-2 py-0.5 text-xs">{labels.kindLabels[item.kind]}</span>
       {item.isAuto ? <span className="text-[10px] text-[var(--ink-soft)]">{labels.auto}</span> : null}
+      {item.recurringExpenseId ? (
+        <span className="rounded border border-[var(--line)] px-1.5 py-0.5 text-[10px] text-[var(--ink-mid)]">
+          {labels.recurringBadge}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -754,6 +1012,8 @@ function LedgerModal({
   );
   const [vehicleId, setVehicleId] = useState(initialItem?.vehicleId ?? "");
   const [note, setNote] = useState(initialItem?.note ?? "");
+  const [recurrence, setRecurrence] = useState<Recurrence>("");
+  const canRepeat = !isEdit && kind === OwnerLedgerKind.EXPENSE_REIMBURSEMENT;
   const existingReceipts = initialItem?.receipts ?? [];
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
@@ -803,6 +1063,7 @@ function LedgerModal({
           occurredAt: new Date(`${occurredAt}T00:00:00`).toISOString(),
           vehicleId: vehicleId || null,
           note,
+          ...(canRepeat && recurrence ? { recurrence } : {}),
         }),
       },
     );
@@ -890,6 +1151,38 @@ function LedgerModal({
             <label className="label">{labels.date}</label>
             <input value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} type="date" className="input" />
           </div>
+
+          {canRepeat ? (
+            <div>
+              <label className="label">{labels.repeat}</label>
+              <select
+                value={recurrence}
+                onChange={(event) => setRecurrence(event.target.value as Recurrence)}
+                className="input"
+              >
+                <option value="">{labels.repeatNone}</option>
+                <option value="MONTHLY">{labels.repeatMonthly}</option>
+                <option value="WEEKLY">{labels.repeatWeekly}</option>
+              </select>
+              {recurrence ? (
+                <>
+                  <p className="mt-1 text-xs text-[var(--ink-soft)]">{labels.repeatHint}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {(locale === "en" ? RECURRING_PRESETS_EN : RECURRING_PRESETS_ZH).map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        className="rounded-full border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--ink-mid)] hover:bg-[var(--surface-muted)]"
+                        onClick={() => setNote(preset)}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
 
           <div>
             <label className="label">{labels.vehicle}</label>

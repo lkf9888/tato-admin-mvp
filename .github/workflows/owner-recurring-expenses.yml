@@ -1,0 +1,25 @@
+name: Owner recurring expenses
+
+# Recurring charges on owner ledgers (insurance, parking, GPS, a lease)
+# are written as each one comes due. Opening a ledger writes that
+# owner's; this daily run writes everyone else's.
+on:
+  schedule:
+    - cron: "20 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write due recurring expenses
+        run: |
+          code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
+            -X POST https://tatocar.co/api/owners/recurring-expenses \
+            -H "x-tato-sync-secret: ${{ secrets.GMAIL_SYNC_SECRET }}")
+          cat /tmp/out.json
+          echo ""
+          if [ "$code" != "200" ]; then
+            echo "::error::Owner recurring expenses returned HTTP $code"
+            exit 1
+          fi

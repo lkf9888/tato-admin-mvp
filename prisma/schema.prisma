@@ -246,6 +246,7 @@ model Owner {
   shareLinks        ShareLink[]
   ledgerItems       OwnerLedgerItem[]
   commissionRules   OwnerCommissionRule[]
+  recurringExpenses OwnerLedgerRecurringExpense[]
 
   @@index([workspaceId])
 }
@@ -594,6 +595,9 @@ model OwnerLedgerItem {
   receiptContentType String?
   receipts           OwnerLedgerReceipt[]
   isAuto             Boolean              @default(false)
+  /// Set on a row a recurring expense wrote. Its id is fixed per rule and
+  /// day (`<ruleId>_<YYYY-MM-DD>`), so no occurrence can be written twice.
+  recurringExpenseId String?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   workspace          Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
@@ -605,6 +609,38 @@ model OwnerLedgerItem {
   @@index([ownerId, occurredAt])
   @@index([vehicleId, occurredAt])
   @@index([orderId])
+  @@index([recurringExpenseId])
+}
+
+/// A charge the operator pays on a schedule and bills to the owner:
+/// insurance, parking, GPS, a loan or lease, plates. Writes one
+/// EXPENSE_REIMBURSEMENT row per occurrence, up to today on the fleet's
+/// clock (lib/owner-ledger-recurring.ts). Deleting any row it wrote
+/// stops it.
+model OwnerLedgerRecurringExpense {
+  workspaceId   String
+  id            String    @id @default(cuid())
+  ownerId       String
+  vehicleId     String?
+  /// Signed like OwnerLedgerItem.amount: negative, charged to the owner.
+  amount        Float
+  note          String
+  /// WEEKLY (every 7 days) or MONTHLY (the start day of the month, or the
+  /// month's last day when it is shorter).
+  interval      String
+  /// Calendar days, YYYY-MM-DD: the first charge, and the newest written.
+  startOn       String
+  lastOn        String
+  stoppedAt     DateTime?
+  /// occurrence_deleted or manual.
+  stoppedReason String?
+  createdBy     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  owner         Owner     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([ownerId])
 }
 
 model OwnerLedgerReceipt {

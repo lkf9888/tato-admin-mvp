@@ -644,3 +644,72 @@ export async function sendAlertDigestEmail(input: {
 
   return sendMail({ to: input.to, subject, text, html, timeoutMs: 20_000 });
 }
+
+/**
+ * "Your statement is ready": the owner's read-only ledger link, and
+ * nothing else of substance.
+ *
+ * No figures, on purpose. The balance is one click away on a page that
+ * needs the token to reach, which is a better home for it than an inbox
+ * that gets forwarded, quoted and left open on shared screens. The owner
+ * replying reaches the operator who sent it (`replyTo`).
+ */
+export async function sendOwnerStatementEmail(input: {
+  to: string;
+  locale: "zh" | "en";
+  ownerName: string;
+  operatorName: string;
+  statementUrl: string;
+  note: string | null;
+  replyTo?: string | null;
+}): Promise<{ ok: boolean; reason?: string }> {
+  // Free text that ends up in the subject line, where a newline would
+  // start a new mail header.
+  const ownerName = input.ownerName.replace(/\s+/g, " ").trim();
+  const operatorName = input.operatorName.replace(/\s+/g, " ").trim() || "TATO";
+  const note = input.note?.trim() || null;
+  const copy =
+    input.locale === "en"
+      ? {
+          subject: `${operatorName}: your statement is ready`,
+          greeting: `Hi ${ownerName},`,
+          body: `Your latest statement from ${operatorName} is ready. It shows your cars' trips, earnings, charges and the current balance.`,
+          view: "View statement",
+          readOnly: "The link opens a read-only page. Reply to this email with any questions.",
+        }
+      : {
+          subject: `${operatorName}：${ownerName} 的对账单已更新`,
+          greeting: `${ownerName}，您好：`,
+          body: `${operatorName} 已更新您的对账单，里面有车辆的行程、收入、费用和当前余额。`,
+          view: "查看对账单",
+          readOnly: "链接打开的是只读页面。有任何问题，直接回复这封邮件即可。",
+        };
+
+  const text = [copy.greeting, "", copy.body, "", note, note ? "" : null, `${copy.view}: ${input.statementUrl}`, "", copy.readOnly]
+    .filter((line) => line !== null)
+    .join("\n");
+
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;color:#111;line-height:1.6">
+      <p style="margin:0 0 12px">${escapeHtml(copy.greeting)}</p>
+      <p style="margin:0 0 20px">${escapeHtml(copy.body)}</p>
+      ${
+        note
+          ? `<div style="margin:0 0 20px;padding:12px;background:#f5f5f5;border-radius:6px;white-space:pre-wrap;font-size:14px">${escapeHtml(note)}</div>`
+          : ""
+      }
+      <p style="margin:0 0 8px">
+        <a href="${escapeHtml(input.statementUrl).replace(/"/g, "&quot;")}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-size:14px">${escapeHtml(copy.view)}</a>
+      </p>
+      <p style="margin:16px 0 0;color:#888;font-size:12px">${escapeHtml(copy.readOnly)}</p>
+    </div>
+  `.trim();
+
+  return sendMail({
+    to: input.to,
+    subject: copy.subject,
+    text,
+    html,
+    ...(input.replyTo ? { replyTo: input.replyTo } : {}),
+  });
+}

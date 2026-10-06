@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentAdminUser } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
+import { stopRuleForDeletedItem } from "@/lib/owner-ledger-recurring";
 import { prisma } from "@/lib/prisma";
 
 type Params = Promise<{ ownerId: string; itemId: string }>;
@@ -122,6 +123,8 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
   }
 
   await prisma.ownerLedgerItem.delete({ where: { id: context.item.id } });
+  // Deleting a charge a recurring expense wrote is how it is turned off.
+  await stopRuleForDeletedItem(context.item);
 
   await logActivity({
     workspaceId: context.workspaceId,

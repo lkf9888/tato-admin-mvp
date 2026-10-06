@@ -3,6 +3,7 @@ import { OwnerPublicShareView } from "@/components/owner-public-share-view";
 import { hasShareAccess } from "@/lib/auth";
 import { getMessages, getStatusLabel, resolveLocale, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
+import { materializeRecurringExpenses } from "@/lib/owner-ledger-recurring";
 import { prisma } from "@/lib/prisma";
 import { getDisplayOrderNote, getOrderNetEarning } from "@/lib/utils";
 
@@ -120,6 +121,7 @@ export default async function SharePage({
     );
   }
 
+  await materializeRecurringExpenses({ ownerId: shareLink.owner.id });
   const ledgerItems = await prisma.ownerLedgerItem.findMany({
     where: {
       workspaceId: shareLink.workspaceId,

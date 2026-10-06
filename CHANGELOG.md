@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.46.0 - 2026-10-06
+
+### Owner ledgers take recurring charges, and the owner can be told their statement is ready
+
+- **Recurring charges.** A reimbursement added to an owner's ledger can repeat every month or every week. Common examples are insurance, parking, GPS, a loan or lease, and plates, and these are offered as one-tap notes. The charge entered is the first occurrence, and one more is written each period until the rule is stopped. A start date in the past fills in the missed periods straight away; a future start date waits for its day. A monthly charge that starts on the 31st falls on the last day of shorter months and returns to the 31st afterwards.
+- **When charges are written.** A daily run writes them (`.github/workflows/owner-recurring-expenses.yml`). Opening the owners list, an owner's ledger or the owner's share link also writes anything due. Each row's id is fixed per rule and day, so overlapping runs never write a period twice, and this needs no new unique index.
+- **Stopping.** The ledger lists its recurring charges with the next date and a Stop button. Rows written by a rule are tagged as recurring. Deleting any one of them also stops the rule, and the delete confirmation says so.
+- **Statement email.** "通知车主对账单已出" on the owner's ledger emails the owner a link to their read-only ledger, with an optional note, in Chinese or English. The email contains no amounts. A share link is created if the owner has none, an existing one is kept, and expired or revoked links are not reused. Replies go to the admin who sent it.
+
 ## v1.45.0 - 2026-10-06
 
 ### Same-day turnarounds are flagged, and a job can carry a guest complaint

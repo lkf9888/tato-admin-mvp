@@ -199,7 +199,7 @@ export function SiteShell({
               {copy.navContact}
             </p>
             {site.contactPhone ? (
-              <a href={telHref(site.contactPhone)} className="block hover:text-[var(--brand)]">
+              <a href={telHref(site.contactPhone)} className="block py-1 hover:text-[var(--brand)]">
                 {site.contactPhone}
               </a>
             ) : null}
@@ -209,7 +209,7 @@ export function SiteShell({
               </p>
             ) : null}
             {site.contactEmail ? (
-              <a href={`mailto:${site.contactEmail}`} className="block break-all hover:text-[var(--brand)]">
+              <a href={`mailto:${site.contactEmail}`} className="block break-all py-1 hover:text-[var(--brand)]">
                 {site.contactEmail}
               </a>
             ) : null}
@@ -246,10 +246,10 @@ export function SiteShell({
           <span>
             © {year} {site.brandName}. {copy.rightsReserved}
           </span>
-          <Link href={siteHref(site, locale, "/legal/terms")} className="hover:text-[var(--brand)]">
+          <Link href={siteHref(site, locale, "/legal/terms")} className="-mx-1 inline-block px-1 py-1.5 hover:text-[var(--brand)]">
             {messages.legal.termsLink}
           </Link>
-          <Link href={siteHref(site, locale, "/legal/privacy")} className="hover:text-[var(--brand)]">
+          <Link href={siteHref(site, locale, "/legal/privacy")} className="-mx-1 inline-block px-1 py-1.5 hover:text-[var(--brand)]">
             {messages.legal.privacyLink}
           </Link>
         </div>

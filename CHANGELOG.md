@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.42.1 - 2026-10-06
+
+### The renter's pages are easier to tap on a phone
+
+Checked the site home, a car page with the booking panel, the renter's
+booking page and a legal page at 375px: nothing scrolls sideways. In the
+booking panel the licence radios and the agreement checkbox were squeezed
+by their labels, and the Terms/Privacy links were 15px tall; in the site
+footer the phone, email and Terms/Privacy links were 17-20px tall (and
+"条款" 24px wide). All now keep their size or have a larger tap area,
+without moving anything.
+
 ## v1.42.0 - 2026-10-06
 
 ### Staff pay: per-task rates, what each person is owed, and reimbursements that reach the owner

@@ -947,7 +947,7 @@ export function PublicBookingPanel({
                       setError("");
                       setHasLocalLicence(option.value);
                     }}
-                    className="mt-0.5"
+                    className="mt-0.5 shrink-0"
                   />
                   <span className="block font-medium text-[var(--ink)]">{option.label}</span>
                 </label>
@@ -1070,7 +1070,7 @@ export function PublicBookingPanel({
                           : current.filter((id) => id !== addOn.id),
                       );
                     }}
-                    className="mt-0.5"
+                    className="mt-0.5 shrink-0"
                   />
                   <span className="min-w-0">
                     <span className="block font-medium text-[var(--ink)]">{addOn.name}</span>
@@ -1292,7 +1292,7 @@ export function PublicBookingPanel({
               setError("");
               setAgreementAccepted(event.target.checked);
             }}
-            className="mt-1 h-4 w-4 rounded border-[var(--line-strong)]"
+            className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--line-strong)]"
           />
           <span className="text-[13px] leading-5 text-[var(--ink-mid)] sm:text-sm sm:leading-6">
             {reserveMessages.agreementCheckbox}
@@ -1347,11 +1347,11 @@ export function PublicBookingPanel({
       {legalLinks ? (
         <p className="mt-1.5 text-[11px] leading-4 text-[var(--ink-soft)] sm:text-xs sm:leading-5">
           {messages.legal.bookingConsent(legalLinks.brand)}{" "}
-          <a href={legalLinks.terms} target="_blank" rel="noreferrer" className="underline">
+          <a href={legalLinks.terms} target="_blank" rel="noreferrer" className="-mx-1 inline-block px-1 py-1.5 underline">
             {messages.legal.termsLink}
           </a>
           {" · "}
-          <a href={legalLinks.privacy} target="_blank" rel="noreferrer" className="underline">
+          <a href={legalLinks.privacy} target="_blank" rel="noreferrer" className="-mx-1 inline-block px-1 py-1.5 underline">
             {messages.legal.privacyLink}
           </a>
         </p>

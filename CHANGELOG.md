@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.34.0 - 2026-10-05
+
+### Message templates fill themselves in for the guest you are answering
+
+A template used to be copied exactly as it was saved, so the guest's name, the pickup time and the lockbox code were all typed in by hand on every trip.
+
+- **Placeholders.** Templates can now contain `{{guest_first_name}}`, `{{guest}}`, `{{car}}`, `{{plate}}`, `{{pickup}}`, `{{return}}`, `{{pickup_location}}`, `{{return_location}}`, `{{reservation}}` and `{{pickup_code}}`. A row of buttons under the content field inserts them at the cursor. Copied from inside a conversation, the template comes out filled from that trip. Dates follow the template's own language: an English template reads "Tue, Oct 6, 10:00 AM", a Chinese one "10月6日 周二 10:00".
+- **Nothing blanked.** A placeholder that cannot be filled, such as a car with no code or a name TATO does not know, stays in the text exactly as written, and the template shows which ones need finishing after pasting.
+- **The right templates first.** Opened from a conversation, the car's own templates come first, then the general ones. Templates already sent in this conversation sink to the bottom with an "Already sent" tag. This is detected from the host's recorded replies by matching the template's longest fixed passage, ignoring spacing and punctuation. The editor starts folded there, so the list is the first thing on screen.
+- **Reachable on a phone.** A Templates button sits in the conversation's reply bar too. On a phone the list, and the button above it, are hidden while a conversation is open.
+
+
 ## v1.33.0 - 2026-10-05
 
 ### The assistant points out idle cars, pickups missing something, and money nobody is collecting

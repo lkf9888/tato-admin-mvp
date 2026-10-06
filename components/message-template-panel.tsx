@@ -7,6 +7,13 @@ import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
 import { deleteMessageTemplateAction, saveMessageTemplateAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
+import {
+  PLACEHOLDER_KEYS,
+  PLACEHOLDER_LABELS,
+  renderTemplate,
+  templateAlreadySent,
+  type PlaceholderContext,
+} from "@/lib/message-placeholders";
 import { cn } from "@/lib/utils";
 
 export type MessageTemplateRow = {
@@ -15,6 +22,16 @@ export type MessageTemplateRow = {
   content: string;
   vehicleId: string | null;
   vehicleLabel: string | null;
+};
+
+/** The conversation the panel was opened from, when there is one. */
+export type MessageTemplateContext = {
+  /** "Guest · car", shown so it is clear whose details fill the template. */
+  title: string;
+  vehicleId: string | null;
+  values: PlaceholderContext;
+  /** What we have already said in this conversation. */
+  sentMessages: string[];
 };
 
 export type MessageTemplateVehicleOption = {
@@ -55,6 +72,12 @@ function copy(locale: Locale) {
         deleting: "删除中…",
         deleteConfirm: "确认删除这个模板吗？",
         validationError: "请填写标题和内容。",
+        contextFor: (title: string) => `正在回复 ${title}：复制时会按这个会话填好变量。`,
+        sentTag: "已发过",
+        missingVars: (list: string) => `${list} 没填上，复制后请手动补。`,
+        insertVar: "插入变量：",
+        thisCarGroup: "这台车专属",
+        newTemplate: "+ 新建模板",
       }
     : {
         title: "Message template settings",
@@ -86,6 +109,12 @@ function copy(locale: Locale) {
         deleting: "Deleting…",
         deleteConfirm: "Delete this template?",
         validationError: "Title and content are both required.",
+        contextFor: (title: string) => `Replying to ${title}: copying fills the placeholders from this conversation.`,
+        sentTag: "Already sent",
+        missingVars: (list: string) => `${list} could not be filled; complete it after pasting.`,
+        insertVar: "Insert:",
+        thisCarGroup: "For this car",
+        newTemplate: "+ New template",
       };
 }
 
@@ -122,13 +151,58 @@ export function MessageTemplatePanel({
   templates,
   vehicleOptions,
   onClose,
+  context = null,
 }: {
   locale: Locale;
   templates: MessageTemplateRow[];
   vehicleOptions: MessageTemplateVehicleOption[];
   onClose: () => void;
+  /** Present when opened from a conversation: placeholders are filled
+   *  from it, its car's templates come first, and what was already
+   *  sent in it sinks to the bottom. */
+  context?: MessageTemplateContext | null;
 }) {
   const t = copy(locale);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+  // In a conversation the point is to copy one, so the editor starts
+  // folded and the list is the first thing on screen.
+  const [editorOpen, setEditorOpen] = useState(!context);
+  const placeholderLabel = (key: string) =>
+    PLACEHOLDER_LABELS[key as keyof typeof PLACEHOLDER_LABELS]?.[locale === "en" ? "en" : "zh"] ?? key;
+
+  function rendered(template: MessageTemplateRow) {
+    return context ? renderTemplate(template.content, context.values) : { text: template.content, missing: [] };
+  }
+  const sentIds = useMemo(
+    () =>
+      new Set(
+        context
+          ? templates
+              .filter((template) => templateAlreadySent(template.content, context.sentMessages))
+              .map((template) => template.id)
+          : [],
+      ),
+    [templates, context],
+  );
+  // Not yet sent first, keeping the saved order otherwise.
+  const bySentLast = (rows: MessageTemplateRow[]) =>
+    [...rows].sort((a, b) => Number(sentIds.has(a.id)) - Number(sentIds.has(b.id)));
+
+  function insertPlaceholder(key: string) {
+    const token = `{{${key}}}`;
+    const element = contentRef.current;
+    setForm((current) => {
+      const start = element?.selectionStart ?? current.content.length;
+      const end = element?.selectionEnd ?? current.content.length;
+      return { ...current, content: current.content.slice(0, start) + token + current.content.slice(end) };
+    });
+    requestAnimationFrame(() => {
+      if (!element) return;
+      element.focus();
+      const caret = (element.selectionStart ?? 0) + token.length;
+      element.setSelectionRange(caret, caret);
+    });
+  }
   const router = useRouter();
 
   const [form, setForm] = useState(emptyForm);
@@ -167,10 +241,15 @@ export function MessageTemplatePanel({
   // Grouped only when nothing is being searched for -- a filtered list
   // is already short enough to read flat, and empty groups either way
   // would be noise a manager has to scroll past.
-  const general = visibleTemplates.filter((template) => !template.vehicleId);
+  const general = bySentLast(visibleTemplates.filter((template) => !template.vehicleId));
+  // In a conversation, the car it is about gets its own group, first.
+  const thisCar = context?.vehicleId
+    ? bySentLast(visibleTemplates.filter((template) => template.vehicleId === context.vehicleId))
+    : [];
   const byVehicle = new Map<string, { label: string; rows: MessageTemplateRow[] }>();
   for (const template of visibleTemplates) {
     if (!template.vehicleId) continue;
+    if (context?.vehicleId && template.vehicleId === context.vehicleId) continue;
     const key = template.vehicleId;
     if (!byVehicle.has(key)) byVehicle.set(key, { label: template.vehicleLabel ?? "", rows: [] });
     byVehicle.get(key)!.rows.push(template);
@@ -178,6 +257,7 @@ export function MessageTemplatePanel({
   const vehicleGroups = [...byVehicle.values()].sort((a, b) => a.label.localeCompare(b.label));
 
   function startEdit(template: MessageTemplateRow) {
+    setEditorOpen(true);
     setForm({
       id: template.id,
       label: template.label,
@@ -236,7 +316,7 @@ export function MessageTemplatePanel({
   async function handleCopy(template: MessageTemplateRow) {
     if (flashTimer.current) clearTimeout(flashTimer.current);
     try {
-      await navigator.clipboard.writeText(template.content);
+      await navigator.clipboard.writeText(rendered(template).text);
       setCopyFailedId(null);
       setCopiedId(template.id);
       flashTimer.current = setTimeout(() => setCopiedId(null), 1800);
@@ -248,6 +328,8 @@ export function MessageTemplatePanel({
   }
 
   function renderRow(template: MessageTemplateRow) {
+    const { text, missing } = rendered(template);
+    const sent = sentIds.has(template.id);
     return (
       <li
         key={template.id}
@@ -255,8 +337,13 @@ export function MessageTemplatePanel({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
-              {highlight(template.label, normalizedSearch)}
+            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] font-semibold text-[var(--ink)]">
+              <span className="break-words">{highlight(template.label, normalizedSearch)}</span>
+              {sent ? (
+                <span className="shrink-0 rounded-full bg-[var(--surface-muted)] px-1.5 py-px text-[10px] font-semibold text-[var(--ink-soft)]">
+                  {t.sentTag}
+                </span>
+              ) : null}
             </p>
             {template.vehicleLabel ? (
               <span className="mt-0.5 inline-block rounded-full border border-[var(--line)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-soft)]">
@@ -304,9 +391,19 @@ export function MessageTemplatePanel({
             </button>
           </div>
         </div>
-        <p className="mt-1.5 whitespace-pre-wrap text-[12px] leading-5 text-[var(--ink-mid)]">
-          {highlight(template.content, normalizedSearch)}
+        <p
+          className={cn(
+            "mt-1.5 whitespace-pre-wrap text-[12px] leading-5",
+            sent ? "text-[var(--ink-soft)]" : "text-[var(--ink-mid)]",
+          )}
+        >
+          {highlight(text, normalizedSearch)}
         </p>
+        {context && missing.length > 0 ? (
+          <p className="mt-1 text-[11px] text-amber-700">
+            {t.missingVars(missing.map((key) => `{{${key}}}`).join("、"))}
+          </p>
+        ) : null}
         {copyFailedId === template.id ? (
           <p className="mt-1 text-[11px] text-rose-600">{t.copyFailed}</p>
         ) : null}
@@ -330,7 +427,9 @@ export function MessageTemplatePanel({
             <h3 className="truncate font-serif text-[1.1rem] font-semibold text-[var(--ink)]">
               {t.title}
             </h3>
-            <p className="mt-1 text-[11.5px] leading-4 text-[var(--ink-soft)]">{t.intro}</p>
+            <p className="mt-1 text-[11.5px] leading-4 text-[var(--ink-soft)]">
+              {context ? t.contextFor(context.title) : t.intro}
+            </p>
           </div>
           <button
             type="button"
@@ -343,6 +442,15 @@ export function MessageTemplatePanel({
         </div>
 
         <div className="space-y-4 px-4 py-4">
+          {!editorOpen ? (
+            <button
+              type="button"
+              onClick={() => setEditorOpen(true)}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-dashed border-[var(--line-strong)] bg-white px-3.5 text-[12px] font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)]"
+            >
+              {t.newTemplate}
+            </button>
+          ) : (
           <form
             onSubmit={handleSubmit}
             className="space-y-2.5 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)]/50 p-3"
@@ -379,6 +487,7 @@ export function MessageTemplatePanel({
                 {t.contentField}
               </span>
               <textarea
+                ref={contentRef}
                 value={form.content}
                 onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))}
                 placeholder={t.contentPlaceholder}
@@ -386,6 +495,22 @@ export function MessageTemplatePanel({
                 className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-[13px] leading-5 outline-none focus:border-[rgba(17,19,24,0.28)]"
               />
             </label>
+            {/* Placeholders fill from the conversation the template is
+                copied in: a guest's name, the pickup time, the code. */}
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-[11px] text-[var(--ink-soft)]">{t.insertVar}</span>
+              {PLACEHOLDER_KEYS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => insertPlaceholder(key)}
+                  title={`{{${key}}}`}
+                  className="tap-compact rounded-full border border-[var(--line)] bg-white px-2 py-0.5 text-[11px] font-medium text-[var(--ink-mid)] transition hover:border-[rgba(17,19,24,0.22)] hover:text-[var(--ink)]"
+                >
+                  {placeholderLabel(key)}
+                </button>
+              ))}
+            </div>
 
             {error ? <p className="text-[12px] text-rose-600">{error}</p> : null}
 
@@ -409,6 +534,7 @@ export function MessageTemplatePanel({
               ) : null}
             </div>
           </form>
+          )}
 
           <div>
             <input
@@ -429,9 +555,17 @@ export function MessageTemplatePanel({
               {templates.length === 0 ? t.empty : t.emptySearch}
             </p>
           ) : normalizedSearch ? (
-            <ul className="space-y-2">{visibleTemplates.map(renderRow)}</ul>
+            <ul className="space-y-2">{bySentLast(visibleTemplates).map(renderRow)}</ul>
           ) : (
             <div className="space-y-4">
+              {thisCar.length > 0 ? (
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
+                    {t.thisCarGroup}
+                  </p>
+                  <ul className="mt-1.5 space-y-2">{thisCar.map(renderRow)}</ul>
+                </div>
+              ) : null}
               {general.length > 0 ? (
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
@@ -445,7 +579,7 @@ export function MessageTemplatePanel({
                   <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
                     {t.vehicleGroup(group.label)}
                   </p>
-                  <ul className="mt-1.5 space-y-2">{group.rows.map(renderRow)}</ul>
+                  <ul className="mt-1.5 space-y-2">{bySentLast(group.rows).map(renderRow)}</ul>
                 </div>
               ))}
             </div>

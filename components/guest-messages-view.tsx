@@ -8,6 +8,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import { GuestMessageAlertPanel } from "@/components/guest-message-alert-panel";
 import {
   MessageTemplatePanel,
+  type MessageTemplateContext,
   type MessageTemplateRow,
   type MessageTemplateVehicleOption,
 } from "@/components/message-template-panel";
@@ -77,6 +78,8 @@ type Order = {
   /** turo.com's page for this reservation's messages. A plain https
    *  link, which a phone with the Turo app opens in the app. */
   turoMessagesUrl?: string | null;
+  vehicleName?: string | null;
+  pickupCode?: string | null;
 };
 
 type Copy = ReturnType<typeof getMessages>["guestMessagesPage"];
@@ -505,6 +508,29 @@ export function GuestMessagesView({
     }
   }
 
+  // Opened from a conversation, templates fill in from it and know what
+  // was already said in it.
+  const templateContext: MessageTemplateContext | null = selected
+    ? {
+        title: [selected.guestName, selected.vehiclePlate ?? selected.vehicleLabel].filter(Boolean).join(" · "),
+        vehicleId: selected.vehicleId,
+        values: {
+          guest: order?.renterName ?? selected.guestName,
+          car: order?.vehicleName ?? selected.vehicleLabel,
+          plate: order?.plateNumber ?? selected.vehiclePlate,
+          pickup: order?.pickupDatetime ?? null,
+          return: order?.returnDatetime ?? null,
+          pickupLocation: order?.pickupLocation ?? null,
+          returnLocation: order?.returnLocation ?? null,
+          reservation: order?.externalOrderId ?? null,
+          pickupCode: order?.pickupCode ?? null,
+        },
+        sentMessages: conversation
+          .filter((message) => message.direction === "outbound")
+          .map((message) => message.body),
+      }
+    : null;
+
   const templatesPanel = (
     <>
       {templatesOpen ? (
@@ -513,6 +539,7 @@ export function GuestMessagesView({
           templates={messageTemplates}
           vehicleOptions={templateVehicleOptions}
           onClose={() => setTemplatesOpen(false)}
+          context={templateContext}
         />
       ) : null}
       {alertsOpen ? <GuestMessageAlertPanel locale={locale} onClose={() => setAlertsOpen(false)} /> : null}
@@ -536,7 +563,12 @@ export function GuestMessagesView({
   const stage = tripStage(order, t);
   const hasComposer = Boolean(
     selected &&
-      (draft !== undefined || draftError || (latestEmail && canDraft) || selected.openCount > 0 || !turoUrl),
+      (draft !== undefined ||
+        draftError ||
+        (latestEmail && canDraft) ||
+        selected.openCount > 0 ||
+        !turoUrl ||
+        messageTemplates.length > 0),
   );
 
   // One stream, oldest first. The recorded conversation when there is
@@ -961,6 +993,19 @@ export function GuestMessagesView({
               {draftError ? <p className="text-[12px] text-rose-600">{draftError}</p> : null}
 
               <div className="flex flex-wrap items-center gap-2">
+                {/* Here as well as above the list: on a phone the list is
+                    hidden while a conversation is open, and this is
+                    where a template is wanted -- filled for this guest. */}
+                {messageTemplates.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setTemplatesOpen(true)}
+                    className="tap-press flex h-9 items-center gap-1.5 rounded-full border border-[var(--line)] px-3.5 text-[13px] font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)]"
+                  >
+                    <LayoutTemplate className="h-4 w-4" aria-hidden />
+                    {t.templatesShort}
+                  </button>
+                ) : null}
                 {draft !== undefined && latestEmail ? (
                   <button
                     type="button"

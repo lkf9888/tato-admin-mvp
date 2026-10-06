@@ -257,7 +257,7 @@ export default async function GuestMessagesPage() {
           sourceMetadata: true,
           source: true,
           importBatchId: true,
-          vehicle: { select: { brand: true, model: true, year: true, plateNumber: true } },
+          vehicle: { select: { brand: true, model: true, year: true, plateNumber: true, pickupPassword: true } },
         },
       })
     : [];
@@ -372,6 +372,10 @@ export default async function GuestMessagesPage() {
               ? `${order.vehicle.year} ${order.vehicle.brand} ${order.vehicle.model} · ${order.vehicle.plateNumber}`
               : null,
             turoMessagesUrl: turoReservationUrl(order, "messages"),
+            // For message templates' {{car}} and {{pickup_code}}. The
+            // code is the operator's own, on an admin-only page.
+            vehicleName: order.vehicle ? `${order.vehicle.brand} ${order.vehicle.model} ${order.vehicle.year}` : null,
+            pickupCode: order.vehicle?.pickupPassword ?? null,
           };
         })}
       />

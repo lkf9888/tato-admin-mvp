@@ -242,8 +242,16 @@ export function SiteShell({
             </p>
           </div>
         ) : null}
-        <div className="mx-auto max-w-6xl px-4 pb-10 pt-6 text-[12px] text-[var(--ink-soft)] sm:px-6">
-          © {year} {site.brandName}. {copy.rightsReserved}
+        <div className="mx-auto flex max-w-6xl flex-wrap gap-x-4 gap-y-1 px-4 pb-10 pt-6 text-[12px] text-[var(--ink-soft)] sm:px-6">
+          <span>
+            © {year} {site.brandName}. {copy.rightsReserved}
+          </span>
+          <Link href={siteHref(site, locale, "/legal/terms")} className="hover:text-[var(--brand)]">
+            {messages.legal.termsLink}
+          </Link>
+          <Link href={siteHref(site, locale, "/legal/privacy")} className="hover:text-[var(--brand)]">
+            {messages.legal.privacyLink}
+          </Link>
         </div>
       </footer>
     </div>

@@ -4,6 +4,26 @@
  */
 export const bookingMessages = {
   en: {
+    cancellationPolicies: {
+      label: "Cancellation policy",
+      flexible: {
+        name: "Flexible",
+        summary: "Free cancellation up to 24 hours before pick-up. After that, one day's rent is kept.",
+      },
+      moderate: {
+        name: "Moderate",
+        summary: "Free cancellation up to 48 hours before pick-up. After that, one day's rent is kept.",
+      },
+      firm: {
+        name: "Firm",
+        summary: "Free cancellation up to 7 days before pick-up. After that, half the rent is kept.",
+      },
+      strict: {
+        name: "Strict",
+        summary: "Free cancellation up to 14 days before pick-up. After that, the rent is not refunded.",
+      },
+      depositNote: "The deposit is always returned in full.",
+    },
     bookingPage: {
       notFoundTitle: "Booking not found",
       notFoundCopy:
@@ -33,7 +53,7 @@ export const bookingMessages = {
       cancelFreeCopy: (amount: string) =>
         `Cancelling now refunds ${amount} in full.`,
       cancelLateCopy: (refund: string, penalty: string) =>
-        `Pick-up is less than 48 hours away, so one day's rent (${penalty}) is kept. You would be refunded ${refund}.`,
+        `The free-cancellation deadline has passed, so ${penalty} of the rent is kept under the cancellation policy. You would be refunded ${refund}.`,
       cancelStartedCopy:
         "This booking has already started, so it cannot be cancelled here. Contact the host.",
       cancelAction: "Request cancellation",
@@ -50,7 +70,7 @@ export const bookingMessages = {
       reschedulePriceSame: "The new dates cost the same as your booking; nothing more to pay.",
       reschedulePriceMore: (amount: string) => `The new dates cost ${amount} more. Once the host approves, the difference is charged to the card you booked with (or you are sent a payment link).`,
       reschedulePriceLess: (amount: string) => `The new dates cost ${amount} less. Once the host approves, the difference is refunded to your card.`,
-      reschedulePriceLessLate: (amount: string) => `The new dates cost ${amount} less, but you are within 48 hours of your original pick-up, so under the cancellation policy the shortened part is not refunded.`,
+      reschedulePriceLessLate: (amount: string) => `The new dates cost ${amount} less, but the free-cancellation deadline for your original pick-up has passed, so under the cancellation policy the shortened part is not refunded.`,
       rescheduleTooSoon: "That pick-up is too soon. Choose a later time.",
       rescheduleUnavailable: "The car is already booked for those dates. Try a different range.",
       noteLabel: "Anything the host should know",
@@ -87,7 +107,7 @@ export const bookingMessages = {
       quotedRefundLabel: "Refund under policy",
       differenceCharge: (amount: string) => `New dates cost ${amount} more: approving charges the renter's saved card (or emails a payment link).`,
       differenceRefund: (amount: string) => `New dates cost ${amount} less: approving refunds it to the renter's card.`,
-      differenceNone: "No price difference to settle (same price, or a cheaper change asked for inside 48 hours).",
+      differenceNone: "No price difference to settle (same price, or a cheaper change asked for after the free-cancellation deadline).",
       settleFailed: (error: string) =>
         `The trip has been moved, but the price difference could not be settled (${error}). Bill it from the order's extra-days panel, or refund it in Stripe.`,
       approveAction: "Approve",
@@ -100,6 +120,26 @@ export const bookingMessages = {
     },
   },
   zh: {
+    cancellationPolicies: {
+      label: "取消政策",
+      flexible: {
+        name: "宽松",
+        summary: "取车前 24 小时以上取消，全额退款；之后取消扣一天租金。",
+      },
+      moderate: {
+        name: "适中",
+        summary: "取车前 48 小时以上取消，全额退款；之后取消扣一天租金。",
+      },
+      firm: {
+        name: "较严",
+        summary: "取车前 7 天以上取消，全额退款；之后取消扣一半租金。",
+      },
+      strict: {
+        name: "严格",
+        summary: "取车前 14 天以上取消，全额退款；之后取消，租金不退。",
+      },
+      depositNote: "押金始终全额退还。",
+    },
     bookingPage: {
       notFoundTitle: "找不到这个预订",
       notFoundCopy: "这个链接已失效。如果你还留着确认邮件，请核对地址，或者直接联系车主。",
@@ -127,7 +167,7 @@ export const bookingMessages = {
       cancelHeading: "取消这个预订",
       cancelFreeCopy: (amount: string) => `现在取消可全额退还 ${amount}。`,
       cancelLateCopy: (refund: string, penalty: string) =>
-        `距取车不到 48 小时，需扣一天租金（${penalty}），可退还 ${refund}。`,
+        `已过免费取消期限，按取消政策需扣租金 ${penalty}，可退还 ${refund}。`,
       cancelStartedCopy: "这个预订已经开始，无法在此取消，请联系车主。",
       cancelAction: "申请取消",
       cancelConfirm: "确定吗？系统会向车主提交取消申请。",
@@ -143,7 +183,7 @@ export const bookingMessages = {
       reschedulePriceSame: "新日期的价格和原订单一样，不需要补差价。",
       reschedulePriceMore: (amount: string) => `新日期比原订单贵 ${amount}。车主批准后，差价会从你下单时的卡上扣除（或发付款链接给你）。`,
       reschedulePriceLess: (amount: string) => `新日期比原订单便宜 ${amount}。车主批准后，差价会退回你的卡上。`,
-      reschedulePriceLessLate: (amount: string) => `新日期比原订单便宜 ${amount}，但距原定取车不足 48 小时，按取消政策，缩短的部分不退款。`,
+      reschedulePriceLessLate: (amount: string) => `新日期比原订单便宜 ${amount}，但已过原订单的免费取消期限，按取消政策，缩短的部分不退款。`,
       rescheduleTooSoon: "新的取车时间离现在太近了，请选得晚一些。",
       rescheduleUnavailable: "该时段这辆车已被预订，请换一个时间。",
       noteLabel: "想让车主知道的事",
@@ -178,7 +218,7 @@ export const bookingMessages = {
       quotedRefundLabel: "按政策应退",
       differenceCharge: (amount: string) => `新日期贵 ${amount}：批准后会从租客保存的卡上补扣（或发付款链接）。`,
       differenceRefund: (amount: string) => `新日期便宜 ${amount}：批准后会退回租客的卡上。`,
-      differenceNone: "没有差价需要结算（价格相同，或 48 小时内申请的缩短不退）。",
+      differenceNone: "没有差价需要结算（价格相同，或过了免费取消期限才申请的缩短不退）。",
       settleFailed: (error: string) => `行程已改期，但差价没能结算（${error}）。请在订单的"补收天数"里补收，或到 Stripe 手动退款。`,
       approveAction: "同意",
       declineAction: "拒绝",

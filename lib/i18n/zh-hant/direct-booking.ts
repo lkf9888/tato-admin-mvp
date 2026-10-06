@@ -45,7 +45,7 @@ export const directBookingMessages = {
           outcome === "free"
             ? `在免費取消期內：按政策退 ${policy}。`
             : outcome === "late"
-              ? `距取車不足 48 小時：按政策退 ${policy}（扣一天租金）。`
+              ? `已過免費取消期限：按政策退 ${policy}。`
               : "行程已開始：按政策不退款。"
         }`,
       policy: (amount: string) => `按政策退款（${amount}）`,
@@ -352,6 +352,8 @@ export const directBookingMessages = {
       policyNoticeHint: "取車時間至少要在下單後多少小時。0 表示隨時可訂。",
       policyBufferLabel: "兩單之間的緩衝（小時）",
       policyBufferHint: "每單取車前和還車後留出的空檔，用於清潔和交接；新的預訂不能落在這段時間裡。",
+      policyCancellationLabel: "取消政策",
+      policyCancellationHint: "顯示在預訂頁上；決定取消時退多少，以及縮短行程能否退差價。押金始終全額退還。",
       policyGraceLabel: "還車寬限（分鐘）",
       policyGraceHint: "每滿 24 小時算 1 天；超出不到這個時長不多收一天。例如 60：10 點取、第二天 11 點前還仍算 1 天。",
       policyInsuranceNonLocalLabel: "非 BC 駕照保險 / 天",

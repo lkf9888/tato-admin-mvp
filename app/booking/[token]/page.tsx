@@ -12,6 +12,7 @@ import {
   loadBookingByToken,
   quoteCancellation,
 } from "@/lib/booking-access";
+import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getAppUrl } from "@/lib/stripe";
@@ -73,7 +74,11 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
     ? await prisma.rentalSite.findUnique({ where: { workspaceId: order.workspaceId } })
     : null;
   const amounts = getAmountsPaid(order);
-  const quote = await quoteCancellation(order);
+  const [quote, policy] = await Promise.all([
+    quoteCancellation(order),
+    getBookingPolicyForVehicle(order.vehicle),
+  ]);
+  const cancellationTerms = messages.cancellationPolicies;
   const openRequest = getOpenRequest(order);
   const lastResolved = order.changeRequests.find(
     (request) => request.status === BookingRequestStatus.DECLINED,
@@ -96,7 +101,9 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
         : { href: `${getAppUrl().replace(/\/$/, "")}/sign/${signer.token}`, signed: false }
       : null;
 
-  const cancelCopy =
+  // The policy they booked under first, then what it means today.
+  const policyLine = `${cancellationTerms.label} · ${cancellationTerms[policy.cancellationPolicy].name}: ${cancellationTerms[policy.cancellationPolicy].summary}`;
+  const outcomeCopy =
     quote.outcome === "free"
       ? copy.cancelFreeCopy(formatCurrency(quote.refundAmount, locale))
       : quote.outcome === "late"
@@ -105,6 +112,7 @@ export default async function RenterBookingPage({ params }: { params: Params }) 
             formatCurrency(quote.penaltyAmount, locale),
           )
         : copy.cancelStartedCopy;
+  const cancelCopy = `${policyLine} ${outcomeCopy}`;
 
   const body = (
     <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">

@@ -2,6 +2,26 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const bookingMessages = {
+    cancellationPolicies: {
+      label: "取消政策",
+      flexible: {
+        name: "寬鬆",
+        summary: "取車前 24 小時以上取消，全額退款；之後取消扣一天租金。",
+      },
+      moderate: {
+        name: "適中",
+        summary: "取車前 48 小時以上取消，全額退款；之後取消扣一天租金。",
+      },
+      firm: {
+        name: "較嚴",
+        summary: "取車前 7 天以上取消，全額退款；之後取消扣一半租金。",
+      },
+      strict: {
+        name: "嚴格",
+        summary: "取車前 14 天以上取消，全額退款；之後取消，租金不退。",
+      },
+      depositNote: "押金始終全額退還。",
+    },
     bookingPage: {
       notFoundTitle: "找不到這個預訂",
       notFoundCopy: "這個連結已失效。如果你還留著確認郵件，請核對地址，或者直接聯絡車主。",
@@ -29,7 +49,7 @@ export const bookingMessages = {
       cancelHeading: "取消這個預訂",
       cancelFreeCopy: (amount: string) => `現在取消可全額退還 ${amount}。`,
       cancelLateCopy: (refund: string, penalty: string) =>
-        `距取車不到 48 小時，需扣一天租金（${penalty}），可退還 ${refund}。`,
+        `已過免費取消期限，按取消政策需扣租金 ${penalty}，可退還 ${refund}。`,
       cancelStartedCopy: "這個預訂已經開始，無法在此取消，請聯絡車主。",
       cancelAction: "申請取消",
       cancelConfirm: "確定嗎？系統會向車主提交取消申請。",
@@ -45,7 +65,7 @@ export const bookingMessages = {
       reschedulePriceSame: "新日期的價格和原訂單一樣，不需要補差價。",
       reschedulePriceMore: (amount: string) => `新日期比原訂單貴 ${amount}。車主批准後，差價會從你下單時的卡上扣除（或發付款連結給你）。`,
       reschedulePriceLess: (amount: string) => `新日期比原訂單便宜 ${amount}。車主批准後，差價會退回你的卡上。`,
-      reschedulePriceLessLate: (amount: string) => `新日期比原訂單便宜 ${amount}，但距原定取車不足 48 小時，按取消政策，縮短的部分不退款。`,
+      reschedulePriceLessLate: (amount: string) => `新日期比原訂單便宜 ${amount}，但已過原訂單的免費取消期限，按取消政策，縮短的部分不退款。`,
       rescheduleTooSoon: "新的取車時間離現在太近了，請選得晚一些。",
       rescheduleUnavailable: "該時段這輛車已被預訂，請換一個時間。",
       noteLabel: "想讓車主知道的事",
@@ -80,7 +100,7 @@ export const bookingMessages = {
       quotedRefundLabel: "按政策應退",
       differenceCharge: (amount: string) => `新日期貴 ${amount}：批准後會從租客儲存的卡上補釦（或發付款連結）。`,
       differenceRefund: (amount: string) => `新日期便宜 ${amount}：批准後會退回租客的卡上。`,
-      differenceNone: "沒有差價需要結算（價格相同，或 48 小時內申請的縮短不退）。",
+      differenceNone: "沒有差價需要結算（價格相同，或過了免費取消期限才申請的縮短不退）。",
       settleFailed: (error: string) => `行程已改期，但差價沒能結算（${error}）。請在訂單的"補收天數"裡補收，或到 Stripe 手動退款。`,
       approveAction: "同意",
       declineAction: "拒絕",

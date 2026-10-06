@@ -17,6 +17,12 @@
  * must resolve exactly what the server will bill from.
  */
 
+import {
+  DEFAULT_CANCELLATION_POLICY,
+  isCancellationPolicyKey,
+  type CancellationPolicyKey,
+} from "@/lib/booking-changes";
+
 /** The number of days at which the weekly rate starts applying. */
 export const WEEKLY_DISCOUNT_MIN_DAYS = 7;
 
@@ -54,6 +60,8 @@ export type BookingPolicy = {
   bookingNoticeHours: number;
   /** Hours kept clear before and after every trip. */
   turnaroundBufferHours: number;
+  /** What cancelling (and shortening) costs, by deadline. */
+  cancellationPolicy: CancellationPolicyKey;
 };
 
 export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
@@ -74,6 +82,7 @@ export const BOOKING_POLICY_DEFAULTS: BookingPolicy = {
   returnGraceMinutes: 60,
   bookingNoticeHours: 0,
   turnaroundBufferHours: 0,
+  cancellationPolicy: DEFAULT_CANCELLATION_POLICY,
 };
 
 type NullablePolicy = {
@@ -92,6 +101,7 @@ type NullablePolicy = {
   returnGraceMinutes?: number | null;
   bookingNoticeHours?: number | null;
   turnaroundBufferHours?: number | null;
+  cancellationPolicy?: string | null;
 };
 
 /**
@@ -170,6 +180,9 @@ export function normalizeBookingPolicy(policy?: NullablePolicy | null): BookingP
         roundCents(pick(policy?.turnaroundBufferHours, BOOKING_POLICY_DEFAULTS.turnaroundBufferHours)),
       ),
     ),
+    cancellationPolicy: isCancellationPolicyKey(policy?.cancellationPolicy)
+      ? policy.cancellationPolicy
+      : DEFAULT_CANCELLATION_POLICY,
     // Clamped well clear of zero: a multiplier of 0 would suggest
     // every car be rented for nothing, and it is far likelier to be a
     // half-typed number than an intention.
@@ -220,6 +233,7 @@ export function resolveBookingPolicy(
     returnGraceMinutes: fleet.returnGraceMinutes,
     bookingNoticeHours: fleet.bookingNoticeHours,
     turnaroundBufferHours: fleet.turnaroundBufferHours,
+    cancellationPolicy: fleet.cancellationPolicy,
   });
 }
 

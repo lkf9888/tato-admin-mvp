@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.30.0 - 2026-10-05
+
+### The operator chooses a cancellation policy; renters and operators get a privacy policy and terms
+
+**Cancellation policy.** A fleet setting with four named tiers
+(`CANCELLATION_POLICIES`, lib/booking-changes.ts): flexible (free until
+24 hours before pick-up, then a day's rent kept), moderate (48 hours,
+a day's rent -- the default, and what every booking ran under before),
+firm (7 days, then half the rent), strict (14 days, then no rent back).
+The deposit is always returned. One definition drives the refund quote,
+whether a shortened reschedule is refunded, and the line now shown above
+the pay button and on the renter's booking page. Copy that said "48
+hours" says "the free-cancellation deadline". New column
+`BookingPricingPolicy.cancellationPolicy` (default "moderate").
+
+**Legal pages.** `/legal/privacy` and `/legal/terms`. On a rental site
+(its domain or `/s/<slug>`, three languages) they are the renter's
+privacy policy and booking terms, filled from the site's brand, contact
+and address and its current booking rules; linked from the footer and
+from the booking panel ("By booking you agree to…"). On the platform
+host they are TATO's own, for operators, including Google's Limited Use
+statement for mailbox access; the entity, address, email, jurisdiction
+and effective date come from `LEGAL_*` environment variables, and the
+page says it is an unpublished draft until they are set. Every service
+named is one the code uses. Not reviewed by a lawyer.
+
 ## v1.29.1 - 2026-10-05
 
 ### Editing a contract template keeps the signatures already collected; contracts with Chinese in them finish

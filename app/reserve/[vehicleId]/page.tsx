@@ -302,6 +302,7 @@ export default async function ReserveVehiclePage({
             returnGraceMinutes={policy.returnGraceMinutes}
             bookingNoticeHours={policy.bookingNoticeHours}
             turnaroundBufferHours={policy.turnaroundBufferHours}
+            cancellationPolicy={policy.cancellationPolicy}
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}
             locations={locations}

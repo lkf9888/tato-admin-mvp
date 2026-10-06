@@ -1,7 +1,8 @@
 import "server-only";
 
 import { chargeOrder, priceTrip, readMetadata, type ExtraChargeResult } from "@/lib/booking-extra-charge";
-import { FREE_CANCELLATION_HOURS } from "@/lib/booking-changes";
+import { isPastFreeCancellation } from "@/lib/booking-changes";
+import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { logActivity } from "@/lib/orders";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { prisma } from "@/lib/prisma";
@@ -16,9 +17,9 @@ function roundMoney(value: number) {
  *
  * The difference between the trip as booked and as asked for, both at
  * today's prices. A dearer trip owes the difference. A cheaper one gets
- * it back when asked for at least 48 hours before the original pick-up,
- * as a free cancellation would; inside that window the shortened part
- * is kept, as a late cancellation keeps a day's rent.
+ * it back when asked before the cancellation policy's free deadline,
+ * as a free cancellation would; past it the shortened part is kept, as
+ * a late cancellation keeps rent.
  */
 export async function quoteReschedule(input: {
   orderId: string;
@@ -32,12 +33,13 @@ export async function quoteReschedule(input: {
   });
   if (!order.vehicle) throw new Error("Order has no vehicle.");
   const now = input.now ?? new Date();
-  const [current, next] = await Promise.all([
+  const [current, next, policy] = await Promise.all([
     priceTrip({ sourceMetadata: order.sourceMetadata, vehicle: order.vehicle }, order.pickupDatetime, order.returnDatetime),
     priceTrip({ sourceMetadata: order.sourceMetadata, vehicle: order.vehicle }, input.pickupAt, input.returnAt),
+    getBookingPolicyForVehicle(order.vehicle),
   ]);
   const difference = roundMoney(next.total - current.total);
-  const late = order.pickupDatetime.getTime() - now.getTime() < FREE_CANCELLATION_HOURS * 3_600_000;
+  const late = isPastFreeCancellation(policy.cancellationPolicy, order.pickupDatetime, now);
   const settlement = difference > 0 ? difference : late ? 0 : difference;
   return {
     difference,

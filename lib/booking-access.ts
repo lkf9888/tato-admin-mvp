@@ -92,7 +92,7 @@ export function getAmountsPaid(order: BookingForRenter) {
 }
 
 /**
- * The late-cancellation penalty is one day's rent, and a car may be
+ * The late-cancellation penalty can be one day's rent, and a car may be
  * priced by the income model rather than by hand -- so the rate is
  * resolved, not read off the column. Reading the column would quietly
  * make every AI-priced car free to cancel late.
@@ -114,6 +114,7 @@ export async function quoteCancellation(
     dailyRate: rate.dailyRate ?? 0,
     pickupDatetime: order.pickupDatetime,
     now,
+    policy: policy.cancellationPolicy,
   });
 }
 

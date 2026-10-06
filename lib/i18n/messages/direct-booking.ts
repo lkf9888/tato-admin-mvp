@@ -49,7 +49,7 @@ export const directBookingMessages = {
           outcome === "free"
             ? `Free cancellation window: the policy refunds ${policy}.`
             : outcome === "late"
-              ? `Within 48 hours of pickup: the policy refunds ${policy} (one day's rent kept).`
+              ? `Past the free-cancellation deadline: the policy refunds ${policy}.`
               : "The trip has started: the policy refunds nothing."
         }`,
       policy: (amount: string) => `Refund under the policy (${amount})`,
@@ -365,6 +365,8 @@ export const directBookingMessages = {
       policyNoticeHint: "How many hours ahead a pick-up must be. 0 takes bookings up to the last minute.",
       policyBufferLabel: "Buffer between trips (hours)",
       policyBufferHint: "Kept free before every pick-up and after every return for cleaning and handover; a new booking cannot start or end inside it.",
+      policyCancellationLabel: "Cancellation policy",
+      policyCancellationHint: "Shown on the booking page; decides what a cancellation refunds and whether a shortened trip gets money back. The deposit is always returned.",
       policyGraceLabel: "Return grace (minutes)",
       policyGraceHint: "Trips are charged per 24 hours; a return up to this late does not add a day. With 60, 10:00 to 11:00 next day is still one day.",
       policyInsuranceNonLocalLabel: "Insurance / day, non-BC licence",
@@ -510,7 +512,7 @@ export const directBookingMessages = {
           outcome === "free"
             ? `在免费取消期内：按政策退 ${policy}。`
             : outcome === "late"
-              ? `距取车不足 48 小时：按政策退 ${policy}（扣一天租金）。`
+              ? `已过免费取消期限：按政策退 ${policy}。`
               : "行程已开始：按政策不退款。"
         }`,
       policy: (amount: string) => `按政策退款（${amount}）`,
@@ -817,6 +819,8 @@ export const directBookingMessages = {
       policyNoticeHint: "取车时间至少要在下单后多少小时。0 表示随时可订。",
       policyBufferLabel: "两单之间的缓冲（小时）",
       policyBufferHint: "每单取车前和还车后留出的空档，用于清洁和交接；新的预订不能落在这段时间里。",
+      policyCancellationLabel: "取消政策",
+      policyCancellationHint: "显示在预订页上；决定取消时退多少，以及缩短行程能否退差价。押金始终全额退还。",
       policyGraceLabel: "还车宽限（分钟）",
       policyGraceHint: "每满 24 小时算 1 天；超出不到这个时长不多收一天。例如 60：10 点取、第二天 11 点前还仍算 1 天。",
       policyInsuranceNonLocalLabel: "非 BC 驾照保险 / 天",

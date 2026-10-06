@@ -2,10 +2,12 @@ import type { RentalSite } from "@prisma/client";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
+import { LegalDocumentView } from "@/components/legal-document";
 import { SiteHome } from "@/components/site-home";
 import { SiteShell } from "@/components/site-shell";
 import { SiteVehicleView } from "@/components/site-vehicle-view";
 import { getMessages } from "@/lib/i18n";
+import { getRenterLegalPage, type LegalDoc } from "@/lib/legal";
 import {
   buildVehicleSlug,
   getBookingDateDefaults,
@@ -246,5 +248,30 @@ export async function buildSiteVehicleMetadata(
       images,
     },
     twitter: { card: "summary_large_image", title, description, images },
+  };
+}
+
+/** The site's privacy policy or booking terms, in the site's own shell. */
+export async function renderSiteLegal(site: RentalSite, doc: LegalDoc, locale: SiteLocale) {
+  const messages = getMessages(locale);
+  const page = await getRenterLegalPage(site, doc, locale);
+  return (
+    <SiteShell site={getLocalizedSite(site, locale)} locale={locale} path={`/legal/${doc}`} messages={messages}>
+      <LegalDocumentView page={page} copy={messages.legal} translated={locale !== "en"} />
+    </SiteShell>
+  );
+}
+
+export async function buildSiteLegalMetadata(
+  site: RentalSite,
+  doc: LegalDoc,
+  locale: SiteLocale,
+): Promise<Metadata> {
+  const page = await getRenterLegalPage(site, doc, locale);
+  return {
+    title: `${page.document.title} · ${getLocalizedSite(site, locale).brandName}`,
+    alternates: buildAlternates(site, `/legal/${doc}`, locale),
+    // An unfinished draft is not something to be found by searching.
+    robots: page.draft ? { index: false } : undefined,
   };
 }

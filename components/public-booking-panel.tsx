@@ -32,6 +32,7 @@ import {
   utcToZonedDate,
   zonedDateTimeToUtc,
 } from "@/lib/booking-time";
+import { DEFAULT_CANCELLATION_POLICY, type CancellationPolicyKey } from "@/lib/booking-changes";
 import { getLocaleTag, getMessages, type Locale } from "@/lib/i18n";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -307,6 +308,8 @@ export function PublicBookingPanel({
   returnGraceMinutes,
   bookingNoticeHours = 0,
   turnaroundBufferHours = 0,
+  cancellationPolicy = DEFAULT_CANCELLATION_POLICY,
+  legalLinks,
   dailyRateOverrides,
   seasonalRates,
   locations,
@@ -342,6 +345,10 @@ export function PublicBookingPanel({
   bookingNoticeHours?: number;
   /** Hours kept clear before and after every other trip. */
   turnaroundBufferHours?: number;
+  /** Stated above the pay button, so it is read before paying. */
+  cancellationPolicy?: CancellationPolicyKey;
+  /** The operator's booking terms and privacy policy, on a site page. */
+  legalLinks?: { brand: string; terms: string; privacy: string };
   /** `YYYY-MM-DD` → price, for days the operator priced by hand. */
   dailyRateOverrides: Record<string, number>;
   /** Model pricing per day, empty when a person set the rate. */
@@ -1330,6 +1337,25 @@ export function PublicBookingPanel({
           </p>
         </div>
       </div>
+
+      <p className="mt-3 text-[11px] leading-4 text-[var(--ink-soft)] sm:mt-4 sm:text-xs sm:leading-5">
+        <span className="font-medium text-[var(--ink)]">
+          {messages.cancellationPolicies.label} · {messages.cancellationPolicies[cancellationPolicy].name}
+        </span>{" "}
+        {messages.cancellationPolicies[cancellationPolicy].summary} {messages.cancellationPolicies.depositNote}
+      </p>
+      {legalLinks ? (
+        <p className="mt-1.5 text-[11px] leading-4 text-[var(--ink-soft)] sm:text-xs sm:leading-5">
+          {messages.legal.bookingConsent(legalLinks.brand)}{" "}
+          <a href={legalLinks.terms} target="_blank" rel="noreferrer" className="underline">
+            {messages.legal.termsLink}
+          </a>
+          {" · "}
+          <a href={legalLinks.privacy} target="_blank" rel="noreferrer" className="underline">
+            {messages.legal.privacyLink}
+          </a>
+        </p>
+      ) : null}
 
       {error ? (
         <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">

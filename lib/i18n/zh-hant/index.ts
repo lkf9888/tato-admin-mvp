@@ -15,6 +15,7 @@ export * from "./imports";
 export * from "./inspections";
 export * from "./investment-ranking";
 export * from "./labels";
+export * from "./legal";
 export * from "./order-detail";
 export * from "./orders";
 export * from "./rental-estimate";

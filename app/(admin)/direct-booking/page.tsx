@@ -4,6 +4,7 @@ import { saveBookingPolicyAction } from "@/app/actions";
 import { listBookingLocations } from "@/lib/booking-locations";
 import { getRateSeasonality } from "@/lib/rental-estimate/rate-seasonality-server";
 import { normalizeBookingPolicy } from "@/lib/booking-policy";
+import { CANCELLATION_POLICY_KEYS } from "@/lib/booking-changes";
 import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { formatCurrency } from "@/lib/utils";
 import { BookingLocationsEditor } from "@/components/booking-locations-editor";
@@ -368,6 +369,25 @@ export default async function DirectBookingPage({
               {directMessages.policyTaxLinesHint}
             </span>
           </div>
+          <label className="block min-w-0 sm:col-span-2">
+            <span className="mb-1 block text-[11px] font-medium text-[color:var(--ink)]">
+              {directMessages.policyCancellationLabel}
+            </span>
+            <select
+              name="cancellationPolicy"
+              defaultValue={fleetPolicy.cancellationPolicy}
+              className="w-full rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px] font-medium text-[color:var(--ink)]"
+            >
+              {CANCELLATION_POLICY_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {messages.cancellationPolicies[key].name} · {messages.cancellationPolicies[key].summary}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-[11px] leading-4 text-[color:var(--ink-soft)]">
+              {directMessages.policyCancellationHint}
+            </span>
+          </label>
         </div>
 
         <StickySaveBar

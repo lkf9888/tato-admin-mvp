@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { findPublishedSiteBySlug, getSiteForCurrentRequest } from "@/lib/rental-site";
+import { isLegalDoc } from "@/lib/legal";
 import {
   buildSiteHomeMetadata,
+  buildSiteLegalMetadata,
   buildSiteVehicleMetadata,
   renderSiteHome,
+  renderSiteLegal,
   renderSiteVehicle,
   type SearchParams,
 } from "@/lib/rental-site-page";
@@ -28,6 +31,8 @@ import type { SiteLocale } from "@/lib/site-locale";
 type SlugParams = Promise<{ slug: string }>;
 type SlugVehicleParams = Promise<{ slug: string; vehicleSlug: string }>;
 type VehicleParams = Promise<{ vehicleSlug: string }>;
+type LegalParams = Promise<{ doc: string }>;
+type SlugLegalParams = Promise<{ slug: string; doc: string }>;
 type Query = Promise<SearchParams>;
 
 export function domainHomeRoute(locale: SiteLocale) {
@@ -94,6 +99,41 @@ export function slugVehicleRoute(locale: SiteLocale) {
       const site = await findPublishedSiteBySlug(slug);
       if (!site) notFound();
       return renderSiteVehicle(site, vehicleSlug, query, locale);
+    },
+  };
+}
+
+/**
+ * `/legal/privacy` and `/legal/terms` on a site's own domain. The
+ * English one on the platform host is TATO's own page instead, which
+ * `app/legal/[doc]` decides before it gets here.
+ */
+export function domainLegalRoute(locale: SiteLocale) {
+  return {
+    async generateMetadata({ params }: { params: LegalParams }): Promise<Metadata> {
+      const [site, { doc }] = await Promise.all([getSiteForCurrentRequest(), params]);
+      return site && isLegalDoc(doc) ? buildSiteLegalMetadata(site, doc, locale) : {};
+    },
+    async Page({ params }: { params: LegalParams }) {
+      const [site, { doc }] = await Promise.all([getSiteForCurrentRequest(), params]);
+      if (!site || !isLegalDoc(doc)) notFound();
+      return renderSiteLegal(site, doc, locale);
+    },
+  };
+}
+
+export function slugLegalRoute(locale: SiteLocale) {
+  return {
+    async generateMetadata({ params }: { params: SlugLegalParams }): Promise<Metadata> {
+      const { slug, doc } = await params;
+      const site = await findPublishedSiteBySlug(slug);
+      return site && isLegalDoc(doc) ? buildSiteLegalMetadata(site, doc, locale) : {};
+    },
+    async Page({ params }: { params: SlugLegalParams }) {
+      const { slug, doc } = await params;
+      const site = await findPublishedSiteBySlug(slug);
+      if (!site || !isLegalDoc(doc)) notFound();
+      return renderSiteLegal(site, doc, locale);
     },
   };
 }

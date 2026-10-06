@@ -30,6 +30,7 @@ import { directBookingMessages } from "@/lib/i18n/messages/direct-booking";
 import { fleetMessages } from "@/lib/i18n/messages/fleet";
 import { importsMessages } from "@/lib/i18n/messages/imports";
 import { inspectionsMessages } from "@/lib/i18n/messages/inspections";
+import { legalMessages } from "@/lib/i18n/messages/legal";
 import { investmentRankingMessages } from "@/lib/i18n/messages/investment-ranking";
 import { ordersMessages } from "@/lib/i18n/messages/orders";
 import { rentalEstimateMessages } from "@/lib/i18n/messages/rental-estimate";
@@ -199,6 +200,7 @@ const messages = {
     ...bookingMessages.en,
     ...calendarMessages.en,
     ...shareMessages.en,
+    ...legalMessages.en,
   },
   zh: {
     ...shellMessages.zh,
@@ -222,6 +224,7 @@ const messages = {
     ...bookingMessages.zh,
     ...calendarMessages.zh,
     ...shareMessages.zh,
+    ...legalMessages.zh,
   },
 } as const;
 
@@ -255,6 +258,7 @@ const traditionalMessages = {
   ...zhHant.bookingMessages,
   ...zhHant.calendarMessages,
   ...zhHant.shareMessages,
+  ...zhHant.legalMessages,
 } as unknown as Messages;
 
 // Cast through `unknown` because messages.en / messages.zh have different

@@ -2155,6 +2155,11 @@ model BookingPricingPolicy {
   /// Hours kept free before and after every trip for cleaning and
   /// handover; a booking may not start or end inside them.
   turnaroundBufferHours   Float   @default(0)
+  /// One of `CANCELLATION_POLICY_KEYS` (lib/booking-changes.ts):
+  /// flexible, moderate, firm, strict. Moderate (free until 48 hours
+  /// before pick-up, then a day's rent kept) is what every booking ran
+  /// under before this was a choice.
+  cancellationPolicy      String  @default("moderate")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

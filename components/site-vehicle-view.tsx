@@ -183,6 +183,11 @@ export function SiteVehicleView({
           <PublicBookingPanel
             locale={locale}
             vehicleId={vehicle.id}
+            legalLinks={{
+              brand: site.brandName,
+              terms: siteHref(site, locale, "/legal/terms"),
+              privacy: siteHref(site, locale, "/legal/privacy"),
+            }}
             bookingDailyRate={dailyRate}
             bookingInsuranceFee={policy.insuranceFee}
             bookingInsuranceFeeNonLocal={policy.insuranceFeeNonLocal}
@@ -195,6 +200,7 @@ export function SiteVehicleView({
             returnGraceMinutes={policy.returnGraceMinutes}
             bookingNoticeHours={policy.bookingNoticeHours}
             turnaroundBufferHours={policy.turnaroundBufferHours}
+            cancellationPolicy={policy.cancellationPolicy}
             dailyRateOverrides={dailyRateOverrides}
             seasonalRates={seasonalRates}
             locations={locations}

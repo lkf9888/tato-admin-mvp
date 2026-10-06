@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.36.0 - 2026-10-05
+
+### Scheduled guest messages: rules decide what is due, and a queue holds it ready to send
+
+The same messages go to every guest at the same points in a trip: pickup instructions the day before, a return reminder, a thank-you. TATO cannot write to Turo, so a scheduled message is not sent automatically. When it falls due it is put on a queue, already filled in for that trip, for a person to copy across.
+
+- **Rules.** The messages page has a Scheduled tab with a Rules button. A rule names a template and a point in the trip: after booking, before or after pickup, or before or after return, plus a number of hours. It can be limited to Turo trips, to offline and direct trips, or to one car. Rules can be switched off without deleting them.
+- **The queue.** Scheduled lists every message due now, or within the hour, with the template's placeholders filled from the trip. Each has Copy, a Turo button that opens the reservation's messages page, Sent, and Skip. Sent or skipped takes it off the list, and the text that was copied is kept as the record.
+- **What drops out.** Cancelled and deleted trips. A before-pickup message once the car has been picked up, and a before-return message once it is back. Anything missed by more than three days.
+- **An alert.** The assistant raises one alert while messages are waiting. It becomes a WARNING, and so reaches the email digest, once any message is two hours late.
+
+Sending direct-booking messages by email, rather than queueing them, comes next with the rental-site side.
+
+
 ## v1.35.0 - 2026-10-05
 
 ### The AI remembers standing instructions, and drafts guest replies the way this host answers

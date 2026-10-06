@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 
 import { formatBytes, getDiskUsage } from "@/lib/disk";
+import { listDueMessages } from "@/lib/message-rules";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -978,6 +979,35 @@ async function detectOverduePaymentsAndEndingSeries(workspaceId: string): Promis
   return drafts;
 }
 
+/** Past this, a due message counts as late and the alert reaches email. */
+const SCHEDULED_LATE_HOURS = 2;
+
+/**
+ * Scheduled guest messages waiting to be sent. The queue itself lives
+ * on the messages page; this makes sure it is not only seen by someone
+ * already looking there.
+ */
+async function detectDueScheduledMessages(workspaceId: string): Promise<AlertDraft[]> {
+  const due = await listDueMessages(workspaceId);
+  if (due.length === 0) return [];
+  const lateBefore = Date.now() - SCHEDULED_LATE_HOURS * 3_600_000;
+  const late = due.filter((item) => new Date(item.dueAt).getTime() < lateBefore).length;
+  const lines = due
+    .slice(0, 10)
+    .map((item) => `${item.renterName} · ${item.ruleName}（${formatDateTime(new Date(item.dueAt))}）`);
+  if (due.length > 10) lines.push(`…还有 ${due.length - 10} 条`);
+  lines.push("在消息页的「定时」里复制发送，再点「已发」或「跳过」。");
+  return [
+    {
+      dedupeKey: "scheduled_messages",
+      severity: late > 0 ? AssistantAlertSeverity.WARNING : AssistantAlertSeverity.INFO,
+      title: late > 0 ? `${due.length} 条定时消息该发了，其中 ${late} 条已过点` : `${due.length} 条定时消息该发了`,
+      body: lines.join("\n"),
+      href: "/messages",
+    },
+  ];
+}
+
 /**
  * Run every detector and reconcile the alert table against reality.
  *
@@ -1000,6 +1030,7 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
       detectIdleCars(workspaceId),
       detectPickupsMissingPrep(workspaceId),
       detectOverduePaymentsAndEndingSeries(workspaceId),
+      detectDueScheduledMessages(workspaceId),
       detectDiskPressure(),
     ])
   ).flat();

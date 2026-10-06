@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { GuestMessageAlertPanel } from "@/components/guest-message-alert-panel";
+import { MessageRulesPanel } from "@/components/message-rules-panel";
 import {
   MessageTemplatePanel,
   type MessageTemplateContext,
@@ -83,6 +84,19 @@ type Order = {
 };
 
 type Copy = ReturnType<typeof getMessages>["guestMessagesPage"];
+
+type DueMessage = {
+  ruleId: string;
+  ruleName: string;
+  orderId: string;
+  renterName: string;
+  vehicleLabel: string;
+  dueAt: string;
+  text: string;
+  missing: string[];
+  turoUrl: string | null;
+  overdue: boolean;
+};
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -255,7 +269,36 @@ export function GuestMessagesView({
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "open">("all");
+  const [filter, setFilter] = useState<"all" | "open" | "scheduled">("all");
+  const [rulesOpen, setRulesOpen] = useState(false);
+  // Scheduled messages due now; see lib/message-rules. Fetched rather
+  // than rendered with the page, because it changes as time passes.
+  const [due, setDue] = useState<DueMessage[] | null>(null);
+  const [dueBusy, setDueBusy] = useState<string | null>(null);
+  async function loadDue() {
+    try {
+      const response = await fetch("/api/messages/scheduled");
+      if (response.ok) setDue(((await response.json()) as { due: DueMessage[] }).due);
+    } catch {
+      // The queue is a convenience on this page; the threads still work.
+    }
+  }
+  useEffect(() => {
+    void loadDue();
+  }, []);
+  async function markDue(item: DueMessage, status: "sent" | "skipped") {
+    setDueBusy(`${item.ruleId}:${item.orderId}`);
+    try {
+      const response = await fetch("/api/messages/scheduled", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruleId: item.ruleId, orderId: item.orderId, status, text: item.text }),
+      });
+      if (response.ok) setDue(((await response.json()) as { due: DueMessage[] }).due);
+    } finally {
+      setDueBusy(null);
+    }
+  }
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [tripOpen, setTripOpen] = useState(false);
@@ -543,6 +586,15 @@ export function GuestMessagesView({
         />
       ) : null}
       {alertsOpen ? <GuestMessageAlertPanel locale={locale} onClose={() => setAlertsOpen(false)} /> : null}
+      {rulesOpen ? (
+        <MessageRulesPanel
+          locale={locale}
+          templates={messageTemplates}
+          vehicleOptions={templateVehicleOptions}
+          onClose={() => setRulesOpen(false)}
+          onChanged={() => void loadDue()}
+        />
+      ) : null}
     </>
   );
 
@@ -687,9 +739,10 @@ export function GuestMessagesView({
             </div>
 
             <div className="flex items-center gap-1.5" role="tablist">
-              {(["all", "open"] as const).map((value) => {
+              {(["all", "open", "scheduled"] as const).map((value) => {
                 const active = filter === value;
-                const count = value === "all" ? threads.length : openThreadCount;
+                const count =
+                  value === "all" ? threads.length : value === "open" ? openThreadCount : (due?.length ?? 0);
                 return (
                   <button
                     key={value}
@@ -703,7 +756,7 @@ export function GuestMessagesView({
                         : "bg-[var(--surface-muted)] text-[var(--ink-mid)] hover:text-[var(--ink)]"
                     }`}
                   >
-                    {value === "all" ? t.filterAll : t.filterOpen} {count}
+                    {value === "all" ? t.filterAll : value === "open" ? t.filterOpen : t.filterScheduled} {count}
                   </button>
                 );
               })}
@@ -715,7 +768,16 @@ export function GuestMessagesView({
             </div>
           </div>
 
-          {visibleThreads.length === 0 ? (
+          {filter === "scheduled" ? (
+            <ScheduledQueue
+              due={due}
+              busyKey={dueBusy}
+              t={t}
+              locale={locale}
+              onMark={markDue}
+              onOpenRules={() => setRulesOpen(true)}
+            />
+          ) : visibleThreads.length === 0 ? (
             <p className="px-4 py-10 text-center text-[13px] text-[var(--ink-soft)]">
               {filter === "open" && !normalizedSearch ? t.noOpen : t.searchCount(0)}
             </p>
@@ -1135,6 +1197,110 @@ function CarNotesEditor({ vehicleId, t }: { vehicleId: string; t: Copy }) {
         </button>
         {failed ? <span className="text-[12px] text-rose-600">{t.carNotesFailed}</span> : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Scheduled messages that have fallen due, each filled in for its trip:
+ * copy, send on Turo, mark sent -- or skip. Marking is what takes one
+ * off the list and keeps the record.
+ */
+function ScheduledQueue({
+  due,
+  busyKey,
+  t,
+  locale,
+  onMark,
+  onOpenRules,
+}: {
+  due: DueMessage[] | null;
+  busyKey: string | null;
+  t: Copy;
+  locale: Locale;
+  onMark: (item: DueMessage, status: "sent" | "skipped") => void;
+  onOpenRules: () => void;
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+  return (
+    <div className="min-h-0 flex-1 lg:overflow-y-auto">
+      <div className="flex items-center justify-between gap-2 px-3 py-2">
+        <p className="text-[12px] text-[var(--ink-soft)]">{t.scheduledIntro}</p>
+        <button
+          type="button"
+          onClick={onOpenRules}
+          className="tap-press shrink-0 rounded-full border border-[var(--line)] px-3 py-1 text-[12px] font-semibold text-[var(--ink-mid)] hover:bg-[var(--surface-muted)]"
+        >
+          {t.scheduledRules}
+        </button>
+      </div>
+      {due == null ? null : due.length === 0 ? (
+        <p className="px-4 py-10 text-center text-[13px] text-[var(--ink-soft)]">{t.scheduledEmpty}</p>
+      ) : (
+        <ul className="grid gap-2 px-3 pb-3">
+          {due.map((item) => {
+            const key = `${item.ruleId}:${item.orderId}`;
+            return (
+              <li key={key} className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                  <p className="text-[13.5px] font-semibold text-[var(--ink)]">
+                    {item.renterName} <span className="font-normal text-[var(--ink-soft)]">· {item.vehicleLabel}</span>
+                  </p>
+                  <span className={`text-[11.5px] tabular-nums ${item.overdue ? "font-semibold text-rose-600" : "text-[var(--ink-soft)]"}`}>
+                    {item.ruleName} · {formatWhen(item.dueAt, locale)}
+                  </span>
+                </div>
+                <p className="mt-1.5 whitespace-pre-wrap break-words rounded-md bg-[var(--surface-muted)] px-2.5 py-2 text-[13px] leading-5 text-[var(--ink)]">
+                  {item.text}
+                </p>
+                {item.missing.length > 0 ? (
+                  <p className="mt-1 text-[11.5px] text-amber-700">
+                    {t.scheduledMissing(item.missing.map((key) => `{{${key}}}`).join("、"))}
+                  </p>
+                ) : null}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(item.text).catch(() => null);
+                      setCopied(key);
+                    }}
+                    className="tap-press h-8 rounded-full bg-[var(--ink)] px-3.5 text-[12px] font-bold text-white hover:opacity-90"
+                  >
+                    {copied === key ? t.draftCopied : t.draftCopyButton}
+                  </button>
+                  {item.turoUrl ? (
+                    <a
+                      href={item.turoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tap-press flex h-8 items-center gap-1 rounded-full bg-[var(--brand)] px-3.5 text-[12px] font-bold text-white hover:opacity-90"
+                    >
+                      Turo <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => onMark(item, "sent")}
+                    disabled={busyKey === key}
+                    className="tap-press ml-auto h-8 rounded-full border border-[var(--line)] px-3.5 text-[12px] font-semibold text-[var(--ink)] hover:bg-[var(--surface-muted)] disabled:opacity-50"
+                  >
+                    {t.scheduledSent}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onMark(item, "skipped")}
+                    disabled={busyKey === key}
+                    className="tap-press h-8 rounded-full px-2.5 text-[12px] font-semibold text-[var(--ink-soft)] hover:text-[var(--ink)] disabled:opacity-50"
+                  >
+                    {t.scheduledSkip}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

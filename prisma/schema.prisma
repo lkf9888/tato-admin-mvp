@@ -2285,3 +2285,46 @@ model VehicleReplyKnowledge {
 
   @@index([workspaceId])
 }
+
+/// A guest message that goes out at a point in every trip: "send the
+/// pickup instructions 24 hours before pickup". Turo cannot be written
+/// to, so a due message is queued for a person to copy and send; the
+/// rule only decides what and when.
+model MessageRule {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  name          String
+  enabled       Boolean  @default(true)
+  /// The message, with its placeholders filled per trip.
+  templateId    String
+  /// booked | before_pickup | after_pickup | before_return | after_return
+  trigger       String
+  /// Hours from the trigger point; direction comes from the trigger.
+  offsetHours   Int      @default(0)
+  /// all | turo | offline
+  source        String   @default("all")
+  /// JSON array of vehicle ids, or null for every car.
+  vehicleIds    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+/// What happened to one rule on one trip: sent by a person, or skipped.
+/// Its existence is what takes the message off the queue.
+model MessageRuleSend {
+  id          String   @id @default(cuid())
+  workspaceId String
+  ruleId      String
+  orderId     String
+  /// sent | skipped
+  status      String
+  /// The text as it was copied, for the record.
+  text        String?
+  actor       String?
+  createdAt   DateTime @default(now())
+
+  @@unique([ruleId, orderId])
+  @@index([workspaceId])
+}

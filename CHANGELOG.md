@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.43.0 - 2026-10-06
+
+### Staff see their own pay on their task link
+
+A staff member's task link (/staff-share/…) now has two tabs, Tasks and My income. My income shows the same figures as their page under 员工结算, from the same calculation: what they have earned, what has been paid, what is still owed, the pay for each task, their payments and their reimbursements.
+
+- **Read-only.** Nothing on it can be edited.
+- **Kept back.** The link does not show the operator's notes on payments, the owners of the cars that reimbursements were charged to, or the receipt files, which can only be opened by a signed-in admin. It shows how many receipts each reimbursement has.
+
 ## v1.42.2 - 2026-10-06
 
 ### The signing page carries the operator's name, and can be filled in on a phone

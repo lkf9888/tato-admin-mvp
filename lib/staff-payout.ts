@@ -338,3 +338,116 @@ export async function resolveWorkspaceVehicleId(workspaceId: string, vehicleId: 
   });
   return vehicle?.id ?? null;
 }
+
+/**
+ * Everything one person's pay page shows, for the admin ledger and for
+ * the staff link's own "my income" tab. `forStaff` is the staff link:
+ * payment notes are the operator's, and the owners behind the cars and
+ * the receipt files (served to signed-in admins only) are not theirs to
+ * see, so those are left out.
+ */
+export async function getStaffPayoutDetail(
+  workspaceId: string,
+  staffId: string,
+  options: { forStaff?: boolean } = {},
+) {
+  const [summary] = await getStaffPayoutSummaries(workspaceId, { staffIds: [staffId] });
+  if (!summary) return null;
+  const forStaff = Boolean(options.forStaff);
+
+  const [tasks, payments, reimbursements, vehicles] = await Promise.all([
+    prisma.staffTask.findMany({
+      where: { workspaceId, staffId, ...payableTaskWhere },
+      orderBy: [{ dueDatetime: "desc" }, { completedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        category: true,
+        dueDatetime: true,
+        timeWindow: true,
+        completedAt: true,
+        payRate: true,
+        vehicleLabel: true,
+        vehicle: { select: { plateNumber: true, nickname: true } },
+      },
+    }),
+    prisma.staffPayment.findMany({
+      where: { workspaceId, staffId },
+      orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.staffReimbursement.findMany({
+      where: { workspaceId, staffId },
+      orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+      include: { receipts: { orderBy: { uploadedAt: "asc" } } },
+    }),
+    prisma.vehicle.findMany({
+      where: { workspaceId },
+      orderBy: [{ isArchived: "asc" }, { plateNumber: "asc" }],
+      select: {
+        id: true,
+        plateNumber: true,
+        nickname: true,
+        brand: true,
+        model: true,
+        owner: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  const todayKey = utcToZonedDate(new Date());
+  const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+
+  return {
+    summary,
+    todayKey,
+    tasks: tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      status: task.status,
+      category: task.category,
+      workDate: staffTaskWorkDate(task),
+      timeWindow: task.timeWindow,
+      payRate: task.payRate,
+      pay: staffTaskPay(task, summary.defaultTaskRate),
+      due: isStaffTaskDue(task, todayKey),
+      vehicleLabel: task.vehicle ? `${task.vehicle.plateNumber} · ${task.vehicle.nickname}` : task.vehicleLabel,
+    })),
+    payments: payments.map((payment) => ({
+      id: payment.id,
+      amount: payment.amount,
+      paidAt: payment.paidAt.toISOString().slice(0, 10),
+      purpose: payment.purpose,
+      method: payment.method,
+      reference: payment.reference,
+      notes: forStaff ? null : payment.notes,
+    })),
+    reimbursements: reimbursements.map((row) => {
+      const vehicle = row.vehicleId ? vehicleById.get(row.vehicleId) : undefined;
+      return {
+        id: row.id,
+        amount: row.amount,
+        occurredAt: row.occurredAt.toISOString().slice(0, 10),
+        note: row.note,
+        vehicleId: row.vehicleId,
+        vehicleLabel: vehicle ? `${vehicle.plateNumber} · ${vehicle.nickname}` : null,
+        ownerName: forStaff ? null : vehicle?.owner?.name ?? null,
+        onOwnerLedger: forStaff ? false : Boolean(row.ownerLedgerItemId),
+        receipts: row.receipts.map((receipt) => ({
+          id: receipt.id,
+          filename: receipt.filename,
+          url: forStaff ? null : staffReimbursementReceiptUrl(staffId, row.id, receipt.id),
+        })),
+      };
+    }),
+    vehicles: forStaff
+      ? []
+      : vehicles.map((vehicle) => ({
+          value: vehicle.id,
+          label: `${vehicle.plateNumber} · ${vehicle.nickname}${vehicle.owner ? ` · ${vehicle.owner.name}` : ""}`,
+          searchText: `${vehicle.brand} ${vehicle.model}`,
+        })),
+  };
+}
+
+export type StaffPayoutDetail = NonNullable<Awaited<ReturnType<typeof getStaffPayoutDetail>>>;

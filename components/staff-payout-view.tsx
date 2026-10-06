@@ -57,7 +57,8 @@ type Reimbursement = {
   vehicleLabel: string | null;
   ownerName: string | null;
   onOwnerLedger: boolean;
-  receipts: Array<{ id: string; filename: string | null; url: string }>;
+  /** Url null: listed, not openable (the staff link cannot serve files). */
+  receipts: Array<{ id: string; filename: string | null; url: string | null }>;
 };
 
 type VehicleOption = { value: string; label: string; searchText: string };
@@ -79,6 +80,10 @@ function inRange(day: string | null, from: string, to: string) {
   return (!from || day >= from) && (!to || day <= to);
 }
 
+/**
+ * One person's pay: the admin ledger, and with `readOnly` the staff
+ * link's "my income" tab -- the same numbers, nothing editable.
+ */
 export function StaffPayoutView({
   locale,
   summary,
@@ -86,8 +91,10 @@ export function StaffPayoutView({
   payments,
   reimbursements,
   vehicles,
+  readOnly = false,
 }: {
   locale: Locale;
+  readOnly?: boolean;
   summary: Summary;
   todayKey: string;
   tasks: PayoutTask[];
@@ -185,16 +192,18 @@ export function StaffPayoutView({
   const taskStatusLabel = (status: PayoutTask["status"]) => t.taskStatus[status];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-3 sm:p-6">
-      <div>
-        <Link href="/staff-schedule/payouts" className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]">
-          ← {t.backToList}
-        </Link>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: summary.color }} aria-hidden />
-          <h1 className="font-serif text-2xl text-[var(--ink)]">{summary.name}</h1>
+    <div className={readOnly ? "space-y-4" : "mx-auto max-w-5xl space-y-4 p-3 sm:p-6"}>
+      {readOnly ? null : (
+        <div>
+          <Link href="/staff-schedule/payouts" className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]">
+            ← {t.backToList}
+          </Link>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: summary.color }} aria-hidden />
+            <h1 className="font-serif text-2xl text-[var(--ink)]">{summary.name}</h1>
+          </div>
         </div>
-      </div>
+      )}
 
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
@@ -231,6 +240,14 @@ export function StaffPayoutView({
         </div>
       </section>
 
+      {readOnly ? (
+        <p className="px-1 text-xs text-[var(--ink-soft)]">
+          {t.defaultRate}:{" "}
+          <span className="text-[var(--ink-mid)]">
+            {summary.defaultTaskRate != null ? money(summary.defaultTaskRate) : t.notSet}
+          </span>
+        </p>
+      ) : (
       <section className="card flex flex-wrap items-end gap-3 p-4">
         <label className="grid gap-1 text-xs text-[var(--ink-mid)]">
           {t.defaultRate}
@@ -252,6 +269,7 @@ export function StaffPayoutView({
         </label>
         <p className="pb-2 text-xs text-[var(--ink-soft)]">{t.defaultRateHint}</p>
       </section>
+      )}
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex gap-1 rounded-md border border-[var(--line)] bg-white p-0.5" role="tablist">
@@ -319,6 +337,9 @@ export function StaffPayoutView({
                       ) : null}
                     </td>
                     <td className="px-3 py-2 text-right">
+                      {readOnly ? (
+                        <span className="tabular-nums text-[var(--ink)]">{money(task.pay)}</span>
+                      ) : (
                       <input
                         key={`${task.id}:${task.payRate ?? ""}`}
                         type="number"
@@ -331,6 +352,7 @@ export function StaffPayoutView({
                         className={`${fieldClass} w-32 text-right tabular-nums`}
                         aria-label={`${t.colPay} · ${task.title}`}
                       />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -342,11 +364,13 @@ export function StaffPayoutView({
 
       {tab === "payments" ? (
         <div className="space-y-2">
-          <div className="flex justify-end">
-            <button className="btn-primary" onClick={() => setPaymentModal("new")}>
-              {t.payment.add}
-            </button>
-          </div>
+          {readOnly ? null : (
+            <div className="flex justify-end">
+              <button className="btn-primary" onClick={() => setPaymentModal("new")}>
+                {t.payment.add}
+              </button>
+            </div>
+          )}
           <div className="card overflow-x-auto">
             {visiblePayments.length === 0 ? (
               <p className="p-6 text-center text-sm text-[var(--ink-soft)]">{t.payment.empty}</p>
@@ -362,7 +386,7 @@ export function StaffPayoutView({
                       {[payment.method, payment.reference, payment.notes].filter(Boolean).join(" · ")}
                     </span>
                     <span className="font-semibold tabular-nums text-[var(--ink)]">{money(payment.amount)}</span>
-                    <span className="flex gap-1">
+                    <span className={readOnly ? "hidden" : "flex gap-1"}>
                       <button className="btn-secondary min-h-8 px-2 text-xs" onClick={() => setPaymentModal(payment)}>
                         {t.edit}
                       </button>
@@ -380,11 +404,13 @@ export function StaffPayoutView({
 
       {tab === "reimbursements" ? (
         <div className="space-y-2">
-          <div className="flex justify-end">
-            <button className="btn-primary" onClick={() => setReimbursementModal("new")}>
-              {t.reimbursement.add}
-            </button>
-          </div>
+          {readOnly ? null : (
+            <div className="flex justify-end">
+              <button className="btn-primary" onClick={() => setReimbursementModal("new")}>
+                {t.reimbursement.add}
+              </button>
+            </div>
+          )}
           <div className="card overflow-x-auto">
             {visibleReimbursements.length === 0 ? (
               <p className="p-6 text-center text-sm text-[var(--ink-soft)]">{t.reimbursement.empty}</p>
@@ -396,7 +422,7 @@ export function StaffPayoutView({
                       <span className="w-24 tabular-nums text-[var(--ink-mid)]">{row.occurredAt}</span>
                       <span className="min-w-0 flex-1 text-[var(--ink)]">{row.note}</span>
                       <span className="font-semibold tabular-nums text-[var(--ink)]">{money(row.amount)}</span>
-                      <span className="flex gap-1">
+                      <span className={readOnly ? "hidden" : "flex gap-1"}>
                         <button className="btn-secondary min-h-8 px-2 text-xs" onClick={() => setReimbursementModal(row)}>
                           {t.edit}
                         </button>
@@ -410,17 +436,22 @@ export function StaffPayoutView({
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pl-0 text-xs text-[var(--ink-soft)] sm:pl-[6.75rem]">
                       {row.vehicleLabel ? <span>{row.vehicleLabel}</span> : null}
-                      {row.vehicleLabel ? (
+                      {row.vehicleLabel && !readOnly ? (
                         <span className="rounded-full border border-[var(--line)] px-1.5 py-0.5 text-[10px]">
                           {row.onOwnerLedger && row.ownerName
                             ? t.reimbursement.onOwnerLedger(row.ownerName)
                             : t.reimbursement.noOwner}
                         </span>
                       ) : null}
-                      {row.receipts.map((receipt, index) => (
+                      {row.receipts.some((receipt) => !receipt.url) ? (
+                        <span>
+                          {t.reimbursement.receipts} × {row.receipts.length}
+                        </span>
+                      ) : null}
+                      {row.receipts.filter((receipt) => receipt.url).map((receipt, index) => (
                         <a
                           key={receipt.id}
-                          href={receipt.url}
+                          href={receipt.url!}
                           target="_blank"
                           rel="noreferrer"
                           className="underline decoration-dotted hover:text-[var(--ink)]"
@@ -428,11 +459,13 @@ export function StaffPayoutView({
                           {receipt.filename || `${t.reimbursement.receipts} ${index + 1}`}
                         </a>
                       ))}
-                      <ReceiptPicker
-                        label={uploadingId === row.id ? t.reimbursement.uploading : t.reimbursement.addReceipts}
-                        disabled={uploadingId === row.id}
-                        onFiles={(files) => void addReceipts(row, files)}
-                      />
+                      {readOnly ? null : (
+                        <ReceiptPicker
+                          label={uploadingId === row.id ? t.reimbursement.uploading : t.reimbursement.addReceipts}
+                          disabled={uploadingId === row.id}
+                          onFiles={(files) => void addReceipts(row, files)}
+                        />
+                      )}
                     </div>
                   </li>
                 ))}
@@ -442,7 +475,7 @@ export function StaffPayoutView({
         </div>
       ) : null}
 
-      {paymentModal ? (
+      {paymentModal && !readOnly ? (
         <PaymentModal
           t={t}
           initial={paymentModal === "new" ? null : paymentModal}
@@ -464,7 +497,7 @@ export function StaffPayoutView({
         />
       ) : null}
 
-      {reimbursementModal ? (
+      {reimbursementModal && !readOnly ? (
         <ReimbursementModal
           t={t}
           vehicles={vehicles}

@@ -13,7 +13,9 @@ import {
   ZoomOut,
 } from "lucide-react";
 
+import { StaffPayoutView } from "@/components/staff-payout-view";
 import type { Locale } from "@/lib/i18n";
+import type { StaffPayoutDetail } from "@/lib/staff-payout";
 import { compressImageFiles } from "@/lib/client-image-compression";
 
 type StaffTaskStatus = "todo" | "in_progress" | "done" | "cancelled";
@@ -69,6 +71,8 @@ function copy(locale: Locale) {
   return locale === "zh"
     ? {
         kicker: "我的任务",
+        tasksTab: "任务",
+        incomeTab: "我的收入",
         subtitle: "只显示分配给你的任务",
         active: "待处理",
         history: "已完成 / 已取消",
@@ -115,6 +119,8 @@ function copy(locale: Locale) {
       }
     : {
         kicker: "My tasks",
+        tasksTab: "Tasks",
+        incomeTab: "My income",
         subtitle: "Only tasks assigned to you are shown",
         active: "Open",
         history: "Done / cancelled",
@@ -167,13 +173,17 @@ export function StaffShareClient({
   token,
   staff,
   initialTasks,
+  income,
 }: {
   locale: Locale;
   token: string;
   staff: ShareStaff;
   initialTasks: StaffShareTask[];
+  /** What this person has earned and been paid, read-only. */
+  income?: StaffPayoutDetail;
 }) {
   const [activeLocale, setActiveLocale] = useState<Locale>("en");
+  const [view, setView] = useState<"tasks" | "income">("tasks");
   const labels = copy(activeLocale);
   const [tasks, setTasks] = useState(initialTasks.map(normalizeTask));
   const [editingTask, setEditingTask] = useState<StaffShareTask | null>(null);
@@ -381,6 +391,29 @@ export function StaffShareClient({
       </header>
 
       <div className="mx-auto max-w-2xl space-y-4 px-3 py-4">
+        {income ? (
+          <div className="flex gap-1 rounded-md border border-[var(--line)] bg-white p-0.5" role="tablist">
+            {(["tasks", "income"] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={view === key}
+                onClick={() => setView(key)}
+                className={`min-h-9 flex-1 rounded-[5px] px-3 text-sm font-semibold ${
+                  view === key ? "bg-[var(--ink)] text-white" : "text-[var(--ink-soft)]"
+                }`}
+              >
+                {key === "tasks" ? labels.tasksTab : labels.incomeTab}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {income && view === "income" ? (
+          <StaffPayoutView readOnly locale={activeLocale} {...income} />
+        ) : (
+        <>
         {notice ? (
           <div className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink-mid)]">
             {notice}
@@ -481,6 +514,8 @@ export function StaffShareClient({
             ) : null}
           </section>
         ) : null}
+        </>
+        )}
       </div>
 
       {editingTask ? (

@@ -2538,3 +2538,61 @@ model MessageRuleSend {
   @@unique([ruleId, orderId])
   @@index([workspaceId])
 }
+
+/// An invoice or a receipt the operator writes by hand: line items with
+/// quantity, unit price and tax rate, a discount, a number, a status and
+/// dates (lib/invoices.ts). Totals are computed on save and stored, so a
+/// list can sum them without reading every line.
+model Invoice {
+  workspaceId    String
+  id             String        @id @default(cuid())
+  /// INVOICE or RECEIPT.
+  type           String        @default("INVOICE")
+  /// INV-2026-0001 / REC-2026-0001; unique per workspace.
+  number         String
+  /// DRAFT, SENT, PAID or VOID.
+  status         String        @default("DRAFT")
+  recipientName  String?
+  recipientEmail String?
+  recipientPhone String?
+  billToAddress  String?
+  /// Calendar days, stored at noon UTC.
+  issueDate      DateTime
+  dueDate        DateTime?
+  paidAt         DateTime?
+  currency       String        @default("CAD")
+  subtotal       Float         @default(0)
+  taxTotal       Float         @default(0)
+  discountTotal  Float         @default(0)
+  total          Float         @default(0)
+  amountPaid     Float         @default(0)
+  notes          String?
+  terms          String?
+  /// The trip it bills, if any.
+  orderId        String?
+  lastSentAt     DateTime?
+  createdBy      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  items          InvoiceItem[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, issueDate])
+  @@index([workspaceId, status])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float   @default(0)
+  /// Percent: 5 is 5%.
+  taxRate     Float   @default(0)
+  /// quantity x unitPrice, before tax.
+  lineTotal   Float   @default(0)
+  sortOrder   Int     @default(0)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, sortOrder])
+}

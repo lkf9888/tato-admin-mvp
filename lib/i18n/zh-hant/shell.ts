@@ -33,6 +33,7 @@ export const shellMessages = {
         trash: "回收站",
         billing: "購買額度",
         payouts: "收款帳戶",
+        invoices: "發票和收據",
         accountSettings: "帳戶設定",
         shareLinks: "共享連結",
         assistant: "助理",

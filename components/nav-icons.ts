@@ -1,4 +1,5 @@
 import {
+  ReceiptText,
   Banknote,
   Bot,
   Car,
@@ -56,6 +57,7 @@ export const NAV_ICONS = {
   activity: History,
   billing: CreditCard,
   payouts: Banknote,
+  invoices: ReceiptText,
   accountSettings: Settings,
 } satisfies Record<string, LucideIcon>;
 

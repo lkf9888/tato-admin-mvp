@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.50.0 - 2026-10-06
+
+### Invoices and receipts
+
+A new page under 账务, 发票和收据, is for billing anything outside Turo and the rental site: an offline rental, a damage charge, a deposit kept.
+
+- **Writing one.** An invoice or receipt has a recipient (name, email, phone, address), an issue date, and a due date or a paid date. Lines have a description, quantity, unit price and tax rate. A discount, amount paid, notes and terms are optional. Totals update as you type, and the server recomputes them on save with the same function (`lib/invoice-math.ts`), so the preview and the saved figures match. The discount applies after tax and cannot take the total below zero.
+- **Numbers.** Numbers run per type and year, for example INV-2026-0001 and REC-2026-0001. A collision between two simultaneous saves takes the next number.
+- **Status.** The statuses are Draft, Sent, Paid and Void. A receipt, or an invoice marked paid, counts as paid in full unless an amount is given. A sent invoice past its due date shows as overdue, and the page totals what is outstanding. Void keeps the record and its number.
+- **Print and email.** Print opens the document alone on a page, ready for the browser's Save as PDF. Email sends the same document in the message body, with an optional note, in Chinese or English. Replies go to the admin who sent it, and a draft becomes Sent. User text is escaped everywhere it is rendered.
+
 ## v1.49.0 - 2026-10-06
 
 ### Photos and documents download as one ZIP

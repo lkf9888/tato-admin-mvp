@@ -147,7 +147,7 @@ export const calendarMessages = {
       selectionClear: "取消",
       selectionCreateOrder: "新建訂單",
       pricesToggle: "價格",
-      pricesToggleHint: "顯示每天的價格，並在這裡改。",
+      pricesToggleHint: "顯示每天的價格，並在這裡改。粗體為手動設定，藍色為動態定價。",
       priceLabel: "價格",
       priceSetAction: "設定",
       priceClearAction: "恢復",

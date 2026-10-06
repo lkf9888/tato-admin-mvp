@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.38.2 - 2026-10-06
+
+### The calendar shows which day prices dynamic pricing set
+
+With prices on, a day dynamic pricing priced is drawn in blue, a day
+priced by hand stays bold, and a day on the car's own rate stays grey;
+the Prices toggle's hint says so. A price set in the calendar's price
+panel turns its days bold at once, as the backend already treats it: a
+hand price takes the day over from dynamic pricing for good.
+
 ## v1.38.1 - 2026-10-06
 
 ### Word contracts keep their clause numbers, tables and bold text

@@ -760,6 +760,8 @@ export function CalendarView({
   pricing?: {
     seasonality: RateSeasonality;
     overrides: Record<string, Record<string, number>>;
+    /** Per car, the days whose price dynamic pricing set. */
+    dynamicDays?: Record<string, string[]>;
     rates: Record<string, { baseRate: number; source: "manual" | "suggested"; bookable?: boolean }>;
   };
   readOnly?: boolean;
@@ -903,6 +905,14 @@ export function CalendarView({
   useEffect(() => {
     setPriceOverrides(pricing?.overrides ?? {});
   }, [pricing?.overrides]);
+  const [dynamicDays, setDynamicDays] = useState(
+    () => new Set(Object.entries(pricing?.dynamicDays ?? {}).flatMap(([id, days]) => days.map((day) => `${id}:${day}`))),
+  );
+  useEffect(() => {
+    setDynamicDays(
+      new Set(Object.entries(pricing?.dynamicDays ?? {}).flatMap(([id, days]) => days.map((day) => `${id}:${day}`))),
+    );
+  }, [pricing?.dynamicDays]);
 
   /**
    * What a day costs, resolved exactly as the server does: a price set
@@ -926,9 +936,14 @@ export function CalendarView({
   const resolveDayPrice = useMemo(() => {
     const seasonality = pricing?.seasonality;
     const rates = pricing?.rates ?? {};
-    return (vehicleId: string, dayKey: string): { price: number; fixed: boolean } | null => {
+    return (
+      vehicleId: string,
+      dayKey: string,
+    ): { price: number; fixed: boolean; dynamic?: boolean } | null => {
       const override = priceOverrides[vehicleId]?.[dayKey];
-      if (typeof override === "number" && override > 0) return { price: override, fixed: true };
+      if (typeof override === "number" && override > 0) {
+        return { price: override, fixed: true, dynamic: dynamicDays.has(`${vehicleId}:${dayKey}`) };
+      }
 
       const rate = rates[vehicleId];
       if (!rate || rate.baseRate <= 0) return null;
@@ -944,7 +959,7 @@ export function CalendarView({
         fixed: false,
       };
     };
-  }, [pricing?.seasonality, pricing?.rates, priceOverrides]);
+  }, [pricing?.seasonality, pricing?.rates, priceOverrides, dynamicDays]);
 
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkSelection, setBulkSelection] = useState<Set<string>>(new Set());
@@ -2761,6 +2776,12 @@ export function CalendarView({
               }
               return next;
             });
+            // A price set here is a person's, whatever set the day before.
+            setDynamicDays((current) => {
+              const next = new Set(current);
+              for (const change of changes) next.delete(`${change.vehicleId}:${change.date}`);
+              return next;
+            });
             setShowPrices(true);
             setPricePanel(null);
             setDaySelection(null);
@@ -3200,9 +3221,11 @@ export function CalendarView({
                                 aria-hidden
                                 className={cn(
                                   "pointer-events-none absolute bottom-0.5 text-center text-[9px] leading-none tabular-nums",
-                                  resolved.fixed
-                                    ? "font-bold text-[color:var(--ink)]"
-                                    : "text-[color:var(--ink-soft)]",
+                                  resolved.dynamic
+                                    ? "font-bold text-sky-700"
+                                    : resolved.fixed
+                                      ? "font-bold text-[color:var(--ink)]"
+                                      : "text-[color:var(--ink-soft)]",
                                 )}
                                 style={{ left: index * dayColumnWidth, width: dayColumnWidth }}
                               >

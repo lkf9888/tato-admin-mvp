@@ -1,3 +1,4 @@
+import { DYNAMIC_PRICING_ACTOR } from "@/lib/vehicle-pricing-dynamic";
 import { CalendarView } from "@/components/calendar-view";
 import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
 import { getRateSeasonality } from "@/lib/rental-estimate/rate-seasonality-server";
@@ -61,7 +62,7 @@ export default async function CalendarPage() {
     // so this is small even for a fleet that has been running years.
     prisma.vehiclePriceOverride.findMany({
       where: { vehicle: { workspaceId: workspace.id } },
-      select: { vehicleId: true, date: true, price: true },
+      select: { vehicleId: true, date: true, price: true, createdBy: true },
     }),
     prisma.owner.findMany({
       where: { workspaceId: workspace.id },
@@ -119,9 +120,14 @@ export default async function CalendarPage() {
     vehicles.map((vehicle) => [vehicle.id, resolveVehicleDailyRate(vehicle, bookingPolicy)]),
   );
   const priceOverrides: Record<string, Record<string, number>> = {};
+  // Days dynamic pricing set rather than a person, drawn apart from them.
+  const dynamicDays: Record<string, string[]> = {};
   for (const row of priceOverrideRows) {
     const key = dateToDateOnly(row.date);
     priceOverrides[row.vehicleId] = { ...(priceOverrides[row.vehicleId] ?? {}), [key]: row.price };
+    if (row.createdBy === DYNAMIC_PRICING_ACTOR) {
+      (dynamicDays[row.vehicleId] ??= []).push(key);
+    }
   }
 
   const calendarView = (
@@ -130,6 +136,7 @@ export default async function CalendarPage() {
       pricing={{
         seasonality,
         overrides: priceOverrides,
+        dynamicDays,
         rates: Object.fromEntries(
           [...vehicleRates].map(([id, rate]) => [
             id,

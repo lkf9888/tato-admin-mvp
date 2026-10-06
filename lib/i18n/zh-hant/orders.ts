@@ -27,6 +27,16 @@ export const ordersMessages = {
       clearSearch: "清除",
       searchTitle: "訂單檔案",
       searchSummary: (count: number) => `共找到 ${count} 條匹配訂單`,
+      listSummary: {
+        title: "篩選結果合計",
+        hint: "按全部匹配的訂單計算，不只是這一頁；已取消的訂單不計入。",
+        orders: "訂單數",
+        total: "收入合計",
+        received: "已收（手動建的訂單）",
+        outstanding: "待收",
+        noTax: "沒有記錄稅費",
+        exportExcel: "匯出 Excel",
+      },
       emptySearch: "沒有找到符合這個關鍵字的訂單。",
       filters: {
         toggleLabel: "篩選",

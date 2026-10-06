@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.47.0 - 2026-10-06
+
+### The orders list totals what a filter selects, exports it, and marks hand-entered orders paid in bulk
+
+- **Totals.** With a date range set, a box above the list totals every matching order, not only the page on screen, and leaves out cancelled orders. It shows the number of orders, earnings, each tax by name (GST and PST from site bookings, and Turo's sales tax), and what has been received and is still to collect on hand-entered orders.
+- **Export to Excel.** Exports every order that matches the current filters and search, with dates, car, owner, guest, source, status, earnings, tax, received, to-collect, payment method, contract and reservation number. Money columns are number cells. The page and the export share one filter implementation (`lib/orders-list.ts`), and both exports share one workbook writer (`lib/spreadsheet-xml.ts`).
+- **Paid / unpaid in bulk.** Hand-entered orders have a checkbox and a "paid in full" or "to collect" pill. Selected orders can be marked paid: open instalments are marked received today, and any remaining shortfall is recorded as one more payment. They can also be marked unpaid: payments go back to expected and the rows are kept. Turo trips and rental-site bookings are skipped, because Turo and Stripe settle those.
+
 ## v1.46.0 - 2026-10-06
 
 ### Owner ledgers take recurring charges, and the owner can be told their statement is ready

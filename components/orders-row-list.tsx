@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
@@ -22,6 +23,17 @@ function labels(locale: Locale) {
         price: "金额",
         phone: "电话",
         open: "打开订单详情",
+        select: "选择这笔订单",
+        selected: (count: number) => `已选 ${count} 笔`,
+        markPaid: "标记已收款",
+        markUnpaid: "标记未收款",
+        clearSelection: "取消选择",
+        paidInFull: "已收齐",
+        toCollect: (amount: string) => `待收 ${amount}`,
+        confirmUnpaid: "把选中订单的收款全部改回「待收」？收款记录本身会保留。",
+        result: (updated: number, skipped: number) =>
+          skipped > 0 ? `已更新 ${updated} 笔，跳过 ${skipped} 笔（Turo 和网站订单不在这里记收款）` : `已更新 ${updated} 笔`,
+        failed: "操作失败，请重试。",
       }
     : {
         empty: "No orders matched this keyword.",
@@ -32,6 +44,19 @@ function labels(locale: Locale) {
         price: "Price",
         phone: "Phone",
         open: "Open order details",
+        select: "Select this order",
+        selected: (count: number) => `${count} selected`,
+        markPaid: "Mark paid",
+        markUnpaid: "Mark unpaid",
+        clearSelection: "Clear",
+        paidInFull: "Paid in full",
+        toCollect: (amount: string) => `To collect ${amount}`,
+        confirmUnpaid: "Set every payment on the selected orders back to expected? The payment rows stay.",
+        result: (updated: number, skipped: number) =>
+          skipped > 0
+            ? `${updated} updated, ${skipped} skipped (Turo and rental-site orders are not settled here)`
+            : `${updated} updated`,
+        failed: "That did not work. Try again.",
       };
 }
 
@@ -39,12 +64,49 @@ export function OrdersRowList({
   orders,
   vehicleOptions,
   locale,
+  paymentInfo = {},
 }: {
   orders: EditableOrder[];
   vehicleOptions: OrderEditorVehicleOption[];
   locale: Locale;
+  /** Hand-entered orders only: what has come in and what is still due.
+   *  Their rows can be selected and marked paid or unpaid in bulk. */
+  paymentInfo?: Record<string, { received: number; outstanding: number }>;
 }) {
   const t = labels(locale);
+  const router = useRouter();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkPayment(action: "paid" | "unpaid") {
+    if (action === "unpaid" && !window.confirm(t.confirmUnpaid)) return;
+    setBusy(true);
+    setNotice(null);
+    const response = await fetch("/api/orders/bulk-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [...selectedIds], action }),
+    }).catch(() => null);
+    const payload = response ? await response.json().catch(() => ({})) : {};
+    setBusy(false);
+    if (!response?.ok) {
+      setNotice(t.failed);
+      return;
+    }
+    setNotice(t.result(payload.updated ?? 0, payload.skipped ?? 0));
+    setSelectedIds(new Set());
+    router.refresh();
+  }
   const [rows, setRows] = useState(orders);
   const [selectedOrder, setSelectedOrder] = useState<EditableOrder | null>(null);
 
@@ -72,14 +134,26 @@ export function OrdersRowList({
     <>
       <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.9)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
         <div className="divide-y divide-[color:var(--line)]">
-          {rows.map((order) => (
+          {rows.map((order) => {
+            const payment = paymentInfo[order.id];
+            return (
+            <div key={order.id} className={cn("flex items-stretch", order.hasConflict ? "bg-rose-50/70" : "bg-white/60")}>
+              <label className="flex w-9 shrink-0 cursor-pointer items-start justify-center pt-4 sm:w-10">
+                {payment ? (
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={selectedIds.has(order.id)}
+                    onChange={() => toggleSelected(order.id)}
+                    aria-label={`${t.select}: ${order.renterName}`}
+                  />
+                ) : null}
+              </label>
             <button
-              key={order.id}
               type="button"
               onClick={() => setSelectedOrder(order)}
               className={cn(
-                "grid w-full gap-2 px-3 py-3 text-left transition hover:bg-white sm:px-4 lg:grid-cols-[minmax(13rem,1.4fr)_minmax(11rem,1fr)_minmax(15rem,1.25fr)_minmax(8rem,0.72fr)] lg:items-center",
-                order.hasConflict ? "bg-rose-50/70" : "bg-white/60",
+                "grid min-w-0 flex-1 gap-2 py-3 pr-3 text-left transition hover:bg-white sm:pr-4 lg:grid-cols-[minmax(13rem,1.4fr)_minmax(11rem,1fr)_minmax(15rem,1.25fr)_minmax(8rem,0.72fr)] lg:items-center",
               )}
               aria-label={`${t.open}: ${order.vehicleName} ${order.renterName}`}
             >
@@ -123,11 +197,50 @@ export function OrdersRowList({
                 <span className="rounded-full bg-[var(--ink)] px-2.5 py-1 text-[11px] font-semibold text-white">
                   {t.price}: {formatCurrency(order.totalPrice, locale)}
                 </span>
+                {payment ? (
+                  <span
+                    className={cn(
+                      "rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                      payment.outstanding > 0.005
+                        ? "border-amber-300 bg-amber-50 text-amber-800"
+                        : "border-emerald-300 bg-emerald-50 text-emerald-800",
+                    )}
+                  >
+                    {payment.outstanding > 0.005
+                      ? t.toCollect(formatCurrency(payment.outstanding, locale))
+                      : t.paidInFull}
+                  </span>
+                ) : null}
               </div>
             </button>
-          ))}
+            </div>
+            );
+          })}
         </div>
       </section>
+
+      {notice ? (
+        <p className="rounded-md border border-[color:var(--line)] bg-white px-3 py-2 text-[12px] text-[color:var(--ink-mid)]">
+          {notice}
+        </p>
+      ) : null}
+
+      {selectedIds.size > 0 ? (
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+64px)] z-30 flex justify-center px-3 lg:bottom-4">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 shadow-xl">
+            <span className="text-[12px] font-semibold text-[color:var(--ink)]">{t.selected(selectedIds.size)}</span>
+            <button type="button" className="btn-primary min-h-8 px-3 text-[12px]" disabled={busy} onClick={() => void bulkPayment("paid")}>
+              {t.markPaid}
+            </button>
+            <button type="button" className="btn-secondary min-h-8 px-3 text-[12px]" disabled={busy} onClick={() => void bulkPayment("unpaid")}>
+              {t.markUnpaid}
+            </button>
+            <button type="button" className="text-[12px] text-[color:var(--ink-soft)] underline" onClick={() => setSelectedIds(new Set())}>
+              {t.clearSelection}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {selectedOrder ? (
         <OrderDetailModal

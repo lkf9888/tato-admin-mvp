@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-import type { Prisma } from "@prisma/client";
-
 import { deleteOrderAction, saveOfflineOrderAction, updateOrderStatusAction } from "@/app/actions";
 import { DateTimeField } from "@/components/date-time-field";
 import { requireCurrentWorkspace } from "@/lib/auth";
@@ -12,6 +10,16 @@ import { getOrderStatusOptions, getStatusLabel, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { getOrderFeeLines } from "@/lib/ledger-policy";
 import { resolveOrderCleaningFees } from "@/lib/owner-commission";
+import {
+  buildWhereClause,
+  fetchFilteredOrders,
+  isManualOfflineOrder,
+  matchesOrderSearch,
+  orderReceipts,
+  ORDER_SOURCES,
+  parseDateParam,
+  summarizeOrders,
+} from "@/lib/orders-list";
 import { prisma } from "@/lib/prisma";
 import { PendingOrdersPanel } from "@/components/pending-orders-panel";
 import { matchVehiclesForEmail } from "@/lib/turo-message-match";
@@ -23,7 +31,6 @@ import {
   formatDateTimeLocalInput,
   getDisplayOrderNote,
   getOrderNetEarning,
-  normalizeText,
 } from "@/lib/utils";
 
 // Bounded pagination: 20 cards per page is comfortable on mobile
@@ -31,12 +38,6 @@ import {
 // (~10 rows). Big enough to not feel like clicking through trivia,
 // small enough that initial render stays snappy.
 const PAGE_SIZE = 20;
-
-// Order sources are the same two enum values used elsewhere in the
-// app; declared here so the filter controls stay a typed source of
-// truth instead of a magic-string list.
-const ORDER_SOURCES = ["turo", "offline"] as const;
-type OrderSource = (typeof ORDER_SOURCES)[number];
 
 type OrdersSearchParams = {
   error?: string;
@@ -48,125 +49,6 @@ type OrdersSearchParams = {
   from?: string;
   to?: string;
 };
-
-/**
- * Build the Prisma `where` clause for the structured filters.
- * The free-text `q` search is applied AFTER this query (in JS) so
- * users can match across many fields and Chinese names without
- * needing case-insensitive SQL (which SQLite doesn't ship).
- */
-function buildWhereClause(
-  workspaceId: string,
-  filters: {
-    status?: string;
-    source?: string;
-    vehicleId?: string;
-    from?: Date | null;
-    to?: Date | null;
-  },
-): Prisma.OrderWhereInput {
-  const where: Prisma.OrderWhereInput = {
-    workspaceId,
-    isArchived: false,
-  };
-  if (filters.status) where.status = filters.status as Prisma.OrderWhereInput["status"];
-  if (filters.source && (ORDER_SOURCES as readonly string[]).includes(filters.source)) {
-    where.source = filters.source as OrderSource;
-  }
-  if (filters.vehicleId) where.vehicleId = filters.vehicleId;
-  if (filters.from || filters.to) {
-    // Date range matches on `pickupDatetime` (the most common "when
-    // was the rental?" semantic). `from` includes the whole start day,
-    // `to` includes the whole end day, so `from=2026-04-01&to=2026-04-30`
-    // returns every trip starting in April.
-    where.pickupDatetime = {};
-    if (filters.from) (where.pickupDatetime as { gte?: Date }).gte = filters.from;
-    if (filters.to) (where.pickupDatetime as { lte?: Date }).lte = filters.to;
-  }
-  return where;
-}
-
-async function fetchFilteredOrders(where: Prisma.OrderWhereInput) {
-  return prisma.order.findMany({
-    where,
-    include: {
-      vehicle: {
-        include: {
-          owner: true,
-          // The row list edits the cleaning fee straight from this
-          // page's data, so it needs the same dated rules the PATCH
-          // response resolves against -- without them every order
-          // opened here shows a blank fee regardless of what is
-          // actually saved.
-          cleaningFeeRules: { orderBy: { effectiveFrom: "desc" } },
-        },
-      },
-    },
-    orderBy: { pickupDatetime: "desc" },
-  });
-}
-
-type SearchableOrder = Awaited<ReturnType<typeof fetchFilteredOrders>>[number];
-
-function buildOrderSearchText(order: SearchableOrder, locale: Locale) {
-  const netEarning = getOrderNetEarning(order.sourceMetadata, order.totalPrice);
-
-  return normalizeText(
-    [
-      order.id,
-      order.externalOrderId,
-      order.source,
-      order.status,
-      order.renterName,
-      order.renterPhone,
-      order.vehicle.plateNumber,
-      order.vehicle.nickname,
-      order.vehicle.brand,
-      order.vehicle.model,
-      String(order.vehicle.year),
-      order.vehicle.owner?.name,
-      order.pickupLocation,
-      order.returnLocation,
-      order.paymentMethod,
-      order.contractNumber,
-      order.createdBy,
-      getDisplayOrderNote(order.notes, order.source),
-      formatDateTime(order.pickupDatetime, locale),
-      formatDateTime(order.returnDatetime, locale),
-      order.pickupDatetime.toISOString(),
-      order.returnDatetime.toISOString(),
-      netEarning != null ? String(netEarning) : null,
-    ]
-      .filter(Boolean)
-      .join(" "),
-  );
-}
-
-function matchesOrderSearch(order: SearchableOrder, query: string, locale: Locale) {
-  const normalizedQuery = normalizeText(query);
-  if (!normalizedQuery) return true;
-
-  const haystack = buildOrderSearchText(order, locale);
-  return normalizedQuery.split(" ").every((term) => haystack.includes(term));
-}
-
-/**
- * Parse a `yyyy-mm-dd` (HTML <input type="date"> output) into a Date,
- * or return `null` if missing/invalid. The Date is constructed with
- * the local server time as midnight; for `to` we shift to end-of-day
- * so the inclusive range matches user intent (`to=2026-04-30` includes
- * trips starting on April 30 at any hour).
- */
-function parseDateParam(raw: string | undefined, mode: "start" | "end"): Date | null {
-  if (!raw) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
-  if (!match) return null;
-  const [, year, month, day] = match;
-  const d = new Date(Number(year), Number(month) - 1, Number(day));
-  if (Number.isNaN(d.getTime())) return null;
-  if (mode === "end") d.setHours(23, 59, 59, 999);
-  return d;
-}
 
 /**
  * Build a query string carrying every filter EXCEPT `page`. Used by the
@@ -271,6 +153,10 @@ export default async function OrdersPage({
   // user sees the count of what they actually asked for, not the
   // count of orders in the workspace).
   const totalCount = searchedOrders.length;
+  // With a date range set, the question is "what did this period come
+  // to", and the answer has to cover every matching order, not the 20
+  // on screen.
+  const listSummary = fromFilterRaw || toFilterRaw ? summarizeOrders(searchedOrders) : null;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const currentPage = Math.min(requestedPageSafe, totalPages);
   const startIndex = (currentPage - 1) * PAGE_SIZE;
@@ -640,7 +526,71 @@ export default async function OrdersPage({
         </form>
       </section>
 
-      <OrdersRowList orders={orderRows} vehicleOptions={orderVehicleOptions} locale={locale} />
+      <section className="flex flex-col gap-2 rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-3 sm:flex-row sm:items-start sm:justify-between">
+        {listSummary ? (
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold text-[color:var(--ink)]">{orderMessages.listSummary.title}</p>
+            <p className="text-[11px] text-[color:var(--ink-soft)]">{orderMessages.listSummary.hint}</p>
+            <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-[12px] tabular-nums">
+              <div>
+                <dt className="text-[10px] text-[color:var(--ink-soft)]">{orderMessages.listSummary.orders}</dt>
+                <dd className="font-semibold text-[color:var(--ink)]">{listSummary.count}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] text-[color:var(--ink-soft)]">{orderMessages.listSummary.total}</dt>
+                <dd className="font-semibold text-[color:var(--ink)]">{formatCurrency(listSummary.total, locale)}</dd>
+              </div>
+              {listSummary.taxes.length > 0 ? (
+                listSummary.taxes.map((tax) => (
+                  <div key={tax.name}>
+                    <dt className="text-[10px] text-[color:var(--ink-soft)]">{tax.name}</dt>
+                    <dd className="font-semibold text-[color:var(--ink)]">{formatCurrency(tax.amount, locale)}</dd>
+                  </div>
+                ))
+              ) : (
+                <div>
+                  <dt className="text-[10px] text-[color:var(--ink-soft)]">&nbsp;</dt>
+                  <dd className="text-[color:var(--ink-soft)]">{orderMessages.listSummary.noTax}</dd>
+                </div>
+              )}
+              {listSummary.manualCount > 0 ? (
+                <>
+                  <div>
+                    <dt className="text-[10px] text-[color:var(--ink-soft)]">{orderMessages.listSummary.received}</dt>
+                    <dd className="font-semibold text-[color:var(--ink)]">{formatCurrency(listSummary.received, locale)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] text-[color:var(--ink-soft)]">{orderMessages.listSummary.outstanding}</dt>
+                    <dd className={cn("font-semibold", listSummary.outstanding > 0 ? "text-amber-700" : "text-[color:var(--ink)]")}>
+                      {formatCurrency(listSummary.outstanding, locale)}
+                    </dd>
+                  </div>
+                </>
+              ) : null}
+            </dl>
+          </div>
+        ) : (
+          <div className="hidden sm:block" />
+        )}
+        <a
+          href={`/api/orders/export?${filterQs ? `${filterQs}&` : ""}locale=${locale}`}
+          className={subtleButtonClass}
+        >
+          {orderMessages.listSummary.exportExcel}
+        </a>
+      </section>
+
+      <OrdersRowList
+        orders={orderRows}
+        vehicleOptions={orderVehicleOptions}
+        locale={locale}
+        paymentInfo={Object.fromEntries(
+          pageOrders.filter((order) => isManualOfflineOrder(order)).map((order) => {
+            const money = orderReceipts(order);
+            return [order.id, { received: money.received, outstanding: money.outstanding }];
+          }),
+        )}
+      />
 
       <section className="hidden">
         {pageOrders.length === 0 ? (

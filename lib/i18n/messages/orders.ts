@@ -34,6 +34,16 @@ export const ordersMessages = {
       clearSearch: "Clear",
       searchTitle: "Booking archive",
       searchSummary: (count: number) => `${count} matching order(s)`,
+      listSummary: {
+        title: "Totals for this filter",
+        hint: "Every matching order, not just this page. Cancelled orders are left out.",
+        orders: "Orders",
+        total: "Earnings",
+        received: "Received (hand-entered orders)",
+        outstanding: "Still to collect",
+        noTax: "No tax recorded",
+        exportExcel: "Export to Excel",
+      },
       emptySearch: "No orders matched this keyword.",
       filters: {
         toggleLabel: "Filters",
@@ -98,6 +108,16 @@ export const ordersMessages = {
       clearSearch: "清除",
       searchTitle: "订单档案",
       searchSummary: (count: number) => `共找到 ${count} 条匹配订单`,
+      listSummary: {
+        title: "筛选结果合计",
+        hint: "按全部匹配的订单计算，不只是这一页；已取消的订单不计入。",
+        orders: "订单数",
+        total: "收入合计",
+        received: "已收（手动建的订单）",
+        outstanding: "待收",
+        noTax: "没有记录税费",
+        exportExcel: "导出 Excel",
+      },
       emptySearch: "没有找到符合这个关键字的订单。",
       filters: {
         toggleLabel: "筛选",

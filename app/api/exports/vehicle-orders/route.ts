@@ -4,6 +4,7 @@ import { OrderStatus } from "@prisma/client";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getMessages, type Locale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { buildWorkbookXml, workbookResponseHeaders } from "@/lib/spreadsheet-xml";
 import { formatCurrency, formatDateTime, getOrderNetEarning } from "@/lib/utils";
 
 function parseLocale(value: string | null): Locale {
@@ -19,52 +20,6 @@ function addDays(value: Date, amount: number) {
   const date = new Date(value);
   date.setDate(date.getDate() + amount);
   return date;
-}
-
-function escapeXml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-function sanitizeWorksheetName(value: string) {
-  return value.replace(/[\\/*?:[\]]/g, "").slice(0, 31) || "Orders";
-}
-
-function buildCell(value: string, styleId?: string) {
-  const styleAttribute = styleId ? ` ss:StyleID="${styleId}"` : "";
-  return `<Cell${styleAttribute}><Data ss:Type="String">${escapeXml(value)}</Data></Cell>`;
-}
-
-function buildWorkbookXml(sheetName: string, headers: string[], rows: string[][]) {
-  const headerRow = `<Row>${headers.map((header) => buildCell(header, "Header")).join("")}</Row>`;
-  const dataRows = rows
-    .map((row) => `<Row>${row.map((cell) => buildCell(cell)).join("")}</Row>`)
-    .join("");
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:office"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:html="http://www.w3.org/TR/REC-html40">
- <Styles>
-  <Style ss:ID="Header">
-   <Font ss:Bold="1"/>
-   <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
-  </Style>
- </Styles>
- <Worksheet ss:Name="${escapeXml(sheetName)}">
-  <Table>
-   ${headerRow}
-   ${dataRows}
-  </Table>
- </Worksheet>
-</Workbook>`;
 }
 
 export async function GET(request: Request) {
@@ -135,7 +90,7 @@ export async function GET(request: Request) {
   ]);
 
   const workbook = buildWorkbookXml(
-    sanitizeWorksheetName(`${vehicle.plateNumber} ${calendarMessages.exportSheetName}`),
+    `${vehicle.plateNumber} ${calendarMessages.exportSheetName}`,
     headers,
     rows,
   );
@@ -144,10 +99,6 @@ export async function GET(request: Request) {
 
   return new NextResponse(workbook, {
     status: 200,
-    headers: {
-      "Content-Type": "application/vnd.ms-excel; charset=utf-8",
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
-      "Cache-Control": "no-store",
-    },
+    headers: workbookResponseHeaders(filename),
   });
 }

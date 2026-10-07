@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
-import { requireCurrentAdminContext } from "@/lib/auth";
+import { requireSectionContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import {
@@ -88,7 +88,7 @@ export async function startConnectOnboarding(formData: FormData) {
     } as const;
   }
 
-  const { user, workspace } = await requireCurrentAdminContext();
+  const { user, workspace } = await requireSectionContext("/payouts");
 
   try {
     await ensureWorkspaceConnectAccount({
@@ -116,7 +116,7 @@ export async function continueConnectOnboarding() {
     return NOT_CONFIGURED;
   }
 
-  const { workspace } = await requireCurrentAdminContext();
+  const { workspace } = await requireSectionContext("/payouts");
 
   try {
     const origin = await resolveOrigin();
@@ -135,7 +135,7 @@ export async function openConnectDashboard() {
     return NOT_CONFIGURED;
   }
 
-  const { workspace } = await requireCurrentAdminContext();
+  const { workspace } = await requireSectionContext("/payouts");
 
   try {
     const url = await createConnectLoginLink({ workspaceId: workspace.id });
@@ -150,7 +150,7 @@ export async function refreshConnectStatus() {
     return NOT_CONFIGURED;
   }
 
-  const { workspace } = await requireCurrentAdminContext();
+  const { workspace } = await requireSectionContext("/payouts");
 
   try {
     await refreshConnectAccountSnapshot({ workspaceId: workspace.id });
@@ -173,7 +173,7 @@ export async function startConnectExistingAccount() {
     return NOT_CONFIGURED;
   }
 
-  const { user, workspace } = await requireCurrentAdminContext();
+  const { user, workspace } = await requireSectionContext("/payouts");
   const billing = await prisma.workspaceBilling.findUnique({
     where: { workspaceId: workspace.id },
     select: { stripeConnectAccountId: true },
@@ -212,7 +212,7 @@ export async function disconnectConnectAccount() {
     return NOT_CONFIGURED;
   }
 
-  const { user, workspace } = await requireCurrentAdminContext();
+  const { user, workspace } = await requireSectionContext("/payouts");
 
   try {
     const detached = await disconnectWorkspaceConnectAccount({ workspaceId: workspace.id });

@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.53.2 - 2026-10-07
+
+### The rental site's actions check their own section
+
+Server actions are addressed by a global id, and the page-access check
+looks at the request path -- so a member given only the orders page could
+post the site's or the pricing rules' action to /orders and have it run.
+Each of the site's actions now names its section with
+`requireSectionContext` (v1.52.0): the site, email template, booking rules,
+locations, a car's booking settings, agreement clauses, coupons and extras
+under "/direct-booking", and the six Stripe Connect actions under
+"/payouts" (owner only). Members limited to some cars cannot reach them.
+Checked locally: the owner still saves; a member with only "/orders"
+posting the booking-rules action to /orders is refused with ACCESS_DENIED
+and nothing changes.
+
 ## v1.53.1 - 2026-10-06
 
 ### Turo-sync and message actions check their own section

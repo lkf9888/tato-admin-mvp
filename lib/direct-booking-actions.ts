@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { requireCurrentAdminContext } from "@/lib/auth";
+import { requireSectionContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { normalizeAgreementClauses } from "@/lib/rental-agreement-clauses";
@@ -56,7 +56,7 @@ export async function updateVehicleBookingAction(
   vehicleIds: string[],
   patch: VehicleBookingPatch,
 ): Promise<VehicleBookingUpdateResult> {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/direct-booking");
 
   const ids = Array.from(new Set((vehicleIds ?? []).filter((id) => typeof id === "string" && id)));
   const parsed = patchSchema.safeParse(patch);
@@ -115,7 +115,7 @@ export async function updateVehicleBookingAction(
  * agreements already sent keep the wording their renter saw.
  */
 export async function saveAgreementClausesAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/direct-booking");
   const headings = formData.getAll("clauseHeading").map(String);
   const bodies = formData.getAll("clauseBody").map(String);
   const clauses = normalizeAgreementClauses(
@@ -147,7 +147,7 @@ export async function saveAgreementClausesAction(formData: FormData) {
 
 /** Back to the built-in wording: the workspace's own set is removed. */
 export async function resetAgreementClausesAction() {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/direct-booking");
   await prisma.rentalAgreementClauseSet.deleteMany({ where: { workspaceId: workspace.id } });
   await logActivity({
     workspaceId: workspace.id,
@@ -180,7 +180,7 @@ const couponFormSchema = z.object({
  * letters so a renter can tell whose it is.
  */
 export async function createCouponAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/direct-booking");
   const parsed = couponFormSchema.safeParse({
     kind: formData.get("kind"),
     value: formData.get("value"),
@@ -220,7 +220,7 @@ export async function createCouponAction(formData: FormData) {
 
 /** Withdraw an unused code; a used one is history and stays as it is. */
 export async function voidCouponAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/direct-booking");
   const id = formData.get("id")?.toString() ?? "";
   const result = await prisma.bookingCoupon.updateMany({
     where: { id, workspaceId: workspace.id, redeemedAt: null, voidedAt: null },
@@ -247,7 +247,7 @@ export async function voidCouponAction(formData: FormData) {
  * booking that bought one still reads sensibly.
  */
 export async function saveBookingAddOnsAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/direct-booking");
   const list = (key: string) => formData.getAll(key).map((value) => value.toString().trim());
   const ids = list("addOnId");
   const names = list("addOnName");

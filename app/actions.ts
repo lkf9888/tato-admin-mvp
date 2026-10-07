@@ -1973,7 +1973,7 @@ async function saveRentalSiteLogo(siteId: string, file: File) {
  * state to get out of step with the database.
  */
 export async function saveRentalSiteAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/direct-booking");
 
   const existing = await prisma.rentalSite.findUnique({
     where: { workspaceId: workspace.id },
@@ -2116,7 +2116,7 @@ export async function saveRentalSiteAction(formData: FormData) {
  * default wording back, not an email with no body.
  */
 export async function saveDirectBookingEmailTemplateAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/direct-booking");
 
   const isEnabled = formData.get("isEnabled")?.toString() === "on";
   const subjectTemplate = formData.get("subjectTemplate")?.toString().trim() || null;
@@ -2151,7 +2151,7 @@ export async function saveDirectBookingEmailTemplateAction(formData: FormData) {
  * inherit.
  */
 export async function saveBookingPolicyAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/direct-booking");
 
   const read = (name: string, fallback: number) => {
     const raw = formData.get(name)?.toString().trim();
@@ -2223,7 +2223,7 @@ export async function saveBookingPolicyAction(formData: FormData) {
  * of every renter-facing list while leaving the row.
  */
 export async function saveBookingLocationsAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/direct-booking");
 
   const labels = formData.getAll("locationLabel").map((value) => value.toString().trim());
   const addresses = formData.getAll("locationAddress").map((value) => value.toString().trim());

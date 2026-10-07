@@ -110,6 +110,7 @@ export function parseVehicleScope(value: string | null | undefined): string[] | 
  */
 const SCOPED_API_PREFIXES = [
   "/api/calendar/orders",
+  "/api/calendar/service-records",
   "/api/orders/offline",
   "/api/orders/export",
   "/api/orders/bulk-payment",

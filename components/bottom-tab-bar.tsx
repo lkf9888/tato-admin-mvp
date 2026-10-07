@@ -1,19 +1,18 @@
 "use client";
 
+import { CloseButton } from "@/components/back-button";
 import { CountPill, NavBadge, useNavBadges } from "@/components/nav-badges";
 import { NAV_ICONS, type NavIconName } from "@/components/nav-icons";
 import {
   CalendarDays,
-  ChevronRight,
   LayoutGrid,
   ListChecks,
   MoreHorizontal,
   UsersRound,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -33,10 +32,15 @@ import { cn } from "@/lib/utils";
  */
 
 type SidebarItem = { href: string; label: string; icon?: NavIconName };
+type SidebarGroup = { label: string; items: SidebarItem[] };
+
+/** How far the sheet must be pulled down, in px, to close on release. */
+const DISMISS_DRAG = 80;
 
 export function BottomTabBar({
   labels,
   moreItems,
+  moreGroups,
   moreFooter,
 }: {
   labels: {
@@ -52,6 +56,8 @@ export function BottomTabBar({
   // tabs. Passed down from AppShell so the source of truth for the
   // total nav stays in one place.
   moreItems: SidebarItem[];
+  /** The same items under the sidebar's group headings, for the sheet. */
+  moreGroups?: SidebarGroup[];
   // Slot at the bottom of the More sheet for non-nav controls
   // (language switcher, sign-out, version chip, etc.) so the mobile
   // shell exposes everything the desktop sidebar does without needing
@@ -59,6 +65,8 @@ export function BottomTabBar({
   moreFooter?: React.ReactNode;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [dragY, setDragY] = useState(0);
+  const dragStart = useRef<number | null>(null);
   const pathname = usePathname();
 
   // Close the More sheet on route change so it doesn't linger across
@@ -73,10 +81,41 @@ export function BottomTabBar({
     if (!moreOpen) return;
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMoreOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = original;
+      window.removeEventListener("keydown", onKey);
+      setDragY(0);
     };
   }, [moreOpen]);
+
+  // Pull the sheet down by its handle to close it, as on iOS. Only the
+  // handle and title row drag: the list below scrolls.
+  const dragHandlers = {
+    onPointerDown: (event: React.PointerEvent) => {
+      dragStart.current = event.clientY;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    onPointerMove: (event: React.PointerEvent) => {
+      if (dragStart.current === null) return;
+      setDragY(Math.max(0, event.clientY - dragStart.current));
+    },
+    onPointerUp: () => {
+      if (dragStart.current === null) return;
+      dragStart.current = null;
+      if (dragY > DISMISS_DRAG) setMoreOpen(false);
+      else setDragY(0);
+    },
+    onPointerCancel: () => {
+      dragStart.current = null;
+      setDragY(0);
+    },
+  };
+
+  const groups: SidebarGroup[] = moreGroups ?? [{ label: "", items: moreItems }];
 
   const tabs: Array<{
     href: string;
@@ -194,82 +233,76 @@ export function BottomTabBar({
         </div>
       </nav>
 
-      {/* "More" modal. Tapping outside or on a row closes it
-          (rows close via the route-change effect; the backdrop has
-          its own onClick). */}
+      {/* "More" sheet, rising from the bottom where the thumb already
+          is. Tapping outside, pressing Escape or pulling it down closes
+          it; rows close it through the route-change effect. */}
       {moreOpen ? (
         <div
           role="dialog"
           aria-modal="true"
           aria-label={labels.moreTitle}
-          className="fixed inset-0 z-40 flex items-center justify-center p-4 lg:hidden"
+          className="fixed inset-0 z-40 flex items-end justify-center lg:hidden"
         >
           <button
             type="button"
             aria-label="Close menu"
             onClick={() => setMoreOpen(false)}
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="tato-fade-in absolute inset-0 bg-black/40"
           />
-          <div className="relative max-h-[85vh] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-lg bg-[var(--surface)] pb-safe shadow-[0_30px_80px_rgba(0,0,0,0.25)]">
-            <div className="flex items-center justify-between px-5 pb-3 pt-3">
-              <h2 className="font-serif text-lg font-semibold text-[var(--ink)]">
-                {labels.moreTitle}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setMoreOpen(false)}
-                aria-label="Close menu"
-                className="tap-press inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--ink)]"
-              >
-                <X className="h-4 w-4" />
-              </button>
+          <div
+            className="tato-sheet-up relative flex max-h-[88dvh] w-full max-w-xl flex-col rounded-t-2xl bg-[var(--surface)] pb-safe shadow-[0_-20px_60px_rgba(0,0,0,0.22)]"
+            style={dragY ? { transform: `translateY(${dragY}px)`, transition: "none" } : undefined}
+          >
+            <div {...dragHandlers} className="shrink-0 cursor-grab touch-none select-none px-4 pt-2 pb-2">
+              <div aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-[var(--line-strong)]" />
+              <div className="mt-2 flex items-center justify-between">
+                <h2 className="text-[15px] font-semibold text-[var(--ink)]">{labels.moreTitle}</h2>
+                <span onPointerDown={(event) => event.stopPropagation()}>
+                  <CloseButton onClick={() => setMoreOpen(false)} label="Close menu" />
+                </span>
+              </div>
             </div>
 
-            <ul className="grid gap-1 px-3 pb-2">
-              {moreItems.map((item) => {
-                const active = pathname.startsWith(item.href);
-                const Icon = item.icon ? NAV_ICONS[item.icon] : null;
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      prefetch
-                      className={cn(
-                        // 52px tall rather than the 44px floor: this
-                        // sheet is a one-handed list scrolled with a
-                        // thumb, and the extra height is what stops a
-                        // reach to the top of the screen landing on
-                        // the neighbouring row.
-                        "tap-press flex min-h-[52px] items-center gap-3 rounded-md px-4 py-3 text-[15px] font-medium",
-                        active
-                          ? "bg-[var(--brand-soft)] font-bold text-[var(--brand)]"
-                          : "bg-[var(--surface-muted)] text-[var(--ink)] hover:bg-[var(--accent-soft)]",
-                      )}
-                    >
-                      {Icon ? (
-                        <Icon
-                          className="size-[19px] shrink-0 opacity-70"
-                          strokeWidth={1.75}
-                          aria-hidden
-                        />
-                      ) : null}
-                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      <NavBadge href={item.href} />
-                      <ChevronRight
-                        aria-hidden
-                        className="size-4 shrink-0 text-[var(--ink-soft)]"
-                      />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+              {groups.map((group) => (
+                <section key={group.label || "all"} className="pt-2">
+                  {group.label ? (
+                    <h3 className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-soft)]">
+                      {group.label}
+                    </h3>
+                  ) : null}
+                  {/* Two columns of tiles: the whole site map fits on
+                      one screen of a phone instead of a long list. */}
+                  <ul className="grid grid-cols-2 gap-1.5">
+                    {group.items.map((item) => {
+                      const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                      const Icon = item.icon ? NAV_ICONS[item.icon] : null;
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            prefetch
+                            aria-current={active ? "page" : undefined}
+                            className={cn(
+                              "tap-press flex min-h-[52px] items-center gap-2.5 rounded-lg px-3 py-2.5 text-[14px] font-medium",
+                              active
+                                ? "bg-[var(--brand-soft)] font-semibold text-[var(--brand)]"
+                                : "bg-[var(--surface-muted)] text-[var(--ink)] hover:bg-[var(--accent-soft)]",
+                            )}
+                          >
+                            {Icon ? <Icon className="size-[18px] shrink-0 opacity-70" strokeWidth={1.75} aria-hidden /> : null}
+                            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                            <NavBadge href={item.href} />
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
 
-            {moreFooter ? (
-              <div className="border-t border-[var(--line)] px-4 pt-4 pb-4">
-                {moreFooter}
-              </div>
-            ) : null}
+              {moreFooter ? <div className="mt-4 border-t border-[var(--line)] px-1 pt-4">{moreFooter}</div> : null}
+            </div>
           </div>
         </div>
       ) : null}

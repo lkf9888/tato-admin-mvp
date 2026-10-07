@@ -11,6 +11,9 @@ import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { readDirectBookingPayment } from "@/lib/stripe-refunds";
 import { getNetEarningFromFinancials, turoReservationUrl } from "@/lib/utils";
+import { BackLink } from "@/components/back-button";
+import { RememberOrderView } from "@/components/order-click-tracker";
+import { TuroCsvFields } from "@/components/turo-csv-fields";
 
 /**
  * One trip, laid out the way Turo lays out a reservation.
@@ -109,12 +112,8 @@ export default async function OrderDetailPage({
 
   return (
     <div className="space-y-3">
-      <Link
-        href="/orders"
-        className="inline-flex items-center gap-1 text-[12px] font-bold text-[var(--brand)]"
-      >
-        ← {t.back}
-      </Link>
+      <BackLink href="/orders" label={t.back} />
+      <RememberOrderView orderId={order.id} />
 
       <header className="flex flex-col gap-2 border-b border-[var(--line)] pb-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
@@ -131,6 +130,7 @@ export default async function OrderDetailPage({
       </header>
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+        <div className="min-w-0 space-y-3">
         {/* Facts. Hairlines between groups, not boxes around them. */}
         <section className="space-y-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-4 sm:px-4">
           <dl className="grid grid-cols-2 gap-x-3 gap-y-4">
@@ -149,7 +149,7 @@ export default async function OrderDetailPage({
                     href={`https://maps.google.com/?q=${encodeURIComponent(order.pickupLocation)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 inline-flex items-center text-[12px] font-bold text-[var(--brand)] underline underline-offset-2"
+                    className="mt-1 flex w-fit items-center text-[12px] font-bold text-[var(--brand)] underline underline-offset-2"
                   >
                     {t.directions}
                   </a>
@@ -177,6 +177,13 @@ export default async function OrderDetailPage({
             </div>
           ) : null}
         </section>
+
+        {/* The whole row Turo's CSV had for this trip, with the columns
+            the workspace chose to hide left out. The Turo-sync session's
+            component; renders nothing for an order that did not come
+            from a CSV. */}
+        <TuroCsvFields sourceMetadata={order.sourceMetadata} locale={locale} />
+        </div>
 
         {/* Right rail: who, and where to act. */}
         <aside className="space-y-3">

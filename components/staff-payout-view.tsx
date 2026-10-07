@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import { SearchableSelect } from "@/components/searchable-select";
 import { getMessages, type Locale } from "@/lib/i18n";
 import { formatCurrency } from "@/lib/utils";
+import { BackLink } from "@/components/back-button";
 
 type Summary = {
   staffId: string;
@@ -195,9 +195,7 @@ export function StaffPayoutView({
     <div className={readOnly ? "space-y-4" : "mx-auto max-w-5xl space-y-4 p-3 sm:p-6"}>
       {readOnly ? null : (
         <div>
-          <Link href="/staff-schedule/payouts" className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]">
-            ← {t.backToList}
-          </Link>
+          <BackLink href="/staff-schedule/payouts" label={t.backToList} />
           <div className="mt-1 flex items-center gap-2">
             <span className="h-3 w-3 rounded-full" style={{ backgroundColor: summary.color }} aria-hidden />
             <h1 className="font-serif text-2xl text-[var(--ink)]">{summary.name}</h1>

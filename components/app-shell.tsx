@@ -3,6 +3,7 @@ import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { ContactButton } from "@/components/contact-button";
 import { MobileNav } from "@/components/mobile-nav";
 import { NavBadgeProvider } from "@/components/nav-badges";
+import { ActivityIndicator } from "@/components/activity-indicator";
 import { NavigationOptimizer } from "@/components/navigation-optimizer";
 import { SessionExpiryRedirect } from "@/components/session-expiry-redirect";
 import { SidebarNav } from "@/components/sidebar-nav";
@@ -182,7 +183,7 @@ export function AppShell({
     <div className="min-h-screen bg-[var(--surface-muted)] text-[var(--ink)]">
       <MobileNav
         brandTitle={messages.shell.brandTitle}
-        brandKicker={messages.shell.brandKicker}
+        items={navGroups.flatMap((group) => group.items.map(({ href, label }) => ({ href, label })))}
       />
 
       <div className="flex min-h-screen w-full">
@@ -209,6 +210,7 @@ export function AppShell({
       <BottomTabBar
         labels={messages.shell.bottomNav}
         moreItems={moreItems}
+        moreGroups={visibleGroups}
         moreFooter={moreFooter}
       />
 
@@ -218,6 +220,7 @@ export function AppShell({
         currentUserEmail={currentUserEmail}
       />
       <NavigationOptimizer hrefs={navHrefs} />
+      <ActivityIndicator stillWorking={messages.shell.stillWorking} />
       <SessionExpiryRedirect />
     </div>
     </NavBadgeProvider>

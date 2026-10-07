@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { prisma } from "@/lib/prisma";
@@ -5,6 +6,7 @@ import {
   cn,
   formatCurrency,
   formatCurrencyCompact,
+  formatDate,
   formatDateTime,
   formatTime,
   formatNumber,
@@ -13,8 +15,10 @@ import {
   turoReservationUrl,
 } from "@/lib/utils";
 import { CsvQuickImportButton } from "@/components/csv-quick-import-button";
+import { OrderClickTracker } from "@/components/order-click-tracker";
 import { StatusBadge } from "@/components/status-badge";
-import { requireCurrentWorkspace } from "@/lib/auth";
+import { requireAccessContext } from "@/lib/auth";
+import { recentOrderViews } from "@/lib/recent-orders";
 import { getActivityActionLabel, getLocaleTag, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 
@@ -76,7 +80,11 @@ function buildDayEvents(orders: DayOrder[], dayStart: Date, dayEnd: Date): DayEv
       events.push({
         kind: "return",
         time: order.returnDatetime,
-        location: order.returnLocation,
+        // A Turo trip ends where it started unless the guest arranged
+        // otherwise, and an order made from Turo's booking email only
+        // knows the pickup spot -- so a return without its own place
+        // shows the pickup's rather than "no location".
+        location: order.returnLocation?.trim() || order.pickupLocation,
         order,
       });
     }
@@ -85,7 +93,7 @@ function buildDayEvents(orders: DayOrder[], dayStart: Date, dayEnd: Date): DayEv
 }
 
 export default async function DashboardPage() {
-  const workspace = await requireCurrentWorkspace();
+  const { workspace, user, vehicleIds } = await requireAccessContext();
   const now = new Date();
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
@@ -118,6 +126,7 @@ export default async function DashboardPage() {
     latestImport,
     latestLogs,
     monthlyOrders,
+    recentOrders,
   ] = await Promise.all([
     getI18n(),
     prisma.order.findMany({
@@ -161,6 +170,7 @@ export default async function DashboardPage() {
         sourceMetadata: true,
       },
     }),
+    recentOrderViews({ workspaceId: workspace.id, userId: user.id, vehicleIds }),
   ]);
   const dashboardMessages = messages.dashboard;
   const monthlyMessages = dashboardMessages.monthly;
@@ -297,6 +307,7 @@ export default async function DashboardPage() {
         target="_blank"
         rel="noopener noreferrer"
         title={eventMessages.openTuroChat}
+        data-order-id={order.id}
         className={rowClass}
       >
         {content}
@@ -306,12 +317,44 @@ export default async function DashboardPage() {
         key={`${order.id}-${event.kind}`}
         href={`/orders/${order.id}`}
         title={eventMessages.openOrder}
+        data-order-id={order.id}
         className={rowClass}
       >
         {content}
       </Link>
     );
   };
+
+  // A recently opened order: the same row as a pickup or return, with
+  // its dates where the time was. It opens the order's page here.
+  const renderRecent = (order: (typeof recentOrders)[number]) => (
+    <Link
+      key={order.id}
+      href={`/orders/${order.id}`}
+      title={eventMessages.openOrder}
+      data-order-id={order.id}
+      className="tap-press group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-md px-2 py-1.5 hover:bg-[var(--surface-muted)]"
+    >
+      <span className="min-w-0">
+        <span className="block truncate text-[12.5px] font-semibold text-[var(--ink)]">
+          {order.vehicle.plateNumber || order.vehicle.nickname}
+          <span className="font-normal text-[var(--ink-soft)]"> · </span>
+          {order.renterName}
+        </span>
+        <span className="block truncate text-[11px] tabular-nums text-[var(--ink-soft)]">
+          {order.vehicle.plateNumber ? `${order.vehicle.nickname} · ` : ""}
+          {dashboardMessages.recentDates(formatDate(order.pickupDatetime, locale), formatDate(order.returnDatetime, locale))}
+        </span>
+      </span>
+      <span className="flex items-center gap-1">
+        {order.status === "cancelled" ? <StatusBadge value="cancelled" locale={locale} /> : null}
+        {order.source !== "turo" ? <StatusBadge value={order.source} locale={locale} /> : null}
+        <span aria-hidden className="text-[12px] text-[var(--ink-soft)] group-hover:text-[var(--brand)]">
+          ›
+        </span>
+      </span>
+    </Link>
+  );
 
   const panelLinkClass =
     "tap-press shrink-0 text-[11px] font-medium text-[var(--ink-soft)] hover:text-[var(--brand)]";
@@ -444,13 +487,21 @@ export default async function DashboardPage() {
         <CsvQuickImportButton locale={locale} />
       </div>
 
-      <div className="grid gap-2.5 lg:grid-cols-3">
-        {renderPanel(
-          `${dashboardMessages.todayKicker} · ${dashboardMessages.todayTitle}`,
-          todayEvents.length,
-          { href: "/orders", label: dashboardMessages.openOrders },
-          todayEvents.length === 0 ? emptyRow(dashboardMessages.todayEmpty) : todayEvents.map(renderEvent),
-        )}
+      <OrderClickTracker className="grid items-start gap-2.5 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-2.5">
+          {renderPanel(
+            dashboardMessages.recentTitle,
+            null,
+            { href: "/orders", label: dashboardMessages.openOrders },
+            recentOrders.length === 0 ? emptyRow(dashboardMessages.recentEmpty) : recentOrders.map(renderRecent),
+          )}
+          {renderPanel(
+            `${dashboardMessages.todayKicker} · ${dashboardMessages.todayTitle}`,
+            todayEvents.length,
+            { href: "/orders", label: dashboardMessages.openOrders },
+            todayEvents.length === 0 ? emptyRow(dashboardMessages.todayEmpty) : todayEvents.map(renderEvent),
+          )}
+        </div>
         {renderPanel(
           `${dashboardMessages.tomorrowKicker} · ${dashboardMessages.tomorrowTitle}`,
           tomorrowEvents.length,
@@ -459,27 +510,49 @@ export default async function DashboardPage() {
             ? emptyRow(dashboardMessages.tomorrowEmpty)
             : tomorrowEvents.map(renderEvent),
         )}
-        {renderPanel(
-          dashboardMessages.activityTitle,
-          null,
-          { href: "/activity", label: dashboardMessages.openActivity },
-          latestLogs.length === 0
-            ? emptyRow(dashboardMessages.activityEmpty)
-            : latestLogs.map((log) => (
-                <div key={log.id} className="flex items-baseline justify-between gap-2 rounded-md px-2 py-1.5">
-                  <span className="min-w-0">
-                    <span className="block truncate text-[12.5px] font-medium text-[var(--ink)]">
-                      {getActivityActionLabel(log.action, locale)}
+        {/* Folded: what happened lately is worth a glance now and then,
+            not the height of the page every time. */}
+        <details className="group/activity min-w-0 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-2 sm:p-2.5">
+          <summary className="tap-press cursor-pointer list-none px-1 [&::-webkit-details-marker]:hidden">
+            <span className="flex items-baseline justify-between gap-2">
+              <h3 className="flex min-w-0 items-center gap-1 text-[13px] font-semibold text-[var(--ink)]">
+                <ChevronRight
+                  aria-hidden
+                  className="size-3.5 shrink-0 text-[var(--ink-soft)] transition group-open/activity:rotate-90"
+                />
+                <span className="truncate">{dashboardMessages.activityTitle}</span>
+              </h3>
+              <Link href="/activity" className={panelLinkClass}>
+                {dashboardMessages.openActivity} →
+              </Link>
+            </span>
+            {/* Closed, it still says what happened last. */}
+            {latestLogs[0] ? (
+              <span className="mt-0.5 block truncate pl-[18px] text-[11px] text-[var(--ink-soft)] group-open/activity:hidden">
+                {getActivityActionLabel(latestLogs[0].action, locale)} · {latestLogs[0].actor} ·{" "}
+                {formatDateTime(latestLogs[0].createdAt, locale)}
+              </span>
+            ) : null}
+          </summary>
+          <div className="mt-1 space-y-0.5">
+            {latestLogs.length === 0
+              ? emptyRow(dashboardMessages.activityEmpty)
+              : latestLogs.map((log) => (
+                  <div key={log.id} className="flex items-baseline justify-between gap-2 rounded-md px-2 py-1.5">
+                    <span className="min-w-0">
+                      <span className="block truncate text-[12.5px] font-medium text-[var(--ink)]">
+                        {getActivityActionLabel(log.action, locale)}
+                      </span>
+                      <span className="block truncate text-[11px] text-[var(--ink-soft)]">{log.actor}</span>
                     </span>
-                    <span className="block truncate text-[11px] text-[var(--ink-soft)]">{log.actor}</span>
-                  </span>
-                  <span className="shrink-0 text-[11px] tabular-nums text-[var(--ink-soft)]">
-                    {formatDateTime(log.createdAt, locale)}
-                  </span>
-                </div>
-              )),
-        )}
-      </div>
+                    <span className="shrink-0 text-[11px] tabular-nums text-[var(--ink-soft)]">
+                      {formatDateTime(log.createdAt, locale)}
+                    </span>
+                  </div>
+                ))}
+          </div>
+        </details>
+      </OrderClickTracker>
     </div>
   );
 }

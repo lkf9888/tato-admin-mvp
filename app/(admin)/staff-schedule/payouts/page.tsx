@@ -5,6 +5,7 @@ import { getMessages } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { getStaffPayoutSummaries } from "@/lib/staff-payout";
 import { formatCurrency } from "@/lib/utils";
+import { BackLink } from "@/components/back-button";
 
 /**
  * Every staff member's pay at a glance: earned, paid, owed, and the
@@ -21,9 +22,7 @@ export default async function StaffPayoutsPage() {
     <div className="mx-auto max-w-5xl space-y-4 p-3 sm:p-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <Link href="/staff-schedule" className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]">
-            ← {t.back}
-          </Link>
+          <BackLink href="/staff-schedule" label={t.back} />
           <h1 className="mt-1 font-serif text-2xl text-[var(--ink)]">{t.title}</h1>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--ink-soft)]">{t.intro}</p>
         </div>

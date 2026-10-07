@@ -249,6 +249,19 @@ model UserInvite {
   @@index([workspaceId])
 }
 
+/// The orders a person opened last, for the dashboard's "recently viewed".
+/// One row per person and order, its id "<userId>:<orderId>", so opening
+/// the same order again moves it up instead of adding a row.
+model OrderView {
+  id          String   @id
+  workspaceId String
+  userId      String
+  orderId     String
+  viewedAt    DateTime @default(now())
+
+  @@index([userId, viewedAt])
+}
+
 model Owner {
   workspaceId       String?
   id                String                @id @default(cuid())
@@ -2068,6 +2081,31 @@ model CalendarNote {
   @@index([workspaceId])
   @@index([vehicleId, startDate, endDate])
   @@index([workspaceId, isArchived])
+}
+
+/// A car's repair, service or odometer reading, drawn on the calendar as
+/// a yellow band that may overlap its trips. Whole days, kept as midnight
+/// UTC like CalendarNote, so the band's edges do not move with the
+/// reader's timezone. No relations on purpose: it is additive and reads
+/// by workspace and car.
+model VehicleServiceRecord {
+  id          String   @id @default(cuid())
+  workspaceId String
+  vehicleId   String
+  startDate   DateTime
+  endDate     DateTime
+  /// repair | maintenance | mileage | other
+  kind        String   @default("maintenance")
+  description String   @default("")
+  mileage     Int?
+  cost        Float?
+  isArchived  Boolean  @default(false)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId, startDate])
+  @@index([vehicleId])
 }
 
 /// One instalment against an order.

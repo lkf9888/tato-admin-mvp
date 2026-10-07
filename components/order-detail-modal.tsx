@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Pencil, Save, Share2, Trash2, X } from "lucide-react";
+import { Check, ExternalLink, Pencil, Save, Share2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { BookingExtraChargePanel } from "@/components/booking-extra-charge-panel";
 import { DirectBookingCancelPanel } from "@/components/direct-booking-cancel-panel";
 import { DirectBookingHandoverPanel } from "@/components/direct-booking-handover-panel";
 import { OrderAttachments } from "@/components/order-attachments";
+import { rememberOrder } from "@/components/remember-order";
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { getOrderStatusOptions, getStatusLabel, type Locale } from "@/lib/i18n";
@@ -22,6 +23,7 @@ import {
   maskPhone,
   parseDateTimeInputParts,
   todayDateInputValue,
+  turoReservationUrl,
 } from "@/lib/utils";
 
 export type EditableOrder = {
@@ -191,6 +193,7 @@ function labels(locale: Locale) {
         ownerShareUnsynced: "未同步给车主",
         ownerShareSynced: "已同步给车主",
         ownerShareSync: "同步给车主共享",
+        viewOnTuro: "查看Turo订单",
         ownerShareResync: "重新同步",
         ownerShareSyncing: "同步中...",
         ownerShareSyncSuccess: "已同步到车主共享。",
@@ -268,6 +271,7 @@ function labels(locale: Locale) {
         ownerShareUnsynced: "Not shared with owner",
         ownerShareSynced: "Shared with owner",
         ownerShareSync: "Sync to owner share",
+        viewOnTuro: "View on Turo",
         ownerShareResync: "Resync",
         ownerShareSyncing: "Syncing...",
         ownerShareSyncSuccess: "Synced to owner share.",
@@ -341,7 +345,7 @@ function EditableField({
         // A field not being edited shows a read-only input. The touch
         // rule's 44px minimum is for things you type into, and on these
         // it made a name or a phone twice the height of its neighbours.
-        "grid min-w-0 gap-0.5 rounded-md border px-3 py-1.5 transition [&_input[readonly]]:min-h-0",
+        "grid min-w-0 gap-0 rounded-md border px-2.5 py-1 transition [&_input[readonly]]:min-h-0",
         editing
           ? "border-[var(--accent)] bg-white shadow-[0_0_0_3px_rgba(89,60,251,0.1)]"
           : "border-[rgba(17,19,24,0.1)] bg-white/84 focus-within:border-[rgba(17,19,24,0.28)]",
@@ -489,6 +493,7 @@ export function OrderDetailModal({
   const selectedVehicle = vehicleOptions.find((vehicle) => vehicle.id === draft.vehicleId);
   const displayPhone = maskSensitive ? maskPhone(currentOrder.renterPhone) : currentOrder.renterPhone || "-";
   const selectedOwnerId = selectedVehicle?.ownerId ?? currentOrder.ownerId ?? null;
+  const turoTripUrl = turoReservationUrl({ source: currentOrder.source, externalOrderId: currentOrder.externalOrderId ?? null });
   const ownerShareSyncedAt = currentOrder.ownerLedgerSyncedAt ?? null;
 
   const updateDraft = (patch: Partial<OrderDraft>) => {
@@ -732,6 +737,17 @@ export function OrderDetailModal({
     };
   }, [currentOrder.id, readOnly]);
 
+  // Opening an order here counts as viewing it, for the dashboard's
+  // "recently viewed". Not in the read-only views shown to owners.
+  useEffect(() => {
+    if (!readOnly && currentOrder.id) rememberOrder(currentOrder.id);
+  }, [currentOrder.id, readOnly]);
+
+  const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 640px)").matches) setAttachmentsOpen(true);
+  }, []);
+
   const paidTotal = payments.reduce(
     (sum, payment) => (payment.paidAt ? sum + (Number(payment.amount) || 0) : sum),
     0,
@@ -864,14 +880,26 @@ export function OrderDetailModal({
         )}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 border-b border-[var(--line)] bg-[rgba(255,255,255,0.94)] px-4 py-3 backdrop-blur">
-          <div className="flex items-start justify-between gap-3">
+        {/* One compact header: what car, whose, which state, and the
+            actions that leave this panel (Turo, owner share, close). The
+            row of four summary cards that sat under it repeated fields
+            shown again below and cost a third of a phone screen. */}
+        <div className="sticky top-0 z-10 border-b border-[var(--line)] bg-[rgba(255,255,255,0.94)] px-3 py-2 backdrop-blur sm:px-4 sm:py-2.5">
+          <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate font-serif text-[1.15rem] font-semibold text-[color:var(--ink)] sm:text-[1.35rem]">
+              <h3 className="truncate text-[15px] font-semibold text-[color:var(--ink)] sm:text-[1.15rem]">
                 {currentOrder.vehiclePlateNumber
                   ? `${currentOrder.vehiclePlateNumber} · ${currentOrder.vehicleName}`
                   : currentOrder.vehicleName}
               </h3>
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                <StatusBadge value={currentOrder.source} locale={locale} />
+                <StatusBadge value={draft.status} locale={locale} />
+                {currentOrder.hasConflict ? <StatusBadge value="conflict" locale={locale} /> : null}
+                <span className="truncate text-[11px] text-[color:var(--ink-soft)]">
+                  {t.owner}: {selectedVehicle?.ownerName ?? currentOrder.ownerName ?? "-"}
+                </span>
+              </div>
               {/* Only the read-only notice: the caption for editors
                   ("Calendar and Orders open the same detail panel")
                   said nothing an operator acts on. */}
@@ -879,16 +907,30 @@ export function OrderDetailModal({
                 <p className="mt-1 text-[12px] text-[color:var(--ink-soft)]">{t.readOnly}</p>
               ) : null}
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
+              {turoTripUrl ? (
+                <a
+                  href={turoTripUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={t.viewOnTuro}
+                  aria-label={t.viewOnTuro}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-2.5 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[var(--ink)]"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                  <span className="hidden sm:inline">{t.viewOnTuro}</span>
+                </a>
+              ) : null}
               {!readOnly ? (
                 <button
                   type="button"
                   onClick={syncOwnerShare}
                   disabled={!selectedOwnerId || isSaving || isSyncingOwner || isDeleting}
-                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 text-[12px] font-semibold text-white transition hover:-translate-y-0.5 hover:border-emerald-700 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[var(--surface-muted)] disabled:text-[color:var(--ink-soft)]"
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-2.5 text-[12px] font-semibold text-white transition hover:border-emerald-700 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:bg-[var(--surface-muted)] disabled:text-[color:var(--ink-soft)]"
                   title={selectedOwnerId ? t.ownerShareHelp : t.ownerShareNotAssigned}
+                  aria-label={t.ownerShareSync}
                 >
-                  <Share2 className="h-3.5 w-3.5" aria-hidden />
+                  <Share2 className={cn("h-3.5 w-3.5", isSyncingOwner && "motion-safe:animate-pulse")} aria-hidden />
                   <span className="hidden sm:inline">
                     {isSyncingOwner
                       ? t.ownerShareSyncing
@@ -908,43 +950,8 @@ export function OrderDetailModal({
               </button>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <StatusBadge value={currentOrder.source} locale={locale} />
-            <StatusBadge value={draft.status} locale={locale} />
-            {currentOrder.hasConflict ? <StatusBadge value="conflict" locale={locale} /> : null}
-          </div>
-        </div>
-
-        <div className="px-4 py-4">
-          <div className="grid grid-cols-2 gap-2 text-[12px] text-[color:var(--ink)] sm:gap-3 md:grid-cols-4">
-            <div className="min-w-0 rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                {t.owner}
-              </p>
-              <p className="mt-1 truncate font-semibold">{selectedVehicle?.ownerName ?? currentOrder.ownerName ?? "-"}</p>
-            </div>
-            <div className="min-w-0 rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                {t.source}
-              </p>
-              <p className="mt-1 truncate font-semibold">{getStatusLabel(currentOrder.source, locale)}</p>
-            </div>
-            <div className="min-w-0 rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                {t.totalPrice}
-              </p>
-              <p className="mt-1 truncate font-semibold">{formatCurrency(currentOrder.totalPrice, locale)}</p>
-            </div>
-            <div className="min-w-0 rounded-md border border-[rgba(17,19,24,0.06)] bg-white/72 px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                {t.phone}
-              </p>
-              <p className="mt-1 truncate font-semibold">{displayPhone}</p>
-            </div>
-          </div>
-
           {!readOnly ? (
-            <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] leading-4 text-[color:var(--ink-soft)]">
+            <p className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] leading-4 text-[color:var(--ink-soft)]">
               <span className="font-semibold text-[color:var(--ink)]">
                 {ownerShareSyncedAt
                   ? t.ownerShareSynced
@@ -952,17 +959,19 @@ export function OrderDetailModal({
                     ? t.ownerShareUnsynced
                     : t.ownerShareNotAssigned}
               </span>
-              {ownerShareSyncedAt ? (
-                <span>{`${t.ownerShareLastSynced}: ${formatDateTime(ownerShareSyncedAt, locale)}`}</span>
-              ) : null}
-              {ownerSyncMessage ? (
-                <span className="font-semibold text-emerald-700">{ownerSyncMessage}</span>
-              ) : null}
+              {ownerShareSyncedAt ? <span>{formatDateTime(ownerShareSyncedAt, locale)}</span> : null}
+              {ownerSyncMessage ? <span className="font-semibold text-emerald-700">{ownerSyncMessage}</span> : null}
             </p>
           ) : null}
+        </div>
 
-          <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <EditableField labelText={t.vehicle} {...fieldChrome("vehicleId")}>
+        <div className="px-3 py-3 sm:px-4">
+          {/* Two columns from the narrowest phone up: a name, a phone
+              number or a status needs half a row, and a whole row each
+              is what made this panel three screens long. Fields with long
+              content, and any field being edited, take the full row. */}
+          <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:gap-2 lg:grid-cols-4">
+            <EditableField className="col-span-2 sm:col-span-1" labelText={t.vehicle} {...fieldChrome("vehicleId")}>
               {editingField === "vehicleId" ? (
                 <SearchableSelect
                   value={draft.vehicleId}
@@ -1027,7 +1036,7 @@ export function OrderDetailModal({
             </EditableField>
 
             <EditableField
-              className="lg:col-span-2"
+              className={cn(editingField === "pickupTime" ? "col-span-2" : "", "lg:col-span-2")}
               labelText={t.pickupTime}
               {...fieldChrome("pickupTime")}
             >
@@ -1062,7 +1071,7 @@ export function OrderDetailModal({
             </EditableField>
 
             <EditableField
-              className="lg:col-span-2"
+              className={cn(editingField === "returnTime" ? "col-span-2" : "", "lg:col-span-2")}
               labelText={t.returnTime}
               {...fieldChrome("returnTime")}
             >
@@ -1100,7 +1109,7 @@ export function OrderDetailModal({
                 the draft, so it re-prices once a new time is saved and
                 never while one is half typed. */}
             {currentOrder.source !== "turo" ? (
-              <div className="empty:hidden sm:col-span-2 lg:col-span-4">
+              <div className="col-span-2 empty:hidden lg:col-span-4">
                 <BookingExtraChargePanel
                   key={`${currentOrder.id}:${currentOrder.pickupDatetime}:${currentOrder.returnDatetime}`}
                   locale={locale}
@@ -1115,7 +1124,7 @@ export function OrderDetailModal({
                 other order. Done closes the dialog: the order it showed is
                 now cancelled, and possibly in the trash. */}
             {currentOrder.source !== "turo" ? (
-              <div ref={cancelPanelRef} className="empty:hidden sm:col-span-2 lg:col-span-4">
+              <div ref={cancelPanelRef} className="col-span-2 empty:hidden lg:col-span-4">
                 <DirectBookingCancelPanel
                   key={`${currentOrder.id}:${currentOrder.status}`}
                   locale={locale}
@@ -1132,14 +1141,19 @@ export function OrderDetailModal({
                 photo grids side by side. Renders nothing for an order that
                 is not a direct booking. */}
             {currentOrder.source !== "turo" ? (
-              <div className="empty:hidden sm:col-span-2 lg:col-span-4">
+              <div className="col-span-2 empty:hidden lg:col-span-4">
                 <DirectBookingHandoverPanel locale={locale} orderId={currentOrder.id} />
               </div>
             ) : null}
 
-            <EditableField labelText={t.pickupLocation} {...fieldChrome("pickupLocation")}>
+            <EditableField
+              className={cn(editingField === "pickupLocation" && "col-span-2")}
+              labelText={t.pickupLocation}
+              {...fieldChrome("pickupLocation")}
+            >
               <input
                 value={editingField === "pickupLocation" ? draft.pickupLocation : currentOrder.pickupLocation ?? ""}
+                title={currentOrder.pickupLocation ?? undefined}
                 onChange={(event) => updateDraft({ pickupLocation: event.target.value })}
                 readOnly={editingField !== "pickupLocation"}
                 autoFocus={editingField === "pickupLocation"}
@@ -1147,9 +1161,14 @@ export function OrderDetailModal({
               />
             </EditableField>
 
-            <EditableField labelText={t.returnLocation} {...fieldChrome("returnLocation")}>
+            <EditableField
+              className={cn(editingField === "returnLocation" && "col-span-2")}
+              labelText={t.returnLocation}
+              {...fieldChrome("returnLocation")}
+            >
               <input
                 value={editingField === "returnLocation" ? draft.returnLocation : currentOrder.returnLocation ?? ""}
+                title={currentOrder.returnLocation ?? undefined}
                 onChange={(event) => updateDraft({ returnLocation: event.target.value })}
                 readOnly={editingField !== "returnLocation"}
                 autoFocus={editingField === "returnLocation"}
@@ -1165,11 +1184,11 @@ export function OrderDetailModal({
               this panel that is not a property of the order at all --
               it is a price on the car, and saving it prices every trip
               that car runs from the chosen date onward. */}
-          <div className="mt-4 rounded-lg border border-[rgba(17,19,24,0.1)] bg-[var(--surface-muted)]/50 p-3">
+          <div className="mt-2.5 rounded-lg border border-[rgba(17,19,24,0.1)] bg-[var(--surface-muted)]/50 p-2 sm:p-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
               {t.accounting}
             </p>
-            <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-1.5 grid min-w-0 grid-cols-2 gap-1.5 sm:gap-2 lg:grid-cols-4">
               <EditableField labelText={t.totalPrice} {...fieldChrome("totalPrice")}>
                 <input
                   type="number"
@@ -1223,7 +1242,7 @@ export function OrderDetailModal({
               </EditableField>
 
               <EditableField
-                className="sm:col-span-2"
+                className="col-span-2"
                 labelText={t.cleaningFee}
                 {...fieldChrome("cleaningFee")}
               >
@@ -1274,15 +1293,15 @@ export function OrderDetailModal({
                 charges -- so "why is this trip $377" had no answer
                 anywhere in the product. */}
             {currentOrder.feeLines && currentOrder.feeLines.length > 0 ? (
-              <div className="mt-3 rounded-md border border-[rgba(17,19,24,0.1)] bg-white/70 px-3 py-2">
+              <div className="mt-2 rounded-md border border-[rgba(17,19,24,0.1)] bg-white/70 px-2.5 py-1.5">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
                   {t.feeBreakdown}
                 </p>
-                <ul className="mt-1.5 space-y-0.5">
+                <ul className="mt-1 grid gap-x-4 sm:grid-cols-2">
                   {currentOrder.feeLines.map((line) => (
                     <li
                       key={line.column}
-                      className="flex items-baseline justify-between gap-3 text-[12px] leading-5"
+                      className="flex items-baseline justify-between gap-3 text-[11.5px] leading-[1.15rem]"
                     >
                       <span className="min-w-0 truncate text-[color:var(--ink-soft)]">
                         {line.column}
@@ -1315,20 +1334,20 @@ export function OrderDetailModal({
             ) : null}
           </div>
 
-          <div className="mt-4 grid min-w-0 gap-2">
+          <div className="mt-2.5 grid min-w-0 gap-2">
             <EditableField labelText={t.notes} {...fieldChrome("notes")}>
               <textarea
                 value={editingField === "notes" ? draft.notes : currentOrder.notes ?? ""}
                 onChange={(event) => updateDraft({ notes: event.target.value })}
                 readOnly={editingField !== "notes"}
                 autoFocus={editingField === "notes"}
-                rows={4}
+                rows={editingField === "notes" ? 4 : Math.min(4, Math.max(1, (currentOrder.notes ?? "").split("\n").length))}
                 className="w-full min-w-0 max-w-full resize-none border-0 bg-transparent p-0 text-[13px] text-[color:var(--ink)] outline-none"
               />
             </EditableField>
           </div>
 
-          <div className="mt-3 grid gap-2 text-[11px] text-[color:var(--ink-soft)] md:grid-cols-3">
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 px-1 text-[11px] text-[color:var(--ink-soft)]">
             {currentOrder.createdBy ? (
               <p>
                 {t.createdBy}: <span className="font-semibold text-[color:var(--ink)]">{currentOrder.createdBy}</span>
@@ -1342,13 +1361,22 @@ export function OrderDetailModal({
             ) : null}
           </div>
 
+          {/* Folded on a phone, where its upload buttons and grids were
+              the tallest thing in the panel; open on a wider screen. */}
           {!readOnly ? (
-            <div className="mt-4 rounded-lg border border-[color:var(--line)] bg-white/58 p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
+            <details
+              open={attachmentsOpen}
+              onToggle={(event) => setAttachmentsOpen((event.currentTarget as HTMLDetailsElement).open)}
+              className="group/files mt-2.5 rounded-lg border border-[color:var(--line)] bg-white/58 p-2 sm:p-2.5"
+            >
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)] [&::-webkit-details-marker]:hidden">
+                <span aria-hidden className="inline-block transition group-open/files:rotate-90">›</span>
                 {t.attachments}
-              </p>
-              <OrderAttachments orderId={currentOrder.id} locale={locale} compact />
-            </div>
+              </summary>
+              <div className="mt-1.5">
+                <OrderAttachments orderId={currentOrder.id} locale={locale} compact />
+              </div>
+            </details>
           ) : null}
 
           {error ? (
@@ -1388,8 +1416,10 @@ export function OrderDetailModal({
           {/* A long rental is not one payment, and a single totalPrice
               cannot answer the only question anybody asks midway
               through it: how much is still owed. */}
-          {!readOnly && paymentsLoaded ? (
-            <section className="mt-4 rounded-md border border-[var(--line)] bg-white/70 p-3">
+          {/* Turo collects for its own trips, so a Turo trip shows the
+              schedule only once someone has written a row into it. */}
+          {!readOnly && paymentsLoaded && (currentOrder.source !== "turo" || payments.length > 0) ? (
+            <section className="mt-2.5 rounded-md border border-[var(--line)] bg-white/70 p-2 sm:p-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-[12px] font-semibold text-[var(--ink)]">{t.payments}</h3>
                 <span
@@ -1512,7 +1542,7 @@ export function OrderDetailModal({
               speed bump -- it no longer needs a second one borrowed
               from a global edit mode that does not exist anymore. */}
           {!readOnly ? (
-            <div className="mt-4 flex flex-wrap justify-start gap-2 border-t border-[var(--line)] pt-4">
+            <div className="mt-3 flex flex-wrap justify-start gap-2 border-t border-[var(--line)] pt-3">
               <button
                 type="button"
                 onClick={() => void duplicateOrder()}

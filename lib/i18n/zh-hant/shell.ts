@@ -57,6 +57,7 @@ export const shellMessages = {
         moreTitle: "所有功能",
       },
       signOut: "退出登入",
+      stillWorking: "還在處理，請稍候，不要重新整理頁面…",
       workspaceKicker: "運營工作台",
       workspaceBadge: "Turo 管理後台 MVP · SQLite + Prisma + 手動 CSV 同步",
       languageLabel: "語言",

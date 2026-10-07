@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import {
+  ADMIN_COOKIE,
+  ADMIN_SESSION_MAX_AGE_SECONDS,
+  adminCookieOptions,
+  SESSION_RENEWED_COOKIE,
+  SESSION_RENEW_EVERY_SECONDS,
+} from "@/lib/session-cookie";
 import { getSiteHreflang, getSiteLocaleFromPath } from "@/lib/site-locale";
 
 const protectedPrefixes = [
@@ -26,7 +33,8 @@ const protectedPrefixes = [
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasAdminCookie = Boolean(request.cookies.get("turo-admin-session")?.value);
+  const adminCookie = request.cookies.get(ADMIN_COOKIE)?.value;
+  const hasAdminCookie = Boolean(adminCookie);
 
   if (protectedPrefixes.some((prefix) => pathname.startsWith(prefix)) && !hasAdminCookie) {
     return NextResponse.redirect(new URL("/login", request.url));
@@ -48,7 +56,21 @@ export function middleware(request: NextRequest) {
     requestHeaders.set("x-site-lang", getSiteHreflang(siteLocale));
   }
 
-  return NextResponse.next({ request: { headers: requestHeaders } });
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+
+  // Keep a session in use alive: the cookie's seven days restart whenever
+  // it is used, at most every six hours, so someone working in TATO daily is
+  // never signed out mid-week. The value is passed back untouched -- it is
+  // checked where it is read (lib/auth.ts), and a forged one stays forged.
+  // Reads only: signing out is a POST, and renewing the cookie in the same
+  // response that deletes it would race the deletion.
+  const isRead = request.method === "GET" || request.method === "HEAD";
+  if (adminCookie && isRead && !request.cookies.get(SESSION_RENEWED_COOKIE)) {
+    response.cookies.set(ADMIN_COOKIE, adminCookie, adminCookieOptions(ADMIN_SESSION_MAX_AGE_SECONDS));
+    response.cookies.set(SESSION_RENEWED_COOKIE, "1", adminCookieOptions(SESSION_RENEW_EVERY_SECONDS));
+  }
+
+  return response;
 }
 
 export const config = {

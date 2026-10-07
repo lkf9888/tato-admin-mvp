@@ -66,17 +66,65 @@ function leadingBlanks(firstOfMonth: Date) {
   return weekday === 0 ? 6 : weekday - 1;
 }
 
+/** The main calendar's colours (getTimelineBarClasses), so a trip looks the same in both. */
 function barColour(order: MonthOrder) {
   if (order.hasConflict) return "border-[#c61e22] bg-[#e5484d] text-white";
-  if (order.status === "cancelled") {
-    return "border-dashed border-[rgba(17,19,24,0.3)] bg-[rgba(17,19,24,0.1)] text-[color:var(--ink-soft)] line-through";
-  }
-  if (order.ownerId && order.ownerLedgerSyncedAt) {
-    return "border-[#1f5b48] bg-[#2f7f67] text-white";
-  }
+  if (order.status === "cancelled") return "border-slate-500 bg-[var(--ink-soft)] text-white";
+  if (order.ownerId && order.ownerLedgerSyncedAt) return "border-[#1f5b48] bg-[#2f7f67] text-white";
   if (order.source === "turo") return "border-[#1f3aa8] bg-[#3456df] text-white";
   return "border-[#1f5b48] bg-[#2f7f67] text-white";
 }
+
+type WeekBar = {
+  order: MonthOrder;
+  /** Fractions of the week's width, by the hour, as the main calendar places them. */
+  left: number;
+  width: number;
+  lane: number;
+  clippedStart: boolean;
+  clippedEnd: boolean;
+};
+
+/**
+ * One week of a month, as continuous bars rather than a chip per day:
+ * a trip is drawn once from its pickup hour to its return hour, and is
+ * only cut where the week or the month ends. Overlapping trips take
+ * lanes, live trips before cancelled ones.
+ */
+function weekBars(orders: MonthOrder[], weekStart: Date, from: Date, to: Date): WeekBar[] {
+  const weekMs = 7 * DAY_IN_MS;
+  const start = Math.max(weekStart.getTime(), from.getTime());
+  const end = Math.min(weekStart.getTime() + weekMs, to.getTime());
+  const touching = orders
+    .filter((order) => new Date(order.pickupDatetime).getTime() < end && new Date(order.returnDatetime).getTime() > start)
+    .sort(
+      (a, b) =>
+        Number(a.status === "cancelled") - Number(b.status === "cancelled") ||
+        new Date(a.pickupDatetime).getTime() - new Date(b.pickupDatetime).getTime(),
+    );
+  const laneEnds: number[] = [];
+  return touching.map((order) => {
+    const pickup = new Date(order.pickupDatetime).getTime();
+    const ret = new Date(order.returnDatetime).getTime();
+    const barStart = Math.max(pickup, start);
+    const barEnd = Math.min(ret, end);
+    let lane = laneEnds.findIndex((laneEnd) => laneEnd <= barStart);
+    if (lane === -1) lane = laneEnds.length;
+    laneEnds[lane] = barEnd;
+    return {
+      order,
+      left: (barStart - weekStart.getTime()) / weekMs,
+      width: Math.max((barEnd - barStart) / weekMs, 1 / 28),
+      lane,
+      clippedStart: pickup < start,
+      clippedEnd: ret > end,
+    };
+  });
+}
+
+/** How many lanes of bars a week row has room to show before "+n". */
+const MAX_LANES = 3;
+const LANE_HEIGHT = 13;
 
 export function VehicleMonthCalendar({
   locale,
@@ -153,17 +201,6 @@ export function VehicleMonthCalendar({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  /** The trips touching one day, for the cell that draws them. */
-  const ordersOnDay = (day: Date) => {
-    const start = day.getTime();
-    const end = start + DAY_IN_MS;
-    return orders.filter(
-      (order) =>
-        new Date(order.pickupDatetime).getTime() < end &&
-        new Date(order.returnDatetime).getTime() > start,
-    );
-  };
 
   const monthFormatter = new Intl.DateTimeFormat(locale === "en" ? "en-CA" : "zh-CN", {
     year: "numeric",
@@ -248,7 +285,7 @@ export function VehicleMonthCalendar({
                   <p className="mb-1.5 text-[12px] font-semibold text-[var(--ink)]">
                     {monthFormatter.format(month)}
                   </p>
-                  <div className="grid grid-cols-7 gap-px text-center">
+                  <div className="grid grid-cols-7 text-center">
                     {weekdayHeaders.map((label) => (
                       <span
                         key={label}
@@ -257,66 +294,81 @@ export function VehicleMonthCalendar({
                         {label}
                       </span>
                     ))}
-                    {Array.from({ length: blanks }, (_, index) => (
-                      <span key={`blank-${index}`} />
-                    ))}
-                    {Array.from({ length: daysInMonth }, (_, index) => {
-                      const day = new Date(month.getFullYear(), month.getMonth(), index + 1);
-                      const dayOrders = ordersOnDay(day);
-                      const weekend = [0, 6].includes(day.getDay());
-                      const isToday = isSameDay(day, today);
-                      const live = dayOrders.filter((order) => order.status !== "cancelled");
-                      const primary = live[0] ?? dayOrders[0];
-
-                      return (
-                        <button
-                          key={day.toISOString()}
-                          type="button"
-                          disabled={!primary}
-                          onClick={() => primary && onSelectOrder(primary)}
-                          title={
-                            primary
-                              ? `${primary.renterName} · ${getStatusLabel(primary.status, locale)}`
-                              : undefined
-                          }
-                          className={cn(
-                            "flex aspect-square flex-col items-center justify-start gap-0.5 rounded-[3px] border p-0.5 text-[10px] leading-none transition",
-                            weekend ? "bg-[#faf4eb]" : "bg-white",
-                            isToday
-                              ? "border-[var(--accent)] ring-1 ring-[var(--accent)]"
-                              : "border-[rgba(17,19,24,0.06)]",
-                            primary ? "cursor-pointer hover:brightness-95" : "cursor-default",
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "tabular-nums",
-                              isToday
-                                ? "font-bold text-[var(--accent)]"
-                                : "text-[color:var(--ink-soft)]",
-                            )}
-                          >
-                            {index + 1}
-                          </span>
-                          {primary ? (
+                  </div>
+                  {Array.from({ length: Math.ceil((blanks + daysInMonth) / 7) }, (_, week) => {
+                    const weekStart = new Date(month.getFullYear(), month.getMonth(), 1 - blanks + week * 7);
+                    const monthEnd = addMonths(month, 1);
+                    const bars = weekBars(orders, weekStart, month, monthEnd);
+                    const lanes = Math.min(MAX_LANES, bars.reduce((most, bar) => Math.max(most, bar.lane + 1), 0));
+                    const hidden = bars.filter((bar) => bar.lane >= MAX_LANES).length;
+                    return (
+                      <div
+                        key={week}
+                        className="relative grid grid-cols-7 border-t border-[rgba(17,19,24,0.06)]"
+                        style={{ minHeight: 18 + Math.max(lanes, 1) * LANE_HEIGHT + (hidden ? 10 : 2) }}
+                      >
+                        {Array.from({ length: 7 }, (_, column) => {
+                          const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + column);
+                          const inMonth = day.getMonth() === month.getMonth();
+                          const isToday = isSameDay(day, today);
+                          const weekend = [0, 6].includes(day.getDay());
+                          return (
                             <span
+                              key={column}
                               className={cn(
-                                "w-full truncate rounded-[2px] border px-0.5 text-[8px] leading-[11px]",
-                                barColour(primary),
+                                "border-l border-[rgba(17,19,24,0.04)] px-0.5 pt-0.5 text-left text-[10px] leading-none first:border-l-0",
+                                inMonth && weekend ? "bg-[#faf4eb]" : "",
+                                isToday ? "bg-[var(--brand-soft)]" : "",
                               )}
                             >
-                              {primary.renterName}
+                              {inMonth ? (
+                                <span
+                                  className={cn(
+                                    "tabular-nums",
+                                    isToday ? "font-bold text-[var(--accent)]" : "text-[color:var(--ink-soft)]",
+                                  )}
+                                >
+                                  {day.getDate()}
+                                </span>
+                              ) : null}
                             </span>
-                          ) : null}
-                          {live.length > 1 ? (
-                            <span className="text-[8px] font-bold text-[#c61e22]">
-                              +{live.length - 1}
-                            </span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                  </div>
+                          );
+                        })}
+                        {bars
+                          .filter((bar) => bar.lane < MAX_LANES)
+                          .map((bar) => (
+                            <button
+                              key={bar.order.id}
+                              type="button"
+                              onClick={() => onSelectOrder(bar.order)}
+                              title={`${bar.order.renterName} · ${getStatusLabel(bar.order.status, locale)}`}
+                              className={cn(
+                                "tap-compact absolute flex items-center overflow-hidden border px-1 text-left text-[9px] font-semibold leading-none shadow-[0_6px_14px_-8px_rgba(17,19,24,0.6)] transition hover:brightness-110",
+                                barColour(bar.order),
+                                bar.clippedStart ? "rounded-l-none border-l-0" : "rounded-l-[4px]",
+                                bar.clippedEnd ? "rounded-r-none border-r-0" : "rounded-r-[4px]",
+                              )}
+                              style={{
+                                left: `${bar.left * 100}%`,
+                                width: `${bar.width * 100}%`,
+                                top: 15 + bar.lane * LANE_HEIGHT,
+                                height: LANE_HEIGHT - 2,
+                              }}
+                            >
+                              <span className="truncate">{bar.order.renterName}</span>
+                            </button>
+                          ))}
+                        {hidden ? (
+                          <span
+                            className="absolute right-1 text-[8px] font-bold text-[#c61e22]"
+                            style={{ top: 15 + MAX_LANES * LANE_HEIGHT - 1 }}
+                          >
+                            +{hidden}
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}

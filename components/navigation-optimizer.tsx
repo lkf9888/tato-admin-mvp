@@ -95,8 +95,10 @@ export function NavigationOptimizer({ hrefs }: { hrefs: string[] }) {
 
   if (!pending) return null;
 
+  // The one progress bar (page placeholders draw none). It waits 300ms
+  // before showing, so a page that arrives at once does not flash it.
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-[90] h-1 bg-[var(--accent-soft-strong)]/70">
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-[90] h-1 bg-[var(--accent-soft-strong)]/70 opacity-0 animate-[tato-fade-in_150ms_ease-out_300ms_forwards]">
       <div className="h-full w-1/3 animate-[tato-route-progress_1.05s_ease-in-out_infinite] bg-[var(--ink)] shadow-[0_0_18px_rgba(17,17,17,0.35)]" />
     </div>
   );

@@ -70,6 +70,42 @@
   }
 }
 
+/* The mobile More sheet rises from the bottom; its backdrop fades in. */
+@keyframes tato-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes tato-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.tato-sheet-up {
+  animation: tato-sheet-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform 180ms ease-out;
+}
+
+.tato-fade-in {
+  animation: tato-fade-in 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tato-sheet-up,
+  .tato-fade-in {
+    animation: none;
+    transition: none;
+  }
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -451,8 +487,10 @@ a[class*="rounded-2xl"],
      you press and forgot the things you tap into. Measured at 35px on
      the vehicle form, which is a miss waiting to happen when the next
      field is 8px below it. */
-  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not(.tap-compact),
-  textarea:not(.tap-compact) {
+  /* Not a read-only field: nobody types into it, and the order panel
+     shows every saved value as one, which made each value 44px tall. */
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([readonly]):not(.tap-compact),
+  textarea:not([readonly]):not(.tap-compact) {
     min-height: var(--tap-min);
   }
 

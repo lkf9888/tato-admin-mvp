@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Ticket } from "lucide-react";
+import { Ticket, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { CalendarPricePanel } from "@/components/calendar-price-panel";
@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { VehicleEditDialog, type VehicleEditDialogVehicle } from "@/components/vehicle-edit-dialog";
 import { CalendarFeedDialog } from "@/components/calendar-feed-dialog";
 import { RecurringOrderDialog } from "@/components/recurring-order-dialog";
+import { type ServiceRecord, ServiceRecordDialog } from "@/components/service-record-dialog";
 import { VehicleMonthCalendar } from "@/components/vehicle-month-calendar";
 import { VehicleOrdersExportButton } from "@/components/vehicle-orders-export-button";
 import {
@@ -202,6 +203,11 @@ const NOTE_BAND_HEIGHT = 16;
  *  -- the calendar used to drop them server-side, which made "this
  *  trip was cancelled" and "this trip never existed" identical. */
 const CANCELLED_BAND_HEIGHT = 12;
+
+/** A repair or service: a yellow label of its own at the foot of the row,
+ *  and a pale yellow wash over its days that the trips draw on top of --
+ *  so a car in the shop during a booking shows both, neither hidden. */
+const SERVICE_BAND_HEIGHT = 15;
 
 function startOfDay(value: Date | string) {
   const date = new Date(value);
@@ -968,6 +974,10 @@ export function CalendarView({
   const [noteDraft, setNoteDraft] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [notes, setNotes] = useState<CalendarNote[]>([]);
+  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
+  const [serviceDialog, setServiceDialog] = useState<
+    { record: ServiceRecord } | { seed: { vehicleId: string; startDate: string; endDate: string } } | null
+  >(null);
 
   // Horizontal scroll position, sampled once per frame. Three things
   // read it: which header cells to render, which bars to render, and
@@ -1780,6 +1790,47 @@ export function CalendarView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readOnly, toDayParam(rangeStart), toDayParam(rangeEndExclusive), storeVersion]);
 
+  // Repairs and services for the whole canvas, like notes: a few per car,
+  // not one per day.
+  useEffect(() => {
+    if (readOnly) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch(
+          `/api/calendar/service-records?from=${toDayParam(rangeStart)}&to=${toDayParam(rangeEndExclusive)}`,
+          { headers: { Accept: "application/json" } },
+        );
+        if (!response.ok) return;
+        const data = (await response.json()) as { records?: ServiceRecord[] };
+        if (!cancelled) setServiceRecords(data.records ?? []);
+      } catch {
+        // Like notes: the bookings on the grid are still right without them.
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly, toDayParam(rangeStart), toDayParam(rangeEndExclusive), storeVersion]);
+
+  const openServiceDialog = () => {
+    const vehicleId =
+      selectedVehicleId !== "all" ? selectedVehicleId : filteredVehicles[0]?.id ?? vehicleOptions[0]?.id ?? "";
+    const day = toDayParam(normalizedFocusDate);
+    setServiceDialog({ seed: { vehicleId, startDate: day, endDate: day } });
+  };
+
+  const openServiceFromSelection = () => {
+    if (!daySelection) return;
+    const sorted = [...daySelection.days].sort();
+    setServiceDialog({
+      seed: { vehicleId: daySelection.vehicleId, startDate: sorted[0], endDate: sorted[sorted.length - 1] },
+    });
+    clearDaySelection();
+  };
+
   async function saveNote() {
     if (!daySelection || !noteDraft.trim() || isSavingNote) return;
     setIsSavingNote(true);
@@ -2286,6 +2337,18 @@ export function CalendarView({
                   },
                 ]}
               />
+            ) : null}
+            {!readOnly ? (
+              <button
+                type="button"
+                onClick={openServiceDialog}
+                disabled={vehicleOptions.length === 0}
+                className={cn(secondaryActionClass, "gap-1.5 border-amber-300 bg-amber-50 text-amber-950 hover:border-amber-400 hover:bg-amber-100")}
+              >
+                <Wrench className="h-3.5 w-3.5" aria-hidden />
+                <span className="sm:hidden">{calendarMessages.service.newActionShort}</span>
+                <span className="hidden sm:inline">{calendarMessages.service.newAction}</span>
+              </button>
             ) : null}
 
             {/* The price layer's two controls, together. Their behaviour
@@ -2821,6 +2884,15 @@ export function CalendarView({
                   {calendarMessages.selectionCreateOrder}
                 </button>
 
+                <button
+                  type="button"
+                  onClick={openServiceFromSelection}
+                  className={cn(secondaryActionClass, "h-8 gap-1.5 border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100")}
+                >
+                  <Wrench className="h-3.5 w-3.5" aria-hidden />
+                  {calendarMessages.service.newAction}
+                </button>
+
                 {pricing ? (
                   <button
                     type="button"
@@ -3025,6 +3097,7 @@ export function CalendarView({
                   barWindowEndExclusive,
                 );
                 const rowNotes = notes.filter((note) => note.vehicleId === vehicle.id);
+                const rowServices = serviceRecords.filter((record) => record.vehicleId === vehicle.id);
                 const rowCancelled = cancelledOrders.filter(
                   (order) =>
                     order.vehicleId === vehicle.id &&
@@ -3033,7 +3106,8 @@ export function CalendarView({
                 const rowHeight =
                   Math.max(minRowHeight, laneCount * laneHeight + 8) +
                   (rowNotes.length > 0 ? NOTE_BAND_HEIGHT + 2 : 0) +
-                  (rowCancelled.length > 0 ? CANCELLED_BAND_HEIGHT + 2 : 0);
+                  (rowCancelled.length > 0 ? CANCELLED_BAND_HEIGHT + 2 : 0) +
+                  (rowServices.length > 0 ? SERVICE_BAND_HEIGHT + 2 : 0);
                 const alternateRow = index % 2 === 1;
                 const rowSelection =
                   daySelection?.vehicleId === vehicle.id ? daySelection.days : null;
@@ -3153,7 +3227,7 @@ export function CalendarView({
                         if (readOnly || bulkMode) return;
                         // Bars and note bands are their own targets.
                         const target = event.target as HTMLElement;
-                        if (target.closest("[data-calendar-order-bar],[data-calendar-note]")) return;
+                        if (target.closest("[data-calendar-order-bar],[data-calendar-note],[data-calendar-service],[data-calendar-cancelled]")) return;
                         // Fires on click, not pointer-down, so a pan
                         // that merely starts on a day does not pick it
                         // -- and a pan that ends on one is swallowed by
@@ -3252,6 +3326,60 @@ export function CalendarView({
                         />
                       ) : null}
 
+                      {rowServices.map((record) => {
+                        const from = Math.max(
+                          Math.round((new Date(`${record.startDate}T00:00:00`).getTime() - canvasStart.getTime()) / DAY_IN_MS),
+                          0,
+                        );
+                        const to = Math.min(
+                          Math.round((new Date(`${record.endDate}T00:00:00`).getTime() - canvasStart.getTime()) / DAY_IN_MS),
+                          days.length - 1,
+                        );
+                        if (to < from) return null;
+                        const left = from * dayColumnWidth;
+                        const width = (to - from + 1) * dayColumnWidth;
+                        const kindLabel = calendarMessages.service.kinds[record.kind] ?? record.kind;
+                        const label = [
+                          kindLabel,
+                          record.mileage != null ? calendarMessages.service.km(record.mileage.toLocaleString(getLocaleTag(locale))) : null,
+                          record.description || null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ");
+                        return (
+                          <div key={`service-${record.id}`}>
+                            {/* The wash: under the trips, over the day grid. */}
+                            <div
+                              aria-hidden
+                              className="pointer-events-none absolute inset-y-0 border-x-2 border-amber-400/80 bg-[repeating-linear-gradient(135deg,rgba(251,191,36,0.42)_0_6px,rgba(251,191,36,0.20)_6px_12px)]"
+                              style={{ left, width }}
+                            />
+                            <button
+                              type="button"
+                              data-calendar-service="true"
+                              title={label}
+                              onClick={() => {
+                                if (bulkMode) return;
+                                setServiceDialog({ record });
+                              }}
+                              className="tap-compact absolute z-10 flex items-center gap-1 overflow-hidden rounded-sm border border-amber-500 bg-amber-300 px-1 text-left text-[10px] font-semibold leading-none text-amber-950 shadow-[0_4px_10px_-6px_rgba(120,53,15,0.7)] transition hover:bg-amber-400"
+                              style={{
+                                left: left + 1,
+                                width: Math.max(width - 2, 18),
+                                bottom:
+                                  (rowNotes.length > 0 ? NOTE_BAND_HEIGHT + 3 : 0) +
+                                  (rowCancelled.length > 0 ? CANCELLED_BAND_HEIGHT + 3 : 0) +
+                                  1,
+                                height: SERVICE_BAND_HEIGHT,
+                              }}
+                            >
+                              <Wrench className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                              <span className="truncate">{label}</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+
                       {rowCancelled.map((order) => {
                         const start = new Date(order.pickupDatetime).getTime();
                         const end = new Date(order.returnDatetime).getTime();
@@ -3272,7 +3400,7 @@ export function CalendarView({
                               setOrderPopover({ isOpen: true });
                             }}
                             className={cn(
-                              "absolute z-10 flex items-center overflow-hidden rounded-sm border border-dashed px-1 text-left text-[9px] leading-none line-through",
+                              "tap-compact absolute z-10 flex items-center overflow-hidden rounded-sm border border-dashed px-1 text-left text-[9px] leading-none line-through",
                               "border-[rgba(17,19,24,0.28)] bg-[rgba(17,19,24,0.10)] text-[color:var(--ink-soft)] transition hover:bg-[rgba(17,19,24,0.18)]",
                               !orderMatchesSearch(order) ? "opacity-15" : "",
                             )}
@@ -3310,7 +3438,7 @@ export function CalendarView({
                             data-calendar-note="true"
                             title={`${note.text} \u00b7 ${calendarMessages.noteDeleteHint}`}
                             onClick={() => deleteNote(note)}
-                            className="absolute z-20 flex items-center overflow-hidden rounded-sm border border-[rgba(17,19,24,0.12)] bg-[rgba(17,19,24,0.07)] px-1.5 text-left text-[10px] font-medium leading-none text-[color:var(--ink)] transition hover:bg-[rgba(17,19,24,0.14)]"
+                            className="tap-compact absolute z-10 flex items-center overflow-hidden rounded-sm border border-[rgba(17,19,24,0.12)] bg-[rgba(17,19,24,0.07)] px-1.5 text-left text-[10px] font-medium leading-none text-[color:var(--ink)] transition hover:bg-[rgba(17,19,24,0.14)]"
                             style={{
                               left: clampedFrom * dayColumnWidth + 1,
                               width: Math.max((clampedTo - clampedFrom + 1) * dayColumnWidth - 2, 16),
@@ -3462,6 +3590,24 @@ export function CalendarView({
           onDeleted={() => {
             setOrderPopover(null);
             setSelectedOrder(null);
+          }}
+        />
+      ) : null}
+
+      {!readOnly && serviceDialog ? (
+        <ServiceRecordDialog
+          locale={locale}
+          vehicles={vehicleOptions}
+          record={"record" in serviceDialog ? serviceDialog.record : null}
+          seed={"seed" in serviceDialog ? serviceDialog.seed : undefined}
+          onClose={() => setServiceDialog(null)}
+          onSaved={(saved) => {
+            setServiceRecords((current) => [...current.filter((item) => item.id !== saved.id), saved]);
+            setServiceDialog(null);
+          }}
+          onDeleted={(id) => {
+            setServiceRecords((current) => current.filter((item) => item.id !== id));
+            setServiceDialog(null);
           }}
         />
       ) : null}

@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.55.0 - 2026-10-07
+
+### Dashboard: recently viewed orders, a folded activity list, return locations
+
+- **Recently viewed.** A panel above Today lists the last three orders you opened, from the dashboard, the calendar or an order's page. It is kept per person on the server (`OrderView`, `lib/recent-orders.ts`), so it follows you from laptop to phone. Clicks are sent with `navigator.sendBeacon` and never hold the click up. A member limited to some cars only ever sees theirs.
+- **Recent actions** is folded by default, with the latest action shown on the closed row.
+- **Return locations.** A return without its own location shows the pickup's, since a Turo trip ends where it started unless arranged otherwise. Orders made from Turo's booking email only ever recorded the pickup spot. The parsing itself is the Turo-sync session's to fix.
+
+### Calendar: a tighter order panel, a Turo link, service records, a fixed car calendar
+
+- **The order panel is about half as tall on a phone.** The summary cards that repeated fields shown again below are gone. The owner and sharing state moved into the header. Fields sit two to a row on the narrowest phone, and take the full row only when long or being edited. Spacing, notes and the fee breakdown were tightened.
+- **查看Turo订单** sits left of the owner-share button on Turo trips and opens the reservation on turo.com.
+- **Service records.** 新建维修记录, next to the New menu and in the day-selection bar, records a repair, service, odometer reading or other work: a car, a run of days, mileage, cost and a description. It is drawn as a yellow label at the foot of the car's row, over a pale yellow wash across those days. The trips are drawn on top of the wash, so a car in the shop during a booking shows both. Tap the label to edit or delete it. Records are whole days, like calendar notes, and are archived rather than deleted (`VehicleServiceRecord`, `/api/calendar/service-records`). A member limited to some cars gets only theirs.
+- **A car's own calendar draws trips as continuous bars.** Each trip was a chip in every day it touched, so it looked cut at each date. Bars now run from the pickup hour to the return hour, break only at the end of a week or month, take lanes when they overlap, and use the main calendar's colours.
+
+### The order page shows the trip's whole Turo CSV row
+
+The order page now shows, below the trip's facts, every column Turo's CSV had for the trip. The component (`components/turo-csv-fields.tsx`) and the choice of which columns to hide are the Turo-sync session's; this page only places it.
+
+### Waiting is visible everywhere
+
+- **Server waits.** On every admin page, any wait on the server — an API call, a save (server actions included), an import or an export — shows a bar along the top after 300ms. A change still going after 5 seconds adds "还在处理，请稍候，不要刷新页面…". Reloading or closing the page while a change is in flight asks first. This works by watching `fetch` in `components/activity-indicator.tsx`, so pages from every session are covered without changes. Background polling is ignored.
+- **Page changes.** Navigation keeps its own single bar, which now waits 300ms before showing. Every main page has a placeholder shaped like the page instead of one shared dashboard shape.
+
+### Interface polish
+
+- **Stay signed in while in use.** The session's seven days now restart when it is used, at most every six hours. The app's own minute-by-minute session check counts, so an app left open stays signed in. Signing out is never renewed.
+- **The mobile top bar names the page** you are on. A sub-page shows its section's name.
+- **"More" is a bottom sheet** with a drag handle, grouped as in the sidebar, in two columns of tiles. Pull it down, tap outside or press Escape to close it.
+- **One back link and one close button** replace three hand-typed "←" styles.
+- **"?" hints** draw above the page, so a card no longer clips them, and stay on screen.
+- **Searchable dropdowns** work from the keyboard: arrows, Home/End and Enter, which picks the highlighted row and never submits the form. Their search box is ignored by password managers.
+
 ## v1.54.0 - 2026-10-07
 
 ### CSV import asks for the account and confirms new cars; long waits show progress

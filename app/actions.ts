@@ -434,7 +434,7 @@ function parseTuroCurlCommand(value: string | null) {
 }
 
 export async function saveTuroSyncSettingsAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/imports");
   const parsed = turoSyncSettingsSchema.parse({
     csvUrl: formData.get("csvUrl")?.toString(),
     csvYear: formData.get("csvYear")?.toString(),
@@ -1055,7 +1055,7 @@ export async function deleteOwnerCommissionAction(formData: FormData) {
  * accounts expect a settlement. The next import fills it in.
  */
 export async function assignPendingOrderAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/orders");
 
   const pendingId = formData.get("pendingId")?.toString() ?? "";
   const vehicleId = formData.get("vehicleId")?.toString() ?? "";
@@ -1125,7 +1125,7 @@ export async function assignPendingOrderAction(formData: FormData) {
 
 /** Drop a parked booking without filing it. */
 export async function dismissPendingOrderAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/orders");
   const pendingId = formData.get("pendingId")?.toString() ?? "";
 
   const pending = await prisma.pendingOrder.findFirst({
@@ -1865,7 +1865,7 @@ export async function unlockShareLinkAction(formData: FormData) {
  * requirement every other vehicle-scoped write in this file makes.
  */
 export async function saveMessageTemplateAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/messages");
 
   const templateId = formData.get("templateId")?.toString() || null;
   const label = cleanText(formData.get("label")?.toString());
@@ -1912,7 +1912,7 @@ export async function saveMessageTemplateAction(formData: FormData) {
 }
 
 export async function deleteMessageTemplateAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/messages");
 
   const templateId = formData.get("templateId")?.toString() ?? "";
   const template = await prisma.messageTemplate.findFirst({

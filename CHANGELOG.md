@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.53.1 - 2026-10-06
+
+### Turo-sync and message actions check their own section
+
+Follows v1.53.0, which moved the operations actions over: a server action is reachable from any page, so checking the page it was posted from let a member allowed only some pages run actions from others with a hand-made request.
+
+- Saving the Turo sync settings needs 导入. Assigning or dismissing a pending Turo order needs 订单, where that panel lives; members limited to some cars are refused, because pending orders belong to the whole fleet.
+- Saving or deleting a message template needs 消息.
+- The sync, message and assistant API routes already checked the route's own path, so they are unchanged.
+
 ## v1.53.0 - 2026-10-06
 
 ### A team member can be limited to some cars

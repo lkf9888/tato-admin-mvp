@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyLabel } from "@/components/booking-spinner";
 import { useCallback, useEffect, useState } from "react";
 
 import { getMessages, type Locale } from "@/lib/i18n";
@@ -28,6 +29,7 @@ export function BookingExtraChargePanel({ locale, orderId }: { locale: Locale; o
   const [quote, setQuote] = useState<Quote | null>(null);
   const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [billingMethod, setBillingMethod] = useState<"card" | "link" | null>(null);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const money = (value: number) => formatCurrency(value, locale);
 
@@ -49,6 +51,7 @@ export function BookingExtraChargePanel({ locale, orderId }: { locale: Locale; o
     const confirmText =
       method === "card" ? copy.confirmCard(money(quote.total)) : copy.confirmLink(money(quote.total));
     if (!window.confirm(confirmText)) return;
+    setBillingMethod(method);
     setBusy(true);
     setResult(null);
     try {
@@ -112,7 +115,7 @@ export function BookingExtraChargePanel({ locale, orderId }: { locale: Locale; o
                 className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
                 style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
               >
-                {busy ? copy.working : copy.chargeCard(money(quote.total))}
+                <BusyLabel busy={busy && billingMethod === "card"} idle={copy.chargeCard(money(quote.total))} working={copy.working} />
               </button>
             ) : null}
             <button
@@ -121,7 +124,7 @@ export function BookingExtraChargePanel({ locale, orderId }: { locale: Locale; o
               disabled={busy}
               className="rounded-md border border-[var(--line)] bg-white px-3 py-1.5 text-[12px] font-medium text-[var(--ink)] hover:bg-[var(--surface-muted)] disabled:opacity-60"
             >
-              {busy && !quote.hasSavedCard ? copy.working : copy.sendLink}
+              <BusyLabel busy={busy && billingMethod === "link"} idle={copy.sendLink} working={copy.working} />
             </button>
           </div>
           <p className="mt-1.5 text-[11px] leading-4 text-[var(--ink-soft)]">

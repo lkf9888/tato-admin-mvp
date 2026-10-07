@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { BusyLabel } from "@/components/booking-spinner";
 import { getMessages, type Locale } from "@/lib/i18n";
 
 type Photo = { id: string; filename: string; capturedAt: string | null; uploadedAt: string };
@@ -115,7 +116,11 @@ export function BookingHandoverRenter({
               onClick={() => inputs.current[stage]?.click()}
               className="mt-3 h-11 w-full rounded-[var(--control-radius)] bg-[var(--brand)] px-4 text-sm font-semibold text-white disabled:opacity-60"
             >
-              {busy === stage ? progress : photos.length ? copy.handoverAddMore : copy.handoverAction}
+              <BusyLabel
+                busy={busy === stage}
+                idle={photos.length ? copy.handoverAddMore : copy.handoverAction}
+                working={progress}
+              />
             </button>
           </>
         ) : null}

@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.53.3 - 2026-10-07
+
+### Waits on the booking pages show they are waits
+
+A wait with nothing moving reads as a page that has stopped, and gets
+reloaded or tapped again. A small spinner (`components/booking-spinner.tsx`)
+now goes with the "working" word on every long action of the site and its
+admin pages. On the renter's side, which has no admin shell: the pay
+button stays disabled through the redirect to Stripe ("Opening secure
+payment…") -- it used to come back to life during the second or two
+Stripe takes to load -- and a network failure there now says so; links
+between a site's pages show a thin bar in the site's colour until the next
+page arrives (`site-route-progress`, listening in the capture phase since
+Next's Link cancels the click); the signing page spins while it loads and
+while each PDF page paints; change requests and check-in photo uploads
+spin on the button pressed. In the admin: approve/decline say which and
+stay disabled through the reload that follows; deposit, cancellation,
+extra-day and mileage charges spin only the button pressed; Stripe
+Connect, dynamic pricing, ad rewrites and the contracts page spin too.
+
 ## v1.53.2 - 2026-10-07
 
 ### The rental site's actions check their own section

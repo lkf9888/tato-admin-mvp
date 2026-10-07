@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 
 import { BOOKING_TIME_OPTIONS, zonedDateTimeToUtc } from "@/lib/booking-time";
+import { BusyLabel } from "@/components/booking-spinner";
 import { getMessages, type Locale } from "@/lib/i18n";
 import { formatCurrency } from "@/lib/utils";
 
@@ -77,7 +78,11 @@ export function BookingChangeForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const [sendingKind, setSendingKind] = useState<"CANCEL" | "RESCHEDULE" | null>(null);
+  const waitCopy = getMessages(locale).waitLabels;
+
   function submit(kind: "CANCEL" | "RESCHEDULE") {
+    setSendingKind(kind);
     setError(null);
 
     const pickupAt = zonedDateTimeToUtc(pickupDate, pickupTime);
@@ -200,7 +205,7 @@ export function BookingChangeForm({
           onClick={() => submit("RESCHEDULE")}
           className="h-11 rounded-[var(--control-radius)] bg-[var(--brand)] px-5 text-sm font-semibold text-white disabled:opacity-60"
         >
-          {copy.rescheduleAction}
+          <BusyLabel busy={pending && sendingKind === "RESCHEDULE"} idle={copy.rescheduleAction} working={waitCopy.sending} />
         </button>
       </div>
 
@@ -214,7 +219,7 @@ export function BookingChangeForm({
             onClick={() => submit("CANCEL")}
             className="mt-3 h-11 rounded-[var(--control-radius)] border border-[color:var(--bad-fg)]/30 px-5 text-sm font-semibold text-[color:var(--bad-fg)] disabled:opacity-60"
           >
-            {copy.cancelAction}
+            <BusyLabel busy={pending && sendingKind === "CANCEL"} idle={copy.cancelAction} working={waitCopy.sending} />
           </button>
         ) : null}
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyLabel } from "@/components/booking-spinner";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getMessages, type Locale } from "@/lib/i18n";
@@ -85,6 +86,7 @@ export function DirectBookingHandoverPanel({ locale, orderId }: { locale: Locale
               charge={view.mileageCharge}
               hasSavedCard={view.hasSavedCard}
               copy={copy}
+              working={getMessages(locale).waitLabels.working}
               money={(value) => formatCurrency(value, locale)}
               onDone={load}
             />
@@ -101,6 +103,7 @@ function MileageBill({
   charge,
   hasSavedCard,
   copy,
+  working,
   money,
   onDone,
 }: {
@@ -108,10 +111,12 @@ function MileageBill({
   charge: NonNullable<View["mileageCharge"]>;
   hasSavedCard: boolean;
   copy: ReturnType<typeof getMessages>["directBookingHandover"];
+  working: string;
   money: (value: number) => string;
   onDone: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
+  const [billingMethod, setBillingMethod] = useState<"card" | "link" | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   if (charge.billed) {
@@ -127,6 +132,7 @@ function MileageBill({
   async function bill(method: "card" | "link") {
     const confirmText = method === "card" ? copy.mileageConfirmCard(money(charge.total)) : copy.mileageConfirmLink(money(charge.total));
     if (!window.confirm(confirmText)) return;
+    setBillingMethod(method);
     setBusy(true);
     setMessage(null);
     const response = await fetch(`${base}/mileage`, {
@@ -167,7 +173,7 @@ function MileageBill({
             className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
             style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
           >
-            {copy.mileageChargeCard(money(charge.total))}
+            <BusyLabel busy={busy && billingMethod === "card"} idle={copy.mileageChargeCard(money(charge.total))} working={working} />
           </button>
         ) : null}
         <button
@@ -176,7 +182,7 @@ function MileageBill({
           onClick={() => void bill("link")}
           className="rounded-md border border-[var(--line)] bg-white px-3 py-1.5 text-[12px] font-medium text-[var(--ink)] disabled:opacity-60"
         >
-          {copy.mileageSendLink}
+          <BusyLabel busy={busy && billingMethod === "link"} idle={copy.mileageSendLink} working={working} />
         </button>
       </div>
       {message ? (
@@ -334,7 +340,7 @@ function StageCard({
           className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
           style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
         >
-          {busy || copy.save}
+          <BusyLabel busy={busy !== ""} idle={copy.save} working={busy} />
         </button>
         {message ? (
           <span className={`text-[11px] ${message.ok ? "text-[color:var(--ok-fg)]" : "text-[color:var(--bad-fg)]"}`}>

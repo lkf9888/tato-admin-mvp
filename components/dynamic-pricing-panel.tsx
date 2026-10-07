@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyLabel } from "@/components/booking-spinner";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
@@ -71,6 +72,7 @@ export function DynamicPricingPanel({
   suggestions: Suggestion[];
 }) {
   const copy = getMessages(locale).directBookingPricing;
+  const working = getMessages(locale).waitLabels.working;
   const money = (value: number) => formatCurrency(value, locale);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -241,7 +243,7 @@ export function DynamicPricingPanel({
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" disabled={pending} onClick={save} className={primary} style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}>
-            {busy === "save" ? copy.saving : copy.save}
+            <BusyLabel busy={busy === "save"} idle={copy.save} working={copy.saving} />
           </button>
           <button
             type="button"
@@ -249,7 +251,7 @@ export function DynamicPricingPanel({
             onClick={() => run("compute", async () => ((await send("POST", { action: "compute" })) ? "" : null))}
             className={button}
           >
-            {busy === "compute" ? copy.computing : copy.compute}
+            <BusyLabel busy={busy === "compute"} idle={copy.compute} working={copy.computing} />
           </button>
           {suggestions.length > 0 ? (
             <button
@@ -259,7 +261,7 @@ export function DynamicPricingPanel({
               className={primary}
               style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
             >
-              {copy.applyAll(suggestions.length)}
+              <BusyLabel busy={busy === "apply"} idle={copy.applyAll(suggestions.length)} working={working} />
             </button>
           ) : null}
           <button
@@ -270,7 +272,7 @@ export function DynamicPricingPanel({
             }}
             className={button}
           >
-            {copy.clear}
+            <BusyLabel busy={busy === "clear"} idle={copy.clear} working={working} />
           </button>
           {lastRun ? <span className="text-[11px] text-[color:var(--ink-soft)]">{copy.lastRun(lastRun)}</span> : null}
         </div>
@@ -333,7 +335,7 @@ export function DynamicPricingPanel({
               onClick={() => run("apply-" + vehicleId, async () => ((await send("POST", { action: "apply", vehicleId })) ? "" : null))}
               className={`${button} mt-2`}
             >
-              {copy.applyCar}
+              <BusyLabel busy={busy === "apply-" + vehicleId} idle={copy.applyCar} working={working} />
             </button>
           </details>
         );

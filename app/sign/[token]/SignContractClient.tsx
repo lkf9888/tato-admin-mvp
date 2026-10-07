@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 
+import { BookingSpinner, BusyLabel } from "@/components/booking-spinner";
 import { SignaturePad } from "@/components/signature-pad";
 
 type FieldType = "SIGNATURE" | "TEXT" | "DATE" | "CHECKBOX";
@@ -73,7 +74,11 @@ const PdfPageCanvas = dynamic(
   () => import("@/components/pdf-page-canvas").then((module) => module.PdfPageCanvas),
   {
     ssr: false,
-    loading: () => <div className="absolute inset-0 bg-white" />,
+    loading: () => (
+      <div className="absolute inset-0 flex items-center justify-center bg-white text-[var(--ink-soft)]">
+        <BookingSpinner className="h-6 w-6" />
+      </div>
+    ),
   },
 );
 
@@ -296,7 +301,10 @@ export default function SignContractClient({ token }: { token: string }) {
     return (
       <main className="min-h-screen bg-[var(--surface-muted)] p-6 text-[var(--ink)]">
         <div className="mx-auto max-w-3xl rounded-lg border bg-white p-8">
-          {copy.loading}
+          <span className="inline-flex items-center gap-2" role="status">
+            <BookingSpinner />
+            {copy.loading}
+          </span>
         </div>
       </main>
     );
@@ -506,7 +514,7 @@ export default function SignContractClient({ token }: { token: string }) {
               disabled={submitting}
               onClick={submit}
             >
-              {submitting ? copy.submitting : copy.submitSignature}
+              <BusyLabel busy={submitting} idle={copy.submitSignature} working={copy.submitting} />
             </button>
           </section>
         )}

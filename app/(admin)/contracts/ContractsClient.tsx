@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyLabel } from "@/components/booking-spinner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -1037,7 +1038,7 @@ export default function ContractsClient({
             </button>
           </div>
           <button type="button" className="btn-primary mt-4" disabled={busy === "send"} onClick={sendEnvelope}>
-            {busy === "send" ? "发送中…" : "发送签约邮件"}
+            <BusyLabel busy={busy === "send"} idle="发送签约邮件" working="发送中…" />
           </button>
         </section>
 
@@ -1206,7 +1207,7 @@ export default function ContractsClient({
                       disabled={!appendFile || busy === "append-document"}
                       onClick={appendTemplateDocument}
                     >
-                      {busy === "append-document" ? "追加中…" : "追加到模板"}
+                      <BusyLabel busy={busy === "append-document"} idle="追加到模板" working="追加中…" />
                     </button>
                   </div>
                 </div>
@@ -1233,7 +1234,7 @@ export default function ContractsClient({
                   </label>
                 </div>
                 <button type="button" className="btn-primary mt-3" disabled={busy === "upload"} onClick={createTemplate}>
-                  {busy === "upload" ? "上传中…" : "上传文件并创建模板"}
+                  <BusyLabel busy={busy === "upload"} idle="上传文件并创建模板" working="上传中…" />
                 </button>
               </>
             )}
@@ -1378,7 +1379,7 @@ export default function ContractsClient({
               Word 转 PDF 为签署底稿；签名框、日期框、文本框仍在下方字段编辑器中添加。
             </div>
             <button type="button" className="btn-primary" disabled={busy === "editable-content"} onClick={saveEditableContent}>
-              {busy === "editable-content" ? "生成中…" : "保存 Word 内容"}
+              <BusyLabel busy={busy === "editable-content"} idle="保存 Word 内容" working="生成中…" />
             </button>
           </div>
         </section>
@@ -1611,7 +1612,7 @@ export default function ContractsClient({
                     disabled={busy === "preset"}
                     onClick={createTextPreset}
                   >
-                    {busy === "preset" ? "保存中…" : "保存"}
+                    <BusyLabel busy={busy === "preset"} idle="保存" working="保存中…" />
                   </button>
                 </div>
                 {textPresets.length > 0 && (
@@ -1662,7 +1663,7 @@ export default function ContractsClient({
                 )}
               </div>
               <button type="button" className="btn-primary w-full" disabled={busy === "fields"} onClick={saveFields}>
-                {busy === "fields" ? "保存中…" : "保存字段"}
+                <BusyLabel busy={busy === "fields"} idle="保存字段" working="保存中…" />
               </button>
             </div>
           </div>

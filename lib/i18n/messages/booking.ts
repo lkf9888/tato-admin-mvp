@@ -4,6 +4,14 @@
  */
 export const bookingMessages = {
   en: {
+    waitLabels: {
+      working: "Working…",
+      sending: "Sending…",
+      openingPayment: "Opening secure payment…",
+      loadingDocument: "Loading the document…",
+      approving: "Approving…",
+      declining: "Declining…",
+    },
     cancellationPolicies: {
       label: "Cancellation policy",
       flexible: {
@@ -122,6 +130,14 @@ export const bookingMessages = {
     },
   },
   zh: {
+    waitLabels: {
+      working: "处理中…",
+      sending: "发送中…",
+      openingPayment: "正在打开安全付款页面…",
+      loadingDocument: "正在加载文件…",
+      approving: "正在批准…",
+      declining: "正在拒绝…",
+    },
     cancellationPolicies: {
       label: "取消政策",
       flexible: {

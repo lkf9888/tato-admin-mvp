@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyLabel } from "@/components/booking-spinner";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -168,7 +169,7 @@ export function DirectBookingCancelPanel({
               className="rounded-md px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
               style={{ backgroundColor: "var(--bad-fg)", color: "#ffffff" }}
             >
-              {busy ? copy.working : copy.submit(money(amount))}
+              <BusyLabel busy={busy} idle={copy.submit(money(amount))} working={copy.working} />
             </button>
             <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[var(--ink-soft)]">
               {copy.close}

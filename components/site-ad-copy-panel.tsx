@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyLabel } from "@/components/booking-spinner";
 import { useState } from "react";
 
 import { getMessages, type Locale } from "@/lib/i18n";
@@ -66,7 +67,7 @@ function AdCard({ locale, vehicleId, draft }: { locale: Locale; vehicleId: strin
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-[14px] font-semibold text-[color:var(--ink)]">{copy.platformNames[draft.platform]}</h4>
         <button type="button" disabled={busy || blocked} onClick={() => void polish()} className={`${button} disabled:opacity-50`}>
-          {busy ? copy.polishing : copy.polish}
+          <BusyLabel busy={busy} idle={copy.polish} working={copy.polishing} />
         </button>
       </div>
 

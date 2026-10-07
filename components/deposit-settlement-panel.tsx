@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyLabel } from "@/components/booking-spinner";
 import { useState, useTransition } from "react";
 
 import { getMessages, type Locale } from "@/lib/i18n";
@@ -152,7 +153,7 @@ export function DepositSettlementPanel({
             className="w-full rounded-md px-3 py-2 text-[12px] font-bold disabled:opacity-50"
             style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
           >
-            {pending ? copy.depositSubmitting : copy.depositSubmit}
+            <BusyLabel busy={pending} idle={copy.depositSubmit} working={copy.depositSubmitting} />
           </button>
           <p className="text-[11px] leading-4 text-[var(--ink-soft)]">{copy.depositEmailNote}</p>
           {error ? <p className="text-[12px] text-[color:var(--bad-fg)]">{error}</p> : null}

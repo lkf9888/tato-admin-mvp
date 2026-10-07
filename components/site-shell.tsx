@@ -1,5 +1,8 @@
 import Link from "next/link";
 import Script from "next/script";
+import { Suspense } from "react";
+
+import { SiteRouteProgress } from "@/components/site-route-progress";
 
 import type { Messages } from "@/lib/i18n";
 import { getSiteBasePath } from "@/lib/rental-site";
@@ -83,6 +86,10 @@ export function SiteShell({
       className="site-theme min-h-screen"
       style={accent ? ({ "--brand": accent, "--accent": accent } as React.CSSProperties) : undefined}
     >
+      {/* Inside the theme so the bar takes the site's own colour. */}
+      <Suspense fallback={null}>
+        <SiteRouteProgress />
+      </Suspense>
       {/* Inter, as on the operator's company site. Latin only: the CJK
           text falls through to PingFang / Noto, which read better than
           any web font at these sizes and cost nothing to load. */}

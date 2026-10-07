@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyLabel } from "@/components/booking-spinner";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -38,6 +39,7 @@ export function DepositOverviewActions({
   const [mode, setMode] = useState<"idle" | "edit" | "settle">("idle");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const working = getMessages(locale).waitLabels.working;
 
   const [depositAmount, setDepositAmount] = useState(amount.toFixed(2));
   const [via, setVia] = useState(collectedVia ?? "");
@@ -148,7 +150,7 @@ export function DepositOverviewActions({
           </label>
           <div className="flex gap-2 sm:col-span-4">
             <button type="button" disabled={pending} onClick={saveDetails} className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}>
-              {copy.save}
+              <BusyLabel busy={pending} idle={copy.save} working={working} />
             </button>
             <button type="button" onClick={() => setMode("idle")} className="rounded-md border border-[color:var(--line)] bg-white px-3 py-1.5 text-[12px]">
               {copy.cancel}
@@ -169,7 +171,11 @@ export function DepositOverviewActions({
           </label>
           <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
             <button type="button" disabled={pending} onClick={settle} className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}>
-              {viaStripe ? copy.settleStripe.replace("…", "") : copy.settleManual.replace("…", "")}
+              <BusyLabel
+                busy={pending}
+                idle={viaStripe ? copy.settleStripe.replace("…", "") : copy.settleManual.replace("…", "")}
+                working={working}
+              />
             </button>
             <button type="button" onClick={() => setMode("idle")} className="rounded-md border border-[color:var(--line)] bg-white px-3 py-1.5 text-[12px]">
               {copy.cancel}

@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyLabel } from "@/components/booking-spinner";
 import { useState, useTransition } from "react";
 
 import { getMessages, type Locale } from "@/lib/i18n";
@@ -314,7 +315,7 @@ export function PayoutsPanel({
               disabled={!configured || isStarting}
               className="inline-flex items-center justify-center rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[var(--ink)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isStarting ? t.connectLoading : t.connectAction}
+              <BusyLabel busy={isStarting} idle={t.connectAction} working={t.connectLoading} />
             </button>
 
             {canConnectExisting ? (
@@ -329,7 +330,7 @@ export function PayoutsPanel({
                   disabled={!configured || isLinking}
                   className="mt-2 inline-flex items-center justify-center rounded-md border border-[var(--line)] bg-white px-4 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isLinking ? t.connectLoading : t.existingAction}
+                  <BusyLabel busy={isLinking} idle={t.existingAction} working={t.connectLoading} />
                 </button>
               </div>
             ) : null}
@@ -343,7 +344,7 @@ export function PayoutsPanel({
                 disabled={!configured || isResuming}
                 className="inline-flex items-center justify-center rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[var(--ink)]/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isResuming ? t.connectLoading : t.continueAction}
+                <BusyLabel busy={isResuming} idle={t.continueAction} working={t.connectLoading} />
               </button>
             )}
             <button
@@ -368,7 +369,7 @@ export function PayoutsPanel({
               disabled={!configured || isDisconnecting}
               className="inline-flex items-center justify-center rounded-md px-3 py-2 text-[12px] font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:ml-auto"
             >
-              {isDisconnecting ? t.connectLoading : t.disconnectAction}
+              <BusyLabel busy={isDisconnecting} idle={t.disconnectAction} working={t.connectLoading} />
             </button>
           </div>
         )}

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+
+import { BookingSpinner } from "@/components/booking-spinner";
 import * as pdfjs from "pdfjs-dist";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 
@@ -47,6 +49,10 @@ export function PdfPageCanvas({
   const onPageMeasuredRef = useRef(onPageMeasured);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [failed, setFailed] = useState(false);
+  // Until the first paint the page is a white box, which on a slow phone
+  // looks like a document with nothing in it. Resizes repaint without
+  // bringing the spinner back.
+  const [painted, setPainted] = useState(false);
 
   useEffect(() => {
     onPageMeasuredRef.current = onPageMeasured;
@@ -121,6 +127,7 @@ export function PdfPageCanvas({
         if (renderTaskRef.current === task) {
           renderTaskRef.current = null;
         }
+        if (!cancelled) setPainted(true);
       } catch (error) {
         if (!cancelled && !isRenderCancelled(error)) {
           setFailed(true);
@@ -141,7 +148,11 @@ export function PdfPageCanvas({
       <canvas ref={canvasRef} className="block h-full w-full bg-white" />
       {failed ? (
         <div className="absolute inset-0 flex items-center justify-center bg-white text-xs text-[var(--ink-soft)]">
-          PDF 预览加载失败
+          PDF 预览加载失败 · The PDF preview could not load
+        </div>
+      ) : !painted ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-white text-[var(--ink-soft)]">
+          <BookingSpinner className="h-6 w-6" />
         </div>
       ) : null}
     </div>

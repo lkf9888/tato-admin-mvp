@@ -2,6 +2,14 @@
 // Do not edit: change the Simplified text there and re-run the script.
 
 export const bookingMessages = {
+    waitLabels: {
+      working: "處理中…",
+      sending: "傳送中…",
+      openingPayment: "正在開啟安全付款頁面…",
+      loadingDocument: "正在載入檔案…",
+      approving: "正在批准…",
+      declining: "正在拒絕…",
+    },
     cancellationPolicies: {
       label: "取消政策",
       flexible: {

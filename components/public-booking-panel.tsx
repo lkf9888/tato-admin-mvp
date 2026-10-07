@@ -33,6 +33,7 @@ import {
   zonedDateTimeToUtc,
 } from "@/lib/booking-time";
 import { DEFAULT_CANCELLATION_POLICY, type CancellationPolicyKey } from "@/lib/booking-changes";
+import { BusyLabel } from "@/components/booking-spinner";
 import { getLocaleTag, getMessages, type Locale } from "@/lib/i18n";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -451,6 +452,10 @@ export function PublicBookingPanel({
   const [showClauses, setShowClauses] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
+  // Set once Stripe's page is on its way: the transition ends as soon as
+  // the redirect starts, and a re-enabled button during the second or two
+  // Stripe takes to load is how a renter ends up paying twice.
+  const [redirecting, setRedirecting] = useState(false);
 
   const isPickupDateDisabled = useCallback(
     (candidate: string) => {
@@ -784,14 +789,15 @@ export function PublicBookingPanel({
       const response = await fetch("/api/direct-booking/checkout", {
         method: "POST",
         body: formData,
-      });
+      }).catch(() => null);
 
-      const payload = (await response.json()) as { error?: string; url?: string };
-      if (!response.ok || !payload.url) {
+      const payload = ((await response?.json().catch(() => null)) ?? {}) as { error?: string; url?: string };
+      if (!response?.ok || !payload.url) {
         setError(payload.error ?? reserveMessages.genericCheckoutError);
         return;
       }
 
+      setRedirecting(true);
       window.location.href = payload.url;
     });
   }
@@ -1365,10 +1371,14 @@ export function PublicBookingPanel({
 
       <button
         onClick={startCheckout}
-        disabled={!stripeReady || !hostPayoutsReady || isPending}
+        disabled={!stripeReady || !hostPayoutsReady || isPending || redirecting}
         className="mt-3 w-full rounded-md bg-[var(--ink)] px-4 py-3 text-sm sm:mt-5 sm:py-3.5 font-semibold text-white shadow-[0_18px_40px_-24px_rgba(15,23,42,0.9)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isPending ? reserveMessages.checkoutLoading : reserveMessages.checkoutAction}
+        <BusyLabel
+          busy={isPending || redirecting}
+          idle={reserveMessages.checkoutAction}
+          working={redirecting ? messages.waitLabels.openingPayment : reserveMessages.checkoutLoading}
+        />
       </button>
     </div>
   );

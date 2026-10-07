@@ -34,6 +34,8 @@ export const assistantMessages = {
       needsReply: "Needs reply",
       syncNow: "Sync now",
       syncing: "Syncing…",
+      syncProgressStep: "Reading new Turo mail from Gmail",
+      syncProgressNote: "Each new mail is read in turn; this can take up to a minute.",
       syncFailed: "Sync failed. Check the Gmail settings.",
       syncedCount: (imported: number) =>
         imported === 0 ? "No new Turo emails." : `Pulled in ${imported} new Turo email(s).`,
@@ -72,6 +74,8 @@ export const assistantMessages = {
       needsReply: "待回复",
       syncNow: "立即同步",
       syncing: "同步中…",
+      syncProgressStep: "正在从 Gmail 读取新的 Turo 邮件",
+      syncProgressNote: "新邮件要逐封读取，可能需要一分钟左右。",
       syncFailed: "同步失败,请检查 Gmail 设置。",
       syncedCount: (imported: number) =>
         imported === 0 ? "没有新的 Turo 邮件。" : `收取了 ${imported} 封新的 Turo 邮件。`,

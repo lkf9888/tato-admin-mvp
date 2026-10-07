@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { TypingDots } from "@/components/turo-task-progress";
 import { getMessages, type Locale } from "@/lib/i18n";
 
 type ChatMessage = {
@@ -40,6 +41,7 @@ export function AssistantChat({
   const [threadId, setThreadId] = useState<string | null>(initialThreadId);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [sentAt, setSentAt] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<SnapshotSummary | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -56,6 +58,7 @@ export function AssistantChat({
 
     setError(null);
     setSending(true);
+    setSentAt(Date.now());
     setDraft("");
 
     // Optimistic echo so the operator sees their question immediately
@@ -168,8 +171,9 @@ export function AssistantChat({
 
         {sending ? (
           <div className="flex justify-start">
-            <div className="rounded-lg rounded-bl-sm border border-[var(--line)] bg-[var(--surface-muted)] px-3.5 py-2.5 text-[13px] text-[var(--ink-soft)]">
+            <div className="flex items-center gap-2.5 rounded-lg rounded-bl-sm border border-[var(--line)] bg-[var(--surface-muted)] px-3.5 py-2.5 text-[13px] text-[var(--ink-soft)]">
               {t.thinking}
+              <TypingDots startedAt={sentAt} locale={locale === "en" ? "en" : "zh"} />
             </div>
           </div>
         ) : null}

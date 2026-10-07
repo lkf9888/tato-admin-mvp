@@ -935,6 +935,14 @@ export async function estimateImportVehicleImpact(input: {
       continue;
     }
 
+    // Only cars the import could actually create: without a plate
+    // candidate `createVehicleFromCsvRow` returns null, and a car listed
+    // for confirmation that then fails to appear is worse than one the
+    // failed rows name.
+    if (buildPlateNumberCandidates(vehicleLabel, externalVehicleId, vin).length === 0) {
+      continue;
+    }
+
     const projectedKey = buildProjectedVehicleKey({
       vehicleLabel,
       vehicleName,

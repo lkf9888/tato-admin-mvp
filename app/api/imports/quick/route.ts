@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { importTuroCsvWithLastSettings, TuroSyncError } from "@/lib/turo-sync";
 
 export const runtime = "nodejs";
@@ -9,8 +10,34 @@ export const runtime = "nodejs";
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 /**
- * The dashboard's one-click CSV import: a file, imported with the last
- * import's settings (see `importTuroCsvWithLastSettings`). Multipart, so
+ * The accounts to pick from: every one the fleet's cars are filed
+ * under, as the imports page offers, and the one last imported.
+ */
+export async function GET() {
+  const { workspace } = await requireCurrentAdminContext();
+  const [vehicles, last] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: { workspaceId: workspace.id, turoAccount: { not: null } },
+      distinct: ["turoAccount"],
+      select: { turoAccount: true },
+      orderBy: { turoAccount: "asc" },
+    }),
+    prisma.importBatch.findFirst({
+      where: { workspaceId: workspace.id },
+      orderBy: { importedAt: "desc" },
+      select: { turoAccount: true },
+    }),
+  ]);
+  return NextResponse.json({
+    accounts: vehicles.map((row) => row.turoAccount).filter((account): account is string => Boolean(account)),
+    // "" is the main account; null means nothing was imported yet.
+    lastAccount: last ? (last.turoAccount ?? "") : null,
+  });
+}
+
+/**
+ * The dashboard's quick CSV import: a file and the Turo account it came
+ * from (see `importTuroCsvWithLastSettings`). Multipart, so
  * the browser sends the file as it is instead of parsing it first.
  */
 export async function POST(request: Request) {
@@ -32,6 +59,8 @@ export async function POST(request: Request) {
       fileName: file.name || "quick-import.csv",
       content: await file.text(),
       billingBypassActive: Boolean(user.isBillingExempt),
+      // Sent as "" for the main account; absent only from an older page.
+      turoAccount: form?.has("turoAccount") ? String(form.get("turoAccount") ?? "") : undefined,
     });
 
     // The cars behind "Vehicle not found" rows, once each: that list is

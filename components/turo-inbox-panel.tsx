@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { InlineSpinner, TuroTaskProgress } from "@/components/turo-task-progress";
+
 import { getMessages, type Locale } from "@/lib/i18n";
 
 type InboxEmail = {
@@ -54,11 +56,13 @@ export function TuroInboxPanel({
   const t = getMessages(locale).assistantPage;
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
+  const [syncStartedAt, setSyncStartedAt] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
 
   async function syncNow() {
     if (syncing || !configured) return;
     setSyncing(true);
+    setSyncStartedAt(Date.now());
     setNotice(null);
     try {
       const response = await fetch("/api/gmail-sync", { method: "POST" });
@@ -100,11 +104,26 @@ export function TuroInboxPanel({
           type="button"
           onClick={syncNow}
           disabled={!configured || syncing}
-          className="tap-press shrink-0 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="tap-press inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--ink)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
         >
+          {syncing ? <InlineSpinner /> : null}
           {syncing ? t.syncing : t.syncNow}
         </button>
       </header>
+
+      {/* A sync reads the mailbox and runs each new mail past the
+          model, which can take most of a minute. */}
+      {syncing ? (
+        <div className="border-b border-[var(--line)] px-3 py-2 sm:px-4">
+          <TuroTaskProgress
+            locale={locale === "en" ? "en" : "zh"}
+            steps={[t.syncProgressStep]}
+            current={0}
+            startedAt={syncStartedAt}
+            note={t.syncProgressNote}
+          />
+        </div>
+      ) : null}
 
       {notice ? (
         <p className="border-b border-[var(--line)] bg-[var(--surface-muted)] px-3 py-1.5 text-[11.5px] text-[var(--ink-soft)] sm:px-4">

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
 
-import { SearchableSelect } from "@/components/searchable-select";
+import { TuroTaskProgress, useLeaveGuard } from "@/components/turo-task-progress";
 import { buildCsvHeaderMapping } from "@/lib/csv-mapping";
 import { getCsvFieldOptions, getMessages, type Locale } from "@/lib/i18n";
 
@@ -24,22 +25,37 @@ type BillingSnapshot = {
   status: string;
 };
 
-type BillingProjection = BillingSnapshot & {
-  projectedVehicleCount: number;
-  projectedNewVehicleCount: number;
-  selectedProjectedNewVehicleCount: number;
-  requiredProjectedPaidSlots: number;
-  additionalPaidSlotsNeeded: number;
+type NewVehicleOption = {
+  key: string;
+  label: string;
+  secondaryLabel: string;
+  rowCount: number;
+};
+
+type ImportCheck = {
+  selectableVehicleOptions: NewVehicleOption[];
   availableNewVehicleSlots: number;
-  selectableVehicleOptions: Array<{
-    key: string;
-    label: string;
-    secondaryLabel: string;
-    rowCount: number;
-  }>;
   exceedsPurchasedLimit: boolean;
 };
 
+type LoadedFile = { name: string; headers: string[]; rows: PreviewRow[] };
+
+/** "" is the main account; "__new__" is "another account", typed in. */
+const NEW_ACCOUNT = "__new__";
+
+/**
+ * Turo CSV upload: a file, the account it came from, then import.
+ *
+ * There is no column mapping to fill in. Turo's export has the same
+ * columns every time and the guess has read every real one; the whole
+ * row is kept on each order anyway (sourceMetadata.rawRow), so nothing
+ * is lost by not choosing columns. A file the guess cannot read is not
+ * a Turo export, and is refused with the column it lacks.
+ *
+ * Cars are never created without a person seeing them: the import first
+ * asks the server which cars are new, lists them, and only the ones
+ * left ticked are created. Each car is a billing slot and an owner.
+ */
 export function CsvImportPanel({
   locale,
   billingSnapshot,
@@ -55,52 +71,45 @@ export function CsvImportPanel({
    *  an account that does not exist. */
   knownTuroAccounts: string[];
 }) {
+  const router = useRouter();
   const messages = getMessages(locale);
   const panelMessages = messages.imports.panel;
-  const csvFieldOptions = getCsvFieldOptions(locale);
-  const [fileName, setFileName] = useState("");
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<PreviewRow[]>([]);
-  const [mapping, setMapping] = useState<Record<string, string>>({});
-  const [result, setResult] = useState("");
+  const importMessages = messages.imports;
+  const fieldLabels: Record<string, string> = Object.fromEntries(
+    getCsvFieldOptions(locale).map((option) => [option.value, option.label]),
+  );
+
+  const [file, setFile] = useState<LoadedFile | null>(null);
+  const [isReading, setIsReading] = useState(false);
+  const [readStartedAt, setReadStartedAt] = useState(0);
+  const [parseError, setParseError] = useState("");
+  // Which Turo host account exported this file. An export only contains
+  // its own account's listings, so this is a property of the whole file
+  // -- and getting it wrong files a co-hosted car as a main-account
+  // vehicle, after which it stops matching its own notification mail.
+  // Null until picked: asked every time rather than defaulted, because
+  // the default is exactly the mistake.
+  const [accountChoice, setAccountChoice] = useState<string | null>(null);
+  const [customAccount, setCustomAccount] = useState("");
+
+  const [stage, setStage] = useState<"idle" | "checking" | "confirm" | "importing">("idle");
+  const [startedAt, setStartedAt] = useState(0);
+  const [newVehicles, setNewVehicles] = useState<NewVehicleOption[]>([]);
+  const [newVehicleCap, setNewVehicleCap] = useState(0);
+  const [selectedVehicleKeys, setSelectedVehicleKeys] = useState<string[]>([]);
+
+  const [billingNotice, setBillingNotice] = useState("");
   const [failureBreakdown, setFailureBreakdown] = useState<
     Array<{ reason: string; count: number; sampleRows: number[] }>
   >([]);
-  const [createMissingVehicles, setCreateMissingVehicles] = useState(true);
-  // Which Turo host account exported this file. Blank is the main one.
-  // An export only contains its own account's listings, so this is a
-  // property of the whole file rather than of any row -- and getting
-  // it wrong files a co-hosted car as a main-account vehicle, after
-  // which it stops matching its own notification mail.
-  const [turoAccount, setTuroAccount] = useState("");
-  const [billingProjection, setBillingProjection] = useState<BillingProjection | null>(null);
-  const [selectedVehicleKeys, setSelectedVehicleKeys] = useState<string[]>([]);
-  const [billingNotice, setBillingNotice] = useState("");
-  const [billingCheckError, setBillingCheckError] = useState("");
-  const [showBillingModal, setShowBillingModal] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [isCheckingBilling, setIsCheckingBilling] = useState(false);
   const [importAlert, setImportAlert] = useState<{
     type: "success" | "failure";
     title: string;
     message: string;
   } | null>(null);
 
-  const previewRows = useMemo(() => rows.slice(0, 5), [rows]);
-
-  const mappedFields = Object.values(mapping).filter(Boolean);
-  const fieldLabels = Object.fromEntries(csvFieldOptions.map((option) => [option.value, option.label]));
-  const missingRequired = [
-    !["vehicleLabel", "vehicleName", "externalVehicleId", "vin"].some((field) =>
-      mappedFields.includes(field),
-    )
-      ? panelMessages.oneVehicleIdentifier
-      : null,
-    !mappedFields.includes("renterName") ? fieldLabels.renterName : null,
-    !mappedFields.includes("pickupDatetime") ? fieldLabels.pickupDatetime : null,
-    !mappedFields.includes("returnDatetime") ? fieldLabels.returnDatetime : null,
-    !mappedFields.includes("externalOrderId") ? fieldLabels.externalOrderId : null,
-  ].filter(Boolean);
+  const busy = stage === "checking" || stage === "importing";
+  useLeaveGuard(busy);
 
   useEffect(() => {
     if (billingState === "success") {
@@ -112,276 +121,233 @@ export function CsvImportPanel({
     }
   }, [billingState, panelMessages.billing]);
 
-  useEffect(() => {
-    if (rows.length === 0 || missingRequired.length > 0) {
-      setBillingProjection(null);
-      setBillingCheckError("");
-      return;
+  const mapping = useMemo(() => (file ? buildCsvHeaderMapping(file.headers) : {}), [file]);
+  const columnFor = useMemo(() => {
+    const byField: Record<string, string> = {};
+    for (const [column, field] of Object.entries(mapping)) {
+      if (field && !byField[field]) byField[field] = column;
     }
+    return byField;
+  }, [mapping]);
 
-    let cancelled = false;
-    setIsCheckingBilling(true);
+  // The columns an order cannot be made without. Missing any of them,
+  // the file is not a Turo earnings export (or Turo renamed a column,
+  // which `guessCsvField` should then learn).
+  const missingColumns = file
+    ? [
+        !["vehicleLabel", "vehicleName", "externalVehicleId", "vin"].some((field) => columnFor[field])
+          ? panelMessages.oneVehicleIdentifier
+          : null,
+        !columnFor.externalOrderId ? fieldLabels.externalOrderId : null,
+        !columnFor.renterName ? fieldLabels.renterName : null,
+        !columnFor.pickupDatetime ? fieldLabels.pickupDatetime : null,
+        !columnFor.returnDatetime ? fieldLabels.returnDatetime : null,
+      ].filter((label): label is string => Boolean(label))
+    : [];
 
-    void (async () => {
-      try {
-        const response = await fetch("/api/billing/import-check", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            rows,
-            mapping,
-            createMissingVehicles,
-            turoAccount: turoAccount === "__new__" ? null : turoAccount.trim() || null,
-          }),
-        });
+  const summary = useMemo(() => {
+    if (!file) return null;
+    const vehicleColumn =
+      columnFor.vehicleLabel ?? columnFor.vehicleName ?? columnFor.externalVehicleId ?? columnFor.vin;
+    const cars = new Set(
+      vehicleColumn ? file.rows.map((row) => row[vehicleColumn]?.trim()).filter(Boolean) : [],
+    ).size;
+    const times = columnFor.pickupDatetime
+      ? file.rows
+          .map((row) => new Date(row[columnFor.pickupDatetime] ?? "").getTime())
+          .filter((time) => Number.isFinite(time))
+      : [];
+    const format = (time: number) =>
+      new Date(time).toLocaleDateString(locale === "en" ? "en-CA" : "zh-CN", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    const range =
+      times.length > 0 ? `${format(Math.min(...times))} – ${format(Math.max(...times))}` : "";
+    return panelMessages.fileSummary(file.rows.length, cars, range);
+  }, [file, columnFor, locale, panelMessages]);
 
-        const payload = (await response.json()) as BillingProjection & { error?: string };
+  const turoAccount =
+    accountChoice === null ? null : accountChoice === NEW_ACCOUNT ? customAccount.trim() : accountChoice;
+  const accountReady = accountChoice !== null && (accountChoice !== NEW_ACCOUNT || customAccount.trim() !== "");
+  const fileReady = Boolean(file) && missingColumns.length === 0;
+  const blockedByBilling = billingSnapshot.isOverLimit && !billingSnapshot.billingBypassActive;
+  const canStart = fileReady && accountReady && !busy && !blockedByBilling;
 
-        if (cancelled) return;
-
-        if (!response.ok) {
-          setBillingProjection(null);
-          setBillingCheckError(payload.error ?? panelMessages.billing.genericError);
+  function loadFile(picked: File) {
+    setIsReading(true);
+    setReadStartedAt(Date.now());
+    setParseError("");
+    setFile(null);
+    setFailureBreakdown([]);
+    setStage("idle");
+    Papa.parse<PreviewRow>(picked, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        setIsReading(false);
+        const headers = results.meta.fields ?? [];
+        if (headers.length === 0 || results.data.length === 0) {
+          setParseError(panelMessages.parseFailed);
           return;
         }
-
-        setBillingProjection(payload);
-        setBillingCheckError("");
-
-        if (payload.exceedsPurchasedLimit) {
-          setShowBillingModal(true);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsCheckingBilling(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    rows,
-    mapping,
-    createMissingVehicles,
-    turoAccount,
-    missingRequired.length,
-    panelMessages.billing.genericError,
-  ]);
-
-  useEffect(() => {
-    if (
-      !billingProjection ||
-      billingProjection.selectableVehicleOptions.length === 0 ||
-      billingProjection.availableNewVehicleSlots < 1
-    ) {
-      return;
-    }
-
-    setSelectedVehicleKeys((current) => {
-      const validCurrent = current.filter((key) =>
-        billingProjection.selectableVehicleOptions.some((vehicle) => vehicle.key === key),
-      );
-
-      if (validCurrent.length > 0) {
-        return validCurrent.slice(0, billingProjection.availableNewVehicleSlots);
-      }
-
-      return billingProjection.selectableVehicleOptions
-        .slice(0, billingProjection.availableNewVehicleSlots)
-        .map((vehicle) => vehicle.key);
+        setFile({ name: picked.name, headers, rows: results.data });
+      },
+      error: () => {
+        setIsReading(false);
+        setParseError(panelMessages.parseFailed);
+      },
     });
-  }, [billingProjection]);
+  }
 
-  const activeProjection = useMemo(() => {
-    if (!billingProjection) {
-      return {
-        ...billingSnapshot,
-        projectedVehicleCount: billingSnapshot.currentVehicleCount,
-        projectedNewVehicleCount: 0,
-        requiredProjectedPaidSlots: billingSnapshot.requiredPaidSlots,
-        additionalPaidSlotsNeeded: Math.max(
-          0,
-          billingSnapshot.requiredPaidSlots - billingSnapshot.effectivePurchasedVehicleSlots,
-        ),
-        selectedProjectedNewVehicleCount: 0,
-        availableNewVehicleSlots: Math.max(
-          0,
-          billingSnapshot.allowedVehicleCount - billingSnapshot.currentVehicleCount,
-        ),
-        selectableVehicleOptions: [],
-        exceedsPurchasedLimit: billingSnapshot.isOverLimit,
+  /** Step one of an import: which cars in this file are new. */
+  async function startImport() {
+    if (!file || !canStart) return;
+    setStartedAt(Date.now());
+    setStage("checking");
+    setFailureBreakdown([]);
+    try {
+      const response = await fetch("/api/billing/import-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: file.rows, mapping, createMissingVehicles: true }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as Partial<ImportCheck> & { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? panelMessages.billing.genericError);
+
+      const options = payload.selectableVehicleOptions ?? [];
+      if (options.length === 0) {
+        await runImport({ createMissingVehicles: false, selectedVehicleKeys: [] });
+        return;
+      }
+      // Within the plan, every new car can be added; past it, only as
+      // many as there are slots left. Ticked by default either way --
+      // the person is here to import the file, and unticks the odd one.
+      const cap = payload.exceedsPurchasedLimit
+        ? Math.max(0, payload.availableNewVehicleSlots ?? 0)
+        : options.length;
+      setNewVehicles(options);
+      setNewVehicleCap(cap);
+      setSelectedVehicleKeys(options.slice(0, cap).map((option) => option.key));
+      setStage("confirm");
+    } catch (error) {
+      setStage("idle");
+      setImportAlert({
+        type: "failure",
+        title: panelMessages.importFailureTitle,
+        message: error instanceof Error ? error.message : panelMessages.genericFailure,
+      });
+    }
+  }
+
+  async function runImport(options: { createMissingVehicles: boolean; selectedVehicleKeys: string[] }) {
+    if (!file) return;
+    setStage("importing");
+    try {
+      const response = await fetch("/api/imports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          mapping,
+          rows: file.rows,
+          createMissingVehicles: options.createMissingVehicles,
+          selectedVehicleKeys: options.selectedVehicleKeys,
+          turoAccount: turoAccount || null,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        successRows?: number;
+        failedRows?: number;
+        createdVehicles?: number;
+        skippedRows?: number;
+        reclaimedIdentifiers?: Array<{ plateNumber: string; takenFrom: string }>;
+        error?: string;
+        failures?: Array<{ rowNumber: number; reason: string }>;
       };
-    }
 
-    if (billingProjection.selectableVehicleOptions.length === 0) {
-      return billingProjection;
-    }
-
-    const validSelectedVehicleCount = selectedVehicleKeys.filter((key) =>
-      billingProjection.selectableVehicleOptions.some((vehicle) => vehicle.key === key),
-    ).length;
-    const selectedProjectedNewVehicleCount =
-      validSelectedVehicleCount > 0
-        ? Math.min(validSelectedVehicleCount, billingProjection.availableNewVehicleSlots)
-        : 0;
-    const projectedVehicleCount =
-      billingSnapshot.currentVehicleCount + selectedProjectedNewVehicleCount;
-    const requiredProjectedPaidSlots = Math.max(
-      0,
-      projectedVehicleCount - billingSnapshot.freeVehicleSlots - billingSnapshot.bonusVehicleSlots,
-    );
-    const additionalPaidSlotsNeeded = Math.max(
-      0,
-      requiredProjectedPaidSlots - billingSnapshot.effectivePurchasedVehicleSlots,
-    );
-
-    return {
-      ...billingProjection,
-      projectedVehicleCount,
-      selectedProjectedNewVehicleCount,
-      requiredProjectedPaidSlots,
-      additionalPaidSlotsNeeded,
-      exceedsPurchasedLimit: billingSnapshot.billingBypassActive
-        ? false
-        : projectedVehicleCount > billingSnapshot.allowedVehicleCount,
-    };
-  }, [billingProjection, billingSnapshot, selectedVehicleKeys]);
-
-  const billingPageHref = `/billing?required=${activeProjection.requiredProjectedPaidSlots}&projected=${activeProjection.projectedVehicleCount}&needed=${activeProjection.additionalPaidSlotsNeeded}`;
-
-  function submitImport(options?: { skipLimitGuard?: boolean }) {
-    if (!options?.skipLimitGuard && (activeProjection.exceedsPurchasedLimit || billingSnapshot.isOverLimit)) {
-      setShowBillingModal(true);
-      return;
-    }
-
-    setIsImporting(true);
-    void (async () => {
-      try {
-        const response = await fetch("/api/imports", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            fileName,
-            mapping,
-            rows,
-            createMissingVehicles,
-            turoAccount: turoAccount === "__new__" ? null : turoAccount.trim() || null,
-            selectedVehicleKeys,
-          }),
-        });
-
-        const payload = (await response.json()) as {
-          successRows?: number;
-          failedRows?: number;
-          createdVehicles?: number;
-          skippedRows?: number;
-          reclaimedIdentifiers?: Array<{ plateNumber: string; takenFrom: string }>;
-          error?: string;
-          details?: BillingProjection;
-          failures?: Array<{ rowNumber: number; reason: string }>;
-        };
-
-        const billingDetails = payload.details;
-
-        if (response.status === 402 && billingDetails) {
-          const message = payload.error ?? panelMessages.billing.limitExceeded;
-          setBillingProjection(billingDetails);
-          setShowBillingModal(true);
-          setResult(message);
-          return;
-        }
-
-        if (!response.ok) {
-          const message = payload.error ?? panelMessages.genericFailure;
-          setResult(message);
-          setImportAlert({
-            type: "failure",
-            title: panelMessages.importFailureTitle,
-            message,
-          });
-          return;
-        }
-
-        // Reclaiming a VIN edits a vehicle nobody asked about, so it
-        // is said out loud rather than left to the activity log.
-        const reclaimed = payload.reclaimedIdentifiers ?? [];
+      if (!response.ok) {
         const message =
-          panelMessages.importResult(
-            payload.successRows ?? 0,
-            payload.createdVehicles ?? 0,
-            payload.failedRows ?? 0,
-            payload.skippedRows ?? 0,
-          ) +
-          (reclaimed.length > 0
-            ? ` ${panelMessages.reclaimedIdentifiers(
-                reclaimed.map((row) => `${row.plateNumber} ← ${row.takenFrom}`).join("、"),
-              )}`
-            : "");
-
-        setShowBillingModal(false);
-        setResult(message);
-        setImportAlert({
-          type: "success",
-          title: panelMessages.importSuccessTitle,
-          message,
-        });
-
-        // Aggregate per-reason breakdown so the user can see at a glance why
-        // rows were rejected (missing fields, bad date format, unresolved
-        // vehicle, etc.) instead of just a `N 失败` headline.
-        const reasonMap = new Map<string, { count: number; sampleRows: number[] }>();
-        for (const failure of payload.failures ?? []) {
-          const entry = reasonMap.get(failure.reason) ?? { count: 0, sampleRows: [] };
-          entry.count += 1;
-          if (entry.sampleRows.length < 5) {
-            entry.sampleRows.push(failure.rowNumber);
-          }
-          reasonMap.set(failure.reason, entry);
-        }
-        setFailureBreakdown(
-          Array.from(reasonMap.entries())
-            .map(([reason, entry]) => ({ reason, ...entry }))
-            .sort((a, b) => b.count - a.count),
-        );
-      } catch {
-        const message = panelMessages.genericFailure;
-        setResult(message);
-        setImportAlert({
-          type: "failure",
-          title: panelMessages.importFailureTitle,
-          message,
-        });
-      } finally {
-        setIsImporting(false);
+          response.status === 402
+            ? panelMessages.billing.limitExceeded
+            : (payload.error ?? panelMessages.genericFailure);
+        setImportAlert({ type: "failure", title: panelMessages.importFailureTitle, message });
+        return;
       }
-    })();
+
+      // Reclaiming a VIN edits a vehicle nobody asked about, so it
+      // is said out loud rather than left to the activity log.
+      const reclaimed = payload.reclaimedIdentifiers ?? [];
+      const message =
+        panelMessages.importResult(
+          payload.successRows ?? 0,
+          payload.createdVehicles ?? 0,
+          payload.failedRows ?? 0,
+          payload.skippedRows ?? 0,
+        ) +
+        (reclaimed.length > 0
+          ? ` ${panelMessages.reclaimedIdentifiers(
+              reclaimed.map((row) => `${row.plateNumber} ← ${row.takenFrom}`).join("、"),
+            )}`
+          : "");
+      setImportAlert({ type: "success", title: panelMessages.importSuccessTitle, message });
+
+      // Per reason, so "12 failed" comes with why.
+      const reasonMap = new Map<string, { count: number; sampleRows: number[] }>();
+      for (const failure of payload.failures ?? []) {
+        const entry = reasonMap.get(failure.reason) ?? { count: 0, sampleRows: [] };
+        entry.count += 1;
+        if (entry.sampleRows.length < 5) entry.sampleRows.push(failure.rowNumber);
+        reasonMap.set(failure.reason, entry);
+      }
+      setFailureBreakdown(
+        Array.from(reasonMap.entries())
+          .map(([reason, entry]) => ({ reason, ...entry }))
+          .sort((a, b) => b.count - a.count),
+      );
+      // The log, the unconfirmed-trips warning and the account list
+      // below all changed.
+      router.refresh();
+    } catch {
+      setImportAlert({
+        type: "failure",
+        title: panelMessages.importFailureTitle,
+        message: panelMessages.genericFailure,
+      });
+    } finally {
+      setStage("idle");
+    }
   }
 
-  function toggleVehicleSelection(vehicleKey: string) {
-    setSelectedVehicleKeys((current) => {
-      const exists = current.includes(vehicleKey);
-      if (exists) {
-        return current.filter((key) => key !== vehicleKey);
-      }
-
-      if (current.length >= activeProjection.availableNewVehicleSlots) {
-        return current;
-      }
-
-      return [...current, vehicleKey];
-    });
+  function toggleVehicle(key: string) {
+    setSelectedVehicleKeys((current) =>
+      current.includes(key)
+        ? current.filter((value) => value !== key)
+        : current.length >= newVehicleCap
+          ? current
+          : [...current, key],
+    );
   }
 
-  const importMessages = messages.imports;
-  const hasFile = rows.length > 0;
-  const readyToImport = hasFile && missingRequired.length === 0;
+  const accountOptions = [
+    { value: "", label: panelMessages.turoAccountMain },
+    ...knownTuroAccounts.map((account) => ({ value: account, label: account })),
+    { value: NEW_ACCOUNT, label: panelMessages.turoAccountOther },
+  ];
+
+  const cardClass =
+    "rounded-lg border border-[color:var(--line)] bg-white px-4 py-3.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:px-5 sm:py-4";
+  const stepBadge = (n: number, done: boolean) => (
+    <span
+      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+        done ? "bg-[var(--ok-bg)] text-[var(--ok-fg)]" : "bg-[var(--ink)] text-white"
+      }`}
+    >
+      {done ? "✓" : n}
+    </span>
+  );
 
   return (
     <>
@@ -414,18 +380,17 @@ export function CsvImportPanel({
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-3">
-          <section className="rounded-lg border border-[color:var(--line)] bg-white px-5 py-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+          {/* 1. The file */}
+          <section className={cardClass}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-semibold text-white">
-                  1
-                </span>
-                <div>
+              <div className="flex min-w-0 items-center gap-3">
+                {stepBadge(1, fileReady)}
+                <div className="min-w-0">
                   <h3 className="text-[15px] font-semibold text-[color:var(--ink)]">
                     {panelMessages.uploadTitle}
                   </h3>
-                  <p className="text-[12px] text-[color:var(--ink-soft)]">
-                    {fileName ? fileName : panelMessages.emptyState}
+                  <p className="truncate text-[12px] text-[color:var(--ink-soft)]">
+                    {file ? file.name : panelMessages.uploadHint}
                   </p>
                 </div>
               </div>
@@ -438,287 +403,187 @@ export function CsvImportPanel({
                 >
                   {panelMessages.openTuroPage}
                 </a>
-                <label className="inline-flex cursor-pointer items-center rounded-md bg-[var(--ink)] px-3 py-2 text-[13px] font-medium text-white transition hover:bg-[color:rgba(18,18,20,0.85)]">
-                  {panelMessages.chooseFile}
+                <label
+                  className={`inline-flex cursor-pointer items-center rounded-md px-3 py-2 text-[13px] font-medium transition ${
+                    file
+                      ? "border border-[color:var(--line)] bg-white text-[color:var(--ink)] hover:border-[var(--ink)]"
+                      : "bg-[var(--ink)] text-white hover:bg-[color:rgba(18,18,20,0.85)]"
+                  } ${busy ? "pointer-events-none opacity-50" : ""}`}
+                >
+                  {file ? panelMessages.chooseAnother : panelMessages.chooseFile}
                   <input
                     type="file"
-                    accept=".csv"
+                    accept=".csv,text/csv"
                     className="hidden"
+                    disabled={busy}
                     onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (!file) return;
-                      setFileName(file.name);
-                      Papa.parse<PreviewRow>(file, {
-                        header: true,
-                        skipEmptyLines: true,
-                        complete: (results) => {
-                          const nextHeaders = results.meta.fields ?? [];
-                          setHeaders(nextHeaders);
-                          setRows(results.data);
-                          setMapping(buildCsvHeaderMapping(nextHeaders));
-                          setSelectedVehicleKeys([]);
-                          setBillingProjection(null);
-                          setShowBillingModal(false);
-                          setResult("");
-                          setFailureBreakdown([]);
-                          setBillingCheckError("");
-                        },
-                      });
+                      const picked = event.target.files?.[0];
+                      event.target.value = "";
+                      if (picked) loadFile(picked);
                     }}
                   />
                 </label>
               </div>
             </div>
 
-            {hasFile ? (
-              <div className="mt-4 overflow-x-auto rounded-md border border-[color:var(--line)]">
-                <table className="min-w-full divide-y divide-[color:var(--line)] text-left text-[12px]">
-                  <thead className="bg-[var(--surface-muted)]">
-                    <tr>
-                      {headers.map((header) => (
-                        <th
-                          key={header}
-                          className="whitespace-nowrap px-3 py-2 font-semibold text-[color:var(--ink)]"
-                        >
-                          {header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[color:var(--line)] bg-white">
-                    {previewRows.map((row, index) => (
-                      <tr key={`${index}-${row[headers[0] ?? ""]}`}>
-                        {headers.map((header) => (
-                          <td
-                            key={header}
-                            className="whitespace-nowrap px-3 py-2 text-[color:var(--ink-soft)]"
-                          >
-                            {row[header] || "—"}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-          </section>
-
-          <section
-            className={`rounded-lg border border-[color:var(--line)] bg-white px-5 py-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] transition ${
-              hasFile ? "" : "opacity-60"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-semibold text-white">
-                2
-              </span>
-              <div className="flex-1">
-                <h3 className="text-[15px] font-semibold text-[color:var(--ink)]">
-                  {panelMessages.mappingKicker}
-                </h3>
-                <p className="text-[12px] text-[color:var(--ink-soft)]">
-                  {/* Not `emptyState` -- step 1 already says that,
-                      verbatim, eight lines up. Two cards repeating one
-                      sentence reads as a rendering fault. */}
-                  {hasFile
-                    ? missingRequired.length > 0
-                      ? `${panelMessages.requiredMappingLeft}: ${missingRequired.join(", ")}`
-                      : `${panelMessages.requiredMappingLeft}: ${panelMessages.none}`
-                    : panelMessages.mappingWaiting}
-                </p>
-              </div>
-            </div>
-
-            {hasFile ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {headers.map((header) => (
-                  <label key={header} className="block space-y-1">
-                    <span className="text-[12px] font-medium text-[color:var(--ink)]">{header}</span>
-                    <SearchableSelect
-                      value={mapping[header] ?? ""}
-                      onChange={(value) =>
-                        setMapping((current) => ({
-                          ...current,
-                          [header]: value,
-                        }))
-                      }
-                      options={[
-                        { value: "", label: panelMessages.ignoreColumn },
-                        ...csvFieldOptions.map((option) => ({
-                          value: option.value,
-                          label: option.label,
-                        })),
-                      ]}
-                      placeholder={panelMessages.ignoreColumn}
-                      searchPlaceholder={panelMessages.mappingKicker}
-                      className="h-9 w-full rounded-md border border-[color:var(--line)] bg-white px-2 text-[13px] text-[color:var(--ink)] outline-none focus:border-[var(--ink)]"
-                    />
-                  </label>
-                ))}
-              </div>
-            ) : null}
-          </section>
-
-          <section
-            className={`rounded-lg border border-[color:var(--line)] bg-white px-5 py-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] transition ${
-              readyToImport ? "" : "opacity-60"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-semibold text-white">
-                3
-              </span>
-              <div className="flex-1">
-                <h3 className="text-[15px] font-semibold text-[color:var(--ink)]">
-                  {panelMessages.importKicker}
-                </h3>
-                <p className="text-[12px] text-[color:var(--ink-soft)]">
-                  {panelMessages.rowsDetected}: {rows.length}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3 text-[13px] text-[color:var(--ink)]">
-              <label className="block rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2">
-                <span className="font-medium text-[color:var(--ink)]">
-                  {panelMessages.turoAccountTitle}
-                </span>
-                <span className="mt-0.5 block text-[11px] text-[color:var(--ink-soft)]">
-                  {panelMessages.turoAccountHint}
-                </span>
-                {/* Picked, not typed. The account name has to match the
-                    one already on the vehicles exactly -- "Kevin" and
-                    "kevin" are two different fleets to the matcher --
-                    and typing it fresh on every import is how that goes
-                    wrong. The list is what the fleet actually uses. */}
-                <select
-                  value={turoAccount}
-                  onChange={(event) => setTuroAccount(event.target.value)}
-                  className="mt-2 w-full rounded-md border border-[color:var(--line-strong)] bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--brand)]"
-                >
-                  <option value="">{panelMessages.turoAccountMain}</option>
-                  {knownTuroAccounts.map((account) => (
-                    <option key={account} value={account}>
-                      {account}
-                    </option>
-                  ))}
-                  <option value="__new__">{panelMessages.turoAccountOther}</option>
-                </select>
-                {turoAccount === "__new__" ? (
-                  <input
-                    autoFocus
-                    onChange={(event) => setTuroAccount(event.target.value)}
-                    placeholder={panelMessages.turoAccountPlaceholder}
-                    className="mt-2 w-full rounded-md border border-[color:var(--line-strong)] bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--brand)]"
-                  />
-                ) : null}
-              </label>
-
-              <label className="flex items-start gap-3 rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[13px]">
-                <input
-                  type="checkbox"
-                  checked={createMissingVehicles}
-                  onChange={(event) => {
-                    setCreateMissingVehicles(event.target.checked);
-                    if (!event.target.checked) {
-                      setSelectedVehicleKeys([]);
-                    }
-                  }}
-                  className="mt-0.5 h-4 w-4 rounded border-[color:var(--line)]"
+            {isReading ? (
+              <div className="mt-3">
+                <TuroTaskProgress
+                  locale={locale === "en" ? "en" : "zh"}
+                  steps={[panelMessages.reading]}
+                  current={0}
+                  startedAt={readStartedAt}
                 />
-                <span>
-                  <span className="font-medium text-[color:var(--ink)]">
-                    {panelMessages.autoCreateTitle}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] text-[color:var(--ink-soft)]">
-                    {panelMessages.autoCreateHint}
-                  </span>
-                </span>
-              </label>
+              </div>
+            ) : null}
+            {parseError ? (
+              <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-700">{parseError}</p>
+            ) : null}
 
-              {hasFile ? (
-                <div className="rounded-md border border-[color:var(--line)] bg-[var(--surface-muted)] px-3 py-2 text-[12px] text-[color:var(--ink-soft)]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--ink)]">
-                    {panelMessages.billing.projectionTitle}
+            {file ? (
+              <div className="mt-3 space-y-2">
+                {missingColumns.length > 0 ? (
+                  <p className="rounded-md bg-rose-50 px-3 py-2 text-[12px] leading-5 text-rose-700">
+                    {panelMessages.notTuroFile(missingColumns.join("、"))}
                   </p>
-                  <div className="mt-1 grid gap-0.5 sm:grid-cols-3">
-                    <p>
-                      {panelMessages.billing.projectedVehicles(activeProjection.projectedVehicleCount)}
-                    </p>
-                    <p>
-                      {panelMessages.billing.projectedNewVehicles(
-                        activeProjection.projectedNewVehicleCount,
-                      )}
-                    </p>
-                    <p>
-                      {panelMessages.billing.projectedPaidSlots(
-                        activeProjection.requiredProjectedPaidSlots,
-                      )}
-                    </p>
+                ) : (
+                  <p className="text-[13px] font-medium text-[color:var(--ink)]">{summary}</p>
+                )}
+                <details>
+                  <summary className="tap-press cursor-pointer list-none text-[12px] font-semibold text-[color:var(--ink-soft)] underline underline-offset-2">
+                    {panelMessages.previewToggle(file.headers.length)}
+                  </summary>
+                  <div className="mt-2 overflow-x-auto rounded-md border border-[color:var(--line)]">
+                    <table className="min-w-full divide-y divide-[color:var(--line)] text-left text-[12px]">
+                      <thead className="bg-[var(--surface-muted)]">
+                        <tr>
+                          {file.headers.map((header) => (
+                            <th key={header} className="whitespace-nowrap px-3 py-2 font-semibold text-[color:var(--ink)]">
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[color:var(--line)] bg-white">
+                        {file.rows.slice(0, 5).map((row, index) => (
+                          <tr key={index}>
+                            {file.headers.map((header) => (
+                              <td key={header} className="whitespace-nowrap px-3 py-2 text-[color:var(--ink-soft)]">
+                                {row[header] || "—"}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  {activeProjection.selectableVehicleOptions.length > 0 ? (
-                    <p className="mt-1 text-[color:var(--ink)]">
-                      {panelMessages.selectedVehiclesSummary(
-                        selectedVehicleKeys.length,
-                        activeProjection.availableNewVehicleSlots,
-                      )}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
+                </details>
+              </div>
+            ) : null}
+          </section>
 
-              {isCheckingBilling ? (
-                <p className="text-[12px] text-[color:var(--ink-soft)]">
-                  {panelMessages.billing.checkingImport}
-                </p>
-              ) : null}
-              {billingCheckError ? (
-                <p className="rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
-                  {billingCheckError}
-                </p>
-              ) : null}
-              {activeProjection.exceedsPurchasedLimit ? (
+          {/* 2. The account */}
+          <section className={`${cardClass} transition ${fileReady ? "" : "opacity-60"}`}>
+            <div className="flex items-center gap-3">
+              {stepBadge(2, fileReady && accountReady)}
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-semibold text-[color:var(--ink)]">{panelMessages.accountStep}</h3>
+                <p className="text-[12px] leading-5 text-[color:var(--ink-soft)]">{panelMessages.turoAccountHint}</p>
+              </div>
+            </div>
+            {/* Picked, not typed. The account name has to match the one
+                already on the vehicles exactly -- "Kevin" and "kevin"
+                are two different fleets to the matcher -- and typing it
+                fresh on every import is how that goes wrong. */}
+            <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label={panelMessages.accountStep}>
+              {accountOptions.map((option) => {
+                const active = accountChoice === option.value;
+                return (
+                  <button
+                    key={option.value || "(main)"}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    disabled={!fileReady || busy}
+                    onClick={() => setAccountChoice(option.value)}
+                    className={`tap-press min-h-9 rounded-md border px-3 py-1.5 text-[13px] font-medium transition disabled:cursor-not-allowed ${
+                      active
+                        ? "border-[var(--ink)] bg-[var(--ink)] text-white"
+                        : "border-[color:var(--line-strong)] bg-white text-[color:var(--ink)] hover:border-[var(--ink)]"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            {accountChoice === NEW_ACCOUNT ? (
+              <input
+                autoFocus
+                value={customAccount}
+                disabled={busy}
+                onChange={(event) => setCustomAccount(event.target.value)}
+                placeholder={panelMessages.turoAccountPlaceholder}
+                className="mt-2 w-full rounded-md border border-[color:var(--line-strong)] bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--brand)] sm:max-w-xs"
+              />
+            ) : null}
+          </section>
+
+          {/* 3. Import */}
+          <section className={`${cardClass} transition ${fileReady && accountReady ? "" : "opacity-60"}`}>
+            <div className="flex items-center gap-3">
+              {stepBadge(3, false)}
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-semibold text-[color:var(--ink)]">{panelMessages.importStep}</h3>
+                <p className="text-[12px] leading-5 text-[color:var(--ink-soft)]">{panelMessages.importStepHint}</p>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {blockedByBilling ? (
                 <p className="rounded-md bg-amber-50 px-3 py-2 text-[12px] text-amber-700">
-                  {panelMessages.billing.limitExceededDetail(
-                    activeProjection.projectedVehicleCount,
-                    activeProjection.allowedVehicleCount,
-                    activeProjection.additionalPaidSlotsNeeded,
-                  )}
+                  {panelMessages.billing.limitExceeded}{" "}
+                  <Link href="/billing" className="font-semibold underline underline-offset-2">
+                    {panelMessages.billing.openBillingPage}
+                  </Link>
                 </p>
               ) : null}
 
-              <button
-                disabled={!readyToImport || isImporting}
-                onClick={() => submitImport()}
-                className="w-full rounded-md bg-[var(--accent)] px-4 py-2.5 text-[14px] font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-[color:var(--line)] disabled:text-[color:var(--ink-soft)]"
-              >
-                {isImporting ? panelMessages.importing : panelMessages.runImport}
-              </button>
-              {result ? (
-                <p className="rounded-md bg-[var(--surface-muted)] px-3 py-2 text-[12px] text-[color:var(--ink)]">
-                  {result}
-                </p>
-              ) : null}
+              {busy ? (
+                <TuroTaskProgress
+                  locale={locale === "en" ? "en" : "zh"}
+                  steps={panelMessages.progressSteps}
+                  current={stage === "checking" ? 1 : 2}
+                  startedAt={startedAt}
+                  note={file ? panelMessages.progressNote(file.rows.length) : undefined}
+                />
+              ) : (
+                <button
+                  type="button"
+                  disabled={!canStart}
+                  onClick={() => void startImport()}
+                  className="tap-press w-full rounded-md bg-[var(--accent)] px-4 py-2.5 text-[14px] font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-[color:var(--line)] disabled:text-[color:var(--ink-soft)]"
+                >
+                  {!fileReady
+                    ? panelMessages.needsFile
+                    : !accountReady
+                      ? panelMessages.needsAccount
+                      : panelMessages.runImport}
+                </button>
+              )}
+
               {failureBreakdown.length > 0 ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-                  <p className="font-semibold">
-                    {locale === "zh" ? "失败原因分类" : "Failure breakdown"}
-                  </p>
+                  <p className="font-semibold">{panelMessages.failureBreakdown}</p>
                   <ul className="mt-1 space-y-1">
                     {failureBreakdown.slice(0, 8).map((entry) => (
                       <li key={entry.reason}>
                         <span className="font-medium">{entry.reason}</span>
                         <span className="mx-1">·</span>
-                        <span className="tabular-nums">
-                          {locale === "zh"
-                            ? `${entry.count} 行`
-                            : `${entry.count} row${entry.count === 1 ? "" : "s"}`}
-                        </span>
+                        <span className="tabular-nums">{panelMessages.failureRows(entry.count)}</span>
                         {entry.sampleRows.length > 0 ? (
                           <span className="ml-1 text-amber-800">
-                            ({locale === "zh" ? "示例行号" : "sample rows"}:{" "}
-                            {entry.sampleRows.join(", ")}
+                            ({panelMessages.failureSampleRows}: {entry.sampleRows.join(", ")}
                             {entry.count > entry.sampleRows.length ? "…" : ""})
                           </span>
                         ) : null}
@@ -733,17 +598,8 @@ export function CsvImportPanel({
 
         <aside className="space-y-4">
           <section className="rounded-lg border border-[color:var(--line)] bg-white px-5 py-4 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[11px] font-semibold text-[var(--accent)]">
-                0
-              </span>
-              <h3 className="text-[14px] font-semibold text-[color:var(--ink)]">
-                {panelMessages.billing.title}
-              </h3>
-            </div>
-            <p className="mt-2 text-[12px] leading-5 text-[color:var(--ink-soft)]">
-              {panelMessages.billing.copy}
-            </p>
+            <h3 className="text-[14px] font-semibold text-[color:var(--ink)]">{panelMessages.billing.title}</h3>
+            <p className="mt-2 text-[12px] leading-5 text-[color:var(--ink-soft)]">{panelMessages.billing.copy}</p>
 
             <dl className="mt-3 space-y-1.5 text-[12px]">
               {[
@@ -762,12 +618,8 @@ export function CsvImportPanel({
                 </div>
               ))}
               <div className="flex items-center justify-between gap-2">
-                <dt className="text-[color:var(--ink-soft)]">
-                  {panelMessages.billing.subscriptionStatus}
-                </dt>
-                <dd className="font-semibold capitalize text-[color:var(--ink)]">
-                  {billingSnapshot.status}
-                </dd>
+                <dt className="text-[color:var(--ink-soft)]">{panelMessages.billing.subscriptionStatus}</dt>
+                <dd className="font-semibold capitalize text-[color:var(--ink)]">{billingSnapshot.status}</dd>
               </div>
             </dl>
 
@@ -783,12 +635,10 @@ export function CsvImportPanel({
                 </p>
               ) : null}
               {billingNotice ? (
-                <p className="rounded-md bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">
-                  {billingNotice}
-                </p>
+                <p className="rounded-md bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">{billingNotice}</p>
               ) : null}
               <Link
-                href={billingPageHref}
+                href="/billing"
                 className="block w-full rounded-md bg-[var(--ink)] px-3 py-2 text-center text-[13px] font-medium text-white transition hover:bg-[color:rgba(18,18,20,0.85)]"
               >
                 {panelMessages.billing.openBillingPage}
@@ -798,117 +648,84 @@ export function CsvImportPanel({
         </aside>
       </div>
 
-      {showBillingModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ink)]/45 px-4">
-          <div className="w-full max-w-xl rounded-lg border border-[var(--line)] bg-white p-4 shadow-2xl">
+      {stage === "confirm" ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--ink)]/45 sm:items-center sm:px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-t-xl border border-[var(--line)] bg-white p-4 shadow-2xl sm:rounded-lg"
+          >
             <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">
-              {panelMessages.billing.modalKicker}
+              {panelMessages.newVehiclesKicker}
             </p>
-            <h3 className="mt-1 font-serif text-[1.35rem] text-[var(--ink)]">
-              {panelMessages.billing.modalTitle}
+            <h3 className="mt-1 font-serif text-[1.25rem] text-[var(--ink)]">
+              {panelMessages.newVehiclesTitle(newVehicles.length)}
             </h3>
-            <p className="mt-2 text-[12px] leading-5 text-[var(--ink-mid)]">
-              {panelMessages.billing.modalCopy(
-                activeProjection.projectedVehicleCount,
-                activeProjection.allowedVehicleCount,
-              )}
-            </p>
-
-            <div className="mt-3 grid gap-2 rounded-lg bg-[var(--surface-muted)] p-3 text-[12px] text-[var(--ink-mid)]">
-              <div className="flex items-center justify-between">
-                <span>{panelMessages.billing.currentVehicles}</span>
-                <span className="font-semibold text-[var(--ink)]">{billingSnapshot.currentVehicleCount}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>{panelMessages.billing.projectedVehiclesLabel}</span>
-                <span className="font-semibold text-[var(--ink)]">{activeProjection.projectedVehicleCount}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>{panelMessages.billing.additionalNeededLabel}</span>
-                <span className="font-semibold text-[var(--ink)]">{activeProjection.additionalPaidSlotsNeeded}</span>
-              </div>
-            </div>
-
-            {activeProjection.selectableVehicleOptions.length > 0 ? (
-              <div className="mt-3 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-                  {panelMessages.chooseVehiclesLabel}
-                </p>
-                <h4 className="mt-1 text-[13px] font-semibold text-[var(--ink)]">
-                  {panelMessages.chooseVehiclesTitle}
-                </h4>
-                <p className="mt-1.5 text-[12px] leading-5 text-[var(--ink-mid)]">
-                  {panelMessages.chooseVehiclesCopy(activeProjection.availableNewVehicleSlots)}
-                </p>
-                <p className="mt-2 text-[11px] text-[var(--ink-soft)]">
-                  {panelMessages.selectionLimitNotice(activeProjection.availableNewVehicleSlots)}
-                </p>
-
-                <div className="mt-3 max-h-64 space-y-1.5 overflow-y-auto pr-1">
-                  {activeProjection.selectableVehicleOptions.map((vehicle) => {
-                    const checked = selectedVehicleKeys.includes(vehicle.key);
-                    const disableUnchecked =
-                      !checked && selectedVehicleKeys.length >= activeProjection.availableNewVehicleSlots;
-
-                    return (
-                      <label
-                        key={vehicle.key}
-                        className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 transition ${
-                          checked
-                            ? "border-[var(--ink)] bg-white"
-                            : "border-[var(--line)] bg-white/75"
-                        } ${disableUnchecked ? "opacity-60" : ""}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={disableUnchecked}
-                          onChange={() => toggleVehicleSelection(vehicle.key)}
-                          className="mt-0.5 h-3.5 w-3.5 rounded border-[var(--line-strong)]"
-                        />
-                        <span className="block min-w-0">
-                          <span className="block text-[12px] font-medium text-[var(--ink)]">{vehicle.label}</span>
-                          <span className="mt-0.5 block text-[10.5px] text-[var(--ink-soft)]">
-                            {vehicle.secondaryLabel || "—"} · {vehicle.rowCount} row(s)
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-
-                {activeProjection.availableNewVehicleSlots < 1 ? (
-                  <p className="mt-3 rounded-md bg-white px-3 py-2 text-[12px] text-[var(--ink-mid)]">
-                    {panelMessages.selectionNoneAvailable}
-                  </p>
-                ) : null}
-              </div>
+            <p className="mt-1.5 text-[12px] leading-5 text-[var(--ink-mid)]">{panelMessages.newVehiclesCopy}</p>
+            {newVehicleCap < newVehicles.length ? (
+              <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                {panelMessages.newVehiclesQuota(newVehicleCap)}{" "}
+                <Link href="/billing" className="font-semibold underline underline-offset-2">
+                  {panelMessages.billing.openBillingPage}
+                </Link>
+              </p>
             ) : null}
 
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <div className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+              {newVehicles.map((vehicle) => {
+                const checked = selectedVehicleKeys.includes(vehicle.key);
+                const locked = !checked && selectedVehicleKeys.length >= newVehicleCap;
+                return (
+                  <label
+                    key={vehicle.key}
+                    className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 transition ${
+                      checked ? "border-[var(--ink)] bg-white" : "border-[var(--line)] bg-white/75"
+                    } ${locked ? "cursor-not-allowed opacity-50" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={locked}
+                      onChange={() => toggleVehicle(vehicle.key)}
+                      className="mt-0.5 h-4 w-4 rounded border-[var(--line-strong)]"
+                    />
+                    <span className="block min-w-0">
+                      <span className="block text-[13px] font-medium text-[var(--ink)]">{vehicle.label}</span>
+                      <span className="mt-0.5 block text-[11px] text-[var(--ink-soft)]">
+                        {vehicle.secondaryLabel ? `${vehicle.secondaryLabel} · ` : ""}
+                        {panelMessages.newVehicleTrips(vehicle.rowCount)}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
               <button
                 type="button"
-                onClick={() => setShowBillingModal(false)}
-                className="rounded-md border border-[var(--line)] px-3 py-2 text-[12px] font-medium text-[var(--ink-mid)]"
+                disabled={selectedVehicleKeys.length === 0}
+                onClick={() =>
+                  void runImport({ createMissingVehicles: true, selectedVehicleKeys })
+                }
+                className="tap-press flex-1 rounded-md bg-[var(--accent)] px-3 py-2.5 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-[var(--line)] disabled:text-[var(--ink-soft)]"
               >
-                {panelMessages.billing.closeModal}
+                {panelMessages.confirmCreate(selectedVehicleKeys.length)}
               </button>
-              <Link
-                href={billingPageHref}
-                className="flex-1 rounded-md bg-[var(--ink)] px-3 py-2 text-center text-[12px] font-medium text-white transition hover:bg-[var(--ink)]"
+              <button
+                type="button"
+                onClick={() => void runImport({ createMissingVehicles: false, selectedVehicleKeys: [] })}
+                className="tap-press flex-1 rounded-md border border-[var(--line-strong)] bg-white px-3 py-2.5 text-[13px] font-medium text-[var(--ink)]"
               >
-                {panelMessages.billing.openBillingPage}
-              </Link>
-              {activeProjection.selectableVehicleOptions.length > 0 ? (
-                <button
-                  type="button"
-                  disabled={isImporting || selectedVehicleKeys.length === 0}
-                  onClick={() => submitImport({ skipLimitGuard: true })}
-                  className="flex-1 rounded-md bg-white px-3 py-2 text-center text-[12px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] transition hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:text-[var(--ink-soft)]"
-                >
-                  {panelMessages.importSelectedAction}
-                </button>
-              ) : null}
+                {panelMessages.skipCreate}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStage("idle")}
+                className="tap-press rounded-md px-3 py-2.5 text-[13px] font-medium text-[var(--ink-soft)]"
+              >
+                {panelMessages.cancel}
+              </button>
             </div>
           </div>
         </div>
@@ -924,9 +741,7 @@ export function CsvImportPanel({
             >
               {importAlert.type === "success" ? "CSV" : "Error"}
             </p>
-            <h3 className="mt-2 font-serif text-[1.45rem] text-[var(--ink)]">
-              {importAlert.title}
-            </h3>
+            <h3 className="mt-2 font-serif text-[1.45rem] text-[var(--ink)]">{importAlert.title}</h3>
             <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-[var(--ink-mid)]">
               {importAlert.message}
             </p>

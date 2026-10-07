@@ -494,10 +494,11 @@ export async function importTuroCsvText(input: {
 }
 
 /**
- * One-click import: a file, and the settings of the last import.
+ * One-click import: a file, the account it came from, and the column
+ * mapping of the last import.
  *
- * "The settings" are what an ImportBatch keeps -- the column mapping and
- * the Turo account. The mapping is reused only when every column it
+ * The account is asked each time (`turoAccount`); reusing the last one
+ * filed a co-hosted export under whichever account was imported before. The mapping is reused only when every column it
  * names is in the new file; Turo does add and rename export columns, and
  * a mapping pointing at a column that is gone would fail every row. Then
  * it falls back to the same guess any other import makes, and says so.
@@ -513,6 +514,9 @@ export async function importTuroCsvWithLastSettings(input: {
   fileName: string;
   content: string;
   billingBypassActive: boolean;
+  /** The account the person picked for this file; "" or null is the
+   *  main one. Left out, the last import's account is used. */
+  turoAccount?: string | null;
 }): Promise<
   TuroCsvImportResult & {
     settings: { mapping: "last" | "guessed"; turoAccount: string | null; lastImportedAt: Date | null };
@@ -529,12 +533,15 @@ export async function importTuroCsvWithLastSettings(input: {
 
   let mappingUsed: "last" | "guessed" = "guessed";
   const lastMapping = parseStoredMapping(last?.mapping);
+  const turoAccount = normalizeTuroAccount(
+    input.turoAccount !== undefined ? input.turoAccount : last?.turoAccount,
+  );
   const result = await importCsvContent({
     workspaceId: input.workspaceId,
     actor: input.actor,
     fileName: input.fileName,
     content: input.content,
-    turoAccount: normalizeTuroAccount(last?.turoAccount),
+    turoAccount,
     createMissingVehicles: false,
     billingBypassActive: input.billingBypassActive,
     syncConfig,
@@ -549,7 +556,7 @@ export async function importTuroCsvWithLastSettings(input: {
     ...result,
     settings: {
       mapping: mappingUsed,
-      turoAccount: normalizeTuroAccount(last?.turoAccount),
+      turoAccount,
       lastImportedAt: last?.importedAt ?? null,
     },
   };

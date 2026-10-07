@@ -366,6 +366,8 @@ export async function applyTuroOrderFacts(input: {
         externalOrderId: true,
         status: true,
         renterPhone: true,
+        pickupLocation: true,
+        returnLocation: true,
         pickupDatetime: true,
         returnDatetime: true,
       },
@@ -578,6 +580,10 @@ export async function applyTuroOrderFacts(input: {
             pickupDatetime: facts.tripStart,
             returnDatetime: facts.tripEnd,
             pickupLocation: facts.location,
+            // The mail names one place. Turo trips return where they
+            // started unless delivery says otherwise, and the CSV --
+            // which has both columns -- replaces either when it lands.
+            returnLocation: facts.location,
             status: statusFor(facts),
             source: "turo",
             createdBy: input.actor ?? "turo-email",
@@ -613,12 +619,21 @@ export async function applyTuroOrderFacts(input: {
       pickupDatetime?: Date;
       returnDatetime?: Date;
       renterPhone?: string;
+      pickupLocation?: string;
+      returnLocation?: string;
       status?: OrderStatus;
     } = {};
 
     // A phone number is additive and safe on any status: the CSV does
     // not carry one, so this only ever fills a blank.
     if (!order.renterPhone && facts.guestPhone) data.renterPhone = facts.guestPhone;
+    // So is a location, for the trips created before the mail's was
+    // read (or read at all): fill a blank, never overwrite -- a CSV's
+    // pickup and return columns are more exact than the mail's one place.
+    if (facts.location) {
+      if (!order.pickupLocation) data.pickupLocation = facts.location;
+      if (!order.returnLocation) data.returnLocation = facts.location;
+    }
 
     if (finished) {
       const wouldMove =

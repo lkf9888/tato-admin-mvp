@@ -13,6 +13,7 @@ import {
   type MessageTemplateRow,
   type MessageTemplateVehicleOption,
 } from "@/components/message-template-panel";
+import { InlineSpinner, TypingDots } from "@/components/turo-task-progress";
 import { getMessages, type Locale } from "@/lib/i18n";
 
 type ThreadMessage = {
@@ -358,6 +359,7 @@ export function GuestMessagesView({
   // hand one guest the reply written for another.
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [draftingId, setDraftingId] = useState<string | null>(null);
+  const [draftStartedAt, setDraftStartedAt] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
 
@@ -497,6 +499,7 @@ export function GuestMessagesView({
   async function draftFor(message: ThreadMessage) {
     if (!selected || draftingId) return;
     setDraftingId(message.id);
+    setDraftStartedAt(Date.now());
     setDraftError(null);
     try {
       const response = await fetch("/api/messages/draft", {
@@ -962,7 +965,8 @@ export function GuestMessagesView({
 
             {/* Chinese under each bubble: word for word, or the gist. */}
             <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
-              <span className="text-[11px] text-[var(--ink-soft)]">
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-soft)]">
+                {translating ? <InlineSpinner className="h-3 w-3" /> : null}
                 {translating ? t.autoTranslating : t.messageCount(stream.length)}
               </span>
               <span className="inline-flex rounded-full bg-[var(--surface-muted)] p-0.5" title={t.zhModeHint}>
@@ -1055,6 +1059,16 @@ export function GuestMessagesView({
                   </div>
                 </div>
               ) : null}
+              {/* Where the draft will appear, while the model writes it:
+                  a reply can take twenty seconds, and a button that only
+                  says "drafting" for that long reads as stuck. */}
+              {latestEmail && draftingId === latestEmail.id && draft === undefined ? (
+                <div className="flex justify-end">
+                  <div className="rounded-2xl rounded-br-md bg-[var(--brand)] px-3.5 py-2.5 text-white">
+                    <TypingDots startedAt={draftStartedAt} locale={locale === "en" ? "en" : "zh"} />
+                  </div>
+                </div>
+              ) : null}
               {draftError ? <p className="text-[12px] text-rose-600">{draftError}</p> : null}
 
               <div className="flex flex-wrap items-center gap-2">
@@ -1084,8 +1098,9 @@ export function GuestMessagesView({
                     type="button"
                     onClick={() => draftFor(latestEmail)}
                     disabled={draftingId !== null}
-                    className="tap-press h-9 rounded-full bg-[var(--ink)] px-4 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                    className="tap-press inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--ink)] px-4 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
                   >
+                    {draftingId ? <InlineSpinner /> : null}
                     {draftingId ? t.draftingOne : t.draftOne}
                   </button>
                 ) : null}
@@ -1094,8 +1109,9 @@ export function GuestMessagesView({
                     type="button"
                     onClick={() => draftFor(latestEmail)}
                     disabled={draftingId !== null}
-                    className="tap-press h-9 rounded-full border border-[var(--line)] px-3.5 text-[13px] font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] disabled:opacity-50"
+                    className="tap-press inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--line)] px-3.5 text-[13px] font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] disabled:opacity-50"
                   >
+                    {draftingId ? <InlineSpinner /> : null}
                     {draftingId ? t.draftingOne : t.draftAgain}
                   </button>
                 ) : null}

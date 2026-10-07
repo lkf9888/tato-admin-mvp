@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { InlineSpinner, TuroTaskProgress, useLeaveGuard } from "@/components/turo-task-progress";
 import type { Locale } from "@/lib/i18n";
 
 type QuickImportResult = {
@@ -20,7 +21,8 @@ type QuickImportResult = {
 
 type State =
   | { kind: "idle" }
-  | { kind: "busy"; fileName: string }
+  | { kind: "choose"; file: File }
+  | { kind: "busy"; fileName: string; startedAt: number }
   | { kind: "done"; result: QuickImportResult }
   | { kind: "error"; message: string };
 
@@ -29,7 +31,14 @@ function copy(locale: Locale) {
     ? {
         button: "快速导入 CSV",
         busy: (name: string) => `正在导入 ${name}…`,
-        hint: "选一份 Turo 导出的 CSV,直接按上一次导入的设置(列对应、Turo 账户)导入。不会新建车辆;车队里没有的车牌会列出来。",
+        progressSteps: ["上传文件", "导入订单"],
+        progressNote: "请不要刷新或关闭页面",
+        hint: "选一份 Turo 导出的 CSV,再选它属于哪个 Turo 账户,就开始导入。不会新建车辆;车队里没有的车牌会列出来。",
+        chooseAccount: "这份文件属于哪个 Turo 账户?",
+        mainAccount: "主账户",
+        lastUsed: "上次",
+        otherAccount: "别的账户请到 CSV 导入页",
+        cancel: "取消",
         done: (imported: number, total: number) => `已导入 ${imported} / ${total} 行`,
         failed: (count: number) => `${count} 行失败`,
         cancelled: (count: number) => `其中 ${count} 行是 Turo 已取消的行程`,
@@ -50,7 +59,14 @@ function copy(locale: Locale) {
     : {
         button: "Quick CSV import",
         busy: (name: string) => `Importing ${name}…`,
-        hint: "Pick a Turo CSV export and it is imported with the last import's settings (column mapping, Turo account). No vehicles are created; plates the fleet does not have are listed.",
+        progressSteps: ["Upload the file", "Import the trips"],
+        progressNote: "Please don't refresh or close the page",
+        hint: "Pick a Turo CSV export, then the Turo account it came from, and it is imported. No vehicles are created; plates the fleet does not have are listed.",
+        chooseAccount: "Which Turo account is this file from?",
+        mainAccount: "Main account",
+        lastUsed: "last",
+        otherAccount: "Another account? Use the CSV imports page",
+        cancel: "Cancel",
         done: (imported: number, total: number) => `Imported ${imported} of ${total} rows`,
         failed: (count: number) => `${count} failed`,
         cancelled: (count: number) => `${count} of them are trips Turo cancelled`,
@@ -73,24 +89,38 @@ function copy(locale: Locale) {
 const MISSING_SHOWN = 4;
 
 /**
- * One click, one file, the last import's settings.
+ * A file and its account, then import -- no review of new cars.
  *
  * For the routine case -- the same export, downloaded again -- where the
- * imports page's mapping and vehicle-selection steps are the same
- * answers every time. Anything unusual (a new account, new cars to
- * create) still belongs on that page, which the result links to.
+ * imports page's new-car step has nothing to confirm. Anything unusual
+ * (a new account, new cars to create) still belongs on that page, which
+ * the result links to.
  */
 export function CsvQuickImportButton({ locale }: { locale: Locale }) {
   const t = useMemo(() => copy(locale), [locale]);
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>({ kind: "idle" });
+  const [accounts, setAccounts] = useState<{ accounts: string[]; lastAccount: string | null } | null>(null);
 
-  async function upload(file: File) {
-    setState({ kind: "busy", fileName: file.name });
+  // Asked every time, like the imports page: reusing the last account
+  // filed a co-hosted export under whichever account came before it.
+  function pick(file: File) {
+    setState({ kind: "choose", file });
+    if (!accounts) {
+      void fetch("/api/imports/quick")
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data) => setAccounts(data ?? { accounts: [], lastAccount: null }))
+        .catch(() => setAccounts({ accounts: [], lastAccount: null }));
+    }
+  }
+
+  async function upload(file: File, turoAccount: string) {
+    setState({ kind: "busy", fileName: file.name, startedAt: Date.now() });
     try {
       const body = new FormData();
       body.append("file", file);
+      body.append("turoAccount", turoAccount);
       const response = await fetch("/api/imports/quick", { method: "POST", body });
       const data = (await response.json().catch(() => null)) as
         | QuickImportResult
@@ -109,6 +139,7 @@ export function CsvQuickImportButton({ locale }: { locale: Locale }) {
   }
 
   const busy = state.kind === "busy";
+  useLeaveGuard(busy);
 
   return (
     <div className="grid gap-1.5 text-[12px] leading-5">
@@ -118,8 +149,9 @@ export function CsvQuickImportButton({ locale }: { locale: Locale }) {
           title={t.hint}
           disabled={busy}
           onClick={() => input.current?.click()}
-          className="btn-secondary h-8 px-3 text-[12px] disabled:opacity-60"
+          className="btn-secondary inline-flex h-8 items-center gap-1.5 px-3 text-[12px] disabled:opacity-60"
         >
+          {busy ? <InlineSpinner /> : null}
           {busy ? t.busy(state.fileName) : t.button}
         </button>
         <input
@@ -131,10 +163,56 @@ export function CsvQuickImportButton({ locale }: { locale: Locale }) {
             const file = event.target.files?.[0];
             // Cleared so picking the same file again still fires.
             event.target.value = "";
-            if (file) void upload(file);
+            if (file) pick(file);
           }}
         />
       </div>
+
+      {state.kind === "choose" ? (
+        <div className="grid gap-1.5 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2">
+          <p className="font-semibold text-[var(--ink)]">
+            {t.chooseAccount} <span className="font-normal text-[var(--ink-soft)]">{state.file.name}</span>
+          </p>
+          {accounts ? (
+            <div className="flex flex-wrap gap-1.5">
+              {[{ value: "", label: t.mainAccount }, ...accounts.accounts.map((account) => ({ value: account, label: account }))].map(
+                (option) => (
+                  <button
+                    key={option.value || "(main)"}
+                    type="button"
+                    onClick={() => void upload(state.file, option.value)}
+                    className="tap-press min-h-8 rounded-md border border-[var(--line-strong)] bg-white px-3 py-1 text-[12px] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                  >
+                    {option.label}
+                    {accounts.lastAccount === option.value ? (
+                      <span className="ml-1 font-normal text-[var(--ink-soft)]">· {t.lastUsed}</span>
+                    ) : null}
+                  </button>
+                ),
+              )}
+            </div>
+          ) : (
+            <InlineSpinner className="text-[var(--ink-soft)]" />
+          )}
+          <p className="text-[11px] text-[var(--ink-soft)]">
+            <a href="/imports" className="underline underline-offset-2">{t.otherAccount}</a>
+            {" · "}
+            <button type="button" onClick={() => setState({ kind: "idle" })} className="underline underline-offset-2">
+              {t.cancel}
+            </button>
+          </p>
+        </div>
+      ) : null}
+
+      {state.kind === "busy" ? (
+        <TuroTaskProgress
+          locale={locale === "en" ? "en" : "zh"}
+          steps={t.progressSteps}
+          current={1}
+          startedAt={state.startedAt}
+          note={t.progressNote}
+        />
+      ) : null}
 
       {state.kind === "error" ? <p className="text-rose-700">{state.message}</p> : null}
 

@@ -18,12 +18,12 @@ export const importsMessages = {
           body: "Make sure your allowed vehicle total on the right covers your fleet. If it's not enough, buy more slots or apply a coupon first.",
         },
         {
-          title: "Upload and map",
-          body: "Click Choose file to upload the CSV. We auto-map common columns — Reservation ID is required and is the only duplicate-order key.",
+          title: "Choose the file and its account",
+          body: "Choose the CSV, then say which Turo account it was exported from. Every column is read; Reservation ID is the key that tells a new trip from one already imported.",
         },
         {
           title: "Run the import",
-          body: "Click Run import. New vehicles will be auto-created (unless you opt out) and offline conflicts will be flagged for you to review.",
+          body: "Click Start import. Cars your fleet does not have yet are listed for you to confirm before any is created; offline conflicts are flagged for you to review.",
         },
       ],
       unconfirmedKicker: "Check these",
@@ -36,7 +36,7 @@ export const importsMessages = {
       unconfirmedSiblings: (count: number) =>
         `${count} cars in the fleet share this model and year`,
       unconfirmedUnknownVehicles: (list: string) =>
-        `Past imports named cars your fleet does not have: ${list}. Until they exist here, booking email for their model matches one car fewer than really exists — and can land on the wrong one. Re-import with "Auto-create missing vehicles" on, or add them by hand.`,
+        `Past imports named cars your fleet does not have: ${list}. Until they exist here, booking email for their model matches one car fewer than really exists — and can land on the wrong one. Import that file again and confirm the new cars it lists, or add them by hand.`,
       unconfirmedShowList: (count: number) => `Show the ${count}`,
       logShowAll: (count: number) => `Show ${count} older import(s)`,
       logKicker: "Import log",
@@ -52,34 +52,53 @@ export const importsMessages = {
           `${successRows} success / ${failedRows} failed`,
       },
       panel: {
-        uploadKicker: "1. Upload CSV",
-        uploadTitle: "Preview before importing",
+        uploadTitle: "Choose the Turo CSV",
+        uploadHint: "The export from Turo's earnings page. Every column in it is kept on each order.",
         openTuroPage: "Open Turo earnings page",
         chooseFile: "Choose file",
-        emptyState:
-          "Upload the sample CSV in `/sample-data/turo-sample.csv` or a real Turo export to see mapped rows here.",
-        mappingKicker: "2. Field mapping",
-        mappingWaiting: "Waiting for a file.",
-        importKicker: "3. Import",
-        ignoreColumn: "Ignore column",
-        rowsDetected: "Rows detected",
-        requiredMappingLeft: "Required mapping left",
-        none: "none",
-        oneVehicleIdentifier: "one vehicle identifier",
-        turoAccountTitle: "Turo host account for this file",
+        chooseAnother: "Choose another file",
+        reading: "Reading the file…",
+        fileSummary: (rows: number, cars: number, range: string) =>
+          `${rows} row(s) · ${cars} car(s)${range ? ` · ${range}` : ""}`,
+        previewToggle: (columns: number) => `Show the file (first 5 rows, ${columns} columns)`,
+        notTuroFile: (missing: string) =>
+          `This does not look like a Turo earnings export: no ${missing} column. Export it again from Turo's earnings page.`,
+        parseFailed: "The file could not be read. Is it a CSV?",
+        oneVehicleIdentifier: "vehicle",
+        accountStep: "Which Turo account is this file from?",
         turoAccountHint:
-          "Leave blank for the main account. A co-hosted export must name its account, or its cars are filed as main-account vehicles and stop matching their own Turo mail.",
+          "An export only holds one account's cars. Pick the wrong one and its cars are filed under another account, and stop matching their own Turo mail.",
         turoAccountPlaceholder: "e.g. kevin",
         turoAccountMain: "Main account",
         turoAccountOther: "Another account…",
-        autoCreateTitle: "Auto-create missing vehicles from CSV",
-        autoCreateHint: "Recommended for first imports from a real Turo earnings export.",
-        runImport: "Run import",
-        importing: "Importing...",
+        importStep: "Import",
+        importStepHint: "New cars are listed for you to confirm before any is created.",
+        runImport: "Start import",
+        needsFile: "Choose a file first",
+        needsAccount: "Pick the account first",
+        progressSteps: ["Read the file", "Check the cars", "Import the trips"],
+        progressNote: (rows: number) =>
+          `${rows} row(s). A big file takes a few tens of seconds — please don't refresh or close the page.`,
+        newVehiclesKicker: "New cars",
+        newVehiclesTitle: (count: number) =>
+          count === 1 ? "1 car in this file is not in your fleet" : `${count} cars in this file are not in your fleet`,
+        newVehiclesCopy:
+          "The ticked cars are created and their trips imported. Trips of unticked cars are left out this time; add the car later and import the same file again.",
+        newVehiclesQuota: (count: number) =>
+          count === 0
+            ? "Your plan has no room for another car. Buy more slots to add these."
+            : `Your plan has room for ${count} more car(s). Buy more slots to add the rest.`,
+        newVehicleTrips: (count: number) => (count === 1 ? "1 trip" : `${count} trips`),
+        confirmCreate: (count: number) => `Add ${count} car(s) and import`,
+        skipCreate: "Don't add cars, import the rest",
+        cancel: "Cancel",
         genericFailure: "Import failed",
         importSuccessTitle: "Import complete",
         importFailureTitle: "Import failed",
         importAlertClose: "Close",
+        failureBreakdown: "Why rows failed",
+        failureRows: (count: number) => `${count} row(s)`,
+        failureSampleRows: "sample rows",
         billing: {
           kicker: "0. Subscription",
           title: "Vehicle subscription",
@@ -123,22 +142,20 @@ export const importsMessages = {
           failedRows: number,
           skippedRows = 0,
         ) =>
-          `Imported ${successRows} row(s), auto-created ${createdVehicles} vehicle(s), skipped ${skippedRows} row(s), ${failedRows} row(s) need review. Refresh logs below to inspect the new batch.`,
+          `Imported ${successRows} row(s), added ${createdVehicles} car(s), skipped ${skippedRows} row(s); ${failedRows} row(s) need review.`,
         reclaimedIdentifiers: (pairs: string) =>
           `Took back VIN / Turo vehicle id held by the wrong car: ${pairs}. Those identifiers outrank the plate on every import, so the trips were filing against the wrong vehicle until now.`,
-        selectedVehiclesSummary: (selected: number, max: number) =>
-          `Selected ${selected} / ${max} new vehicle(s) to fit within the current quota.`,
-        selectedVehiclesHint:
-          "Existing vehicles in this CSV will still sync normally. Only new vehicles count toward the remaining quota.",
-        chooseVehiclesTitle: "Choose which new vehicles to import",
-        chooseVehiclesCopy: (max: number) =>
-          `This file contains more new vehicles than your remaining quota allows. Pick up to ${max} new vehicle(s) to import now, or buy more quota.`,
-        chooseVehiclesLabel: "New vehicles found in this CSV",
-        importSelectedAction: "Import selected vehicles",
-        selectionLimitNotice: (max: number) => `You can select up to ${max} new vehicle(s).`,
-        selectionNoneAvailable:
-          "No new-vehicle quota is left right now. You can still import existing vehicles from this file, or buy more quota first.",
       },
+    },
+    turoCsvFields: {
+      title: "Turo CSV",
+      hint: "Every column of this trip's row in the Turo export. Choose which ones show; the choice applies to every order.",
+      edit: "Choose fields",
+      done: "Done",
+      showAll: "Show all",
+      hiddenCount: (count: number) => (count === 1 ? "1 field hidden" : `${count} fields hidden`),
+      emptyHidden: "(empty)",
+      saveFailed: "Could not save. Try again.",
     },
   },
   zh: {
@@ -154,12 +171,12 @@ export const importsMessages = {
           body: "先看右侧「当前可用总名额」是否覆盖车队数量。不够的话，先去购买更多名额或输入 coupon 解锁。",
         },
         {
-          title: "上传并映射字段",
-          body: "点击「选择文件」上传 CSV，系统会自动匹配常见列名。Reservation ID 是必填项，也是唯一的重复订单判断依据。",
+          title: "选择文件和账户",
+          body: "选择 CSV，再选它是从哪个 Turo 账户导出的。文件里的每一列都会读入；Reservation ID 用来判断订单是不是已经导入过。",
         },
         {
           title: "执行导入",
-          body: "点击「执行导入」。新车辆会自动建档（除非关闭该选项），与线下订单冲突的记录会被标记等你处理。",
+          body: "点击「开始导入」。车队里没有的车会先列出来让你确认，再新建；与线下订单冲突的记录会被标记等你处理。",
         },
       ],
       unconfirmedKicker: "需要核对",
@@ -168,7 +185,7 @@ export const importsMessages = {
         "预订邮件里只有车型,从来没有车牌,所以这些订单的车辆是拿车型去车队里匹配出来的。只有在车队完整时这才成立:如果真正那台车不在车队里,车型仍然可能唯一匹配到另一台车——错的那台——而结果看上去和正确答案没有任何区别。导入覆盖这些日期的 CSV,车牌就能定案。",
       unconfirmedSiblings: (count: number) => `车队里有 ${count} 台同款同年份`,
       unconfirmedUnknownVehicles: (list: string) =>
-        `以前的导入里出现过车队中没有的车:${list}。只要它们不在车队里,这些车型的预订邮件能匹配到的车就比实际少一台,就可能落到错误的车上。重新导入时勾选「自动创建缺失车辆」,或者手动把它们加进来。`,
+        `以前的导入里出现过车队中没有的车:${list}。只要它们不在车队里,这些车型的预订邮件能匹配到的车就比实际少一台,就可能落到错误的车上。重新导入那份文件，确认它列出的新车，或者手动把它们加进来。`,
       unconfirmedShowList: (count: number) => `查看这 ${count} 笔`,
       logShowAll: (count: number) => `显示更早的 ${count} 次导入`,
       logKicker: "导入日志",
@@ -184,33 +201,51 @@ export const importsMessages = {
           `${successRows} 成功 / ${failedRows} 失败`,
       },
       panel: {
-        uploadKicker: "1. 上传 CSV",
-        uploadTitle: "导入前预览",
+        uploadTitle: "选择 Turo CSV 文件",
+        uploadHint: "Turo 收入页导出的 CSV。文件里的每一列都会存进对应的订单。",
         openTuroPage: "打开 Turo 下载页",
         chooseFile: "选择文件",
-        emptyState: "上传 `/sample-data/turo-sample.csv` 示例文件，或真实的 Turo 导出文件后，这里会显示映射预览。",
-        mappingKicker: "2. 字段映射",
-        mappingWaiting: "等待上传文件。",
-        importKicker: "3. 开始导入",
-        ignoreColumn: "忽略该列",
-        rowsDetected: "识别到行数",
-        requiredMappingLeft: "仍缺少的必填映射",
-        none: "无",
-        oneVehicleIdentifier: "至少一个车辆标识字段",
-        turoAccountTitle: "这份文件属于哪个 Turo 账户",
+        chooseAnother: "换一个文件",
+        reading: "正在读取文件…",
+        fileSummary: (rows: number, cars: number, range: string) =>
+          `${rows} 行 · ${cars} 台车${range ? ` · ${range}` : ""}`,
+        previewToggle: (columns: number) => `查看文件内容（前 5 行，共 ${columns} 列）`,
+        notTuroFile: (missing: string) =>
+          `这份文件不像 Turo 收入导出：找不到「${missing}」列。请从 Turo 收入页重新导出。`,
+        parseFailed: "文件读不出来，请确认是 CSV 格式。",
+        oneVehicleIdentifier: "车辆",
+        accountStep: "这份文件属于哪个 Turo 账户？",
         turoAccountHint:
-          "主账户留空。代管账户的导出必须填账户名，否则它的车会被当成主账户车辆，之后再也匹配不上自己的 Turo 邮件。",
+          "一份导出只包含一个账户的车。选错了，这些车会记到别的账户下，之后再也匹配不上自己的 Turo 邮件。",
         turoAccountPlaceholder: "例如 kevin",
         turoAccountMain: "主账户",
         turoAccountOther: "其他账户…",
-        autoCreateTitle: "自动从 CSV 创建缺失车辆",
-        autoCreateHint: "首次导入真实 Turo earnings 导出时建议开启。",
-        runImport: "执行导入",
-        importing: "导入中...",
+        importStep: "开始导入",
+        importStepHint: "如果有车队里没有的车，会先列出来让你确认，再新建。",
+        runImport: "开始导入",
+        needsFile: "先选择文件",
+        needsAccount: "先选择账户",
+        progressSteps: ["读取文件", "核对车辆", "导入订单"],
+        progressNote: (rows: number) => `共 ${rows} 行，文件大要几十秒，请不要刷新或关闭页面`,
+        newVehiclesKicker: "发现新车",
+        newVehiclesTitle: (count: number) => `这份文件里有 ${count} 台车队里还没有的车`,
+        newVehiclesCopy:
+          "勾选的车会新建，并把它们的订单一起导入。没勾的车，订单这次先不导入；以后把车加上，再导入同一份文件就行。",
+        newVehiclesQuota: (count: number) =>
+          count === 0
+            ? "当前名额已用完，不能再加车。要新增这些车，请先购买名额。"
+            : `当前名额只够再加 ${count} 台。要加更多，请先购买名额。`,
+        newVehicleTrips: (count: number) => `${count} 笔订单`,
+        confirmCreate: (count: number) => `新增 ${count} 台并导入`,
+        skipCreate: "不新增，只导入已有车辆",
+        cancel: "取消",
         genericFailure: "导入失败",
         importSuccessTitle: "导入完成",
         importFailureTitle: "导入失败",
         importAlertClose: "关闭",
+        failureBreakdown: "失败原因分类",
+        failureRows: (count: number) => `${count} 行`,
+        failureSampleRows: "示例行号",
         billing: {
           kicker: "0. 订阅计费",
           title: "车辆名额订阅",
@@ -254,22 +289,20 @@ export const importsMessages = {
           failedRows: number,
           skippedRows = 0,
         ) =>
-          `已导入 ${successRows} 行，自动创建 ${createdVehicles} 台车辆，跳过 ${skippedRows} 行，另有 ${failedRows} 行待人工检查。可刷新下方日志查看新批次。`,
+          `已导入 ${successRows} 行，新增 ${createdVehicles} 台车，跳过 ${skippedRows} 行，另有 ${failedRows} 行待人工检查。`,
         reclaimedIdentifiers: (pairs: string) =>
           `已从错误的车辆上收回 VIN / Turo 车辆 ID:${pairs}。这两个标识在导入时优先级高于车牌,在收回之前行程一直被归到错误的车上。`,
-        selectedVehiclesSummary: (selected: number, max: number) =>
-          `已选择 ${selected} / ${max} 台新车辆，符合当前额度上限。`,
-        selectedVehiclesHint:
-          "这份 CSV 里已存在于系统中的车辆仍会正常同步，只有新车辆会占用剩余额度。",
-        chooseVehiclesTitle: "选择本次要导入的新车辆",
-        chooseVehiclesCopy: (max: number) =>
-          `这份文件里的新车辆数量超过了当前剩余额度。你现在可以先勾选最多 ${max} 台新车辆导入，或者先补购更多额度。`,
-        chooseVehiclesLabel: "这份 CSV 识别到的新车辆",
-        importSelectedAction: "导入已选车辆",
-        selectionLimitNotice: (max: number) => `当前最多可选择 ${max} 台新车辆。`,
-        selectionNoneAvailable:
-          "当前没有可用的新车辆额度。你仍然可以导入这份文件里已存在于系统中的车辆，或者先去补购额度。",
       },
+    },
+    turoCsvFields: {
+      title: "Turo CSV 数据",
+      hint: "这笔订单在 Turo 导出文件里那一行的全部字段。可以选择显示哪些，所有订单一起生效。",
+      edit: "选择字段",
+      done: "完成",
+      showAll: "全部显示",
+      hiddenCount: (count: number) => `已隐藏 ${count} 个字段`,
+      emptyHidden: "（空）",
+      saveFailed: "没保存上，请再试一次。",
     },
   },
 } as const;

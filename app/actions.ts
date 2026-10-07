@@ -1097,6 +1097,8 @@ export async function assignPendingOrderAction(formData: FormData) {
         pickupDatetime: pending.pickupDatetime,
         returnDatetime: pending.returnDatetime,
         pickupLocation: pending.pickupLocation,
+        // The mail's one place; see the email-created order.
+        returnLocation: pending.pickupLocation,
         status: pending.status,
         createdBy: user.name,
       },

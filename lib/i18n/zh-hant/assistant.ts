@@ -34,6 +34,8 @@ export const assistantMessages = {
       needsReply: "待回覆",
       syncNow: "立即同步",
       syncing: "同步中…",
+      syncProgressStep: "正在從 Gmail 讀取新的 Turo 郵件",
+      syncProgressNote: "新郵件要逐封讀取，可能需要一分鐘左右。",
       syncFailed: "同步失敗,請檢查 Gmail 設定。",
       syncedCount: (imported: number) =>
         imported === 0 ? "沒有新的 Turo 郵件。" : `收取了 ${imported} 封新的 Turo 郵件。`,

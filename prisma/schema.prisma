@@ -471,6 +471,17 @@ model TuroSyncConfig {
   @@index([workspaceId])
 }
 
+/// Which Turo CSV columns the order page leaves out. Every imported
+/// order keeps its whole CSV row (sourceMetadata.rawRow); this only
+/// decides what is shown, so hiding a column loses nothing.
+model TuroCsvDisplaySetting {
+  id            String   @id @default(cuid())
+  workspaceId   String   @unique
+  /// JSON array of column names, exactly as Turo's export spells them.
+  hiddenColumns String   @default("[]")
+  updatedAt     DateTime @updatedAt
+}
+
 /// A management commission agreement, as of a date.
 ///
 /// Rates get renegotiated, and a new rate must not silently rewrite

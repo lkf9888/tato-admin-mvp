@@ -156,6 +156,12 @@ function detectCanceller(subject: string): "guest" | "host" | "turo" | null {
   return "guest";
 }
 
+/** A location read from prose: one line, of a sane length, or nothing. */
+function cleanLocation(value: string | undefined): string | null {
+  const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
+  return cleaned && cleaned.length <= 200 ? cleaned : null;
+}
+
 /**
  * Everything a trip email states about its trip, or null when the mail
  * is not about one.
@@ -207,7 +213,11 @@ export function parseTuroOrderEmail(input: {
 
   const earnings = parseMoney(body.match(/You(?:'ll)? earn:?\s*(?:CA)?\$?\s*([\d,]+\.?\d*)/i)?.[1]);
   const mileage = body.match(/Mileage included:\s*([\d,]+)\s*km/i)?.[1];
-  const location = body.match(/with your .+? at ([^.]+?) is booked/i)?.[1]?.trim() ?? null;
+  // "…trip with your Lexus NX at Vancouver International Airport is
+  // booked from …". Read up to "is booked", not up to the first full
+  // stop: a street address carries its own ("8888 No. 3 Rd.", "St."),
+  // and stopping there lost the location of every such booking.
+  const location = cleanLocation(body.match(/with your .+? at (.+?) is booked\b/i)?.[1]);
 
   const conversationUrl =
     body.match(/https:\/\/turo\.com\/(?:us\/en\/)?reservation\/\d+(?:\/messages)?/i)?.[0] ?? null;

@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.54.0 - 2026-10-07
+
+### CSV import asks for the account and confirms new cars; long waits show progress
+
+- **No column mapping.** The imports page no longer asks which column is which. Turo's export has the same columns every time and the header guess has read every real one; a file it cannot read is refused with the column it lacks ("not a Turo earnings export"). Nothing is lost by not choosing: every column of every row is already kept on its order (`sourceMetadata.rawRow`).
+- **Every CSV column on the order.** A new Turo CSV panel (`components/turo-csv-fields.tsx`) shows an order's whole CSV row, empty fields left out. 选择字段 hides columns for every order in the workspace (`TuroCsvDisplaySetting`, a new table). Members who are view-only or limited to some cars see the fields but cannot change the choice. 运营 mounts it on the order page.
+- **File, account, import.** After the file, the page asks which Turo account it came from, every time and with no default, because defaulting to the main account is how a co-hosted car ends up filed under the wrong account. 开始导入 first asks the server which cars are new and lists them with their trip counts, all ticked, capped at the plan's free slots. Only the ticked cars are created; "don't add cars" imports the rest. The 自动创建缺失车辆 checkbox is gone. The dashboard's quick import asks for the account too, instead of reusing the last one.
+- **The new-car list matches what import can create.** A row with no plate candidate was counted as a new car (and in the billing projection) and then failed to create. Such rows are no longer counted.
+- **Progress on long waits.** CSV import, quick import and Gmail sync show their steps, a moving bar and seconds elapsed, and ask before the page is left mid-import. The assistant's reply and message drafts show typing dots with a clock, and buttons spin while busy (`components/turo-task-progress.tsx`).
+- **Pickup and return locations from mail.** The booking mail names the place in one sentence ("…with your Lexus NX at 8888 No. 3 Rd., Richmond is booked from…"). The parser stopped at the first full stop, so addresses with "No.", "St." or "Ave." were lost. It now reads to "is booked". Mail-created orders and pending orders assigned by hand now also get a return location (the same place, which the CSV's own column replaces). Orders missing either location are filled from mail on the next Gmail sync, never overwritten.
+
 ## v1.53.3 - 2026-10-07
 
 ### Waits on the booking pages show they are waits

@@ -2,7 +2,7 @@ import { deleteVehicleAction, saveVehicleAction } from "@/app/actions";
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
 import { VehicleEditDialog } from "@/components/vehicle-edit-dialog";
-import { requireCurrentWorkspace } from "@/lib/auth";
+import { requireAccessContext } from "@/lib/auth";
 import { getVehicleStatusOptions } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
@@ -42,11 +42,11 @@ export default async function VehiclesPage({
     reason?: string;
   }>;
 }) {
-  const workspace = await requireCurrentWorkspace();
+  const { workspace, vehicleIds } = await requireAccessContext();
   const [{ locale, messages }, vehicles, owners, params] = await Promise.all([
     getI18n(),
     prisma.vehicle.findMany({
-      where: { workspaceId: workspace.id },
+      where: { workspaceId: workspace.id, ...(vehicleIds ? { id: { in: vehicleIds } } : {}) },
       // A count, not the orders themselves. Loading every order of every
       // car to print one number per row was thousands of rows per visit.
       include: {
@@ -62,7 +62,7 @@ export default async function VehiclesPage({
       orderBy: [{ isArchived: "asc" }, { createdAt: "desc" }],
     }),
     prisma.owner.findMany({
-      where: { workspaceId: workspace.id },
+      where: { workspaceId: workspace.id, ...(vehicleIds ? { vehicles: { some: { id: { in: vehicleIds } } } } : {}) },
       orderBy: { name: "asc" },
     }),
     searchParams,
@@ -154,7 +154,9 @@ export default async function VehiclesPage({
 
       {/* Create form is 12 inputs deep — collapsed by default on every
        * viewport so the page opens straight to the existing fleet
-       * cards. Same `<details>` pattern as the orders page. */}
+       * cards. Same `<details>` pattern as the orders page. A member
+       * limited to some cars cannot add one, so they do not see it. */}
+      {vehicleIds ? null : (
       <details className="group overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)]">
         <summary className="tap-press flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 sm:px-4 sm:py-3.5">
           <p className="text-[9px] uppercase tracking-[0.22em] text-[var(--ink-soft)] sm:text-[10px] sm:tracking-[0.24em]">
@@ -289,6 +291,7 @@ export default async function VehiclesPage({
           </button>
         </form>
       </details>
+      )}
 
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-3.5">
         <form action="/vehicles" className="flex flex-col gap-2 sm:flex-row">
@@ -427,7 +430,7 @@ export default async function VehiclesPage({
                       />
                       {/* Hidden on a phone: the edit dialog sets the same
                           status, and two buttons per row did not fit. */}
-                      {vehicle.isArchived ? null : (
+                      {vehicle.isArchived || vehicleIds ? null : (
                       <form action={deleteVehicleAction} className="hidden sm:block">
                         <input type="hidden" name="id" value={vehicle.id} />
                         <button className="inline-flex h-8 items-center justify-center rounded-md border border-rose-200 bg-white px-2.5 text-[11.5px] font-semibold text-rose-700 transition hover:bg-rose-50">

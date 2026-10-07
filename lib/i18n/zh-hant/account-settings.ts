@@ -124,6 +124,14 @@ export const accountSettingsMessages = {
         added: "已新增，對方現在就能登入。",
         emailInUse: "這個郵箱已經有 TATO 帳號了。一個帳號只能屬於一個團隊。",
         failed: "沒能完成，請檢查填寫的內容再試。",
+        vehicles: "能看哪些車",
+        vehiclesAll: "全部車輛",
+        vehiclesSome: "只看指定的車",
+        vehiclesHint:
+          "只看指定的車時，只能開啟日曆、訂單、車輛、照片、檔案這幾頁，每頁只顯示這些車。其餘頁面彙總的是整個車隊，勾了也打不開。",
+        vehiclesNone: "至少選一台車。",
+        vehicleFilter: "搜尋車輛",
+        vehicleCount: (count: number) => `${count} 台車`,
       },
       ledgerTitle: "車主分帳規則",
       ledgerCopy:

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { deleteOrderAction, saveOfflineOrderAction, updateOrderStatusAction } from "@/app/actions";
 import { DateTimeField } from "@/components/date-time-field";
-import { requireCurrentWorkspace } from "@/lib/auth";
+import { requireAccessContext } from "@/lib/auth";
 import { OfflineOrderCreateForm } from "@/components/offline-order-create-form";
 import { OrdersRowList } from "@/components/orders-row-list";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -79,7 +79,7 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<OrdersSearchParams>;
 }) {
-  const workspace = await requireCurrentWorkspace();
+  const { workspace, vehicleIds } = await requireAccessContext();
   const params = await searchParams;
 
   const searchQuery = params.q?.trim() ?? "";
@@ -99,13 +99,14 @@ export default async function OrdersPage({
     vehicleId: vehicleFilter || undefined,
     from: fromDate,
     to: toDate,
+    vehicleIds,
   });
 
   const [{ locale, messages }, allMatchingOrders, vehicles] = await Promise.all([
     getI18n(),
     fetchFilteredOrders(where),
     prisma.vehicle.findMany({
-      where: { workspaceId: workspace.id },
+      where: { workspaceId: workspace.id, ...(vehicleIds ? { id: { in: vehicleIds } } : {}) },
       include: { owner: true },
       orderBy: { nickname: "asc" },
     }),
@@ -115,11 +116,14 @@ export default async function OrdersPage({
   // They live here, at the top of the orders page, because that is
   // where someone goes to ask "what have we got" -- and the honest
   // answer includes the ones we could not file.
-  const pendingOrders = await prisma.pendingOrder.findMany({
-    where: { workspaceId: workspace.id },
-    orderBy: { pickupDatetime: "asc" },
-    take: 50,
-  });
+  // Not on any car yet, so not one of a car-limited member's.
+  const pendingOrders = vehicleIds
+    ? []
+    : await prisma.pendingOrder.findMany({
+        where: { workspaceId: workspace.id },
+        orderBy: { pickupDatetime: "asc" },
+        take: 50,
+      });
 
   const orderMessages = messages.orders;
   const orderStatusOptions = getOrderStatusOptions(locale);

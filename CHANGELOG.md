@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.53.0 - 2026-10-06
+
+### A team member can be limited to some cars
+
+The team form has a new choice, 能看哪些车: the whole fleet, or only the cars ticked. It is for a partner who co-owns a few cars, or staff who run a few, and should see nothing else.
+
+- **What a car-limited member sees.** Only the per-car pages: calendar, orders, vehicles, photos and documents. Each page shows only their cars, as do its filters, the order export, the photo ZIP and the order reader's car matching. Pages that add up the whole fleet (dashboard, owners, messages, the site, staff schedule, invoices and the rest) stay closed even if ticked, because filtering each of them by car was not worth the risk of one leaking. Their sidebar shows only what they can open.
+- **What they can change.** An admin limited to some cars can create, edit, cancel and delete orders on their cars, edit their cars, and record payments on their cars' orders. They cannot add or delete a car, or move an order onto a car that is not theirs. Calendar notes and calendar search are not open to them yet. A view-only member limited to some cars only looks.
+- **Enforcement.** A path naming one order or car (`/orders/<id>`, `/api/orders/<id>/…`, `/api/vehicles/<id>/…`) is checked against the member's cars where the signed-in user is looked up (`lib/auth.ts`). Inside their pages, an API is open to them only if it is on a short list of routes that filter by car (`lib/access.ts`), so an endpoint added later starts closed to them. A server action is open to them only if it says it checks their cars (`requireSectionContext(section, { scopeAware: true })`).
+- **Server actions name their own section.** The operations actions (owners, vehicles, orders, share links) now check the section they belong to, rather than the page they were posted from, since a hand-made request can choose the page. This also closes that gap for admins limited to some pages. The site and Turo-sync actions will follow in their own sessions.
+- Invitations carry the cars, and so does an account made from one. A list naming none of the workspace's cars is refused rather than widened to the whole fleet. Nothing changes for existing accounts.
+
 ## v1.52.0 - 2026-10-06
 
 ### Team members sign in with their own accounts

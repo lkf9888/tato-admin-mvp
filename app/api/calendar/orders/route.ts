@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireCurrentAdminContext } from "@/lib/auth";
+import { requireAccessContext } from "@/lib/auth";
 import {
   CALENDAR_ORDER_INCLUDE,
   calendarOrderWhere,
@@ -38,7 +38,7 @@ function parseDay(value: string | null) {
 }
 
 export async function GET(request: Request) {
-  const { workspace } = await requireCurrentAdminContext();
+  const { workspace, vehicleIds } = await requireAccessContext();
   const params = new URL(request.url).searchParams;
 
   const from = parseDay(params.get("from"));
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
   const paddedTo = new Date(to.getTime() + DAY_IN_MS);
 
   const orders = await prisma.order.findMany({
-    where: calendarOrderWhere(workspace.id, paddedFrom, paddedTo),
+    where: calendarOrderWhere(workspace.id, paddedFrom, paddedTo, vehicleIds),
     include: CALENDAR_ORDER_INCLUDE,
     orderBy: { pickupDatetime: "asc" },
   });

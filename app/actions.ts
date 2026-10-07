@@ -21,6 +21,7 @@ import {
   normalizeEmail,
   grantShareAccess,
   requireCurrentAdminContext,
+  requireSectionContext,
   setAdminSession,
   validateAdminCredentials,
 } from "@/lib/auth";
@@ -37,6 +38,11 @@ import {
   syncVehicleOwnerLedger,
 } from "@/lib/owner-ledger";
 import { syncOrderStaffTasks } from "@/lib/staff-order-tasks";
+
+/** A member limited to some cars may only touch those cars. */
+function assertVehicleInScope(vehicleIds: string[] | null, vehicleId: string | null | undefined) {
+  if (vehicleIds && (!vehicleId || !vehicleIds.includes(vehicleId))) throw new Error("ACCESS_DENIED");
+}
 import { logActivity, reconcileVehicleConflicts } from "@/lib/orders";
 import { blocksPlainCancel } from "@/lib/orders-cancel-guard";
 import {
@@ -873,7 +879,7 @@ export async function resetPasswordAction(input: {
 }
 
 export async function saveOwnerAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/owners");
   const parsed = ownerSchema.parse({
     id: cleanOptional(formData.get("id")),
     name: formData.get("name"),
@@ -945,7 +951,7 @@ export async function saveOwnerAction(formData: FormData) {
  * older rule and come out unchanged, which is the point.
  */
 export async function saveOwnerCommissionAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/owners");
 
   const ownerId = formData.get("ownerId")?.toString() ?? "";
   const owner = await prisma.owner.findFirst({
@@ -1010,7 +1016,7 @@ export async function saveOwnerCommissionAction(formData: FormData) {
 
 /** Remove one set of terms; earlier terms take over from that date. */
 export async function deleteOwnerCommissionAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/owners");
 
   const ruleId = formData.get("ruleId")?.toString() ?? "";
   const rule = await prisma.ownerCommissionRule.findFirst({
@@ -1156,7 +1162,7 @@ export async function dismissPendingOrderAction(formData: FormData) {
  * page.
  */
 export async function saveOwnerFeeSharingAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/owners");
 
   const ownerId = formData.get("ownerId")?.toString() ?? "";
   const owner = await prisma.owner.findFirst({
@@ -1198,7 +1204,7 @@ export async function saveOwnerFeeSharingAction(formData: FormData) {
 }
 
 export async function assignOwnerVehiclesAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/owners");
   const ownerId = formData.get("ownerId")?.toString();
   if (!ownerId) return;
 
@@ -1274,7 +1280,7 @@ export async function assignOwnerVehiclesAction(formData: FormData) {
 }
 
 export async function deleteOwnerAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/owners");
   const id = formData.get("id")?.toString();
   if (!id) return;
 
@@ -1316,7 +1322,7 @@ export async function deleteOwnerAction(formData: FormData) {
 }
 
 export async function saveVehicleAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireSectionContext("/vehicles", { scopeAware: true });
 
   // Parsed inside a guard, not thrown from. A ZodError here produced
   // the same anonymous error page as a database failure, so "the year
@@ -1369,6 +1375,8 @@ export async function saveVehicleAction(formData: FormData) {
   }
 
   const parsed = result.data;
+  // A car-limited member edits their own cars and adds none.
+  assertVehicleInScope(vehicleIds, parsed.id);
   const { id, ownerCommissionRate, cleaningFee, bookingTaxRate, ...vehicleData } = parsed;
   const normalizedVehicleData = {
     ...vehicleData,
@@ -1459,7 +1467,7 @@ export async function saveVehicleAction(formData: FormData) {
 }
 
 export async function saveVehiclePurchasePriceAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireSectionContext("/vehicles", { scopeAware: true });
   const id = formData.get("id")?.toString().trim();
   if (!id) return;
 
@@ -1471,6 +1479,7 @@ export async function saveVehiclePurchasePriceAction(formData: FormData) {
     where: { id, workspaceId: workspace.id },
   });
   if (!existingVehicle) return;
+  assertVehicleInScope(vehicleIds, existingVehicle.id);
 
   const vehicle = await prisma.vehicle.update({
     where: { id: existingVehicle.id },
@@ -1493,7 +1502,7 @@ export async function saveVehiclePurchasePriceAction(formData: FormData) {
 }
 
 export async function deleteVehicleAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/vehicles");
   const id = formData.get("id")?.toString();
   if (!id) return;
 
@@ -1525,7 +1534,7 @@ export async function deleteVehicleAction(formData: FormData) {
 }
 
 export async function saveOfflineOrderAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireSectionContext("/orders", { scopeAware: true });
   const parsed = orderSchema.parse({
     id: cleanOptional(formData.get("id")),
     vehicleId: formData.get("vehicleId"),
@@ -1572,11 +1581,14 @@ export async function saveOfflineOrderAction(formData: FormData) {
     createdBy: user.name,
   };
 
+  assertVehicleInScope(vehicleIds, parsed.vehicleId);
   const existingOrder = parsed.id
     ? await prisma.order.findFirst({
         where: { id: parsed.id, workspaceId: workspace.id },
       })
     : null;
+  // Moving someone else's trip onto your car is not editing your car.
+  if (existingOrder) assertVehicleInScope(vehicleIds, existingOrder.vehicleId);
 
   const order = existingOrder
     ? await prisma.order.update({
@@ -1610,7 +1622,7 @@ export async function saveOfflineOrderAction(formData: FormData) {
 }
 
 export async function updateOrderStatusAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireSectionContext("/orders", { scopeAware: true });
   const id = formData.get("id")?.toString();
   const status = formData.get("status")?.toString() as OrderStatus | undefined;
 
@@ -1620,6 +1632,7 @@ export async function updateOrderStatusAction(formData: FormData) {
     where: { id, workspaceId: workspace.id },
   });
   if (!existingOrder) return;
+  assertVehicleInScope(vehicleIds, existingOrder.vehicleId);
 
   if (status === OrderStatus.cancelled && blocksPlainCancel(existingOrder)) {
     redirect("/orders?error=paid-direct-booking");
@@ -1648,7 +1661,7 @@ export async function updateOrderStatusAction(formData: FormData) {
 }
 
 export async function deleteOrderAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireSectionContext("/orders", { scopeAware: true });
   const id = formData.get("id")?.toString();
   if (!id) return;
 
@@ -1656,6 +1669,7 @@ export async function deleteOrderAction(formData: FormData) {
     where: { id, workspaceId: workspace.id },
   });
   if (!existing) return;
+  assertVehicleInScope(vehicleIds, existing.vehicleId);
 
   if (existing.source === OrderSource.turo) {
     redirect("/orders?error=turo-order-readonly");
@@ -1688,7 +1702,7 @@ export async function deleteOrderAction(formData: FormData) {
 }
 
 export async function createShareLinkAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/owners");
   const ownerId = formData.get("ownerId")?.toString();
   if (!ownerId) return;
 
@@ -1729,7 +1743,7 @@ export async function createShareLinkAction(formData: FormData) {
 }
 
 export async function revokeShareLinkAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/owners");
   const id = formData.get("id")?.toString();
   if (!id) return;
 
@@ -1755,7 +1769,7 @@ export async function revokeShareLinkAction(formData: FormData) {
 }
 
 export async function deleteShareLinkAction(formData: FormData) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user } = await requireSectionContext("/owners");
   const id = formData.get("id")?.toString();
   if (!id) return;
 

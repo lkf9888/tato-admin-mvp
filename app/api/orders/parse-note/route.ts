@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireCurrentAdminContext } from "@/lib/auth";
+import { requireAccessContext } from "@/lib/auth";
 import { isKimiConfigured } from "@/lib/kimi";
 import { parseOrderNote } from "@/lib/order-note-parser";
 import { prisma } from "@/lib/prisma";
@@ -15,13 +15,13 @@ const bodySchema = z.object({ text: z.string().trim().min(5).max(4000) });
  * is saved: the answer only fills the form for a person to check.
  */
 export async function POST(request: Request) {
-  const { workspace } = await requireCurrentAdminContext();
+  const { workspace, vehicleIds } = await requireAccessContext();
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
   if (!isKimiConfigured()) return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 400 });
 
   const fleet = await prisma.vehicle.findMany({
-    where: { workspaceId: workspace.id, isArchived: false },
+    where: { workspaceId: workspace.id, isArchived: false, ...(vehicleIds ? { id: { in: vehicleIds } } : {}) },
     select: { id: true, plateNumber: true, brand: true, model: true, year: true, nickname: true },
   });
   const result = await parseOrderNote(parsed.data.text, fleet);

@@ -108,11 +108,14 @@ export function calendarOrderWhere(
   workspaceId: string,
   from: Date,
   to: Date,
+  /** A car-limited member's cars; null or omitted for the whole fleet. */
+  vehicleIds?: string[] | null,
 ): Prisma.OrderWhereInput {
   return {
     workspaceId,
     isArchived: false,
     pickupDatetime: { lte: to },
     returnDatetime: { gte: from },
+    ...(vehicleIds ? { vehicleId: { in: vehicleIds } } : {}),
   };
 }

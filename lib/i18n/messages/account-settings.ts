@@ -124,6 +124,14 @@ export const accountSettingsMessages = {
         added: "Added. They can sign in now.",
         emailInUse: "That email already has a TATO account. Each account belongs to one team.",
         failed: "That did not work. Check the fields and try again.",
+        vehicles: "Cars they can see",
+        vehiclesAll: "The whole fleet",
+        vehiclesSome: "Only these cars",
+        vehiclesHint:
+          "Limited to some cars, they can open only the calendar, orders, vehicles, photos and documents, each showing just these cars. Other pages stay closed even if ticked, since they add up the whole fleet.",
+        vehiclesNone: "Pick at least one car.",
+        vehicleFilter: "Search cars",
+        vehicleCount: (count: number) => `${count} ${count === 1 ? "car" : "cars"}`,
       },
       ledgerTitle: "Owner revenue split",
       ledgerCopy:
@@ -268,6 +276,14 @@ export const accountSettingsMessages = {
         added: "已添加，对方现在就能登录。",
         emailInUse: "这个邮箱已经有 TATO 账号了。一个账号只能属于一个团队。",
         failed: "没能完成，请检查填写的内容再试。",
+        vehicles: "能看哪些车",
+        vehiclesAll: "全部车辆",
+        vehiclesSome: "只看指定的车",
+        vehiclesHint:
+          "只看指定的车时，只能打开日历、订单、车辆、照片、文件这几页，每页只显示这些车。其余页面汇总的是整个车队，勾了也打不开。",
+        vehiclesNone: "至少选一台车。",
+        vehicleFilter: "搜索车辆",
+        vehicleCount: (count: number) => `${count} 台车`,
       },
       ledgerTitle: "车主分账规则",
       ledgerCopy:

@@ -5,7 +5,15 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { canMakeRequest } from "@/lib/access";
+import {
+  ACCESS_SECTIONS,
+  canMakeRequest,
+  canOpenPath,
+  canUseSection,
+  objectInPath,
+  parseVehicleScope,
+  userRole,
+} from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { normalizeEmail } from "@/lib/utils";
 import { ensureUserWorkspace } from "@/lib/workspaces";
@@ -96,10 +104,70 @@ async function currentRequest() {
   }
 }
 
-/** Whether the signed-in member's role and pages allow this request. */
-async function requestAllowed(user: { role: string; pageAccess: string | null }) {
+type SessionUser = { workspaceId: string | null; role: string; pageAccess: string | null; vehicleScope: string | null };
+
+/** Whether this order or car is one of the member's cars. */
+async function objectInScope(user: SessionUser, object: { kind: "order" | "vehicle"; id: string }, scope: string[]) {
+  if (object.kind === "vehicle") return scope.includes(object.id);
+  const order = await prisma.order.findFirst({
+    where: { id: object.id, workspaceId: user.workspaceId ?? undefined },
+    select: { vehicleId: true },
+  });
+  // An order that is not there is the route's 404 to give, not ours.
+  return !order || scope.includes(order.vehicleId);
+}
+
+/**
+ * Whether the signed-in member's role, pages and cars allow this request.
+ *
+ * A member limited to some cars is held to more: a path naming one order
+ * or car must name one of theirs. Server actions are not refused here --
+ * an action's POST re-renders the page it came from in the same request,
+ * so refusing the POST would refuse that render too. Each action checks
+ * itself instead: requireSectionContext refuses a car-limited member
+ * unless the action says it filters to their cars (scopeAware).
+ */
+async function requestAllowed(user: SessionUser) {
   const request = await currentRequest();
-  return !request || canMakeRequest(user, request.path, request.method);
+  if (!request) return true;
+  if (!canMakeRequest(user, request.path, request.method)) return false;
+  const scope = userRole(user) === "OWNER" ? null : parseVehicleScope(user.vehicleScope);
+  if (!scope) return true;
+  const object = objectInPath(request.path);
+  return !object || (await objectInScope(user, object, scope));
+}
+
+/**
+ * The context for a server action, checked by what the action is -- not by
+ * the page it was posted from, which a hand-made request can choose. An
+ * action names the section it belongs to; one that filters to a member's
+ * cars says so with `scopeAware`, and only those are open to members
+ * limited to some cars. Viewers never get through: actions change things.
+ */
+export async function requireSectionContext(section: string, options: { scopeAware?: boolean } = {}) {
+  const user = await loadSessionUser();
+  if (!user?.workspaceId || !user.workspace) redirect("/login");
+  const role = userRole(user);
+  const scope = role === "OWNER" ? null : parseVehicleScope(user.vehicleScope);
+  if (role === "VIEWER" || !canUseSection(user, section) || (scope && !options.scopeAware)) {
+    throw new Error("ACCESS_DENIED");
+  }
+  return { user, workspace: user.workspace, vehicleIds: scope };
+}
+
+/**
+ * The signed-in member with the cars they are limited to (null for the
+ * whole fleet), for pages and routes that list cars, trips or files.
+ */
+export async function requireAccessContext() {
+  const { user, workspace } = await requireCurrentAdminContext();
+  const vehicleIds = userRole(user) === "OWNER" ? null : parseVehicleScope(user.vehicleScope);
+  return { user, workspace, vehicleIds };
+}
+
+/** The first page a member may open: where a closed dashboard sends them. */
+export function firstOpenPage(user: SessionUser) {
+  return ACCESS_SECTIONS.find((section) => canOpenPath(user, section.key))?.key ?? "/account-settings";
 }
 
 /**
@@ -155,6 +223,9 @@ export async function requireCurrentAdminUser() {
     if (request?.path.startsWith("/api/") || (request && request.method !== "GET" && request.method !== "HEAD")) {
       throw new Error("ACCESS_DENIED");
     }
+    // Sign-in lands on the dashboard; a member without it goes to the
+    // first page they do have rather than to a refusal.
+    if (request?.path === "/dashboard") redirect(firstOpenPage(user));
     redirect("/no-access");
   }
   return user;

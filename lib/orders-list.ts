@@ -61,6 +61,8 @@ export function buildWhereClause(
     vehicleId?: string;
     from?: Date | null;
     to?: Date | null;
+    /** A car-limited member's cars; null for the whole fleet. */
+    vehicleIds?: string[] | null;
   },
 ): Prisma.OrderWhereInput {
   const where: Prisma.OrderWhereInput = {
@@ -72,6 +74,14 @@ export function buildWhereClause(
     where.source = filters.source as OrderSource;
   }
   if (filters.vehicleId) where.vehicleId = filters.vehicleId;
+  if (filters.vehicleIds) {
+    // A chosen car outside the member's cars selects nothing, not everything.
+    where.vehicleId = filters.vehicleId
+      ? filters.vehicleIds.includes(filters.vehicleId)
+        ? filters.vehicleId
+        : { in: [] }
+      : { in: filters.vehicleIds };
+  }
   if (filters.from || filters.to) {
     // Date range matches on `pickupDatetime` (the most common "when
     // was the rental?" semantic). `from` includes the whole start day,
@@ -150,8 +160,14 @@ export function matchesOrderSearch(order: ListedOrder, query: string, locale: Lo
 }
 
 /** Every order the list's filters and search select, newest pick-up first. */
-export async function loadOrderList(workspaceId: string, params: OrderListParams, locale: Locale) {
+export async function loadOrderList(
+  workspaceId: string,
+  params: OrderListParams,
+  locale: Locale,
+  vehicleIds: string[] | null = null,
+) {
   const where = buildWhereClause(workspaceId, {
+    vehicleIds,
     status: params.status?.trim() || undefined,
     source: params.source?.trim() || undefined,
     vehicleId: params.vehicleId?.trim() || undefined,
@@ -259,9 +275,16 @@ export async function markOrdersPayment(input: {
   ids: string[];
   action: "paid" | "unpaid";
   actor: string;
+  /** A car-limited member's cars: orders on any other car are skipped. */
+  vehicleIds?: string[] | null;
 }) {
   const orders = await prisma.order.findMany({
-    where: { id: { in: input.ids }, workspaceId: input.workspaceId, isArchived: false },
+    where: {
+      id: { in: input.ids },
+      workspaceId: input.workspaceId,
+      isArchived: false,
+      ...(input.vehicleIds ? { vehicleId: { in: input.vehicleIds } } : {}),
+    },
     select: {
       id: true,
       source: true,

@@ -11,8 +11,9 @@ import {
 } from "@/lib/account-settings-actions";
 import { ANDROID_RELEASE, formatBytes } from "@/lib/android-release";
 import { TeamSettings } from "@/components/team-settings";
-import { ASSIGNABLE_SECTIONS, canManageTeam, parsePageAccess } from "@/lib/access";
+import { ASSIGNABLE_SECTIONS, canManageTeam, parsePageAccess, parseVehicleScope } from "@/lib/access";
 import { requireCurrentAdminContext } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { listTeam } from "@/lib/team";
 import { getMessages } from "@/lib/i18n";
 import { getI18n, getLocalePreference } from "@/lib/i18n-server";
@@ -40,6 +41,13 @@ export default async function AccountSettingsPage({
   const t = messages.accountSettingsPage;
   const isOwner = canManageTeam(user);
   const team = isOwner ? await listTeam(workspace.id) : null;
+  const teamVehicles = team
+    ? await prisma.vehicle.findMany({
+        where: { workspaceId: workspace.id, isArchived: false },
+        orderBy: { nickname: "asc" },
+        select: { id: true, nickname: true, plateNumber: true },
+      })
+    : [];
   const navLabels: Record<string, string> = {
     "/dashboard": messages.shell.nav.dashboard,
     "/assistant": messages.shell.nav.assistant,
@@ -397,6 +405,7 @@ export default async function AccountSettingsPage({
               email: member.email,
               role: member.role,
               pageAccess: parsePageAccess(member.pageAccess),
+              vehicleScope: parseVehicleScope(member.vehicleScope),
             }))}
             invites={team.invites.map((invite) => ({
               id: invite.id,
@@ -407,6 +416,10 @@ export default async function AccountSettingsPage({
               acceptUrl: `${appBase}/invite/${invite.token}`,
             }))}
             pages={ASSIGNABLE_SECTIONS.map((key) => ({ key, label: navLabels[key] ?? key }))}
+            vehicles={teamVehicles.map((vehicle) => ({
+              id: vehicle.id,
+              label: vehicle.plateNumber ? `${vehicle.nickname} · ${vehicle.plateNumber}` : vehicle.nickname,
+            }))}
           />
         </section>
       ) : null}

@@ -5,13 +5,20 @@ import { canManageTeam } from "@/lib/access";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
-import { findEditableMember, memberRoleSchema, pageAccessSchema, updateMember } from "@/lib/team";
+import {
+  findEditableMember,
+  memberRoleSchema,
+  pageAccessSchema,
+  storeVehicleScope,
+  updateMember,
+  vehicleScopeSchema,
+} from "@/lib/team";
 
 type Params = Promise<{ userId: string }>;
 
-const bodySchema = z.object({ role: memberRoleSchema, pageAccess: pageAccessSchema });
+const bodySchema = z.object({ role: memberRoleSchema, pageAccess: pageAccessSchema, vehicleScope: vehicleScopeSchema });
 
-/** Change a member's role and pages. Owner only; never an owner, never yourself. */
+/** Change a member's role, pages and cars. Owner only; never an owner, never yourself. */
 export async function PATCH(request: Request, { params }: { params: Params }) {
   const { userId } = await params;
   const { workspace, user } = await requireCurrentAdminContext();
@@ -20,14 +27,21 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
   if (!member) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
-  await updateMember(member.id, parsed.data);
+  const scope = await storeVehicleScope(workspace.id, parsed.data.vehicleScope);
+  if (!scope.ok) return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
+  await updateMember(member.id, { ...parsed.data, vehicleScope: scope.value });
   await logActivity({
     workspaceId: workspace.id,
     actor: user.name,
     action: "team_member_updated",
     entityType: "User",
     entityId: member.id,
-    metadata: { email: member.email, role: parsed.data.role, pages: parsed.data.pageAccess.length },
+    metadata: {
+      email: member.email,
+      role: parsed.data.role,
+      pages: parsed.data.pageAccess.length,
+      vehicles: parsed.data.vehicleScope?.length ?? null,
+    },
   });
   return NextResponse.json({ ok: true });
 }

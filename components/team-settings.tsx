@@ -6,16 +6,25 @@ import { useState } from "react";
 import { getMessages, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-type Member = { id: string; name: string; email: string; role: string; pageAccess: string[] | null };
+type Member = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  pageAccess: string[] | null;
+  vehicleScope: string[] | null;
+};
 type Invite = { id: string; email: string; name: string | null; role: string; expiresAt: string; acceptUrl: string };
 type PageOption = { key: string; label: string };
+type VehicleOption = { id: string; label: string };
 type EditableRole = "ADMIN" | "VIEWER";
 
 const field = "min-h-9 w-full rounded-md border border-[var(--line)] bg-white px-2.5 py-1.5 text-sm";
 
 /**
  * The owner's view of the team: who can sign in, as what, to which pages;
- * invitations still open; adding someone by invite or by password.
+ * which cars, if not the whole fleet; invitations still open; adding
+ * someone by invite or by password.
  */
 export function TeamSettings({
   locale,
@@ -23,12 +32,14 @@ export function TeamSettings({
   members,
   invites,
   pages,
+  vehicles,
 }: {
   locale: Locale;
   currentUserId: string;
   members: Member[];
   invites: Invite[];
   pages: PageOption[];
+  vehicles: VehicleOption[];
 }) {
   const t = getMessages(locale).accountSettingsPage.team;
   const router = useRouter();
@@ -94,6 +105,7 @@ export function TeamSettings({
                 <>
                   <span className="text-[11px] text-[var(--ink-soft)]">
                     {member.pageAccess === null ? t.allPages : t.pageCount(member.pageAccess.length)}
+                    {member.vehicleScope ? ` · ${t.vehicleCount(member.vehicleScope.length)}` : ""}
                   </span>
                   <button type="button" className="underline" onClick={() => setEditing(member)}>{t.edit}</button>
                   <button type="button" className="text-rose-600 underline" onClick={() => void remove(member)}>{t.remove}</button>
@@ -130,6 +142,7 @@ export function TeamSettings({
         <MemberForm
           t={t}
           pages={pages}
+          vehicles={vehicles}
           onCancel={() => setAdding(false)}
           onDone={(result) => {
             setAdding(false);
@@ -147,6 +160,7 @@ export function TeamSettings({
         <MemberForm
           t={t}
           pages={pages}
+          vehicles={vehicles}
           member={editing}
           onCancel={() => setEditing(null)}
           onDone={(result) => {
@@ -166,6 +180,7 @@ type Copy = ReturnType<typeof getMessages>["accountSettingsPage"]["team"];
 function MemberForm({
   t,
   pages,
+  vehicles,
   member,
   allKeys,
   onCancel,
@@ -173,6 +188,7 @@ function MemberForm({
 }: {
   t: Copy;
   pages: PageOption[];
+  vehicles: VehicleOption[];
   member?: Member;
   allKeys?: string[];
   onCancel: () => void;
@@ -182,6 +198,9 @@ function MemberForm({
   const [email, setEmail] = useState(member?.email ?? "");
   const [role, setRole] = useState<EditableRole>(member?.role === "VIEWER" ? "VIEWER" : "ADMIN");
   const [selected, setSelected] = useState<string[]>(member?.pageAccess ?? allKeys ?? pages.map((page) => page.key));
+  const [limited, setLimited] = useState(Boolean(member?.vehicleScope));
+  const [cars, setCars] = useState<string[]>(member?.vehicleScope ?? []);
+  const [carFilter, setCarFilter] = useState("");
   const [how, setHow] = useState<"invite" | "password">("invite");
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -191,17 +210,29 @@ function MemberForm({
     setSelected((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
   }
 
+  function toggleCar(id: string) {
+    setCars((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  }
+
+  const query = carFilter.trim().toLowerCase();
+  const shownCars = query ? vehicles.filter((vehicle) => vehicle.label.toLowerCase().includes(query)) : vehicles;
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (limited && cars.length === 0) {
+      setError(t.vehiclesNone);
+      return;
+    }
     setSaving(true);
     setError(null);
+    const vehicleScope = limited ? cars : null;
     const response = await fetch(member ? `/api/team/${member.id}` : "/api/team", {
       method: member ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
         member
-          ? { role, pageAccess: selected }
-          : { name, email, role, pageAccess: selected, ...(how === "password" ? { password } : {}) },
+          ? { role, pageAccess: selected, vehicleScope }
+          : { name, email, role, pageAccess: selected, vehicleScope, ...(how === "password" ? { password } : {}) },
       ),
     }).catch(() => null);
     const payload = response ? await response.json().catch(() => ({})) : {};
@@ -263,6 +294,42 @@ function MemberForm({
             </label>
           ))}
         </div>
+      </fieldset>
+
+      <fieldset className="grid gap-1">
+        <legend className="mb-1">{t.vehicles}</legend>
+        <label className="flex items-center gap-2">
+          <input type="radio" name="vehicles" checked={!limited} onChange={() => setLimited(false)} />
+          {t.vehiclesAll}
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="radio" name="vehicles" checked={limited} onChange={() => setLimited(true)} />
+          {t.vehiclesSome}
+          {limited ? <span className="text-[var(--ink-soft)]">({t.vehicleCount(cars.length)})</span> : null}
+        </label>
+        {limited ? (
+          <div className="grid gap-1.5 pl-6">
+            <p className="text-[11px] leading-4 text-[var(--ink-soft)]">{t.vehiclesHint}</p>
+            {vehicles.length > 8 ? (
+              <input
+                type="search"
+                autoComplete="off"
+                value={carFilter}
+                onChange={(event) => setCarFilter(event.target.value)}
+                placeholder={t.vehicleFilter}
+                className={field}
+              />
+            ) : null}
+            <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto sm:grid-cols-2">
+              {shownCars.map((vehicle) => (
+                <label key={vehicle.id} className={cn("flex items-center gap-1.5 rounded px-1 py-0.5", cars.includes(vehicle.id) ? "" : "text-[var(--ink-soft)]")}>
+                  <input type="checkbox" checked={cars.includes(vehicle.id)} onChange={() => toggleCar(vehicle.id)} />
+                  <span className="truncate">{vehicle.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </fieldset>
 
       {member ? null : (

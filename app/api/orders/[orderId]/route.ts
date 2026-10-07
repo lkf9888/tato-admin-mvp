@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireCurrentAdminContext } from "@/lib/auth";
+import { requireAccessContext } from "@/lib/auth";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { syncOrderStaffTasks } from "@/lib/staff-order-tasks";
 import { resolveOrderCleaningFees } from "@/lib/owner-commission";
@@ -131,7 +131,7 @@ function buildResponseOrder(order: OrderForResponse) {
 
 export async function PATCH(request: Request, { params }: { params: Params }) {
   const { orderId } = await params;
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireAccessContext();
 
   try {
     const parsed = orderUpdateSchema.parse(await request.json());
@@ -150,7 +150,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       where: { id: orderId, workspaceId: workspace.id, isArchived: false },
     });
 
-    if (!existing) {
+    if (!existing || (vehicleIds && !vehicleIds.includes(existing.vehicleId))) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
 
@@ -165,7 +165,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       select: { id: true },
     });
 
-    if (!vehicle) {
+    if (!vehicle || (vehicleIds && !vehicleIds.includes(vehicle.id))) {
       return NextResponse.json({ error: "VEHICLE_NOT_FOUND" }, { status: 404 });
     }
 
@@ -279,14 +279,14 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
 
 export async function DELETE(_request: Request, { params }: { params: Params }) {
   const { orderId } = await params;
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireAccessContext();
 
   try {
     const existing = await prisma.order.findFirst({
       where: { id: orderId, workspaceId: workspace.id, isArchived: false },
     });
 
-    if (!existing) {
+    if (!existing || (vehicleIds && !vehicleIds.includes(existing.vehicleId))) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
 

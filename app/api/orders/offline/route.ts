@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireCurrentAdminContext } from "@/lib/auth";
+import { requireAccessContext, requireCurrentAdminContext } from "@/lib/auth";
 import { syncOrderOwnerLedger } from "@/lib/owner-ledger";
 import { syncOrderStaffTasks } from "@/lib/staff-order-tasks";
 import { findConflictingOrders, logActivity, reconcileVehicleConflicts } from "@/lib/orders";
@@ -74,7 +74,7 @@ function buildResponseOrder(order: OrderForResponse) {
 }
 
 export async function POST(request: Request) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireAccessContext();
 
   try {
     const parsed = manualOrderSchema.parse(await request.json());
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       select: { id: true },
     });
 
-    if (!vehicle) {
+    if (!vehicle || (vehicleIds && !vehicleIds.includes(vehicle.id))) {
       return NextResponse.json({ error: "VEHICLE_NOT_FOUND" }, { status: 404 });
     }
 
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireAccessContext();
 
   try {
     const payload = (await request.json()) as Record<string, unknown>;
@@ -172,7 +172,7 @@ export async function PATCH(request: Request) {
       where: { id, workspaceId: workspace.id, isArchived: false },
     });
 
-    if (!existing) {
+    if (!existing || (vehicleIds && !vehicleIds.includes(existing.vehicleId))) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
 
@@ -197,7 +197,7 @@ export async function PATCH(request: Request) {
       select: { id: true },
     });
 
-    if (!vehicle) {
+    if (!vehicle || (vehicleIds && !vehicleIds.includes(vehicle.id))) {
       return NextResponse.json({ error: "VEHICLE_NOT_FOUND" }, { status: 404 });
     }
 
@@ -262,7 +262,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireAccessContext();
 
   try {
     const payload = (await request.json()) as Record<string, unknown>;
@@ -276,7 +276,7 @@ export async function DELETE(request: Request) {
       where: { id, workspaceId: workspace.id, isArchived: false },
     });
 
-    if (!existing) {
+    if (!existing || (vehicleIds && !vehicleIds.includes(existing.vehicleId))) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
 

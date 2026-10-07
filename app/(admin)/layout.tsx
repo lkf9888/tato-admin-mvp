@@ -25,7 +25,7 @@ export default async function AdminLayout({
       localePreference={localePreference}
       currentUserName={user.name}
       currentUserEmail={user.email}
-      access={{ role: user.role, pageAccess: user.pageAccess }}
+      access={{ role: user.role, pageAccess: user.pageAccess, vehicleScope: user.vehicleScope }}
     >
       {children}
     </AppShell>

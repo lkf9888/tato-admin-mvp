@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireCurrentAdminContext } from "@/lib/auth";
+import { requireAccessContext } from "@/lib/auth";
 import { logActivity } from "@/lib/orders";
 import { markOrdersPayment } from "@/lib/orders-list";
 
@@ -13,7 +13,7 @@ const bodySchema = z.object({
 
 /** Bulk "paid" / "unpaid" from the orders list; the rules are in markOrdersPayment. */
 export async function POST(request: Request) {
-  const { workspace, user } = await requireCurrentAdminContext();
+  const { workspace, user, vehicleIds } = await requireAccessContext();
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
 
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     ids: parsed.data.ids,
     action: parsed.data.action,
     actor: user.name,
+    vehicleIds,
   });
 
   await logActivity({

@@ -6,7 +6,7 @@ import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { dateToDateOnly } from "@/lib/direct-booking";
 import { MobileCalendarSwitch } from "@/components/mobile-calendar-switch";
 import { MobileScheduleList } from "@/components/mobile-schedule-list";
-import { requireCurrentWorkspace } from "@/lib/auth";
+import { requireAccessContext } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import {
@@ -39,7 +39,9 @@ function initialWindow() {
 }
 
 export default async function CalendarPage() {
-  const workspace = await requireCurrentWorkspace();
+  const { workspace, vehicleIds } = await requireAccessContext();
+  // A car-limited member sees their cars, their trips and those cars' owners.
+  const carFilter = vehicleIds ? { id: { in: vehicleIds } } : {};
   const { from, to, indexes } = initialWindow();
   const [
     { locale, messages },
@@ -52,7 +54,7 @@ export default async function CalendarPage() {
   ] = await Promise.all([
     getI18n(),
     prisma.vehicle.findMany({
-      where: { workspaceId: workspace.id },
+      where: { workspaceId: workspace.id, ...carFilter },
       include: { owner: true },
       orderBy: { plateNumber: "asc" },
     }),
@@ -61,15 +63,15 @@ export default async function CalendarPage() {
     // Sparse by nature: only days somebody priced by hand have rows,
     // so this is small even for a fleet that has been running years.
     prisma.vehiclePriceOverride.findMany({
-      where: { vehicle: { workspaceId: workspace.id } },
+      where: { vehicle: { workspaceId: workspace.id, ...carFilter } },
       select: { vehicleId: true, date: true, price: true, createdBy: true },
     }),
     prisma.owner.findMany({
-      where: { workspaceId: workspace.id },
+      where: { workspaceId: workspace.id, ...(vehicleIds ? { vehicles: { some: { id: { in: vehicleIds } } } } : {}) },
       orderBy: { name: "asc" },
     }),
     prisma.order.findMany({
-      where: calendarOrderWhere(workspace.id, from, to),
+      where: calendarOrderWhere(workspace.id, from, to, vehicleIds),
       include: CALENDAR_ORDER_INCLUDE,
       orderBy: { pickupDatetime: "asc" },
     }),

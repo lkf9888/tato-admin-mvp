@@ -77,7 +77,72 @@ export function sectionForPath(path: string): Section | null {
   return best?.section ?? null;
 }
 
-export type AccessUser = { role: string | null | undefined; pageAccess: string | null | undefined };
+export type AccessUser = {
+  role: string | null | undefined;
+  pageAccess: string | null | undefined;
+  vehicleScope?: string | null | undefined;
+};
+
+/**
+ * The pages a member limited to some cars may have: the ones that show
+ * one car at a time, each filtered to their cars. Everything that adds
+ * up the whole fleet -- the dashboard, owners, messages, the site, the
+ * staff schedule -- is closed to them rather than filtered page by page.
+ */
+export const SCOPED_SECTIONS = ["/calendar", "/orders", "/vehicles", "/photos", "/documents"];
+
+/** The cars this member is limited to; null means the whole fleet. */
+export function parseVehicleScope(value: string | null | undefined): string[] | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The API paths a car-limited member may call, beyond those naming one
+ * order or car (checked against their cars in lib/auth.ts): each of these
+ * filters its answer to their cars. Anything else in their pages'
+ * sections is refused, so an endpoint added later starts closed to them.
+ */
+const SCOPED_API_PREFIXES = [
+  "/api/calendar/orders",
+  "/api/orders/offline",
+  "/api/orders/export",
+  "/api/orders/bulk-payment",
+  "/api/orders/parse-note",
+  "/api/exports/attachments",
+];
+
+/** `/api/orders/<id>` and `/orders/<id>` name one order; these do not. */
+const ORDER_COLLECTION_SEGMENTS = new Set([
+  "offline",
+  "export",
+  "bulk-payment",
+  "bulk-owner-sync",
+  "parse-note",
+  "recurring",
+  "notes",
+]);
+
+/** The order or car a path names, if it names exactly one. */
+export function objectInPath(path: string): { kind: "order" | "vehicle"; id: string } | null {
+  const order = /^(?:\/api)?\/orders\/([^/?]+)/.exec(path);
+  if (order && !ORDER_COLLECTION_SEGMENTS.has(order[1])) return { kind: "order", id: decodeURIComponent(order[1]) };
+  const vehicle = /^(?:\/api)?\/vehicles\/([^/?]+)/.exec(path);
+  if (vehicle) return { kind: "vehicle", id: decodeURIComponent(vehicle[1]) };
+  return null;
+}
+
+/** Whether a car-limited member's request path is one built to serve them. */
+export function scopedPathAllowed(path: string) {
+  if (!path.startsWith("/api/")) return true;
+  if (objectInPath(path)) return true;
+  return SCOPED_API_PREFIXES.some((prefix) => matches(path, prefix));
+}
 
 export function userRole(user: AccessUser): Role {
   return isRole(user.role) ? user.role : "OWNER";
@@ -94,15 +159,24 @@ export function parsePageAccess(value: string | null | undefined): string[] | nu
   }
 }
 
+/** Whether this member may use a section (a nav page and what is under it). */
+export function canUseSection(user: AccessUser, key: string) {
+  const role = userRole(user);
+  if (role === "OWNER") return true;
+  const section = ACCESS_SECTIONS.find((candidate) => candidate.key === key);
+  if (!section || section.ownerOnly) return false;
+  if (parseVehicleScope(user.vehicleScope) && !SCOPED_SECTIONS.includes(key)) return false;
+  const allowed = parsePageAccess(user.pageAccess);
+  return allowed === null || allowed.includes(key);
+}
+
 /** Whether this member may open this path at all. */
 export function canOpenPath(user: AccessUser, path: string) {
   const section = sectionForPath(path);
   if (!section) return true;
-  const role = userRole(user);
-  if (role === "OWNER") return true;
-  if (section.ownerOnly) return false;
-  const allowed = parsePageAccess(user.pageAccess);
-  return allowed === null || allowed.includes(section.key);
+  if (userRole(user) === "OWNER") return true;
+  if (!canUseSection(user, section.key)) return false;
+  return !parseVehicleScope(user.vehicleScope) || scopedPathAllowed(path);
 }
 
 /**

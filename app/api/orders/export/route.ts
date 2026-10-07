@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireCurrentWorkspace } from "@/lib/auth";
+import { requireAccessContext } from "@/lib/auth";
 import { getStatusLabel, type Locale } from "@/lib/i18n";
 import {
   isManualOfflineOrder,
@@ -20,7 +20,7 @@ export const runtime = "nodejs";
  * page (lib/orders-list.ts), so the sheet and the screen cannot disagree.
  */
 export async function GET(request: Request) {
-  const workspace = await requireCurrentWorkspace();
+  const { workspace, vehicleIds } = await requireAccessContext();
   const url = new URL(request.url);
   const locale: Locale = url.searchParams.get("locale") === "en" ? "en" : "zh";
   const params: OrderListParams = {
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     to: url.searchParams.get("to") ?? undefined,
   };
 
-  const orders = await loadOrderList(workspace.id, params, locale);
+  const orders = await loadOrderList(workspace.id, params, locale, vehicleIds);
   const zh = locale !== "en";
   const headers = zh
     ? ["取车", "还车", "车牌", "车辆", "车主", "客人", "电话", "来源", "状态", "收入", "税费", "已收", "待收", "付款方式", "合同号", "订单号"]

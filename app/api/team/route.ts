@@ -4,7 +4,7 @@ import { canManageTeam } from "@/lib/access";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { isEmailConfigured, sendTeamInviteEmail } from "@/lib/email";
 import { logActivity } from "@/lib/orders";
-import { addMemberWithPassword, createInvite, emailInUse, newMemberSchema } from "@/lib/team";
+import { addMemberWithPassword, createInvite, emailInUse, newMemberSchema, storeVehicleScope } from "@/lib/team";
 
 /**
  * Add someone to the team: with a password set now, or by invitation.
@@ -19,6 +19,8 @@ export async function POST(request: Request) {
   const parsed = newMemberSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
   if (await emailInUse(parsed.data.email)) return NextResponse.json({ error: "EMAIL_IN_USE" }, { status: 409 });
+  const scope = await storeVehicleScope(workspace.id, parsed.data.vehicleScope);
+  if (!scope.ok) return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
 
   if (parsed.data.password) {
     const member = await addMemberWithPassword({
@@ -28,6 +30,7 @@ export async function POST(request: Request) {
       name: parsed.data.name,
       role: parsed.data.role,
       pageAccess: parsed.data.pageAccess,
+      vehicleScope: scope.value,
       password: parsed.data.password,
     });
     await logActivity({
@@ -48,6 +51,7 @@ export async function POST(request: Request) {
     name: parsed.data.name,
     role: parsed.data.role,
     pageAccess: parsed.data.pageAccess,
+    vehicleScope: scope.value,
   });
   const base = (process.env.NEXT_PUBLIC_APP_URL?.trim() || new URL(request.url).origin).replace(/\/$/, "");
   const acceptUrl = `${base}/invite/${invite.token}`;

@@ -1,6 +1,6 @@
 import { AttachmentsZipButton } from "@/components/attachments-zip-button";
 import { SearchableSelect } from "@/components/searchable-select";
-import { requireCurrentWorkspace } from "@/lib/auth";
+import { requireAccessContext } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { attachmentListWhere } from "@/lib/attachment-list";
 import { prisma } from "@/lib/prisma";
@@ -20,7 +20,7 @@ export default async function DocumentsPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const workspace = await requireCurrentWorkspace();
+  const { workspace, vehicleIds: scope } = await requireAccessContext();
   const params = await searchParams;
   const selectedVehicleIds = params.vehicle ? params.vehicle.split(",").filter(Boolean) : [];
   const q = params.q?.trim() ?? "";
@@ -28,12 +28,12 @@ export default async function DocumentsPage({
   const [{ locale }, vehicles, attachments] = await Promise.all([
     getI18n(),
     prisma.vehicle.findMany({
-      where: { workspaceId: workspace.id },
+      where: { workspaceId: workspace.id, ...(scope ? { id: { in: scope } } : {}) },
       orderBy: [{ plateNumber: "asc" }, { nickname: "asc" }],
       select: { id: true, plateNumber: true, nickname: true },
     }),
     prisma.orderAttachment.findMany({
-      where: attachmentListWhere(workspace.id, { kind: "document", vehicleIds: selectedVehicleIds, q }),
+      where: attachmentListWhere(workspace.id, { kind: "document", vehicleIds: selectedVehicleIds, q, scope }),
       include: {
         vehicle: { include: { owner: true } },
         order: {

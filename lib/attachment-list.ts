@@ -16,11 +16,15 @@ import { prisma } from "@/lib/prisma";
  */
 export function attachmentListWhere(
   workspaceId: string,
-  filters: { kind: OrderAttachmentKind; vehicleIds: string[]; q: string },
+  filters: { kind: OrderAttachmentKind; vehicleIds: string[]; q: string; scope?: string[] | null },
 ): Prisma.OrderAttachmentWhereInput {
   const and: Prisma.OrderAttachmentWhereInput[] = [
     { OR: [{ orderId: { not: null } }, { vehicleId: { not: null } }] },
   ];
+  // A car-limited member's cars, on top of whatever cars they chose.
+  if (filters.scope) {
+    and.push({ OR: [{ vehicleId: { in: filters.scope } }, { order: { vehicleId: { in: filters.scope } } }] });
+  }
   if (filters.vehicleIds.length) {
     and.push({
       OR: [{ vehicleId: { in: filters.vehicleIds } }, { order: { vehicleId: { in: filters.vehicleIds } } }],
@@ -63,7 +67,7 @@ function safeSegment(value: string) {
  */
 export async function buildAttachmentManifest(
   workspaceId: string,
-  filters: { kind: OrderAttachmentKind; vehicleIds: string[]; q: string },
+  filters: { kind: OrderAttachmentKind; vehicleIds: string[]; q: string; scope?: string[] | null },
   labels: { vehicleFiles: string },
 ) {
   const rows = await prisma.orderAttachment.findMany({

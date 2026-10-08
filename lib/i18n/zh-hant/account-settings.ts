@@ -75,6 +75,20 @@ export const accountSettingsMessages = {
       apiAccessCopy:
         "把令牌交給 AI Agent 或指令碼，它就能透過 HTTP 讀取這個帳戶：車隊、訂單和逐項收費、車主和分成流水帳、客人會話，以及還沒掛到車上的預訂。令牌分兩種：只讀令牌什麼都改不了；讀寫令牌還能匯入 Turo 匯出的 CSV 和從行程頁讀到的行程，訂單和車主帳本會像在「匯入」頁手動匯入一樣更新；也能寫入 Turo 會話，包括你發給客人的回覆。兩種都不能直接改價格、分成規則或流水帳，也刪不了任何東西。",
       apiAccessLink: "簽發 API 令牌",
+      theme: {
+        title: "外觀",
+        hint: "深色模式剛加上，個別面板可能還有淺色的地方。",
+        light: "淺色",
+        dark: "深色",
+        system: "跟隨手機",
+      },
+      iosInstall: {
+        title: "iPhone 主螢幕",
+        copy: "TATO 沒有 App Store 應用。用 Safari 把它加到主螢幕，開啟就是全屏，和 App 一樣，而且保持登入。",
+        steps: ["用 Safari 開啟 tatocar.co，點底部的「分享」", "往下滑，點「新增到主螢幕」", "點右上角的「新增」"],
+        installed: "你正在從主螢幕使用 TATO。",
+        notSafari: "iPhone 上只有 Safari 能新增到主螢幕，請先用 Safari 開啟這個頁面。",
+      },
       androidTitle: "安卓 App",
       androidCopy:
         "把 TATO 裝到手機上：獨立圖示、獨立視窗、沒有位址列。它是套在這個網站外面的殼，不是另一份複製——所以網站一發布，App 裡立刻就是新的，不用重灌。只有殼本身變了（名字、圖示、開啟的地址）才需要換 APK。",

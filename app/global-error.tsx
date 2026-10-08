@@ -1,5 +1,7 @@
 "use client";
 
+import { ERROR_COPY, errorLocaleFrom } from "@/lib/error-copy";
+
 /**
  * Last-resort boundary.
  *
@@ -17,8 +19,12 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // The layout that knows the admin's language is what failed; the
+  // browser's language is the best left.
+  const locale = errorLocaleFrom(typeof navigator === "undefined" ? "zh" : navigator.language);
+  const t = ERROR_COPY[locale];
   return (
-    <html lang="zh">
+    <html lang={locale === "en" ? "en" : locale === "zh-Hant" ? "zh-Hant" : "zh-CN"}>
       <body
         style={{
           margin: 0,
@@ -47,10 +53,10 @@ export default function GlobalError({
             TATO
           </p>
           <h1 style={{ fontSize: 18, fontWeight: 900, letterSpacing: "-0.2px", margin: "8px 0 0" }}>
-            平台暂时无法加载
+            {t.crashTitle}
           </h1>
           <p style={{ fontSize: 13, lineHeight: 1.6, color: "#6e6e73", margin: "8px 0 0" }}>
-            我们已经记录了这个问题。你的数据没有受影响。
+            {t.crashBody}
           </p>
           <button
             type="button"
@@ -68,11 +74,11 @@ export default function GlobalError({
               cursor: "pointer",
             }}
           >
-            重新加载
+            {t.retry}
           </button>
           {error.digest ? (
             <p style={{ fontSize: 11, color: "#6e6e73", marginTop: 12 }}>
-              编号 <strong style={{ color: "#121214" }}>{error.digest}</strong>
+              {t.crashDigest} <strong style={{ color: "#121214" }}>{error.digest}</strong>
             </p>
           ) : null}
         </div>

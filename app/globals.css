@@ -56,6 +56,9 @@
      which a thumb starts missing; every interactive element in the
      app is measured against this on touch devices. */
   --tap-min: 44px;
+
+  /* The calendar's weekend columns. */
+  --calendar-weekend: rgba(245, 238, 229, 0.78);
 }
 
 @keyframes tato-route-progress {
@@ -765,4 +768,274 @@ a[class*="rounded-2xl"],
 
 .site-theme .site-lang > summary::-webkit-details-marker {
   display: none;
+}
+
+/* ---------------------------------------------------------------
+   Dark mode, chosen in account settings (cookie `tato-theme`, read
+   by the root layout into <html data-theme>). Light stays the
+   default: "system" follows the OS, "dark" forces it. Never on the
+   public rental site, which keeps its own light theme.
+
+   The tokens carry most of it. The rest is colour written straight
+   into components -- white cards, the calendar's warm whites, ink
+   chips with white text, pale tinted notices -- caught here by class
+   so dark mode does not wait on every component being rewritten.
+   Generated from one list for both scopes, so the two cannot drift.
+   --------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  --page: #0f1012;
+  --page-glow: #0f1012;
+  --panel-strong: #17181b;
+  --surface: #17181b;
+  --surface-muted: #1f2024;
+  --brand: #a597ff;
+  --brand-soft: #2a2551;
+  --accent: #6f5cf0;
+  --accent-soft: #23242a;
+  --accent-soft-strong: #2d2e35;
+  --ink: #ececf0;
+  --ink-mid: #c5c5cd;
+  --ink-soft: #9a9aa5;
+  --line: #2c2d33;
+  --line-strong: #3d3e45;
+  --ok-fg: #5bd8a3;
+  --ok-bg: #10342a;
+  --bad-fg: #ff8a85;
+  --bad-bg: #3b1716;
+  --warn-fg: #f3c56f;
+  --warn-bg: #3a2b0d;
+  --calendar-weekend: rgba(255, 255, 255, 0.04);
+  color-scheme: dark;
+}
+
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .btn-secondary,
+:root[data-theme="dark"] .btn-danger,
+:root[data-theme="dark"] .input,
+:root[data-theme="dark"] [class*="bg-white/"]:not([class*="bg-white/1"]):not([class*="bg-white/2"]),
+:root[data-theme="dark"] [class*="bg-[rgba(255,255,255"],
+:root[data-theme="dark"] [class*="bg-[linear-gradient(180deg,rgba(255,255,255"],
+:root[data-theme="dark"] [class*="bg-[rgba(255,251,246"],
+:root[data-theme="dark"] [class*="bg-[linear-gradient("][class*="255,255,255"],
+:root[data-theme="dark"] [class*="bg-[linear-gradient("][class*="#ffffff"] {
+  background: var(--surface);
+}
+
+:root[data-theme="dark"] [class*="bg-[#faf4eb]"],
+:root[data-theme="dark"] [class*="bg-[#f3ede4]"],
+:root[data-theme="dark"] [class*="bg-[#fcf7f1]"] {
+  background-color: var(--surface-muted);
+}
+
+:root[data-theme="dark"] [class*="border-[rgba(17,19,24"] {
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] [class*="bg-[var(--ink)]"]:not([class*="bg-[var(--ink)]/"]) {
+  background-color: #3a3b44;
+}
+
+:root[data-theme="dark"] [class*="bg-[var(--ink)]/"] {
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme="dark"] .btn-primary {
+  background: var(--accent);
+}
+
+:root[data-theme="dark"] .input,
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .bg-amber-50,
+:root[data-theme="dark"] .bg-amber-100 {
+  background-color: var(--warn-bg);
+}
+
+:root[data-theme="dark"] .text-amber-700,
+:root[data-theme="dark"] .text-amber-800,
+:root[data-theme="dark"] .text-amber-900,
+:root[data-theme="dark"] .text-amber-950 {
+  color: var(--warn-fg);
+}
+
+:root[data-theme="dark"] .border-amber-200,
+:root[data-theme="dark"] .border-amber-300 {
+  border-color: #6b5520;
+}
+
+:root[data-theme="dark"] .bg-emerald-50,
+:root[data-theme="dark"] .bg-emerald-100 {
+  background-color: var(--ok-bg);
+}
+
+:root[data-theme="dark"] .text-emerald-700,
+:root[data-theme="dark"] .text-emerald-800,
+:root[data-theme="dark"] .text-emerald-900 {
+  color: var(--ok-fg);
+}
+
+:root[data-theme="dark"] .border-emerald-200,
+:root[data-theme="dark"] .border-emerald-300 {
+  border-color: #1f5b48;
+}
+
+:root[data-theme="dark"] .bg-rose-50,
+:root[data-theme="dark"] .bg-rose-100 {
+  background-color: var(--bad-bg);
+}
+
+:root[data-theme="dark"] .text-rose-600,
+:root[data-theme="dark"] .text-rose-700,
+:root[data-theme="dark"] .text-rose-800,
+:root[data-theme="dark"] .text-rose-900 {
+  color: var(--bad-fg);
+}
+
+:root[data-theme="dark"] .border-rose-200,
+:root[data-theme="dark"] .border-rose-300 {
+  border-color: #6b2422;
+}
+
+:root[data-theme="dark"] .bg-sky-50,
+:root[data-theme="dark"] .bg-sky-100 {
+  background-color: #0f2a3a;
+}
+
+:root[data-theme="dark"] .text-sky-700,
+:root[data-theme="dark"] .text-sky-800 {
+  color: #7cc8f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+  --page: #0f1012;
+  --page-glow: #0f1012;
+  --panel-strong: #17181b;
+  --surface: #17181b;
+  --surface-muted: #1f2024;
+  --brand: #a597ff;
+  --brand-soft: #2a2551;
+  --accent: #6f5cf0;
+  --accent-soft: #23242a;
+  --accent-soft-strong: #2d2e35;
+  --ink: #ececf0;
+  --ink-mid: #c5c5cd;
+  --ink-soft: #9a9aa5;
+  --line: #2c2d33;
+  --line-strong: #3d3e45;
+  --ok-fg: #5bd8a3;
+  --ok-bg: #10342a;
+  --bad-fg: #ff8a85;
+  --bad-bg: #3b1716;
+  --warn-fg: #f3c56f;
+  --warn-bg: #3a2b0d;
+  --calendar-weekend: rgba(255, 255, 255, 0.04);
+  color-scheme: dark;
+  }
+
+  :root[data-theme="system"] .bg-white,
+  :root[data-theme="system"] .btn-secondary,
+  :root[data-theme="system"] .btn-danger,
+  :root[data-theme="system"] .input,
+  :root[data-theme="system"] [class*="bg-white/"]:not([class*="bg-white/1"]):not([class*="bg-white/2"]),
+  :root[data-theme="system"] [class*="bg-[rgba(255,255,255"],
+  :root[data-theme="system"] [class*="bg-[linear-gradient(180deg,rgba(255,255,255"],
+  :root[data-theme="system"] [class*="bg-[rgba(255,251,246"],
+  :root[data-theme="system"] [class*="bg-[linear-gradient("][class*="255,255,255"],
+  :root[data-theme="system"] [class*="bg-[linear-gradient("][class*="#ffffff"] {
+    background: var(--surface);
+  }
+
+  :root[data-theme="system"] [class*="bg-[#faf4eb]"],
+  :root[data-theme="system"] [class*="bg-[#f3ede4]"],
+  :root[data-theme="system"] [class*="bg-[#fcf7f1]"] {
+    background-color: var(--surface-muted);
+  }
+
+  :root[data-theme="system"] [class*="border-[rgba(17,19,24"] {
+    border-color: var(--line);
+  }
+
+  :root[data-theme="system"] [class*="bg-[var(--ink)]"]:not([class*="bg-[var(--ink)]/"]) {
+    background-color: #3a3b44;
+  }
+
+  :root[data-theme="system"] [class*="bg-[var(--ink)]/"] {
+    background-color: rgba(0, 0, 0, 0.6);
+  }
+
+  :root[data-theme="system"] .btn-primary {
+    background: var(--accent);
+  }
+
+  :root[data-theme="system"] .input,
+  :root[data-theme="system"] input,
+  :root[data-theme="system"] select,
+  :root[data-theme="system"] textarea {
+    color: var(--ink);
+  }
+
+  :root[data-theme="system"] .bg-amber-50,
+  :root[data-theme="system"] .bg-amber-100 {
+    background-color: var(--warn-bg);
+  }
+
+  :root[data-theme="system"] .text-amber-700,
+  :root[data-theme="system"] .text-amber-800,
+  :root[data-theme="system"] .text-amber-900,
+  :root[data-theme="system"] .text-amber-950 {
+    color: var(--warn-fg);
+  }
+
+  :root[data-theme="system"] .border-amber-200,
+  :root[data-theme="system"] .border-amber-300 {
+    border-color: #6b5520;
+  }
+
+  :root[data-theme="system"] .bg-emerald-50,
+  :root[data-theme="system"] .bg-emerald-100 {
+    background-color: var(--ok-bg);
+  }
+
+  :root[data-theme="system"] .text-emerald-700,
+  :root[data-theme="system"] .text-emerald-800,
+  :root[data-theme="system"] .text-emerald-900 {
+    color: var(--ok-fg);
+  }
+
+  :root[data-theme="system"] .border-emerald-200,
+  :root[data-theme="system"] .border-emerald-300 {
+    border-color: #1f5b48;
+  }
+
+  :root[data-theme="system"] .bg-rose-50,
+  :root[data-theme="system"] .bg-rose-100 {
+    background-color: var(--bad-bg);
+  }
+
+  :root[data-theme="system"] .text-rose-600,
+  :root[data-theme="system"] .text-rose-700,
+  :root[data-theme="system"] .text-rose-800,
+  :root[data-theme="system"] .text-rose-900 {
+    color: var(--bad-fg);
+  }
+
+  :root[data-theme="system"] .border-rose-200,
+  :root[data-theme="system"] .border-rose-300 {
+    border-color: #6b2422;
+  }
+
+  :root[data-theme="system"] .bg-sky-50,
+  :root[data-theme="system"] .bg-sky-100 {
+    background-color: #0f2a3a;
+  }
+
+  :root[data-theme="system"] .text-sky-700,
+  :root[data-theme="system"] .text-sky-800 {
+    color: #7cc8f0;
+  }
 }

@@ -15,9 +15,12 @@ import {
   turoReservationUrl,
 } from "@/lib/utils";
 import { CsvQuickImportButton } from "@/components/csv-quick-import-button";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import { OrderClickTracker } from "@/components/order-click-tracker";
 import { StatusBadge } from "@/components/status-badge";
 import { requireAccessContext } from "@/lib/auth";
+import { userRole } from "@/lib/access";
+import { getOnboardingProgress, ONBOARDING_LINKS, ONBOARDING_STEPS } from "@/lib/onboarding";
 import { recentOrderViews } from "@/lib/recent-orders";
 import { getActivityActionLabel, getLocaleTag, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
@@ -172,6 +175,8 @@ export default async function DashboardPage() {
     }),
     recentOrderViews({ workspaceId: workspace.id, userId: user.id, vehicleIds }),
   ]);
+  // The account's owner sets the account up; members land on a working one.
+  const onboarding = userRole(user) === "OWNER" ? await getOnboardingProgress(workspace.id) : null;
   const dashboardMessages = messages.dashboard;
   const monthlyMessages = dashboardMessages.monthly;
   const eventMessages = dashboardMessages.event;
@@ -447,6 +452,17 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-2.5">
+      {onboarding && !onboarding.finished ? (
+        <OnboardingChecklist
+          workspaceId={workspace.id}
+          locale={locale}
+          steps={ONBOARDING_STEPS.map((step) => ({
+            key: step,
+            href: ONBOARDING_LINKS[step],
+            done: onboarding.done[step],
+          }))}
+        />
+      ) : null}
       <section
         aria-label={`${dashboardMessages.todayKicker} · ${monthlyMessages.title(monthLabel)}`}
         className="grid grid-cols-3 overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--line)] [gap:1px] sm:grid-cols-5 xl:grid-cols-9"

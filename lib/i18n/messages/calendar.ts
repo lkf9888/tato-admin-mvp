@@ -151,6 +151,12 @@ export const calendarMessages = {
         // cross that boundary -- Next refuses to serialise it and the
         // page 500s.
         restoredNotice: "{renter} is back on the calendar.",
+        selectAll: "Select all",
+        selected: "{count} selected",
+        restoreSelected: "Restore",
+        clearSelection: "Clear",
+        restoredMany: "{count} orders are back on the calendar.",
+        restoredSome: "{count} restored; {failed} could not be.",
       },
       searchAllLoading: "Searching every trip...",
       searchAllResults: (count: number) =>
@@ -390,6 +396,12 @@ export const calendarMessages = {
         restoreFailed: "这笔订单没能恢复，请重试。",
         deletedAt: "删除于",
         restoredNotice: "{renter} 已恢复到日历上。",
+        selectAll: "全选",
+        selected: "已选 {count} 笔",
+        restoreSelected: "恢复",
+        clearSelection: "取消选择",
+        restoredMany: "{count} 笔订单已恢复到日历上。",
+        restoredSome: "已恢复 {count} 笔，{failed} 笔没能恢复。",
       },
       searchAllLoading: "正在搜索全部订单…",
       searchAllResults: (count: number) => `全部订单中共 ${count} 条匹配`,

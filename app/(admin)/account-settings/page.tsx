@@ -10,6 +10,8 @@ import {
   updateStripePayoutBindingAction,
 } from "@/lib/account-settings-actions";
 import { ANDROID_RELEASE, formatBytes } from "@/lib/android-release";
+import { IosInstallGuide } from "@/components/ios-install-guide";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import { TeamSettings } from "@/components/team-settings";
 import { ASSIGNABLE_SECTIONS, canManageTeam, parsePageAccess, parseVehicleScope } from "@/lib/access";
 import { requireCurrentAdminContext } from "@/lib/auth";
@@ -356,6 +358,12 @@ export default async function AccountSettingsPage({
           {t.apiAccessLink}
         </Link>
       </section>
+
+      <ThemeSwitcher labels={t.theme} />
+
+      <div id="install" className="scroll-mt-20">
+        <IosInstallGuide t={t.iosInstall} />
+      </div>
 
       {/* The APK. A plain anchor with `download`, not a Link: this
           points at a file in `public/`, and Next's client router would

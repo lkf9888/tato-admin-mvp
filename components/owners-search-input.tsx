@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 export function OwnersSearchInput({
   initialValue,
@@ -30,6 +31,7 @@ export function OwnersSearchInput({
   return (
     <input
       type="search"
+      {...SEARCH_FIELD_PROPS}
       value={query}
       onChange={(event) => setQuery(event.target.value)}
       placeholder={placeholder}

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import "@/app/globals.css";
 import { getI18n } from "@/lib/i18n-server";
@@ -17,7 +17,10 @@ export async function generateMetadata(): Promise<Metadata> {
     appleWebApp: {
       capable: true,
       title: "TATO",
-      statusBarStyle: "black-translucent",
+      // Dark status-bar text on the white top bar. "black-translucent"
+      // drew white clock and battery icons straight onto that white bar,
+      // where they could not be seen.
+      statusBarStyle: "default",
     },
     formatDetection: {
       telephone: false,
@@ -31,7 +34,9 @@ export async function generateMetadata(): Promise<Metadata> {
 // hold non-zero values on iOS, so the bottom tab bar can sit above the
 // home indicator instead of behind it.
 export const viewport: Viewport = {
-  themeColor: "#111318",
+  // The browser's own bar matches the white top bar under it, rather
+  // than a near-black strip above a white page.
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -44,7 +49,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [{ locale }, requestHeaders] = await Promise.all([getI18n(), headers()]);
+  const [{ locale }, requestHeaders, cookieStore] = await Promise.all([getI18n(), headers(), cookies()]);
   // Public rental-site pages take their language from the URL, which
   // middleware reads for us; everything else follows the admin's own
   // preference.
@@ -64,8 +69,13 @@ export default async function RootLayout({
   // desktop the version is already prominent in the sidebar's footer
   // block. Keeping it in two places was clutter for no information
   // gain.
+  // The admin's appearance choice (account settings). Not on the public
+  // rental site, which keeps its own light theme for renters.
+  const themeChoice = cookieStore.get("tato-theme")?.value;
+  const theme = !siteLang && (themeChoice === "dark" || themeChoice === "system") ? themeChoice : undefined;
+
   return (
-    <html lang={lang}>
+    <html lang={lang} data-theme={theme}>
       <body>{children}</body>
     </html>
   );

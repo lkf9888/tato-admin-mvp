@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { ERROR_COPY } from "@/lib/error-copy";
+import { getLocale } from "@/lib/i18n-server";
+
 /**
  * 404.
  *
@@ -9,20 +12,21 @@ import Link from "next/link";
  * two versions. Telling the operator which address failed lets them
  * say something useful about it.
  */
-export default function NotFound() {
+export default async function NotFound() {
+  const t = ERROR_COPY[await getLocale()];
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">
       <div className="w-full max-w-md rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-5 text-center">
         <p className="t-eyebrow text-[var(--ink-soft)]">404</p>
-        <h1 className="t-title mt-1.5 text-[var(--ink)]">找不到这个页面</h1>
+        <h1 className="t-title mt-1.5 text-[var(--ink)]">{t.notFoundTitle}</h1>
         <p className="mt-1.5 text-[12.5px] leading-5 text-[var(--ink-soft)]">
-          它可能已经被删除，或者链接本身就是错的。
+          {t.notFoundBody}
         </p>
         <Link
           href="/dashboard"
           className="tap-press mt-4 inline-flex items-center justify-center rounded-md bg-[var(--ink)] px-4 py-2 text-[12.5px] font-bold text-white transition hover:opacity-90"
         >
-          回到首页
+          {t.home}
         </Link>
       </div>
     </div>

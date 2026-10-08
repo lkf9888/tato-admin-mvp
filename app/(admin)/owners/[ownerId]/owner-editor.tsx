@@ -13,6 +13,7 @@ import {
   type FeeShareRow,
 } from "@/components/owner-fee-sharing-panel";
 import type { Locale } from "@/lib/i18n";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 type Owner = {
   id: string;
@@ -483,7 +484,8 @@ function VehiclePicker({
           <div className="absolute left-0 right-0 z-20 mt-1 flex max-h-80 flex-col rounded-md border border-[var(--line)] bg-white shadow-lg">
             <div className="border-b border-[var(--line)] p-2">
               <input
-                type="text"
+                type="search"
+                {...SEARCH_FIELD_PROPS}
                 placeholder={labels.pickerSearchPlaceholder}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}

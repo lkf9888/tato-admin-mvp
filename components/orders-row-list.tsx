@@ -8,12 +8,13 @@ import {
   OrderDetailModal,
   type OrderEditorVehicleOption,
 } from "@/components/order-detail-modal";
+import { BulkActionBar, BulkActionButton } from "@/components/bulk-action-bar";
 import { StatusBadge } from "@/components/status-badge";
 import type { Locale } from "@/lib/i18n";
 import { cn, formatCurrency, formatDateTime } from "@/lib/utils";
 
 function labels(locale: Locale) {
-  return locale === "zh"
+  return locale !== "en"
     ? {
         empty: "没有找到符合这个关键字的订单。",
         plate: "车牌",
@@ -28,6 +29,15 @@ function labels(locale: Locale) {
         markPaid: "标记已收款",
         markUnpaid: "标记未收款",
         clearSelection: "取消选择",
+        selectAll: "全选本页",
+        syncOwners: "同步给车主",
+        syncResult: (synced: number, skipped: number) =>
+          skipped > 0 ? `已同步 ${synced} 笔，${skipped} 笔没有绑定车主或同步失败` : `已同步 ${synced} 笔给车主`,
+        deleteSelected: "删除",
+        confirmDelete: (count: number) => `删除选中的 ${count} 笔订单？可以在回收站恢复。`,
+        deleteResult: (deleted: number, skipped: number) =>
+          skipped > 0 ? `已删除 ${deleted} 笔，${skipped} 笔已付款的网站订单要在订单里先处理退款` : `已删除 ${deleted} 笔`,
+        working: "处理中…",
         paidInFull: "已收齐",
         toCollect: (amount: string) => `待收 ${amount}`,
         confirmUnpaid: "把选中订单的收款全部改回「待收」？收款记录本身会保留。",
@@ -49,6 +59,15 @@ function labels(locale: Locale) {
         markPaid: "Mark paid",
         markUnpaid: "Mark unpaid",
         clearSelection: "Clear",
+        selectAll: "Select all on this page",
+        syncOwners: "Sync to owners",
+        syncResult: (synced: number, skipped: number) =>
+          skipped > 0 ? `${synced} synced; ${skipped} have no owner or failed` : `${synced} synced to owners`,
+        deleteSelected: "Delete",
+        confirmDelete: (count: number) => `Delete the ${count} selected orders? They can be restored from the trash.`,
+        deleteResult: (deleted: number, skipped: number) =>
+          skipped > 0 ? `${deleted} deleted; ${skipped} paid site bookings need their refund handled first` : `${deleted} deleted`,
+        working: "Working…",
         paidInFull: "Paid in full",
         toCollect: (amount: string) => `To collect ${amount}`,
         confirmUnpaid: "Set every payment on the selected orders back to expected? The payment rows stay.",
@@ -107,6 +126,46 @@ export function OrdersRowList({
     setSelectedIds(new Set());
     router.refresh();
   }
+  async function bulkSyncOwners() {
+    setBusy(true);
+    setNotice(null);
+    const response = await fetch("/api/orders/bulk-owner-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [...selectedIds] }),
+    }).catch(() => null);
+    const payload = response ? await response.json().catch(() => ({})) : {};
+    setBusy(false);
+    if (!response?.ok) {
+      setNotice(t.failed);
+      return;
+    }
+    setNotice(t.syncResult(payload.synced ?? 0, (payload.skipped ?? []).length));
+    setSelectedIds(new Set());
+    router.refresh();
+  }
+
+  /** One order at a time through the same delete as the panel, so a paid
+   *  site booking is refused here exactly as it is there. */
+  async function bulkDelete() {
+    if (!window.confirm(t.confirmDelete(selectedIds.size))) return;
+    setBusy(true);
+    setNotice(null);
+    const ids = [...selectedIds];
+    const deleted: string[] = [];
+    let skipped = 0;
+    for (const id of ids) {
+      const response = await fetch(`/api/orders/${id}`, { method: "DELETE" }).catch(() => null);
+      if (response?.ok) deleted.push(id);
+      else skipped += 1;
+    }
+    setBusy(false);
+    setRows((current) => current.filter((order) => !deleted.includes(order.id)));
+    setSelectedIds(new Set());
+    setNotice(t.deleteResult(deleted.length, skipped));
+    router.refresh();
+  }
+
   const [rows, setRows] = useState(orders);
   const [selectedOrder, setSelectedOrder] = useState<EditableOrder | null>(null);
 
@@ -133,21 +192,33 @@ export function OrdersRowList({
   return (
     <>
       <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.9)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+        <label className="flex cursor-pointer items-center gap-2 border-b border-[color:var(--line)] bg-[var(--surface-muted)]/60 px-2.5 py-1.5 text-[11.5px] text-[color:var(--ink-soft)] sm:px-3">
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={rows.length > 0 && rows.every((order) => selectedIds.has(order.id))}
+            ref={(element) => {
+              if (element) element.indeterminate = selectedIds.size > 0 && !rows.every((order) => selectedIds.has(order.id));
+            }}
+            onChange={(event) =>
+              setSelectedIds(event.target.checked ? new Set(rows.map((order) => order.id)) : new Set())
+            }
+          />
+          {t.selectAll}
+        </label>
         <div className="divide-y divide-[color:var(--line)]">
           {rows.map((order) => {
             const payment = paymentInfo[order.id];
             return (
             <div key={order.id} className={cn("flex items-stretch", order.hasConflict ? "bg-rose-50/70" : "bg-white/60")}>
               <label className="flex w-9 shrink-0 cursor-pointer items-start justify-center pt-4 sm:w-10">
-                {payment ? (
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={selectedIds.has(order.id)}
-                    onChange={() => toggleSelected(order.id)}
-                    aria-label={`${t.select}: ${order.renterName}`}
-                  />
-                ) : null}
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={selectedIds.has(order.id)}
+                  onChange={() => toggleSelected(order.id)}
+                  aria-label={`${t.select}: ${order.renterName}`}
+                />
               </label>
             <button
               type="button"
@@ -225,22 +296,30 @@ export function OrdersRowList({
         </p>
       ) : null}
 
-      {selectedIds.size > 0 ? (
-        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+64px)] z-30 flex justify-center px-3 lg:bottom-4">
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 shadow-xl">
-            <span className="text-[12px] font-semibold text-[color:var(--ink)]">{t.selected(selectedIds.size)}</span>
-            <button type="button" className="btn-primary min-h-8 px-3 text-[12px]" disabled={busy} onClick={() => void bulkPayment("paid")}>
+      <BulkActionBar
+        count={selectedIds.size}
+        countLabel={busy ? t.working : t.selected(selectedIds.size)}
+        clearLabel={t.clearSelection}
+        onClear={() => setSelectedIds(new Set())}
+      >
+        <BulkActionButton tone="primary" disabled={busy} onClick={() => void bulkSyncOwners()}>
+          {t.syncOwners}
+        </BulkActionButton>
+        {/* Payments are recorded only on hand-entered orders. */}
+        {[...selectedIds].some((id) => paymentInfo[id]) ? (
+          <>
+            <BulkActionButton disabled={busy} onClick={() => void bulkPayment("paid")}>
               {t.markPaid}
-            </button>
-            <button type="button" className="btn-secondary min-h-8 px-3 text-[12px]" disabled={busy} onClick={() => void bulkPayment("unpaid")}>
+            </BulkActionButton>
+            <BulkActionButton disabled={busy} onClick={() => void bulkPayment("unpaid")}>
               {t.markUnpaid}
-            </button>
-            <button type="button" className="text-[12px] text-[color:var(--ink-soft)] underline" onClick={() => setSelectedIds(new Set())}>
-              {t.clearSelection}
-            </button>
-          </div>
-        </div>
-      ) : null}
+            </BulkActionButton>
+          </>
+        ) : null}
+        <BulkActionButton tone="danger" disabled={busy} onClick={() => void bulkDelete()}>
+          {t.deleteSelected}
+        </BulkActionButton>
+      </BulkActionBar>
 
       {selectedOrder ? (
         <OrderDetailModal

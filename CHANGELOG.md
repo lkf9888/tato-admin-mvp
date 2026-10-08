@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.57.0 - 2026-10-08
+
+### Bulk actions, first-run checklist, English error pages, quieter search boxes, and an optional dark mode
+
+- **Bulk actions on orders.** Every row in the order list can be ticked, and "select all on this page" sits above the list. A bar fixed to the bottom of the screen, above the phone's tab bar, offers several actions. Sync to owners runs the same sync as the calendar's. Mark paid and mark unpaid show only when hand-entered orders are picked, the only ones settled here. Delete runs each order through the panel's own delete, so a paid site booking is refused and counted rather than cancelled.
+- **Bulk restore in the trash.** The trash gets the same selection and bar, with Restore.
+- **First-run checklist.** The account owner's dashboard lists six steps, each read from the account's own data and linked to where it is done: cars, Turo trips, owners, terms, a shared statement, team. It disappears when all six are done and can be hidden sooner on a browser.
+- **iPhone home-screen guide.** Account settings explains how to add TATO to the iPhone home screen in three steps, with the share-sheet icons. It notices when TATO is already running from the home screen, or open in a browser that cannot add it.
+- **Error and 404 pages in three languages.** The error, crash and 404 pages follow the admin's language (Simplified, Traditional or English). They were Chinese only.
+- **Search boxes are left alone by password managers.** `SEARCH_FIELD_PROPS` (`lib/search-field-props.ts`) opts a field out of 1Password, LastPass, Bitwarden and the browser's own autofill. It is applied to the order, vehicle, owner, calendar, photo, document, staff and team searches.
+- **Top bar colours on phones.** The browser's bar is now white like the top bar under it, and the iPhone status bar uses dark icons, which used to be white icons on a white bar. The shell sizes to `dvh`, so it does not jump as Safari's toolbar shows and hides.
+- **Dark mode, opt-in.** Account settings → Appearance offers Light (the default, unchanged), Dark, or Match phone. The choice is kept in a cookie and read by the root layout, so the first paint is right, and it never applies to the public rental site.
+  - Colour tokens carry most of it. `globals.css` also maps colour written straight into components: white cards, the calendar's warm whites and weekend stripes, ink chips with white text, and pale amber, green, red and blue notices.
+  - The calendar's weekend colour is now a variable.
+  - A few panels may still show light patches, which the setting says.
+
 ## v1.56.2 - 2026-10-08
 
 ### A kept fee is grossed up at the plan its own trip ran on

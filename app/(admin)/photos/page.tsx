@@ -5,6 +5,7 @@ import { getI18n } from "@/lib/i18n-server";
 import { attachmentListWhere } from "@/lib/attachment-list";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 function isVideo(contentType?: string | null, filename?: string | null) {
   const type = contentType?.toLowerCase() ?? "";
@@ -93,7 +94,7 @@ export default async function PhotosPage({
         </label>
         <label className="block">
           <span className="label">{copy.search}</span>
-          <input name="q" defaultValue={q} placeholder={copy.searchPlaceholder} className="input" />
+          <input type="search" name="q" {...SEARCH_FIELD_PROPS} defaultValue={q} placeholder={copy.searchPlaceholder} className="input" />
         </label>
         <button className="btn-primary self-end">{copy.apply}</button>
       </form>

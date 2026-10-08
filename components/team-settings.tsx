@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { getMessages, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 type Member = {
   id: string;
@@ -313,6 +314,7 @@ function MemberForm({
             {vehicles.length > 8 ? (
               <input
                 type="search"
+                {...SEARCH_FIELD_PROPS}
                 autoComplete="off"
                 value={carFilter}
                 onChange={(event) => setCarFilter(event.target.value)}

@@ -27,6 +27,7 @@ import {
   type StaffTaskNotificationTemplate,
 } from "@/lib/staff-task-notification-template";
 import { cn, formatDateTime } from "@/lib/utils";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 type StaffStatus = "todo" | "in_progress" | "done" | "cancelled";
 type StaffPriority = "low" | "normal" | "high";
@@ -1231,6 +1232,7 @@ export function StaffScheduleClient({
                   <input
                     className="input h-8 px-2 py-1 text-xs"
                     type="search"
+                    {...SEARCH_FIELD_PROPS}
                     value={historySearch}
                     placeholder={c.historySearchPlaceholder}
                     onChange={(event) => {
@@ -2581,6 +2583,7 @@ function SearchTextField({
       <input
         className="input"
         type="search"
+        {...SEARCH_FIELD_PROPS}
         list={listId}
         value={value}
         placeholder={placeholder}

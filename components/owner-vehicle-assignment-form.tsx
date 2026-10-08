@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { assignOwnerVehiclesAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
 import { foldLatinLookalikes } from "@/lib/utils";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 type VehicleOption = {
   id: string;
@@ -108,6 +109,7 @@ export function OwnerVehicleAssignmentForm({
           <div className="space-y-1.5">
             <input
               type="search"
+              {...SEARCH_FIELD_PROPS}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={messages.searchPlaceholder}

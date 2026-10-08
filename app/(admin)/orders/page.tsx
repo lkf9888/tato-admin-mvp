@@ -33,6 +33,7 @@ import {
   getDisplayOrderNote,
   getOrderNetEarning,
 } from "@/lib/utils";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 // Bounded pagination: 20 cards per page is comfortable on mobile
 // (one column = ~20 fingers of scrolling) and on desktop's 2-up grid
@@ -364,6 +365,7 @@ export default async function OrdersPage({
           <div className="flex flex-col gap-2 md:flex-row md:items-center">
             <input
               name="q"
+              {...SEARCH_FIELD_PROPS}
               defaultValue={searchQuery}
               placeholder={orderMessages.placeholders.search}
               className="h-9 flex-1 rounded-full border border-[rgba(17,19,24,0.08)] bg-white/84 px-4 text-[12px] text-[color:var(--ink)] outline-none"

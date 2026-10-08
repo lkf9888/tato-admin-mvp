@@ -75,6 +75,20 @@ export const accountSettingsMessages = {
       apiAccessCopy:
         "Hand an AI agent or a script a token and it can read this account over HTTP: the fleet, trips and their charges, owners and their ledgers, guest conversations, and the bookings still waiting on a decision. There are two kinds. A read-only token changes nothing. A read-write token can also import Turo's CSV export and trips read off Turo's trip pages, which update orders and owner ledgers the same way an import on the Imports page does, and record Turo conversations, the host's replies included. Neither can change a price, a commission rule or a ledger line directly, or delete anything.",
       apiAccessLink: "Get an API token",
+      theme: {
+        title: "Appearance",
+        hint: "Dark mode is new; a few panels may still show light patches.",
+        light: "Light",
+        dark: "Dark",
+        system: "Match phone",
+      },
+      iosInstall: {
+        title: "iPhone home screen",
+        copy: "TATO has no App Store app. Add it to the home screen from Safari and it opens full screen, like an app, and stays signed in.",
+        steps: ["Open tatocar.co in Safari and tap Share", "Scroll down and tap Add to Home Screen", "Tap Add in the top corner"],
+        installed: "You're using TATO from the home screen.",
+        notSafari: "On iPhone only Safari can add to the home screen. Open this page in Safari first.",
+      },
       androidTitle: "Android app",
       androidCopy:
         "TATO as an app on your phone: its own icon, its own window, no address bar. It is a shell around this site rather than a separate copy of it, so deploying the site updates the app for everyone immediately — a new APK is only needed when the shell itself changes.",
@@ -227,6 +241,20 @@ export const accountSettingsMessages = {
       apiAccessCopy:
         "把令牌交给 AI Agent 或脚本，它就能通过 HTTP 读取这个账户：车队、订单和逐项收费、车主和分成流水账、客人会话，以及还没挂到车上的预订。令牌分两种：只读令牌什么都改不了；读写令牌还能导入 Turo 导出的 CSV 和从行程页读到的行程，订单和车主账本会像在「导入」页手动导入一样更新；也能写入 Turo 会话，包括你发给客人的回复。两种都不能直接改价格、分成规则或流水账，也删不了任何东西。",
       apiAccessLink: "签发 API 令牌",
+      theme: {
+        title: "外观",
+        hint: "深色模式刚加上，个别面板可能还有浅色的地方。",
+        light: "浅色",
+        dark: "深色",
+        system: "跟随手机",
+      },
+      iosInstall: {
+        title: "iPhone 主屏幕",
+        copy: "TATO 没有 App Store 应用。用 Safari 把它加到主屏幕，打开就是全屏，和 App 一样，而且保持登录。",
+        steps: ["用 Safari 打开 tatocar.co，点底部的「分享」", "往下滑，点「添加到主屏幕」", "点右上角的「添加」"],
+        installed: "你正在从主屏幕使用 TATO。",
+        notSafari: "iPhone 上只有 Safari 能添加到主屏幕，请先用 Safari 打开这个页面。",
+      },
       androidTitle: "安卓 App",
       androidCopy:
         "把 TATO 装到手机上：独立图标、独立窗口、没有地址栏。它是套在这个网站外面的壳，不是另一份拷贝——所以网站一发布，App 里立刻就是新的，不用重装。只有壳本身变了（名字、图标、打开的地址）才需要换 APK。",

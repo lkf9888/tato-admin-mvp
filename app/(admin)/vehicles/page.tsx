@@ -8,6 +8,7 @@ import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import type { ReactNode } from "react";
 import { foldLatinLookalikes } from "@/lib/utils";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 /**
  * Does this plate answer to what was typed, allowing for a character
@@ -306,6 +307,7 @@ export default async function VehiclesPage({
         <form action="/vehicles" className="flex flex-col gap-2 sm:flex-row">
           <input
             type="search"
+            {...SEARCH_FIELD_PROPS}
             name="q"
             defaultValue={vehicleQuery}
             placeholder={vehicleMessages.searchPlaceholder}

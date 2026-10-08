@@ -180,13 +180,13 @@ export function AppShell({
 
   return (
     <NavBadgeProvider>
-    <div className="min-h-screen bg-[var(--surface-muted)] text-[var(--ink)]">
+    <div className="min-h-dvh bg-[var(--surface-muted)] text-[var(--ink)]">
       <MobileNav
         brandTitle={messages.shell.brandTitle}
         items={navGroups.flatMap((group) => group.items.map(({ href, label }) => ({ href, label })))}
       />
 
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-dvh w-full">
         <aside className="fixed inset-y-0 left-0 z-40 hidden w-56 shrink-0 flex-col border-r border-[var(--line)] bg-white lg:flex">
           {sidebarContent}
         </aside>

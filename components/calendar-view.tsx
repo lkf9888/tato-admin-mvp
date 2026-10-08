@@ -29,6 +29,7 @@ import {
   type RateSeasonality,
 } from "@/lib/rental-estimate/rate-seasonality";
 import { cn, foldLatinLookalikes, formatCurrencyInputText, formatCurrencyInputValue, formatDate, formatDateInputDisplay, formatTime as formatTime24, formatTimeInputDisplay, parseDateTimeInputParts } from "@/lib/utils";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 type CalendarOrder = EditableOrder;
 
@@ -691,6 +692,7 @@ function SearchableFilterDropdown({
         <div className="absolute left-0 top-10 z-[70] w-full min-w-[16rem] rounded-lg border border-[var(--line)] bg-white p-2 shadow-[0_22px_52px_-28px_rgba(17,19,24,0.55)]">
           <input
             type="search"
+            {...SEARCH_FIELD_PROPS}
             value={query}
             onChange={(event) => {
               onValueChange("all");
@@ -1607,7 +1609,7 @@ export function CalendarView({
   const weekWidth = dayColumnWidth * 7;
   const dayGridBackground = [
     `repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px ${dayColumnWidth}px)`,
-    `repeating-linear-gradient(to right, transparent 0 ${dayColumnWidth * 5}px, rgba(245,238,229,0.78) ${
+    `repeating-linear-gradient(to right, transparent 0 ${dayColumnWidth * 5}px, var(--calendar-weekend) ${
       dayColumnWidth * 5
     }px ${weekWidth}px)`,
   ].join(", ");
@@ -2429,6 +2431,7 @@ export function CalendarView({
                   <span className="sr-only">{calendarMessages.timelineSearch}</span>
                   <input
                     type="search"
+                    {...SEARCH_FIELD_PROPS}
                     value={calendarSearchQuery}
                     onChange={(event) => setCalendarSearchQuery(event.target.value)}
                     placeholder={calendarMessages.timelineSearchPlaceholder}
@@ -2526,6 +2529,7 @@ export function CalendarView({
               <span className="sr-only">{calendarMessages.timelineSearch}</span>
               <input
                 type="search"
+                {...SEARCH_FIELD_PROPS}
                 value={calendarSearchQuery}
                 onChange={(event) => setCalendarSearchQuery(event.target.value)}
                 placeholder={calendarMessages.timelineSearchPlaceholder}

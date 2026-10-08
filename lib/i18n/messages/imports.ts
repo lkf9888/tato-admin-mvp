@@ -84,6 +84,8 @@ export const importsMessages = {
           count === 1 ? "1 car in this file is not in your fleet" : `${count} cars in this file are not in your fleet`,
         newVehiclesCopy:
           "The ticked cars are created and their trips imported. Trips of unticked cars are left out this time; add the car later and import the same file again.",
+        newVehiclesPlanNote:
+          "New cars have no Turo plan % yet. Until it is filled in, owner payouts that convert Boost, discounts or extra distance back to the guest's price assume 75%. Set it under Turo plan % when editing the car.",
         newVehiclesQuota: (count: number) =>
           count === 0
             ? "Your plan has no room for another car. Buy more slots to add these."
@@ -231,6 +233,8 @@ export const importsMessages = {
         newVehiclesTitle: (count: number) => `这份文件里有 ${count} 台车队里还没有的车`,
         newVehiclesCopy:
           "勾选的车会新建，并把它们的订单一起导入。没勾的车，订单这次先不导入；以后把车加上，再导入同一份文件就行。",
+        newVehiclesPlanNote:
+          "新车还没填 Turo 计划比例。补上之前，车主分成按客人价还原 Boost、折扣、超里程时，会先按 75% 算。请到车辆编辑里的「Turo 计划比例 %」补上。",
         newVehiclesQuota: (count: number) =>
           count === 0
             ? "当前名额已用完，不能再加车。要新增这些车，请先购买名额。"

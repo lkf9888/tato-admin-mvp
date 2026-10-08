@@ -74,6 +74,8 @@ export const importsMessages = {
         newVehiclesTitle: (count: number) => `這份檔案裡有 ${count} 台車隊裡還沒有的車`,
         newVehiclesCopy:
           "勾選的車會新建，並把它們的訂單一起匯入。沒勾的車，訂單這次先不匯入；以後把車加上，再匯入同一份檔案就行。",
+        newVehiclesPlanNote:
+          "新車還沒填 Turo 計劃比例。補上之前，車主分成按客人價還原 Boost、折扣、超里程時，會先按 75% 算。請到車輛編輯裡的「Turo 計劃比例 %」補上。",
         newVehiclesQuota: (count: number) =>
           count === 0
             ? "當前名額已用完，不能再加車。要新增這些車，請先購買名額。"

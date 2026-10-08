@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.56.1 - 2026-10-08
+
+### The new-car list says the Turo plan % is still blank
+
+Neither the Turo CSV nor its mail says which plan a car is on, so a car created by import has no `turoPlanPercent`, and owner payouts that convert Boost, discounts or extra distance back to the guest's price assume 75% until someone fills it in. The CSV import's new-car confirmation now says so, and where to set it (车辆编辑 → Turo 计划比例 %).
+
 ## v1.56.0 - 2026-10-08
 
 ### Kept fees can come off an owner's revenue at the price the guest paid

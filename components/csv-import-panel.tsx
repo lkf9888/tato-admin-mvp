@@ -662,6 +662,9 @@ export function CsvImportPanel({
               {panelMessages.newVehiclesTitle(newVehicles.length)}
             </h3>
             <p className="mt-1.5 text-[12px] leading-5 text-[var(--ink-mid)]">{panelMessages.newVehiclesCopy}</p>
+            {/* Neither the CSV nor the mail says which Turo plan a car is
+                on, and owner payouts read it (Vehicle.turoPlanPercent). */}
+            <p className="mt-1.5 text-[12px] leading-5 text-[var(--ink-soft)]">{panelMessages.newVehiclesPlanNote}</p>
             {newVehicleCap < newVehicles.length ? (
               <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
                 {panelMessages.newVehiclesQuota(newVehicleCap)}{" "}

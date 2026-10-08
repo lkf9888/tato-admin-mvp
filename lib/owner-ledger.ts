@@ -113,7 +113,7 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
     order.sourceMetadata,
     policy,
     parseFeeShareOverrides(owner?.feeShareOverrides),
-    retentionBasisFor(owner?.retentionBasis, order.vehicle.turoPlanPercent),
+    retentionBasisFor(owner?.retentionBasis, order.vehicle.turoPlanPercent, order.sourceMetadata),
   );
   const retainedAmount = roundLedgerAmount(Math.min(retention.total, Math.max(0, netEarning ?? 0)));
 

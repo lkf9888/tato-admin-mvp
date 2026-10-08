@@ -114,7 +114,7 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
       item.order.sourceMetadata,
       policy,
       overrides,
-      retentionBasisFor(owner.retentionBasis, item.order.vehicle?.turoPlanPercent),
+      retentionBasisFor(owner.retentionBasis, item.order.vehicle?.turoPlanPercent, item.order.sourceMetadata),
     );
     if (retention.lines.length === 0) continue;
     breakdownByItemId[item.id] = {

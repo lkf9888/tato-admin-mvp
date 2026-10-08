@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.56.2 - 2026-10-08
+
+### A kept fee is grossed up at the plan its own trip ran on
+
+A car's Turo plan can change, and the export has no plan column. Reservation 61569129 shows the problem. XD361J ran it on the 65% plan in September and is on 75% now, so its $3.67 boost payout was grossed up at 75% to $4.89 instead of the $5.65 the guest paid. The owner was left with $60.03 instead of $59.27.
+
+- **How the plan is read.** Each trip's plan now comes from its own export row (`inferTripPlanPercent`). "Sales tax" is the 12% GST+PST on Turo's fee, so the fee is the tax ÷ 0.12. Delivery and extras account for a flat 10% of the fee. The rest is the plan's cut of the trip-priced charges, which gives plan = payout ÷ (payout + fee).
+- **Snapping.** The result is snapped to Turo's plans (60–90) and only trusted within two points of one. Otherwise the car's own setting is used, then 75%.
+- **Checked against both receipts.** 61326853 and 61569129 both read back as 65%, and the owner comes to $46.98 and $59.27, matching the split sheets.
+
 ## v1.56.1 - 2026-10-08
 
 ### The new-car list says the Turo plan % is still blank

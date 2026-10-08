@@ -323,7 +323,7 @@ export function sumFeeColumnsAtGuestPrice(
   for (const order of orders) {
     const financials = parseImportedOrderMetadata(order.sourceMetadata)?.financials;
     if (!financials) continue;
-    const basis = retentionBasisFor("guest", order.planPercent);
+    const basis = retentionBasisFor("guest", order.planPercent, order.sourceMetadata);
     const plan = basis.kind === "guest" ? basis.planPercent : DEFAULT_TURO_PLAN_PERCENT;
     for (const fee of FEE_CATALOGUE) {
       totals[fee.column] += (parseNumberValue(financials[fee.column]) ?? 0) / hostShareOf(fee.column, plan);
@@ -467,15 +467,72 @@ export const RETENTION_BASES = ["payout", "guest"] as const;
 /** Read when a car has no plan set: most of the fleet is on Turo's 75% plan. */
 export const DEFAULT_TURO_PLAN_PERCENT = 75;
 
+/**
+ * The plan this trip actually ran on, read back from its own export row.
+ * A car's plan can change -- XD361J ran September on 65% and is on 75%
+ * now -- and the export has no plan column, so the car's current setting
+ * would gross a past trip up at the wrong rate. The trip's plan is first,
+ * the car's setting second, 75 last.
+ */
 export function retentionBasisFor(
   ownerBasis: string | null | undefined,
   vehiclePlanPercent: number | null | undefined,
+  sourceMetadata?: string | null,
 ): RetentionBasis {
   if (ownerBasis !== "guest") return { kind: "payout" };
-  const plan = vehiclePlanPercent && vehiclePlanPercent > 0 && vehiclePlanPercent <= 100
-    ? vehiclePlanPercent
-    : DEFAULT_TURO_PLAN_PERCENT;
+  const inferred = inferTripPlanPercent(sourceMetadata);
+  const plan =
+    inferred ??
+    (vehiclePlanPercent && vehiclePlanPercent > 0 && vehiclePlanPercent <= 100
+      ? vehiclePlanPercent
+      : DEFAULT_TURO_PLAN_PERCENT);
   return { kind: "guest", planPercent: plan };
+}
+
+/** The tax Turo charges on its own fees in BC: GST 5% + PST 7%. */
+const TURO_FEE_TAX_RATE = 0.12;
+/** Turo's earnings plans, as the share the host keeps. */
+const TURO_PLAN_PERCENTS = [60, 65, 70, 75, 80, 85, 90];
+
+/**
+ * Work out a trip's earnings plan from its export row.
+ *
+ * "Sales tax" is the GST and PST on Turo's fee, so the fee is the tax
+ * over 12%. Of that fee, delivery and extras carried a flat 10% (a
+ * ninth of what they paid out); the rest was the plan's cut of the
+ * plan-priced charges, whose payout is p and whose fee is 1 − p of the
+ * same guest price. So p = plan payout ÷ (plan payout + plan fee).
+ *
+ * Snapped to Turo's plans, and only trusted within two points of one:
+ * a trip with no tax line, a refund, or a tax rate other than BC's
+ * gives null, and the car's own setting is used instead.
+ *
+ * Reservation 61569129: 73.45 + 3.67 − 7.71 = 69.41 paid out on the
+ * plan; tax 4.49 → fee 37.42; 69.41 ÷ 106.83 = 0.650 → 65%.
+ */
+export function inferTripPlanPercent(sourceMetadata?: string | null): number | null {
+  const financials = parseImportedOrderMetadata(sourceMetadata)?.financials;
+  if (!financials) return null;
+  const value = (column: string) => parseNumberValue(financials[column]) ?? 0;
+
+  let planPayout = 0;
+  for (const column of PLAN_COLUMNS) {
+    const amount = value(column);
+    const isDiscount = FEE_CATALOGUE.find((fee) => fee.column === column)?.group === "discount";
+    planPayout += isDiscount ? -Math.abs(amount) : amount;
+  }
+  const flatPayout = [...FLAT_TEN_PERCENT_COLUMNS].reduce((sum, column) => sum + value(column), 0);
+  const tax = Math.abs(value("Sales tax"));
+  if (planPayout < 5 || tax < 0.05) return null;
+
+  const planFee = tax / TURO_FEE_TAX_RATE - Math.max(0, flatPayout) / 9;
+  if (planFee <= 0) return null;
+
+  const percent = (planPayout / (planPayout + planFee)) * 100;
+  const nearest = TURO_PLAN_PERCENTS.reduce((best, plan) =>
+    Math.abs(plan - percent) < Math.abs(best - percent) ? plan : best,
+  );
+  return Math.abs(nearest - percent) <= 2 ? nearest : null;
 }
 
 /**

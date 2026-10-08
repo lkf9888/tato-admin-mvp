@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ExternalLink, Pencil, Save, Share2, Trash2, X } from "lucide-react";
+import { Check, ExternalLink, Pencil, ReceiptText, Save, Share2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { BookingExtraChargePanel } from "@/components/booking-extra-charge-panel";
@@ -194,6 +194,7 @@ function labels(locale: Locale) {
         ownerShareSynced: "已同步给车主",
         ownerShareSync: "同步给车主共享",
         viewOnTuro: "查看Turo订单",
+        viewTuroReceipt: "查看Turo订单收据",
         ownerShareResync: "重新同步",
         ownerShareSyncing: "同步中...",
         ownerShareSyncSuccess: "已同步到车主共享。",
@@ -272,6 +273,7 @@ function labels(locale: Locale) {
         ownerShareSynced: "Shared with owner",
         ownerShareSync: "Sync to owner share",
         viewOnTuro: "View on Turo",
+        viewTuroReceipt: "View Turo receipt",
         ownerShareResync: "Resync",
         ownerShareSyncing: "Syncing...",
         ownerShareSyncSuccess: "Synced to owner share.",
@@ -494,6 +496,7 @@ export function OrderDetailModal({
   const displayPhone = maskSensitive ? maskPhone(currentOrder.renterPhone) : currentOrder.renterPhone || "-";
   const selectedOwnerId = selectedVehicle?.ownerId ?? currentOrder.ownerId ?? null;
   const turoTripUrl = turoReservationUrl({ source: currentOrder.source, externalOrderId: currentOrder.externalOrderId ?? null });
+  const turoReceiptUrl = turoReservationUrl({ source: currentOrder.source, externalOrderId: currentOrder.externalOrderId ?? null }, "receipt");
   const ownerShareSyncedAt = currentOrder.ownerLedgerSyncedAt ?? null;
 
   const updateDraft = (patch: Partial<OrderDraft>) => {
@@ -908,6 +911,19 @@ export function OrderDetailModal({
               ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
+              {turoReceiptUrl ? (
+                <a
+                  href={turoReceiptUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={t.viewTuroReceipt}
+                  aria-label={t.viewTuroReceipt}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-2.5 text-[12px] font-semibold text-[var(--ink)] transition hover:border-[var(--ink)]"
+                >
+                  <ReceiptText className="h-3.5 w-3.5" aria-hidden />
+                  <span className="hidden sm:inline">{t.viewTuroReceipt}</span>
+                </a>
+              ) : null}
               {turoTripUrl ? (
                 <a
                   href={turoTripUrl}

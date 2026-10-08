@@ -363,17 +363,20 @@ export function getNetEarningFromFinancials(
  *
  * `messages` opens the conversation with the guest. It is the same path
  * Turo's own booking mail links to and the Turo reader walks, so it is
- * known to resolve. A plain https link rather than an app scheme on
+ * known to resolve; `receipt` opens the trip's fee breakdown. A plain https link rather than an app scheme on
  * purpose: on a phone with the Turo app installed, iOS and Android open
  * turo.com links in the app, and without the app the browser still
  * works -- a custom scheme would fail outright there.
  */
 export function turoReservationUrl(
   order: { source: string; externalOrderId: string | null },
-  page: "trip" | "messages" = "trip",
+  page: "trip" | "messages" | "receipt" = "trip",
 ) {
   const reservationId = order.externalOrderId?.trim();
   if (order.source !== "turo" || !reservationId || !/^\d+$/.test(reservationId)) return null;
+  // The receipt keeps the /ca/en form the operator copies from Turo,
+  // the one form of that page known to open on this account.
+  if (page === "receipt") return `https://turo.com/ca/en/reservation/${reservationId}/receipt`;
   const base = `https://turo.com/us/en/reservation/${reservationId}`;
   return page === "messages" ? `${base}/messages` : base;
 }

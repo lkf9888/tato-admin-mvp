@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.57.4 - 2026-10-08
+
+### A Turo trip's receipt is one tap from its detail panel
+
+The order detail panel gains a "View Turo receipt" button, left of "View on
+Turo", that opens the reservation's receipt page on turo.com -- the fee
+breakdown an operator checks when an owner's net looks off. It appears only
+on Turo trips with a numeric reservation id, like the trip link. The receipt
+uses the `/ca/en/.../receipt` form copied from Turo, the one known to open on
+this account; the trip and messages links keep `/us/en`.
+
 ## v1.57.3 - 2026-10-08
 
 ### Turo-sync and message screens read in dark mode; search boxes stay empty; push without pulling

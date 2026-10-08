@@ -11,6 +11,7 @@ import {
   resolveFeeTarget,
   resolveWorkspaceLedgerPolicy,
   sumFeeColumns,
+  sumFeeColumnsAtGuestPrice,
 } from "@/lib/ledger-policy";
 import { getOrderNetEarning } from "@/lib/utils";
 
@@ -76,9 +77,12 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
       vehicle: { ownerId: owner.id },
       sourceMetadata: { not: null },
     },
-    select: { sourceMetadata: true, totalPrice: true },
+    select: { sourceMetadata: true, totalPrice: true, vehicle: { select: { turoPlanPercent: true } } },
   });
   const feeTotals = sumFeeColumns(ownerOrders);
+  const feeGuestTotals = sumFeeColumnsAtGuestPrice(
+    ownerOrders.map((order) => ({ sourceMetadata: order.sourceMetadata, planPercent: order.vehicle.turoPlanPercent })),
+  );
   const payoutTotal =
     Math.round(
       ownerOrders.reduce(
@@ -129,6 +133,8 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
       }))}
       feeRows={feeRows}
       feeTotals={feeTotals}
+      feeGuestTotals={feeGuestTotals}
+      retentionBasis={owner.retentionBasis === "guest" ? "guest" : "payout"}
       payoutTotal={payoutTotal}
       feeOrderCount={ownerOrders.length}
       assignedVehicleIds={owner.vehicles.map((vehicle) => vehicle.id)}

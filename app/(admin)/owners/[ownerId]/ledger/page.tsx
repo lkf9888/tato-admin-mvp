@@ -11,6 +11,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import {
   getManagerRetentionByFee,
+  retentionBasisFor,
   parseFeeShareOverrides,
   resolveWorkspaceLedgerPolicy,
 } from "@/lib/ledger-policy";
@@ -84,6 +85,7 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
           // not forwarded to the owner-facing share view.
           sourceMetadata: true,
           totalPrice: true,
+          vehicle: { select: { turoPlanPercent: true } },
         },
       },
     },
@@ -108,7 +110,12 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
       item.order.totalPrice,
     );
     if (gross == null) continue;
-    const retention = getManagerRetentionByFee(item.order.sourceMetadata, policy, overrides);
+    const retention = getManagerRetentionByFee(
+      item.order.sourceMetadata,
+      policy,
+      overrides,
+      retentionBasisFor(owner.retentionBasis, item.order.vehicle?.turoPlanPercent),
+    );
     if (retention.lines.length === 0) continue;
     breakdownByItemId[item.id] = {
       gross,

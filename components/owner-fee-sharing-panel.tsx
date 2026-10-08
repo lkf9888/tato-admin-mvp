@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { ActionSubmitButton } from "@/components/action-submit-button";
 import { InfoHint } from "@/components/info-hint";
-import { saveOwnerFeeSharingAction } from "@/app/actions";
+import { applyRetentionBasisToAllOwnersAction, saveOwnerFeeSharingAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
 import { formatCurrency } from "@/lib/utils";
 
@@ -31,6 +31,16 @@ function copy(locale: Locale) {
         withheld: "公司留下",
         overrideTag: "例外",
         save: "保存费用共享设置",
+        basisTitle: "公司留下的费用怎么扣",
+        basisGuest: "按客人付的价格",
+        basisGuestHint: "送车费 ÷0.9，Boost、超里程等 ÷车辆的 Turo 计划比例。Turo 对这些费用的抽成算在车主那边，和分成表一致。",
+        basisPayout: "按 Turo 到账金额",
+        basisPayoutHint: "Turo 对这些费用的抽成由公司承担。",
+        applyAll: "把这个口径应用到所有车主",
+        applyAllConfirm: (label: string) => `确定把所有车主都改成「${label}」，并重算他们的账吗？`,
+        applyAllYes: "确定，全部应用",
+        applyAllNo: "取消",
+        applyAllWorking: "正在重算所有车主…",
         saving: "保存中…",
         saved: "已保存,并已重算这位车主的订单",
         calcTitle: "净收益计算",
@@ -66,6 +76,16 @@ function copy(locale: Locale) {
         withheld: "Company keeps",
         overrideTag: "exception",
         save: "Save fee sharing",
+        basisTitle: "How kept fees come off",
+        basisGuest: "At the price the guest paid",
+        basisGuestHint: "Delivery ÷0.9; boost, excess distance and the like ÷ the car's Turo plan. Turo's cut on them stays with the owner, as on the split sheets.",
+        basisPayout: "At what Turo paid out",
+        basisPayoutHint: "The company absorbs Turo's cut on what it keeps.",
+        applyAll: "Use this for every owner",
+        applyAllConfirm: (label: string) => `Switch every owner to "${label}" and recalculate their statements?`,
+        applyAllYes: "Yes, apply to all",
+        applyAllNo: "Cancel",
+        applyAllWorking: "Recalculating every owner…",
         saving: "Saving…",
         saved: "Saved — this owner’s orders were resynced",
         calcTitle: "Net earning, worked out",
@@ -126,7 +146,9 @@ export function OwnerFeeSharingPanel({
   locale,
   ownerId,
   rows,
-  totals,
+  totals: payoutTotals,
+  guestTotals,
+  retentionBasis,
   payoutTotal,
   orderCount,
 }: {
@@ -134,6 +156,9 @@ export function OwnerFeeSharingPanel({
   ownerId: string;
   rows: FeeShareRow[];
   totals: Record<string, number>;
+  /** The same columns at what guests paid, for the guest-price basis. */
+  guestTotals: Record<string, number>;
+  retentionBasis: "payout" | "guest";
   payoutTotal: number;
   orderCount: number;
 }) {
@@ -156,6 +181,10 @@ export function OwnerFeeSharingPanel({
   // leaves the list at the length of the actual agreement; the switch
   // brings them back for anyone setting terms ahead of the money.
   const [onlyUsed, setOnlyUsed] = useState(true);
+  const [basis, setBasis] = useState<"payout" | "guest">(retentionBasis);
+  const [confirmAll, setConfirmAll] = useState(false);
+  // What the company would take off, column by column, on the basis chosen.
+  const totals = basis === "guest" ? guestTotals : payoutTotals;
 
   const amountOf = (column: string) => totals[column] ?? 0;
   const hasAmount = (column: string) => Math.abs(amountOf(column)) >= 0.005;
@@ -183,7 +212,7 @@ export function OwnerFeeSharingPanel({
       net: Math.round((payoutTotal - withheld) * 100) / 100,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [choices, rows, totals, payoutTotal]);
+  }, [choices, rows, totals, payoutTotal, basis]);
 
   const hasAbsorbed = calculation.deductions.some((line) => line.amount < 0);
 
@@ -295,7 +324,49 @@ export function OwnerFeeSharingPanel({
             />
           ))}
 
+        <fieldset className="space-y-1.5 rounded-md border border-[var(--line)] p-3">
+          <legend className="px-1 text-[10px] uppercase tracking-[0.22em] text-[var(--ink-soft)]">{t.basisTitle}</legend>
+          {(["guest", "payout"] as const).map((value) => (
+            <label key={value} className="flex cursor-pointer items-start gap-2 text-[12px] text-[var(--ink)]">
+              <input
+                type="radio"
+                name="retentionBasis"
+                value={value}
+                checked={basis === value}
+                onChange={() => setBasis(value)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-semibold">{value === "guest" ? t.basisGuest : t.basisPayout}</span>
+                <span className="block text-[11px] leading-4 text-[var(--ink-soft)]">
+                  {value === "guest" ? t.basisGuestHint : t.basisPayoutHint}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+
         <ActionSubmitButton label={t.save} pendingLabel={t.saving} savedLabel={t.saved} />
+      </form>
+
+      {/* The basis is usually one agreement for the whole fleet. Confirmed
+          inline rather than with a browser dialog, and it recalculates
+          every owner's statement, so it says so before it runs. */}
+      <form action={applyRetentionBasisToAllOwnersAction} className="flex flex-wrap items-center gap-2 text-[12px]">
+        <input type="hidden" name="retentionBasis" value={basis} />
+        {confirmAll ? (
+          <>
+            <span className="text-[var(--ink)]">{t.applyAllConfirm(basis === "guest" ? t.basisGuest : t.basisPayout)}</span>
+            <ActionSubmitButton label={t.applyAllYes} pendingLabel={t.applyAllWorking} savedLabel={t.saved} />
+            <button type="button" className="underline" onClick={() => setConfirmAll(false)}>
+              {t.applyAllNo}
+            </button>
+          </>
+        ) : (
+          <button type="button" className="text-[var(--brand)] underline underline-offset-2" onClick={() => setConfirmAll(true)}>
+            {t.applyAll}
+          </button>
+        )}
       </form>
 
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">

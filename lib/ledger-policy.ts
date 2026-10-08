@@ -308,6 +308,34 @@ export function sumFeeColumns(
   return totals;
 }
 
+/**
+ * The same totals with each column turned back into what guests paid,
+ * per order at that order's car's plan -- for an owner whose kept fees
+ * come off at the guest's price, so the page's calculator matches what
+ * the ledger will deduct.
+ */
+export function sumFeeColumnsAtGuestPrice(
+  orders: Array<{ sourceMetadata: string | null; planPercent: number | null | undefined }>,
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const fee of FEE_CATALOGUE) totals[fee.column] = 0;
+
+  for (const order of orders) {
+    const financials = parseImportedOrderMetadata(order.sourceMetadata)?.financials;
+    if (!financials) continue;
+    const basis = retentionBasisFor("guest", order.planPercent);
+    const plan = basis.kind === "guest" ? basis.planPercent : DEFAULT_TURO_PLAN_PERCENT;
+    for (const fee of FEE_CATALOGUE) {
+      totals[fee.column] += (parseNumberValue(financials[fee.column]) ?? 0) / hostShareOf(fee.column, plan);
+    }
+  }
+
+  for (const column of Object.keys(totals)) {
+    totals[column] = Math.round(totals[column] * 100) / 100;
+  }
+  return totals;
+}
+
 export type OrderFeeLine = {
   column: string;
   group: FeeGroup;
@@ -399,20 +427,84 @@ export function getManagerRetentionByFee(
   sourceMetadata: string | null | undefined,
   policy: WorkspaceLedgerPolicy,
   overrides: Record<string, string> | null,
-): { total: number; lines: Array<{ column: string; amount: number }> } {
+  basis: RetentionBasis = { kind: "payout" },
+): { total: number; lines: Array<{ column: string; amount: number; payoutAmount: number }> } {
   const financials = parseImportedOrderMetadata(sourceMetadata)?.financials;
   if (!financials) return { total: 0, lines: [] };
 
-  const lines: Array<{ column: string; amount: number }> = [];
+  const lines: Array<{ column: string; amount: number; payoutAmount: number }> = [];
   let total = 0;
 
   for (const column of SHAREABLE_FEE_COLUMNS) {
-    const amount = parseNumberValue(financials[column]) ?? 0;
-    if (Math.abs(amount) < 0.005) continue;
+    const payoutAmount = parseNumberValue(financials[column]) ?? 0;
+    if (Math.abs(payoutAmount) < 0.005) continue;
     if (resolveFeeTarget(column, policy, overrides) !== LedgerShareTarget.MANAGER) continue;
-    lines.push({ column, amount });
+    const amount =
+      basis.kind === "guest"
+        ? Math.round((payoutAmount / hostShareOf(column, basis.planPercent)) * 100) / 100
+        : payoutAmount;
+    lines.push({ column, amount, payoutAmount });
     total += amount;
   }
 
-  return { total, lines };
+  return { total: Math.round(total * 100) / 100, lines };
+}
+
+/**
+ * How a kept fee comes off an owner's revenue.
+ *
+ * Turo's export writes every charge at what reached the host, after
+ * Turo's cut: an $80 delivery fee arrives as $72. "payout" deducts that
+ * $72, so the company absorbs Turo's cut on money it keeps. "guest"
+ * deducts the $80 the guest paid, so the cut stays with the trip's
+ * revenue -- the owner's -- which is how the owner split sheets have
+ * always been drawn up.
+ */
+export type RetentionBasis = { kind: "payout" } | { kind: "guest"; planPercent: number };
+
+export const RETENTION_BASES = ["payout", "guest"] as const;
+
+/** Read when a car has no plan set: most of the fleet is on Turo's 75% plan. */
+export const DEFAULT_TURO_PLAN_PERCENT = 75;
+
+export function retentionBasisFor(
+  ownerBasis: string | null | undefined,
+  vehiclePlanPercent: number | null | undefined,
+): RetentionBasis {
+  if (ownerBasis !== "guest") return { kind: "payout" };
+  const plan = vehiclePlanPercent && vehiclePlanPercent > 0 && vehiclePlanPercent <= 100
+    ? vehiclePlanPercent
+    : DEFAULT_TURO_PLAN_PERCENT;
+  return { kind: "guest", planPercent: plan };
+}
+
+/**
+ * Turo takes a flat 10% of delivery and extras whatever the car's
+ * plan (a 65%-plan BMW's $80 delivery paid out $72).
+ */
+const FLAT_TEN_PERCENT_COLUMNS = new Set(["Delivery", "Extras"]);
+
+/**
+ * Charged at the car's plan, like the trip price itself: the boost and
+ * every discount are adjustments to the trip price, and distance and
+ * time beyond the booking, and a late return, are priced as more trip.
+ */
+const PLAN_COLUMNS = new Set([
+  "Trip price",
+  "Boost price",
+  "Additional usage",
+  "Excess distance",
+  "Late fee",
+  ...FEE_CATALOGUE.filter((fee) => fee.group === "discount").map((fee) => fee.column),
+]);
+
+/**
+ * The share of what the guest paid for a column that reached the host.
+ * Everything not listed -- reimbursements, airport fees, the other
+ * penalties, sales tax -- Turo passes through whole.
+ */
+export function hostShareOf(column: string, planPercent: number) {
+  if (FLAT_TEN_PERCENT_COLUMNS.has(column)) return 0.9;
+  if (PLAN_COLUMNS.has(column)) return planPercent / 100;
+  return 1;
 }

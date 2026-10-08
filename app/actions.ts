@@ -160,6 +160,7 @@ const vehicleSchema = z.object({
   purchasePrice: z.coerce.number().nonnegative().optional(),
   ownerCommissionRate: z.coerce.number().min(0).max(100).optional(),
   cleaningFee: z.coerce.number().nonnegative().optional(),
+  turoPlanPercent: z.coerce.number().int().min(1).max(100).optional(),
   pickupPassword: z.string().optional(),
   bookingTaxName: z.string().optional(),
   bookingTaxRate: z.coerce.number().min(0).max(100).optional(),
@@ -1184,10 +1185,13 @@ export async function saveOwnerFeeSharingAction(formData: FormData) {
     overrides[column] = raw;
   }
 
+  const retentionBasis = formData.get("retentionBasis")?.toString() === "guest" ? "guest" : "payout";
+
   await prisma.owner.update({
     where: { id: owner.id },
     data: {
       feeShareOverrides: Object.keys(overrides).length > 0 ? JSON.stringify(overrides) : null,
+      retentionBasis,
     },
   });
 
@@ -1199,7 +1203,35 @@ export async function saveOwnerFeeSharingAction(formData: FormData) {
     action: "owner_fee_sharing_saved",
     entityType: "Owner",
     entityId: owner.id,
-    metadata: { name: owner.name, overrides, resyncedOrders: resynced.orderCount },
+    metadata: { name: owner.name, overrides, retentionBasis, resyncedOrders: resynced.orderCount },
+  });
+
+  revalidateAdminPages();
+}
+
+/**
+ * One basis for kept fees across every owner on the workspace, and
+ * every owner's statement recalculated on it.
+ */
+export async function applyRetentionBasisToAllOwnersAction(formData: FormData) {
+  const { workspace, user } = await requireSectionContext("/owners");
+  const retentionBasis = formData.get("retentionBasis")?.toString() === "guest" ? "guest" : "payout";
+
+  const owners = await prisma.owner.findMany({ where: { workspaceId: workspace.id }, select: { id: true } });
+  await prisma.owner.updateMany({ where: { workspaceId: workspace.id }, data: { retentionBasis } });
+
+  let resyncedOrders = 0;
+  for (const owner of owners) {
+    resyncedOrders += (await syncOwnerLedger(owner.id, workspace.id)).orderCount;
+  }
+
+  await logActivity({
+    workspaceId: workspace.id,
+    actor: user.name,
+    action: "owner_retention_basis_applied",
+    entityType: "Owner",
+    entityId: workspace.id,
+    metadata: { retentionBasis, owners: owners.length, resyncedOrders },
   });
 
   revalidateAdminPages();
@@ -1361,6 +1393,7 @@ export async function saveVehicleAction(formData: FormData) {
     purchasePrice: cleanOptional(formData.get("purchasePrice")),
     ownerCommissionRate: cleanOptional(formData.get("ownerCommissionRate")),
     cleaningFee: cleanOptional(formData.get("cleaningFee")),
+    turoPlanPercent: cleanOptional(formData.get("turoPlanPercent")),
     pickupPassword: cleanOptional(formData.get("pickupPassword")),
     bookingTaxName: cleanOptional(formData.get("bookingTaxName")),
     bookingTaxRate: cleanOptional(formData.get("bookingTaxRate")),
@@ -1379,7 +1412,7 @@ export async function saveVehicleAction(formData: FormData) {
   const parsed = result.data;
   // A car-limited member edits their own cars and adds none.
   assertVehicleInScope(vehicleIds, parsed.id);
-  const { id, ownerCommissionRate, cleaningFee, bookingTaxRate, ...vehicleData } = parsed;
+  const { id, ownerCommissionRate, cleaningFee, bookingTaxRate, turoPlanPercent, ...vehicleData } = parsed;
   const normalizedVehicleData = {
     ...vehicleData,
     // 停用 and 归档 are one thing now: archived. A form still carrying
@@ -1396,6 +1429,9 @@ export async function saveVehicleAction(formData: FormData) {
       ownerCommissionRate == null ? null : +(ownerCommissionRate / 100).toFixed(4),
     cleaningFee: roundCurrencyAmount(cleaningFee),
     bookingTaxRate: bookingTaxRate == null ? null : +bookingTaxRate.toFixed(3),
+    // Only from a form that has the field, so one that does not (an
+    // older dialog, a script) cannot clear a plan already set.
+    ...(formData.has("turoPlanPercent") ? { turoPlanPercent: turoPlanPercent ?? null } : {}),
   };
 
   const existingVehicle = id

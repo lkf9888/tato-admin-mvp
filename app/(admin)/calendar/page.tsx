@@ -179,6 +179,7 @@ export default async function CalendarPage() {
           purchasePrice: vehicle.purchasePrice,
           ownerCommissionRate: vehicle.ownerCommissionRate,
           cleaningFee: vehicle.cleaningFee,
+          turoPlanPercent: vehicle.turoPlanPercent,
           pickupPassword: vehicle.pickupPassword,
           bookingTaxName: vehicle.bookingTaxName,
           bookingTaxRate: vehicle.bookingTaxRate,

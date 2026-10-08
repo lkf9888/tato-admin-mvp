@@ -279,6 +279,10 @@ model Owner {
   /// and a fee added to the catalogue later inherits the workspace
   /// default instead of silently defaulting to withheld.
   feeShareOverrides String?
+  /// How fees the company keeps come off this owner's revenue: "guest"
+  /// at the price the guest paid (Turo's cut on them is the owner's),
+  /// anything else at what Turo paid out (the company eats the cut).
+  retentionBasis    String?
   notes             String?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
@@ -322,6 +326,10 @@ model Vehicle {
   purchasePrice                Float?
   ownerCommissionRate          Float?
   cleaningFee                  Float?
+  /// The car's Turo earnings plan, as the percent of the trip the host
+  /// keeps (65, 75, 90...). Used to turn a kept fee back into what the
+  /// guest paid; null reads as 75.
+  turoPlanPercent              Int?
   pickupPassword               String?
   directBookingEnabled         Boolean                  @default(false)
   bookingDailyRate             Float?

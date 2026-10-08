@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.56.0 - 2026-10-08
+
+### Kept fees can come off an owner's revenue at the price the guest paid
+
+Turo's export records each charge after Turo's cut. An $80 delivery fee on reservation 61326853 arrived as $72, so a company keeping it took $72 off the owner, and the owner's revenue came to $54.98. The owner split sheets take the $80 the guest paid, and come to $46.98. In that version Turo's cut on the delivery stays with the trip's revenue, the owner's, rather than the company absorbing it.
+
+- **A choice per owner.** "公司留下的费用怎么扣" on the owner's fee-sharing panel offers two options. 按客人付的价格 turns each kept fee back into what the guest paid: Delivery and Extras ÷0.9, which is Turo's flat 10%. Boost, every discount, Excess distance, Additional usage and the Late fee are divided by the car's plan. Reimbursements, airport fees, other penalties and sales tax pass through unchanged. 按 Turo 到账金额 keeps the previous behaviour. An owner with nothing set stays on the payout amount, so no workspace changes until it chooses.
+- **Use this for every owner** sets the same basis on all owners at once and recalculates their statements. It asks for confirmation on the page first.
+- **The car's Turo plan.** Vehicles gain "Turo 计划比例 %", the share of the trip the host keeps (65, 75, 90…). It is used only to gross up plan-priced fees, and a blank reads as 75. A form that does not carry the field leaves a plan already set alone.
+- **Checking the numbers.** The owner page's net-earning calculator follows the basis chosen. The admin ledger's breakdown shows "到账 72.00，按客人价扣" beside each fee deducted at the guest's price.
+
 ## v1.55.0 - 2026-10-07
 
 ### Dashboard: recently viewed orders, a folded activity list, return locations

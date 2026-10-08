@@ -244,6 +244,15 @@ export default async function VehiclesPage({
               placeholder={vehicleMessages.placeholders.cleaningFee}
               className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2"
             />
+            <input
+              name="turoPlanPercent"
+              type="number"
+              min="1"
+              max="100"
+              step="1"
+              placeholder={vehicleMessages.placeholders.turoPlanPercent}
+              className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2"
+            />
           </VehicleFormSection>
 
           <VehicleFormSection title={vehicleSectionLabels.booking} gridClassName="md:grid-cols-2 xl:grid-cols-4">
@@ -415,6 +424,7 @@ export default async function VehiclesPage({
                           purchasePrice: vehicle.purchasePrice,
                           ownerCommissionRate: vehicle.ownerCommissionRate,
                           cleaningFee: vehicle.cleaningFee,
+                          turoPlanPercent: vehicle.turoPlanPercent,
                           pickupPassword: vehicle.pickupPassword,
                           bookingTaxName: vehicle.bookingTaxName,
                           bookingTaxRate: vehicle.bookingTaxRate,

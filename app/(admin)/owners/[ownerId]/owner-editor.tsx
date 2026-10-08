@@ -131,6 +131,8 @@ export function OwnerEditor({
   commissionRules,
   feeRows,
   feeTotals,
+  feeGuestTotals,
+  retentionBasis,
   payoutTotal,
   feeOrderCount,
   locale,
@@ -141,6 +143,8 @@ export function OwnerEditor({
   commissionRules: CommissionRuleRow[];
   feeRows: FeeShareRow[];
   feeTotals: Record<string, number>;
+  feeGuestTotals: Record<string, number>;
+  retentionBasis: "payout" | "guest";
   payoutTotal: number;
   feeOrderCount: number;
   locale: Locale;
@@ -348,6 +352,8 @@ export function OwnerEditor({
         ownerId={owner.id}
         rows={feeRows}
         totals={feeTotals}
+        guestTotals={feeGuestTotals}
+        retentionBasis={retentionBasis}
         payoutTotal={payoutTotal}
         orderCount={feeOrderCount}
       />

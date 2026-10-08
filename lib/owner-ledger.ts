@@ -7,6 +7,7 @@ import {
 
 import {
   getManagerRetentionByFee,
+  retentionBasisFor,
   parseFeeShareOverrides,
   resolveWorkspaceLedgerPolicy,
   type LedgerShareCategory,
@@ -106,12 +107,13 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
   // their totals are unchanged; an owner with exceptions gets them.
   const owner = await db.owner.findUnique({
     where: { id: order.vehicle.ownerId },
-    select: { feeShareOverrides: true },
+    select: { feeShareOverrides: true, retentionBasis: true },
   });
   const retention = getManagerRetentionByFee(
     order.sourceMetadata,
     policy,
     parseFeeShareOverrides(owner?.feeShareOverrides),
+    retentionBasisFor(owner?.retentionBasis, order.vehicle.turoPlanPercent),
   );
   const retainedAmount = roundLedgerAmount(Math.min(retention.total, Math.max(0, netEarning ?? 0)));
 

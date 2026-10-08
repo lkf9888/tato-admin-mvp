@@ -121,6 +121,7 @@ function copy(locale: Locale, operatorName: string) {
         balance: "余额",
         breakdownToggle: "计算明细(内部)",
         breakdownGross: "Turo 打款",
+        breakdownPaidOut: (amount: string) => `（到账 ${amount}，按客人价扣）`,
         breakdownNet: "车主净收益",
         debit: "支出（车主抵扣）",
         auto: "auto",
@@ -211,6 +212,7 @@ function copy(locale: Locale, operatorName: string) {
         balance: "Balance",
         breakdownToggle: "How this was calculated (internal)",
         breakdownGross: "Turo payout",
+        breakdownPaidOut: (amount: string) => ` (paid out ${amount}; deducted at guest price)`,
         breakdownNet: "Owner net earning",
         debit: "Deductions",
         auto: "auto",
@@ -299,7 +301,12 @@ function sortLedgerItems(items: LedgerItem[]) {
 /** How a net-earning line was arrived at, keyed by ledger item id. */
 export type NetEarningBreakdown = Record<
   string,
-  { gross: number; withheld: Array<{ column: string; amount: number }>; net: number }
+  {
+    gross: number;
+    /** `payoutAmount`: what Turo paid out for it, when the deduction is at the guest's price. */
+    withheld: Array<{ column: string; amount: number; payoutAmount?: number }>;
+    net: number;
+  }
 >;
 
 export function OwnerLedgerManager({
@@ -673,7 +680,14 @@ function LedgerRows({
                           </tr>
                           {breakdown[item.id].withheld.map((line) => (
                             <tr key={line.column}>
-                              <td className="py-0.5 pl-2 text-[var(--ink-soft)]">− {line.column}</td>
+                              <td className="py-0.5 pl-2 text-[var(--ink-soft)]">
+                                − {line.column}
+                                {line.payoutAmount != null && Math.abs(line.payoutAmount - line.amount) >= 0.005 ? (
+                                  <span className="text-[10px]">
+                                    {labels.breakdownPaidOut(formatCurrency(line.payoutAmount, locale))}
+                                  </span>
+                                ) : null}
+                              </td>
                               <td className="py-0.5 text-right tabular-nums text-amber-700">
                                 −{formatCurrency(line.amount, locale)}
                               </td>

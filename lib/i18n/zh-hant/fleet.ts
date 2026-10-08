@@ -21,6 +21,7 @@ export const fleetMessages = {
         purchasePrice: "購買價格",
         ownerCommissionRate: "TATO 佣金比例 %（車主分成）",
         cleaningFee: "洗車費",
+        turoPlanPercent: "Turo 計劃比例 %（車主拿到的比例，空著按 75）",
         pickupPassword: "取車密碼",
         bookingTaxName: "預訂稅種",
         bookingTaxRate: "預訂稅率 %",

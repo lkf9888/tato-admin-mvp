@@ -26,6 +26,7 @@ export type VehicleEditDialogVehicle = {
   purchasePrice?: number | null;
   ownerCommissionRate?: number | null;
   cleaningFee?: number | null;
+  turoPlanPercent?: number | null;
   pickupPassword?: string | null;
   bookingTaxName?: string | null;
   bookingTaxRate?: number | null;
@@ -226,6 +227,18 @@ export function VehicleEditDialog({
                 min="0"
                 step="0.01"
                 defaultValue={vehicle.cleaningFee ?? ""}
+                className={fieldClass}
+              />
+            </DialogField>
+            <DialogField label={messages.placeholders.turoPlanPercent}>
+              <input
+                name="turoPlanPercent"
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+                placeholder="75"
+                defaultValue={vehicle.turoPlanPercent ?? ""}
                 className={fieldClass}
               />
             </DialogField>

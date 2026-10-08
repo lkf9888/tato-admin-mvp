@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.57.2 - 2026-10-08
+
+### Translucent tints read in dark mode
+
+Dark mode remaps the light amber, emerald, rose and sky tints by exact
+class name (`.bg-amber-50`), so the translucent forms -- `bg-rose-50/70`,
+`bg-amber-50/50`, `border-amber-200/70` -- kept their cream backgrounds
+behind text that dark mode had already turned light, and were nearly
+unreadable. They now map to the same dark warn/ok/bad surfaces and
+borders, in both the explicit dark theme and the system one. The rules
+match a class only at the start of the attribute or after a space, so
+variant forms such as `hover:bg-amber-50/50` are left alone rather than
+painted permanently.
+
 ## v1.57.1 - 2026-10-08
 
 ### The booking and contracts admin reads in dark mode

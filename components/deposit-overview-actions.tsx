@@ -116,7 +116,7 @@ export function DepositOverviewActions({
             type="button"
             onClick={() => setMode("settle")}
             className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white"
-            style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+            style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
           >
             {viaStripe ? copy.settleStripe : copy.settleManual}
           </button>
@@ -149,7 +149,7 @@ export function DepositOverviewActions({
             <input value={to} maxLength={200} placeholder={copy.refundToPlaceholder} onChange={(e) => setTo(e.target.value)} className={field} />
           </label>
           <div className="flex gap-2 sm:col-span-4">
-            <button type="button" disabled={pending} onClick={saveDetails} className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}>
+            <button type="button" disabled={pending} onClick={saveDetails} className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}>
               <BusyLabel busy={pending} idle={copy.save} working={working} />
             </button>
             <button type="button" onClick={() => setMode("idle")} className="rounded-md border border-[color:var(--line)] bg-white px-3 py-1.5 text-[12px]">
@@ -170,7 +170,7 @@ export function DepositOverviewActions({
             <input value={note} maxLength={1000} disabled={kept === 0} onChange={(e) => setNote(e.target.value)} className={`${field} disabled:opacity-50`} />
           </label>
           <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
-            <button type="button" disabled={pending} onClick={settle} className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}>
+            <button type="button" disabled={pending} onClick={settle} className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}>
               <BusyLabel
                 busy={pending}
                 idle={viaStripe ? copy.settleStripe.replace("…", "") : copy.settleManual.replace("…", "")}

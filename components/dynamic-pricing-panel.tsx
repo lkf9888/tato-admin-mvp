@@ -242,7 +242,7 @@ export function DynamicPricingPanel({
         </details>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button type="button" disabled={pending} onClick={save} className={primary} style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}>
+          <button type="button" disabled={pending} onClick={save} className={primary} style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}>
             <BusyLabel busy={busy === "save"} idle={copy.save} working={copy.saving} />
           </button>
           <button
@@ -259,7 +259,7 @@ export function DynamicPricingPanel({
               disabled={pending || !settings.enabled}
               onClick={() => run("apply", async () => ((await send("POST", { action: "apply" })) ? "" : null))}
               className={primary}
-              style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+              style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
             >
               <BusyLabel busy={busy === "apply"} idle={copy.applyAll(suggestions.length)} working={working} />
             </button>

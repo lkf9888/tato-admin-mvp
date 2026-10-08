@@ -167,7 +167,7 @@ export function DirectBookingCancelPanel({
               onClick={() => void submit()}
               disabled={busy || invalid}
               className="rounded-md px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
-              style={{ backgroundColor: "var(--bad-fg)", color: "#ffffff" }}
+              style={{ backgroundColor: "var(--bad-fg)", color: "var(--surface)" }}
             >
               <BusyLabel busy={busy} idle={copy.submit(money(amount))} working={copy.working} />
             </button>

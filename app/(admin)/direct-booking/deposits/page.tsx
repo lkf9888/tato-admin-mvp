@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DepositOverviewActions } from "@/components/deposit-overview-actions";
 import { DirectBookingSubpageFrame } from "@/components/direct-booking-subpage-frame";
 import { requireCurrentWorkspace } from "@/lib/auth";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 import { formatBookingMoment, utcToZonedDate } from "@/lib/booking-time";
 import { DEPOSIT_RETURN_DAYS, listDeposits, type DepositRow } from "@/lib/direct-booking-deposits";
 import { getI18n } from "@/lib/i18n-server";
@@ -82,6 +83,8 @@ export default async function DepositsPage({ searchParams }: { searchParams: Sea
             {history ? <input type="hidden" name="history" value="1" /> : null}
             <input
               name="q"
+              type="search"
+              {...SEARCH_FIELD_PROPS}
               defaultValue={query.q ?? ""}
               placeholder={copy.searchPlaceholder}
               className="h-8 min-w-0 flex-1 rounded-md border border-[color:var(--line)] bg-white px-2 text-[12px] sm:max-w-xs"

@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.57.1 - 2026-10-08
+
+### The booking and contracts admin reads in dark mode
+
+Dark mode (v1.57.0) recolours through CSS variables and a few class
+overrides, but twenty of this area's primary buttons set their colours in
+an inline style -- `backgroundColor: var(--ink)` with white text -- which
+no stylesheet rule can override: in dark mode `--ink` turns near-white and
+the buttons became white on white. Their text now uses `var(--surface)`,
+white in light mode as before and dark on the light button in dark mode.
+Fixed light warning and error boxes (payouts, contracts, coupon chips, the
+save bar's unsaved state) and the contracts page's blue links now use the
+theme's variables, and dynamic prices on the calendar are drawn in the
+brand colour instead of sky-700 (the price toggle's hint says purple now).
+The deposits and fleet-table search boxes take `SEARCH_FIELD_PROPS`, so
+password managers stop filling them. Checked with a contrast pass on nine
+pages in dark mode: nothing under 3:1.
+
 ## v1.57.0 - 2026-10-08
 
 ### Bulk actions, first-run checklist, English error pages, quieter search boxes, and an optional dark mode

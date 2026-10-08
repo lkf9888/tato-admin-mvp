@@ -134,7 +134,7 @@ export function BookingLocationsEditor({
         <button
           type="submit"
           className="rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white"
-          style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+          style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
         >
           {copy.locationsSaveAction}
         </button>

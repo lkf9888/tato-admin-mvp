@@ -77,14 +77,14 @@ export function StickySaveBar({
       ref={barRef}
       className={`sticky bottom-[calc(env(safe-area-inset-bottom)+72px)] z-20 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 shadow-[0_18px_40px_-24px_rgba(17,19,24,0.55)] backdrop-blur lg:bottom-3 ${className} ${
         dirty
-          ? "border-[#f59e0b]/40 bg-[#fffbeb]/95"
+          ? "border-[#f59e0b]/40 bg-[var(--warn-bg)]/95"
           : "border-[color:var(--line)] bg-[rgba(255,255,255,0.94)]"
       }`}
     >
       <p
         role="status"
         className={`flex min-w-0 items-center gap-2 text-[12px] ${
-          dirty ? "font-medium text-[#92400e]" : "text-[color:var(--ink-soft)]"
+          dirty ? "font-medium text-[color:var(--warn-fg)]" : "text-[color:var(--ink-soft)]"
         }`}
       >
         <span
@@ -97,7 +97,7 @@ export function StickySaveBar({
         type="submit"
         disabled={pending}
         className="shrink-0 rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white disabled:opacity-60"
-        style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+        style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
       >
         {pending ? savingLabel : saveLabel}
         <span className="ml-2 hidden text-[10px] text-white/60 sm:inline">{shortcut}</span>

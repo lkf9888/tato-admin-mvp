@@ -123,7 +123,7 @@ export default async function RentalSitePage({
                 href={liveUrl}
                 target="_blank"
                 className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[11px] font-medium text-white"
-                style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+                style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
               >
                 {copy.previewAction}
               </Link>

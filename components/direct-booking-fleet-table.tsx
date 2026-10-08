@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { updateVehicleBookingAction, type VehicleBookingPatch } from "@/lib/direct-booking-actions";
@@ -273,6 +274,7 @@ export function DirectBookingFleetTable({
           <input
             ref={searchRef}
             type="search"
+            {...SEARCH_FIELD_PROPS}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={`${copy.searchPlaceholder}  /`}
@@ -1072,7 +1074,7 @@ function EditDrawer({
             onClick={submit}
             disabled={pending}
             className="ml-auto rounded-md px-4 py-2 text-[12px] font-medium text-white disabled:opacity-60"
-            style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+            style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
           >
             {pending ? copy.saving : copy.drawerSave}
           </button>

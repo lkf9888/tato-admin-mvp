@@ -171,7 +171,7 @@ function MileageBill({
             disabled={busy}
             onClick={() => void bill("card")}
             className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
-            style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+            style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
           >
             <BusyLabel busy={busy && billingMethod === "card"} idle={copy.mileageChargeCard(money(charge.total))} working={working} />
           </button>
@@ -338,7 +338,7 @@ function StageCard({
           disabled={busy !== ""}
           onClick={() => void saveReadings()}
           className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
-          style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+          style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
         >
           <BusyLabel busy={busy !== ""} idle={copy.save} working={busy} />
         </button>

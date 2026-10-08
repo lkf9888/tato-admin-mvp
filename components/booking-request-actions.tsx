@@ -64,7 +64,7 @@ export function BookingRequestActions({
           disabled={pending || deciding !== null}
           onClick={() => decide("APPROVE")}
           className="rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-60"
-          style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+          style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
         >
           <BusyLabel busy={deciding === "APPROVE"} idle={copy.approveAction} working={waitCopy.approving} />
         </button>

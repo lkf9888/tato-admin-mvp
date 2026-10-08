@@ -41,7 +41,7 @@ const STATUS_TONE: Record<
   },
   restricted: {
     dot: "bg-orange-500",
-    card: "border-orange-200 bg-orange-50/70",
+    card: "border-[color:var(--warn-fg)]/30 bg-[var(--warn-bg)]",
   },
   active: {
     dot: "bg-emerald-500",
@@ -204,7 +204,7 @@ export function PayoutsPanel({
       </p>
 
       {!configured && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-800">
+        <div className="rounded-lg border border-[color:var(--bad-fg)]/30 bg-[var(--bad-bg)] px-4 py-3 text-[12px] text-[color:var(--bad-fg)]">
           {t.notConfigured}
         </div>
       )}
@@ -367,7 +367,7 @@ export function PayoutsPanel({
               type="button"
               onClick={handleDisconnect}
               disabled={!configured || isDisconnecting}
-              className="inline-flex items-center justify-center rounded-md px-3 py-2 text-[12px] font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:ml-auto"
+              className="inline-flex items-center justify-center rounded-md px-3 py-2 text-[12px] font-medium text-[color:var(--bad-fg)] transition hover:bg-[var(--bad-bg)] disabled:cursor-not-allowed disabled:opacity-60 sm:ml-auto"
             >
               <BusyLabel busy={isDisconnecting} idle={t.disconnectAction} working={t.connectLoading} />
             </button>
@@ -375,7 +375,7 @@ export function PayoutsPanel({
         )}
 
         {error && (
-          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] leading-5 text-red-800">
+          <div className="mt-3 rounded-lg border border-[color:var(--bad-fg)]/30 bg-[var(--bad-bg)] px-3 py-2 text-[12px] leading-5 text-[color:var(--bad-fg)]">
             <p>
               {error.code === "CONNECT_NOT_ENABLED"
                 ? t.errorConnectNotEnabled
@@ -405,7 +405,7 @@ export function PayoutsPanel({
                 name -- a translated guess would hide the one line that
                 says what actually went wrong. */}
             {error.detail && (error.code === "UNKNOWN" || !error.code) ? (
-              <p className="mt-1 text-red-700/80">{t.errorStripeSays(error.detail)}</p>
+              <p className="mt-1 text-[color:var(--bad-fg)]/80">{t.errorStripeSays(error.detail)}</p>
             ) : null}
           </div>
         )}

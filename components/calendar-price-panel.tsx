@@ -414,7 +414,7 @@ export function CalendarPricePanel({
             onClick={() => void save()}
             disabled={saving || preview.changes.length === 0}
             className="h-9 rounded-md bg-[var(--ink)] px-4 text-[12px] font-semibold text-white disabled:opacity-50"
-            style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+            style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
           >
             {saving ? copy.saving : copy.save(preview.changes.length)}
           </button>

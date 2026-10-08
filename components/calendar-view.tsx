@@ -3300,7 +3300,7 @@ export function CalendarView({
                                 className={cn(
                                   "pointer-events-none absolute bottom-0.5 text-center text-[9px] leading-none tabular-nums",
                                   resolved.dynamic
-                                    ? "font-bold text-sky-700"
+                                    ? "font-bold text-[color:var(--brand)]"
                                     : resolved.fixed
                                       ? "font-bold text-[color:var(--ink)]"
                                       : "text-[color:var(--ink-soft)]",

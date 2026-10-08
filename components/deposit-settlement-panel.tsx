@@ -151,7 +151,7 @@ export function DepositSettlementPanel({
             disabled={!canSubmit}
             onClick={submit}
             className="w-full rounded-md px-3 py-2 text-[12px] font-bold disabled:opacity-50"
-            style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+            style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
           >
             <BusyLabel busy={pending} idle={copy.depositSubmit} working={copy.depositSubmitting} />
           </button>

@@ -23,7 +23,7 @@ const FIELD =
 
 const STATE_TONE: Record<CouponState, string> = {
   available: "bg-[var(--ok-bg)] text-[color:var(--ok-fg)]",
-  reserved: "bg-[#fef3c7] text-[#92400e]",
+  reserved: "bg-[var(--warn-bg)] text-[color:var(--warn-fg)]",
   redeemed: "bg-[var(--surface-muted)] text-[color:var(--ink-soft)]",
   expired: "bg-[var(--surface-muted)] text-[color:var(--ink-soft)]",
   voided: "bg-[var(--surface-muted)] text-[color:var(--ink-soft)]",
@@ -91,7 +91,7 @@ export function BookingCouponsPanel({
         <button
           type="submit"
           className="rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white"
-          style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+          style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
         >
           {copy.generate}
         </button>

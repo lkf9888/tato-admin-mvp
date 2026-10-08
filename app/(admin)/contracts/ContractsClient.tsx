@@ -943,7 +943,7 @@ export default function ContractsClient({
           </Link>
         </div>
 
-        {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+        {error && <div className="rounded-lg border border-[color:var(--bad-fg)]/30 bg-[var(--bad-bg)] p-3 text-sm text-[color:var(--bad-fg)]">{error}</div>}
         {notice && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</div>}
 
         <section className="card p-4">
@@ -977,7 +977,7 @@ export default function ContractsClient({
                   </a>
                   <button
                     type="button"
-                    className="text-xs font-semibold text-red-600 disabled:opacity-50"
+                    className="text-xs font-semibold text-[color:var(--bad-fg)] disabled:opacity-50"
                     disabled={busy === `delete-template-${template.id}`}
                     onClick={() => deleteTemplate(template)}
                   >
@@ -1074,12 +1074,12 @@ export default function ContractsClient({
                     <td className="py-2 pr-4">
                       {envelope.signedPdfUrl ? (
                         <div className="flex flex-wrap gap-2">
-                          <a className="text-blue-600 hover:underline" href={envelope.signedPdfUrl} target="_blank" rel="noreferrer">
+                          <a className="text-[color:var(--brand)] hover:underline" href={envelope.signedPdfUrl} target="_blank" rel="noreferrer">
                             下载 signed PDF
                           </a>
                           <button
                             type="button"
-                            className="text-red-600 hover:underline disabled:opacity-50"
+                            className="text-[color:var(--bad-fg)] hover:underline disabled:opacity-50"
                             disabled={busy === `delete-envelope-${envelope.id}`}
                             onClick={() => deleteEnvelopeDocument(envelope)}
                           >
@@ -1089,7 +1089,7 @@ export default function ContractsClient({
                       ) : envelope.status === "SENT" || envelope.status === "PARTIALLY_SIGNED" ? (
                         <button
                           type="button"
-                          className="text-blue-600 hover:underline disabled:opacity-50"
+                          className="text-[color:var(--brand)] hover:underline disabled:opacity-50"
                           disabled={busy === `resend-envelope-${envelope.id}`}
                           onClick={() => resendEnvelopeInvitation(envelope)}
                         >
@@ -1139,7 +1139,7 @@ export default function ContractsClient({
                   </a>
                   <button
                     type="button"
-                    className="btn-secondary text-xs text-red-600 disabled:opacity-50"
+                    className="btn-secondary text-xs text-[color:var(--bad-fg)] disabled:opacity-50"
                     disabled={busy === `delete-envelope-${envelope.id}`}
                     onClick={() => deleteEnvelopeDocument(envelope)}
                   >
@@ -1168,7 +1168,7 @@ export default function ContractsClient({
         </Link>
       </div>
 
-      {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {error && <div className="rounded-lg border border-[color:var(--bad-fg)]/30 bg-[var(--bad-bg)] p-3 text-sm text-[color:var(--bad-fg)]">{error}</div>}
       {notice && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</div>}
 
       <section className="card p-4">
@@ -1185,7 +1185,7 @@ export default function ContractsClient({
                   <div className="mt-1 text-[var(--ink-soft)]">
                     {selectedTemplate.pageCount} 页 · {fields.length} 个字段 · {templateRecipients.length} 位签署人
                   </div>
-                  <a className="mt-3 inline-flex text-blue-600 hover:underline" href={selectedTemplate.pdfUrl} target="_blank" rel="noreferrer">
+                  <a className="mt-3 inline-flex text-[color:var(--brand)] hover:underline" href={selectedTemplate.pdfUrl} target="_blank" rel="noreferrer">
                     打开当前签署 PDF
                   </a>
                 </div>
@@ -1279,7 +1279,7 @@ export default function ContractsClient({
                   </button>
                   <button
                     type="button"
-                    className="mt-2 text-xs font-semibold text-red-600 disabled:opacity-50"
+                    className="mt-2 text-xs font-semibold text-[color:var(--bad-fg)] disabled:opacity-50"
                     disabled={busy === `delete-template-${template.id}`}
                     onClick={() => deleteTemplate(template)}
                   >
@@ -1296,7 +1296,7 @@ export default function ContractsClient({
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold">2. 签署人信息</h2>
           {isEditMode && recipientSaveStatus !== "idle" && (
-            <span className={`text-xs ${recipientSaveStatus === "error" ? "text-red-600" : "text-[var(--ink-soft)] dark:text-[var(--ink-soft)]"}`}>
+            <span className={`text-xs ${recipientSaveStatus === "error" ? "text-[color:var(--bad-fg)]" : "text-[var(--ink-soft)] dark:text-[var(--ink-soft)]"}`}>
               {recipientSaveStatus === "saving" ? "签署人自动保存中…" : recipientSaveStatus === "saved" ? "签署人已自动保存" : "签署人自动保存失败"}
             </span>
           )}
@@ -1622,7 +1622,7 @@ export default function ContractsClient({
                         {preset.label}
                         <button
                           type="button"
-                          className="text-red-600 disabled:opacity-50"
+                          className="text-[color:var(--bad-fg)] disabled:opacity-50"
                           disabled={busy === `delete-preset-${preset.id}`}
                           onClick={() => deleteTextPreset(preset)}
                           aria-label={`删除 ${preset.label}`}
@@ -1844,7 +1844,7 @@ function UnsavedChangesModal({
           <button type="button" className="btn-secondary text-sm" disabled={saving} onClick={onCancel}>
             取消
           </button>
-          <button type="button" className="btn-secondary text-sm text-red-600" disabled={saving} onClick={onDiscard}>
+          <button type="button" className="btn-secondary text-sm text-[color:var(--bad-fg)]" disabled={saving} onClick={onDiscard}>
             不保存并离开
           </button>
           <button type="button" className="btn-primary text-sm" disabled={saving} onClick={onSave}>
@@ -2027,7 +2027,7 @@ function FieldEditModal({
             <button type="button" className="btn-secondary text-sm" onClick={onDuplicate}>
               复制字段
             </button>
-            <button type="button" className="btn-secondary text-sm text-red-600" onClick={onDelete}>
+            <button type="button" className="btn-secondary text-sm text-[color:var(--bad-fg)]" onClick={onDelete}>
               删除字段
             </button>
             <button type="button" className="btn-primary text-sm" onClick={onClose}>

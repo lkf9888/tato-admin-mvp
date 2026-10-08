@@ -47,7 +47,7 @@ export function TuroBookmarklet({ locale, origin }: { locale: Locale; origin: st
         ref={linkRef}
         onClick={(event) => event.preventDefault()}
         className="mt-2 inline-block cursor-grab rounded-md bg-[var(--ink)] px-3 py-1.5 text-[12px] font-semibold text-white"
-        style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+        style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
       >
         {copy.bookmarkletName}
       </a>
@@ -170,7 +170,7 @@ export function TuroPhotoImport({
           onClick={runImport}
           disabled={!vehicleId || selected.length === 0 || pending}
           className="rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white disabled:opacity-50"
-          style={{ backgroundColor: "var(--ink)", color: "#ffffff" }}
+          style={{ backgroundColor: "var(--ink)", color: "var(--surface)" }}
         >
           {pending ? copy.importing : copy.importAction(selected.length)}
         </button>

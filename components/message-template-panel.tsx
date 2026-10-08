@@ -15,6 +15,7 @@ import {
   type PlaceholderContext,
 } from "@/lib/message-placeholders";
 import { cn } from "@/lib/utils";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 export type MessageTemplateRow = {
   id: string;
@@ -413,7 +414,7 @@ export function MessageTemplatePanel({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--ink)]/35 p-3 backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm sm:p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -538,6 +539,8 @@ export function MessageTemplatePanel({
 
           <div>
             <input
+              type="search"
+              {...SEARCH_FIELD_PROPS}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t.searchPlaceholder}

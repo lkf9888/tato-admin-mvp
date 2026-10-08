@@ -16,10 +16,12 @@ type Alert = {
   updatedAt: string;
 };
 
-/** Severity drives the whole visual weight — this list is scanned, not read. */
+/** Severity drives the whole visual weight — this list is scanned, not read.
+ *  Theme tokens rather than Tailwind's tints: a translucent `bg-amber-50/50`
+ *  escapes the dark theme's overrides and left grey-on-beige text. */
 const TONE: Record<Alert["severity"], string> = {
-  CRITICAL: "border-l-[3px] border-l-rose-500 bg-rose-50/60",
-  WARNING: "border-l-[3px] border-l-amber-500 bg-amber-50/50",
+  CRITICAL: "border-l-[3px] border-l-rose-500 bg-[var(--bad-bg)]",
+  WARNING: "border-l-[3px] border-l-amber-500 bg-[var(--warn-bg)]",
   INFO: "border-l-[3px] border-l-[var(--line)] bg-[var(--surface-muted)]",
 };
 
@@ -30,8 +32,8 @@ const TONE_LABEL: Record<Alert["severity"], { en: string; zh: string }> = {
 };
 
 const TONE_TEXT: Record<Alert["severity"], string> = {
-  CRITICAL: "text-rose-700",
-  WARNING: "text-amber-700",
+  CRITICAL: "text-[var(--bad-fg)]",
+  WARNING: "text-[var(--warn-fg)]",
   INFO: "text-[var(--ink-soft)]",
 };
 

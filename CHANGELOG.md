@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.57.3 - 2026-10-08
+
+### Turo-sync and message screens read in dark mode; search boxes stay empty; push without pulling
+
+- **Dark mode.** The import, template, rules and alert-settings dialogs dim the page with a fixed black instead of `var(--ink)`, which turns light in dark mode. The assistant's alert cards use the theme's warning and danger colours, not translucent Tailwind tints the dark overrides did not reach, so their text is readable. The Gmail inbox's "needs reply" badge gets the same fix.
+- **Search boxes.** The messages page and template search boxes use `SEARCH_FIELD_PROPS`, so password managers stop filling them with the sign-in email.
+- **CLAUDE.md: push without pulling when not behind.** In the shared working tree, `pull --rebase --autostash` stashes every session's uncommitted work. On 2026-10-07 one aborted halfway and left `.git/rebase-merge` blocking everyone. Sessions now `git fetch` and pull only when `HEAD..origin/main` is non-empty.
+
 ## v1.57.2 - 2026-10-08
 
 ### Translucent tints read in dark mode

@@ -80,7 +80,10 @@
   升之前先 `git fetch`，**以 `origin/main` 上的版本号为准**往上加，改完立刻提交推送。
   两个会话各自从旧版本往上加就会撞号——v1.5.1 事后改成了 v1.6.1
 - **推送 main 就是部署**：Railway 从 main 构建，会把**所有已提交的**改动一起带上线，不只是你的。
-  推送前 `git pull --rebase`；上线后看 `https://tatocar.co/api/health` 里的 `version`
+  推送前 `git fetch`，`git log HEAD..origin/main` 为空就**直接 push，不要 pull**——共用目录里 `pull --rebase --autostash`
+  会把所有会话没提交的改动一起收起再放回，中途失败就卡在 `.git/rebase-merge`，谁都拉不了（2026-10-07）。
+  确实落后才 pull，且先确认暂存区里没有残留（`git status --short | grep -v '^ M\|^??'` 为空）。
+  上线后看 `https://tatocar.co/api/health` 里的 `version`
 - CI（`.github/workflows/ci.yml`）检查：schema 能不能推到线上已有的库、上线清单、繁体文案、类型检查、构建
 - **提交、推送、部署都只在用户要求时做**
 

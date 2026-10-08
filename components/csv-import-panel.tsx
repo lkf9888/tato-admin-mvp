@@ -649,7 +649,7 @@ export function CsvImportPanel({
       </div>
 
       {stage === "confirm" ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--ink)]/45 sm:items-center sm:px-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:px-4">
           <div
             role="dialog"
             aria-modal="true"
@@ -735,7 +735,7 @@ export function CsvImportPanel({
       ) : null}
 
       {importAlert ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--ink)]/45 px-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-lg rounded-lg border border-[var(--line)] bg-white p-5 shadow-2xl">
             <p
               className={`text-[10px] font-semibold uppercase tracking-[0.22em] ${

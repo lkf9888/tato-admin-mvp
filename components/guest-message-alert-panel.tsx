@@ -161,7 +161,7 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-[var(--ink)]/35 backdrop-blur-sm sm:items-center sm:p-4"
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"

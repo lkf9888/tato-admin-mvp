@@ -15,6 +15,7 @@ import {
 } from "@/components/message-template-panel";
 import { InlineSpinner, TypingDots } from "@/components/turo-task-progress";
 import { getMessages, type Locale } from "@/lib/i18n";
+import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 type ThreadMessage = {
   id: string;
@@ -712,6 +713,8 @@ export function GuestMessagesView({
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-soft)]"
                 />
                 <input
+                  type="search"
+                  {...SEARCH_FIELD_PROPS}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder={t.searchPlaceholder}

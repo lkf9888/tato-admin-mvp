@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type EditableOrder } from "@/components/order-detail-modal";
 import { getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { columnPosition } from "@/lib/calendar-window";
 
 /**
  * One car, laid out as months instead of a strip.
@@ -35,7 +36,6 @@ type MonthOrder = Pick<
   | "vehicleId"
 >;
 
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const MONTHS_BACK = 2;
 const MONTHS_FORWARD = 9;
 const MONTH_STEP = 6;
@@ -92,9 +92,13 @@ type WeekBar = {
  * lanes, live trips before cancelled ones.
  */
 function weekBars(orders: MonthOrder[], weekStart: Date, from: Date, to: Date): WeekBar[] {
-  const weekMs = 7 * DAY_IN_MS;
+  // The week ends at the next Monday's local midnight, and bars are
+  // placed by local day: the weeks holding a clock change are 167 or
+  // 169 hours, and a fixed 7x24h pushed the last hour of one into the
+  // next row.
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7).getTime();
   const start = Math.max(weekStart.getTime(), from.getTime());
-  const end = Math.min(weekStart.getTime() + weekMs, to.getTime());
+  const end = Math.min(weekEnd, to.getTime());
   const touching = orders
     .filter((order) => new Date(order.pickupDatetime).getTime() < end && new Date(order.returnDatetime).getTime() > start)
     .sort(
@@ -113,8 +117,11 @@ function weekBars(orders: MonthOrder[], weekStart: Date, from: Date, to: Date): 
     laneEnds[lane] = barEnd;
     return {
       order,
-      left: (barStart - weekStart.getTime()) / weekMs,
-      width: Math.max((barEnd - barStart) / weekMs, 1 / 28),
+      left: columnPosition(barStart, weekStart.getTime()) / 7,
+      width: Math.max(
+        (columnPosition(barEnd, weekStart.getTime()) - columnPosition(barStart, weekStart.getTime())) / 7,
+        1 / 28,
+      ),
       lane,
       clippedStart: pickup < start,
       clippedEnd: ret > end,
@@ -162,9 +169,9 @@ export function VehicleMonthCalendar({
     const load = async () => {
       try {
         const response = await fetch(
-          `/api/calendar/orders?from=${from.toISOString().slice(0, 10)}&to=${to
+          `/api/calendar/orders?vehicleId=${encodeURIComponent(vehicleId)}&from=${from
             .toISOString()
-            .slice(0, 10)}`,
+            .slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`,
           { headers: { Accept: "application/json" } },
         );
         if (!response.ok) throw new Error(String(response.status));

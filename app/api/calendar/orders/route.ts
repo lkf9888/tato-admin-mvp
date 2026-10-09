@@ -26,6 +26,9 @@ import { prisma } from "@/lib/prisma";
 /** Wide enough for a year's scroll in one request, narrow enough that
  *  a malformed or hostile range cannot ask for the whole table. */
 const MAX_WINDOW_DAYS = 420;
+/** One car's history is small at any span; the month view asks for up
+ *  to eight years of it as you page back. */
+const MAX_SINGLE_VEHICLE_WINDOW_DAYS = 3000;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function parseDay(value: string | null) {
@@ -43,12 +46,18 @@ export async function GET(request: Request) {
 
   const from = parseDay(params.get("from"));
   const to = parseDay(params.get("to"));
+  // One car, for the month view. It used to fetch the whole fleet for
+  // the span and filter in the browser -- a year of every car to draw
+  // one -- and its Earlier/Later buttons pushed the span past the cap,
+  // so they always failed.
+  const vehicleId = params.get("vehicleId");
 
   if (!from || !to || to < from) {
     return NextResponse.json({ error: "INVALID_RANGE" }, { status: 400 });
   }
 
-  if ((to.getTime() - from.getTime()) / DAY_IN_MS > MAX_WINDOW_DAYS) {
+  const maxDays = vehicleId ? MAX_SINGLE_VEHICLE_WINDOW_DAYS : MAX_WINDOW_DAYS;
+  if ((to.getTime() - from.getTime()) / DAY_IN_MS > maxDays) {
     return NextResponse.json({ error: "RANGE_TOO_WIDE" }, { status: 400 });
   }
 
@@ -56,7 +65,13 @@ export async function GET(request: Request) {
   const paddedTo = new Date(to.getTime() + DAY_IN_MS);
 
   const orders = await prisma.order.findMany({
-    where: calendarOrderWhere(workspace.id, paddedFrom, paddedTo, vehicleIds),
+    where: {
+      // ANDed, so a car-limited member's scope still applies.
+      AND: [
+        calendarOrderWhere(workspace.id, paddedFrom, paddedTo, vehicleIds),
+        ...(vehicleId ? [{ vehicleId }] : []),
+      ],
+    },
     include: CALENDAR_ORDER_INCLUDE,
     orderBy: { pickupDatetime: "asc" },
   });

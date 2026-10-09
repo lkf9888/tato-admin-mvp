@@ -87,3 +87,24 @@ export function spanForChunks(indexes: number[]) {
     to: chunkRange(sorted[sorted.length - 1]).end,
   };
 }
+
+/**
+ * Where an instant falls on a strip of local days, in days from its
+ * origin (a local midnight). The calendar grid and the month view both
+ * place bars with it.
+ *
+ * The columns are local calendar days, and two of those a year are 23
+ * or 25 hours long. Dividing elapsed milliseconds by 24 hours drifted
+ * by one hour for every trip on the far side of a clock change: from
+ * 1 November every bar sat an hour to the right, and a hand-over after
+ * 23:00 was drawn in the next day's column. Whole days are counted
+ * between local midnights instead, and the hour within the day as a
+ * share of that day's own length.
+ */
+export function columnPosition(ms: number, originMs: number) {
+  const date = new Date(ms);
+  const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const nextMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
+  const wholeDays = Math.round((midnight - originMs) / DAY_IN_MS);
+  return wholeDays + (ms - midnight) / (nextMidnight - midnight);
+}

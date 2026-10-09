@@ -19,6 +19,7 @@ import {
   CANVAS_PAST_DAYS,
   chunkIndexesForRange,
   chunkRange,
+  columnPosition,
   DAY_IN_MS as CHUNK_DAY_IN_MS,
   PREFETCH_LEAD_DAYS,
   toDayParam,
@@ -209,6 +210,8 @@ const CANCELLED_BAND_HEIGHT = 12;
  *  and a pale yellow wash over its days that the trips draw on top of --
  *  so a car in the shop during a booking shows both, neither hidden. */
 const SERVICE_BAND_HEIGHT = 15;
+/** A gap this short between two trips on one car gets a marker. */
+const TURNAROUND_ALERT_MS = 6 * 60 * 60 * 1000;
 
 function startOfDay(value: Date | string) {
   const date = new Date(value);
@@ -269,9 +272,14 @@ function getTimelineBarClasses(
   compact = false,
   dimmed = false,
   picked = false,
+  past = false,
 ) {
   return cn(
-    "absolute flex items-center overflow-hidden border-[1.5px] text-left font-semibold leading-tight text-white shadow-[0_18px_36px_-18px_rgba(17,19,24,0.7)] transition hover:-translate-y-0.5 hover:brightness-110 cursor-pointer",
+    "absolute flex items-center overflow-hidden border-[1.5px] text-left font-semibold leading-tight text-white shadow-[0_6px_14px_-10px_rgba(17,19,24,0.6)] transition hover:-translate-y-0.5 hover:brightness-110 cursor-pointer",
+    // A trip that is over steps back, so the eye lands on what is out
+    // now and what goes out next. Still its own colour -- the money
+    // state of an old trip is exactly what a month-end check looks for.
+    past && !dimmed ? "opacity-55 saturate-[0.6] hover:opacity-100 hover:saturate-100" : "",
     // Search dims rather than hides, so the matches stand out without
     // the rest of the week disappearing.
     dimmed ? "opacity-15 hover:opacity-40" : "",
@@ -365,8 +373,12 @@ function assignTimelineBars(
     visibleBars.push({
       order,
       lane,
-      left: ((visibleStart - rangeStartMs) / DAY_IN_MS) * dayColumnWidth,
-      width: Math.max(((visibleEnd - visibleStart) / DAY_IN_MS) * dayColumnWidth, 18),
+      left: columnPosition(visibleStart, rangeStartMs) * dayColumnWidth,
+      width: Math.max(
+        (columnPosition(visibleEnd, rangeStartMs) - columnPosition(visibleStart, rangeStartMs)) *
+          dayColumnWidth,
+        18,
+      ),
       clippedStart: actualStart < rangeStartMs,
       clippedEnd: actualEnd > rangeEndMs,
     });
@@ -444,7 +456,7 @@ function ToolbarMenu({
   };
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative" data-calendar-menu-open={open ? "" : undefined}>
       <button
         ref={buttonRef}
         type="button"
@@ -520,13 +532,14 @@ function formatWeekday(date: Date, locale: Locale, compact = false) {
   // did not fit and read as "M…". Two letters in English and the bare
   // numeral in Chinese (一, 二) stay distinct -- one letter would make
   // Tuesday and Thursday the same "T".
+  // Both Chinese locales: zh-Hant read "Mon" and "October 2026".
   if (compact) {
-    if (locale === "zh") {
-      return new Intl.DateTimeFormat("zh-CN", { weekday: "narrow" }).format(date);
+    if (locale !== "en") {
+      return new Intl.DateTimeFormat(getLocaleTag(locale), { weekday: "narrow" }).format(date);
     }
     return new Intl.DateTimeFormat("en-CA", { weekday: "short" }).format(date).slice(0, 2);
   }
-  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-CA", {
+  return new Intl.DateTimeFormat(getLocaleTag(locale), {
     weekday: "short",
   }).format(date);
 }
@@ -536,7 +549,7 @@ function formatTimelineDateLabel(date: Date) {
 }
 
 function formatMonthTitle(date: Date, locale: Locale) {
-  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-CA", {
+  return new Intl.DateTimeFormat(getLocaleTag(locale), {
     month: "long",
     year: "numeric",
   }).format(date);
@@ -741,14 +754,22 @@ function SearchableFilterDropdown({
 export function CalendarView({
   locale,
   orders: serverOrders,
-  loadedChunkIndexes = [],
+  loadedChunkIndexes,
   vehicleOptions,
   ownerOptions,
   pricing,
   readOnly = false,
   maskSensitive = false,
+  limitedToVehicles = false,
 }: {
   locale: Locale;
+  /**
+   * A member who sees only some cars. The server refuses them the
+   * fleet-wide tools -- search across all trips, notes, recurring
+   * orders, calendar feeds, bulk sync, adding a car -- so those are not
+   * offered; before, each was a button that always failed.
+   */
+  limitedToVehicles?: boolean;
   /** The chunks the server already rendered, so the grid opens with
    *  bars on it rather than fetching its own first screen. */
   orders: CalendarOrder[];
@@ -854,9 +875,19 @@ export function CalendarView({
   // deletion: an order removed on the server would stay on screen
   // forever, because "not in the new response" is indistinguishable
   // from "not in this response's date range".
+  //
+  // Without `loadedChunkIndexes` -- the owner's share page, whose
+  // visitor has no session to fetch with -- the orders handed in are
+  // the whole story: each is filed under every chunk it touches and
+  // nothing is fetched. That page used to fall through to a default
+  // `[]`, a new array every render: every order was dropped as "not in
+  // a covered chunk", and the memo, the reset effect below and the
+  // render chased each other in a loop of failing fetches. Owners saw
+  // an empty calendar.
+  const fetchesChunks = loadedChunkIndexes !== undefined;
   const serverChunks = useMemo(() => {
     const store = new Map<number, CalendarOrder[]>();
-    for (const index of loadedChunkIndexes) store.set(index, []);
+    for (const index of loadedChunkIndexes ?? []) store.set(index, []);
     for (const order of serverOrders) {
       for (const index of chunkIndexesForRange(
         new Date(order.pickupDatetime),
@@ -866,6 +897,7 @@ export function CalendarView({
         // reaching past the server's window must not mark the chunk it
         // reaches into as loaded -- that chunk holds other orders the
         // server never sent.
+        if (!loadedChunkIndexes && !store.has(index)) store.set(index, []);
         store.get(index)?.push(order);
       }
     }
@@ -991,8 +1023,10 @@ export function CalendarView({
   // stale, so it is dropped and the prefetch effect reloads whatever
   // is on screen.
   useEffect(() => {
+    // New objects rather than cleared ones: a request still in flight
+    // holds the old pair and lands in them, out of the way.
     fetchedChunksRef.current = new Map();
-    inFlightChunksRef.current.clear();
+    inFlightChunksRef.current = new Set();
     setChunkError(false);
     setStoreVersion((version) => version + 1);
   }, [serverChunks]);
@@ -1263,12 +1297,20 @@ export function CalendarView({
     };
   }, []);
 
+  // Which `orders` the open panel was last synced against. The swap
+  // below is for when the data changes under an open panel -- not for
+  // when the panel hands back the order it just saved: then `orders`
+  // still holds the pre-save copy until the refresh lands, and swapping
+  // that back in reset the panel to the old values for a moment.
+  const syncedOrdersRef = useRef<CalendarOrder[] | null>(null);
   useEffect(() => {
     if (!selectedOrder) return;
+    const ordersChanged = syncedOrdersRef.current !== orders;
+    syncedOrdersRef.current = orders;
 
     const refreshedOrder = orders.find((order) => order.id === selectedOrder.id);
     if (refreshedOrder && refreshedOrder !== selectedOrder) {
-      setSelectedOrder(refreshedOrder);
+      if (ordersChanged) setSelectedOrder(refreshedOrder);
       return;
     }
 
@@ -1305,6 +1347,20 @@ export function CalendarView({
       if (event.key !== "Escape") return;
       // The order panel is in front; let it have the key first.
       if (orderPopover) return;
+      // So are a dialog and a toolbar menu. Escape closing one of those
+      // also threw away bulk mode and every trip picked in it.
+      if (
+        event.defaultPrevented ||
+        monthCalendarFor ||
+        isFeedOpen ||
+        isRecurringOpen ||
+        isAddVehicleOpen ||
+        serviceDialog ||
+        pricePanel ||
+        document.querySelector("[data-calendar-menu-open]")
+      ) {
+        return;
+      }
       if (daySelection) {
         clearDaySelection();
         return;
@@ -1316,13 +1372,26 @@ export function CalendarView({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [daySelection, bulkMode, orderPopover]);
+  }, [
+    daySelection,
+    bulkMode,
+    orderPopover,
+    monthCalendarFor,
+    isFeedOpen,
+    isRecurringOpen,
+    isAddVehicleOpen,
+    serviceDialog,
+    pricePanel,
+  ]);
 
   useEffect(() => {
     if (!orderPopover) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      // A field being edited takes Escape as "cancel this edit" and
+      // marks it handled; closing the whole panel on the same key threw
+      // the operator out of the order they were in the middle of.
+      if (event.key === "Escape" && !event.defaultPrevented) {
         setOrderPopover(null);
       }
     };
@@ -1371,6 +1440,22 @@ export function CalendarView({
   // date on the canvas is positioned relative to it, so a value that
   // moved would shift the whole strip under the viewport.
   const today = useMemo(() => startOfDay(new Date()), []);
+  // The clock, for what does move: the now line, which column says
+  // "today", and which trips count as over. Ticks once a minute -- a
+  // tab left open overnight kept yesterday highlighted. Null until
+  // mounted, so the server's render and the browser's first one agree.
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  // Keyed on the local date. `toDayParam` is the UTC date, which in
+  // Vancouver turns over at 17:00 -- the column would have stayed on
+  // yesterday all morning.
+  const nowDayKey = now ? `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}` : "";
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const nowDay = useMemo(() => (now ? startOfDay(now) : today), [nowDayKey, today]);
   // Anchored to a Monday. The weekend shading below is a repeating
   // gradient, which only works if the phase of the week is known from
   // the canvas origin.
@@ -1599,8 +1684,20 @@ export function CalendarView({
   // What the corner count and the search summary are about: the trips
   // actually on screen. Everything ever scrolled past stays loaded, so
   // counting the loaded set would answer a question nobody asked.
-  const visibleOrders = filteredOrders.filter((order) =>
-    orderIntersectsRange(order, visibleRangeStart, addDays(visibleRangeEndInclusive, 1)),
+  //
+  // Three things it used to get wrong. It counted the ten overscan
+  // columns either side as "in view"; it counted trips on cars the
+  // filters had taken off the grid; and while searching it counted every
+  // trip on the remaining rows rather than the ones that matched -- so a
+  // search for one renter still said "210 bookings".
+  const onScreenStart = days[leadingDayIndex] ?? rangeStart;
+  const onScreenEndExclusive = addDays(onScreenStart, viewportDays);
+  const shownVehicleIds = new Set(sortedVehicles.map((vehicle) => vehicle.id));
+  const visibleOrders = filteredOrders.filter(
+    (order) =>
+      shownVehicleIds.has(order.vehicleId) &&
+      orderIntersectsRange(order, onScreenStart, onScreenEndExclusive) &&
+      orderMatchesSearch(order),
   );
 
   // The row background: a hairline at every day boundary, and a warm
@@ -1615,11 +1712,17 @@ export function CalendarView({
   ].join(", ");
   dayColumnWidthRef.current = dayColumnWidth;
   panPillLabelRef.current = calendarMessages.panByDrag;
-  const todayOffsetDays = Math.round((today.getTime() - canvasStart.getTime()) / DAY_IN_MS);
+  const todayOffsetDays = Math.round((nowDay.getTime() - canvasStart.getTime()) / DAY_IN_MS);
   const todayColumnOffset =
     todayOffsetDays >= 0 && todayOffsetDays < days.length
       ? todayOffsetDays * dayColumnWidth
       : null;
+  // Where this minute falls on the strip.
+  const nowOffset =
+    now && now.getTime() >= canvasStart.getTime() && now.getTime() < rangeEndExclusive.getTime()
+      ? columnPosition(now.getTime(), canvasStart.getTime()) * dayColumnWidth
+      : null;
+  const nowMs = now?.getTime() ?? null;
 
   // --- Fetching the chunks you are scrolling toward -------------------
   //
@@ -1640,16 +1743,20 @@ export function CalendarView({
   const neededChunkKey = neededChunkIndexes.join(",");
 
   useEffect(() => {
+    if (!fetchesChunks) return;
+    // The store and in-flight set this pass belongs to. A refresh swaps
+    // both for new ones; a response from before it then lands in the
+    // old store, where nothing reads it -- instead of overwriting the
+    // fresh copy with the dates as they were before the edit.
+    const store = fetchedChunksRef.current;
+    const inFlight = inFlightChunksRef.current;
     const missing = neededChunkIndexes.filter(
-      (index) =>
-        !serverChunks.has(index) &&
-        !fetchedChunksRef.current.has(index) &&
-        !inFlightChunksRef.current.has(index),
+      (index) => !serverChunks.has(index) && !store.has(index) && !inFlight.has(index),
     );
     if (missing.length === 0) return;
 
     let cancelled = false;
-    for (const index of missing) inFlightChunksRef.current.add(index);
+    for (const index of missing) inFlight.add(index);
     setIsLoadingChunks(true);
 
     const load = async () => {
@@ -1669,33 +1776,38 @@ export function CalendarView({
             );
             if (!response.ok) throw new Error(String(response.status));
             const data = (await response.json()) as { orders?: CalendarOrder[] };
-            // Kept even if this effect pass was superseded mid-flight.
-            // The bytes are already here and the store is a ref, so
-            // throwing them away only guarantees fetching them again.
-            fetchedChunksRef.current.set(index, data.orders ?? []);
+            // Kept even if this effect pass was superseded mid-flight by
+            // a scroll. The bytes are already here and the store is a
+            // ref, so throwing them away only guarantees fetching them
+            // again.
+            store.set(index, data.orders ?? []);
           } catch {
             // Left out of the store on purpose, so scrolling back over
             // these dates retries instead of trusting a gap.
             if (!cancelled) setChunkError(true);
           } finally {
-            inFlightChunksRef.current.delete(index);
+            inFlight.delete(index);
           }
         }),
       );
       // Outside the cancelled guard: a superseded pass still has to put
       // the spinner down, or it spins for the rest of the session.
       setIsLoadingChunks(inFlightChunksRef.current.size > 0);
-      if (cancelled) return;
-      setChunkTick((tick) => tick + 1);
+      // Repaint whenever this pass's store is still the live one, even
+      // if a scroll superseded the pass: the next pass skipped these
+      // chunks as in flight, so nobody else will ask for the paint.
+      if (store === fetchedChunksRef.current) setChunkTick((tick) => tick + 1);
     };
 
     void load();
     return () => {
+      // The requests keep running and stay marked in flight; dropping
+      // the marks here made every scroll re-request chunks already on
+      // their way.
       cancelled = true;
-      for (const index of missing) inFlightChunksRef.current.delete(index);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [neededChunkKey, storeVersion, serverChunks]);
+  }, [neededChunkKey, storeVersion, serverChunks, fetchesChunks]);
 
   // The grid's own search filters what it has loaded, which is the
   // dates near where you have scrolled. That narrows the view; it does
@@ -1707,7 +1819,9 @@ export function CalendarView({
   // matches half the table.
   useEffect(() => {
     const query = calendarSearchQuery.trim();
-    if (readOnly || query.length < 2) {
+    // The grid's own search over the loaded dates still works for a
+    // member limited to some cars; the all-history one is refused them.
+    if (readOnly || limitedToVehicles || query.length < 2) {
       setSearchHits([]);
       setSearchTruncated(false);
       setSearchFailed(false);
@@ -1767,7 +1881,7 @@ export function CalendarView({
   // account, not one per day, so windowing them would cost more in
   // requests than it saves in rows.
   useEffect(() => {
-    if (readOnly) return;
+    if (readOnly || limitedToVehicles) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -1988,7 +2102,7 @@ export function CalendarView({
     setIsRefreshing(true);
     setChunkError(false);
     fetchedChunksRef.current = new Map();
-    inFlightChunksRef.current.clear();
+    inFlightChunksRef.current = new Set();
     setStoreVersion((version) => version + 1);
     router.refresh();
     window.setTimeout(() => setIsRefreshing(false), 800);
@@ -2069,6 +2183,24 @@ export function CalendarView({
     settle();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timelineViewportWidth, dayColumnWidth]);
+
+  // Keeps the date in place when the columns change width.
+  //
+  // The scroll position is pixels, and a date is pixels divided by the
+  // column width -- so widening the columns with the zoom slider,
+  // turning a phone sideways (its columns are a seventh of the screen),
+  // or crossing from the desktop layout to the phone one all kept the
+  // pixel and moved the date: going 1440px to 375px jumped from early
+  // October to January. Rescaling by the ratio holds the leading day.
+  const anchoredDayWidthRef = useRef(dayColumnWidth);
+  useLayoutEffect(() => {
+    const previous = anchoredDayWidthRef.current;
+    anchoredDayWidthRef.current = dayColumnWidth;
+    const node = timelineViewportRef.current;
+    if (!node || !didInitialScrollRef.current || previous === dayColumnWidth || previous <= 0) return;
+    node.scrollLeft = (node.scrollLeft / previous) * dayColumnWidth;
+    setScrollLeft(node.scrollLeft);
+  }, [dayColumnWidth]);
 
   // The address bar follows the calendar, so a refresh, a bookmark or
   // a link pasted to a colleague all land where you were rather than
@@ -2311,7 +2443,7 @@ export function CalendarView({
                 &#8250;
               </button>
             </div>
-            <button type="button" onClick={() => scrollToDate(today)} className={secondaryActionClass}>
+            <button type="button" onClick={() => scrollToDate(nowDay)} className={secondaryActionClass}>
               {calendarMessages.today}
             </button>
 
@@ -2326,17 +2458,21 @@ export function CalendarView({
                     onSelect: openCreateOrderDialog,
                     disabled: vehicleOptions.length === 0,
                   },
-                  {
-                    key: "recurring",
-                    label: calendarMessages.recurringAction,
-                    onSelect: () => setIsRecurringOpen(true),
-                    disabled: vehicleOptions.length === 0,
-                  },
-                  {
-                    key: "vehicle",
-                    label: calendarMessages.addVehicleAction.replace(/^\+\s*/, ""),
-                    onSelect: () => setIsAddVehicleOpen(true),
-                  },
+                  ...(limitedToVehicles
+                    ? []
+                    : [
+                        {
+                          key: "recurring",
+                          label: calendarMessages.recurringAction,
+                          onSelect: () => setIsRecurringOpen(true),
+                          disabled: vehicleOptions.length === 0,
+                        },
+                        {
+                          key: "vehicle",
+                          label: calendarMessages.addVehicleAction.replace(/^\+\s*/, ""),
+                          onSelect: () => setIsAddVehicleOpen(true),
+                        },
+                      ]),
                 ]}
               />
             ) : null}
@@ -2475,17 +2611,21 @@ export function CalendarView({
                 label={calendarMessages.menuTools}
                 align="right"
                 items={[
-                  {
-                    key: "bulk",
-                    label: calendarMessages.bulkModeEnter,
-                    checked: bulkMode,
-                    onSelect: toggleBulkMode,
-                  },
-                  {
-                    key: "feed",
-                    label: calendarMessages.feedAction,
-                    onSelect: () => setIsFeedOpen(true),
-                  },
+                  ...(limitedToVehicles
+                    ? []
+                    : [
+                        {
+                          key: "bulk",
+                          label: calendarMessages.bulkModeEnter,
+                          checked: bulkMode,
+                          onSelect: toggleBulkMode,
+                        },
+                        {
+                          key: "feed",
+                          label: calendarMessages.feedAction,
+                          onSelect: () => setIsFeedOpen(true),
+                        },
+                      ]),
                   {
                     key: "export",
                     label: calendarMessages.downloadOrders,
@@ -2743,6 +2883,26 @@ export function CalendarView({
             </div>
 
             <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 xl:justify-end">
+              {/* What the colours mean. Learnt once, but until then a
+                  blue bar and a green one were two shades of "a trip". */}
+              <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[color:var(--ink-soft)]">
+                {(
+                  [
+                    ["unsynced", "h-2.5 w-4 rounded-sm bg-[#3456df]"],
+                    ["synced", "h-2.5 w-4 rounded-sm bg-[#2f7f67]"],
+                    ["conflict", "h-2.5 w-4 rounded-sm bg-[#e5484d]"],
+                    ["service", "h-2.5 w-4 rounded-sm border border-amber-500 bg-amber-300"],
+                    ["cancelled", "h-2 w-4 rounded-sm border border-dashed border-[rgba(17,19,24,0.35)] bg-[rgba(17,19,24,0.10)]"],
+                    ["now", "h-3 w-[2px] bg-[var(--accent)]"],
+                    ["turnaround", "h-2.5 w-2.5 rounded-full border border-amber-400 bg-amber-100"],
+                  ] as const
+                ).map(([key, swatch]) => (
+                  <li key={key} className="flex items-center gap-1.5 whitespace-nowrap">
+                    <span aria-hidden className={cn("inline-block shrink-0", swatch)} />
+                    {calendarMessages.barLegend[key]}
+                  </li>
+                ))}
+              </ul>
               {normalizedCalendarSearchQuery ? (
                 <span className="rounded-full bg-[rgba(255,231,122,0.58)] px-2.5 py-0.5 text-[11px] font-semibold text-[color:var(--ink)]">
                   {calendarMessages.summary(sortedVehicles.length, visibleOrders.length)}
@@ -2804,10 +2964,12 @@ export function CalendarView({
           }
           onClose={() => setMonthCalendarFor(null)}
           onSelectOrder={(order) => {
-            // The month view hands back a trimmed record; the panel
-            // wants the full one, which the grid already holds.
-            const full = orders.find((item) => item.id === order.id);
-            if (!full) return;
+            // The grid's copy when it has one. A trip months away is
+            // not loaded here, and clicking it used to do nothing; the
+            // month view fetched it from the same route the grid uses,
+            // so its record is already the full shape.
+            const full =
+              orders.find((item) => item.id === order.id) ?? (order as unknown as CalendarOrder);
             setMonthCalendarFor(null);
             setSelectedOrder(full);
             setOrderPopover({ isOpen: true });
@@ -2914,6 +3076,8 @@ export function CalendarView({
 
                 {/* Its own row on a phone. Sharing one with four buttons
                     left the field three letters wide. */}
+                {!limitedToVehicles ? (
+                <>
                 <label className="flex min-w-0 flex-1 items-center gap-1.5 max-sm:basis-full">
                   <span className="whitespace-nowrap text-[color:var(--ink-soft)]">
                     {calendarMessages.noteLabel}
@@ -2942,6 +3106,8 @@ export function CalendarView({
                     ? calendarMessages.noteSavingAction
                     : calendarMessages.noteSaveAction}
                 </button>
+                </>
+                ) : null}
                 <button
                   type="button"
                   onClick={clearDaySelection}
@@ -3060,31 +3226,57 @@ export function CalendarView({
                 <div className="relative" style={{ width: timelineWidth }}>
                 {visibleDays.map(({ date, index }) => {
                   const weekend = [0, 6].includes(date.getDay());
-                  const todayColumn = isSameDay(date, today);
+                  const todayColumn = isSameDay(date, nowDay);
 
                   return (
                     <div
                       key={index}
                       className={cn(
                         "absolute inset-y-0 border-r border-[color:var(--line)] px-1 py-1.5 text-center",
-                        weekend ? "bg-[#f3ede4]" : "bg-[rgba(255,251,246,0.9)]",
-                        todayColumn ? "bg-[rgba(89,60,251,0.14)]" : "",
+                        // One background each: two bg classes on one
+                        // element let the stylesheet's order pick, and a
+                        // weekend today came out as a plain weekend.
+                        todayColumn
+                          ? "bg-[rgba(89,60,251,0.14)]"
+                          : weekend
+                            ? "bg-[#f3ede4]"
+                            : "bg-[rgba(255,251,246,0.9)]",
                       )}
                       style={{ left: index * dayColumnWidth, width: dayColumnWidth }}
                     >
                       {/* Bigger. This row is the calendar's own axis --
                           every bar below is read against it -- and it
                           was set two steps smaller than the body text
-                          it labels. */}
-                      <p className="truncate text-[11px] font-semibold uppercase tracking-[0.04em] text-[color:var(--ink-soft)] max-lg:text-[9px] max-lg:tracking-normal">
-                        {formatWeekday(date, locale, compact)}
+                          it labels. Today's column says so in words, in
+                          the accent, so it is found without counting. */}
+                      <p
+                        className={cn(
+                          "truncate text-[11px] font-semibold uppercase tracking-[0.04em] max-lg:text-[9px] max-lg:tracking-normal",
+                          todayColumn ? "text-[var(--accent)]" : "text-[color:var(--ink-soft)]",
+                        )}
+                      >
+                        {todayColumn && !compact ? calendarMessages.today : formatWeekday(date, locale, compact)}
                       </p>
-                      <p className="mt-0.5 whitespace-nowrap text-[14px] font-bold leading-tight text-[color:var(--ink)] tabular-nums max-lg:text-[11px]">
+                      <p
+                        className={cn(
+                          "mt-0.5 whitespace-nowrap text-[14px] font-bold leading-tight tabular-nums max-lg:text-[11px]",
+                          todayColumn ? "text-[var(--accent)]" : "text-[color:var(--ink)]",
+                        )}
+                      >
                         {formatTimelineDateLabel(date)}
                       </p>
                     </div>
                   );
                 })}
+                {/* Now, as a notch at the foot of the date row; the line
+                    itself runs down every row below. */}
+                {nowOffset !== null ? (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute bottom-0 h-1.5 w-1.5 -translate-x-1/2 translate-y-1/2 rounded-full bg-[var(--accent)]"
+                    style={{ left: nowOffset }}
+                  />
+                ) : null}
                 </div>
               </div>
 
@@ -3112,6 +3304,43 @@ export function CalendarView({
                   (rowNotes.length > 0 ? NOTE_BAND_HEIGHT + 2 : 0) +
                   (rowCancelled.length > 0 ? CANCELLED_BAND_HEIGHT + 2 : 0) +
                   (rowServices.length > 0 ? SERVICE_BAND_HEIGHT + 2 : 0);
+                // The strips along the foot of the row, stacked.
+                const bandsHeight =
+                  (rowNotes.length > 0 ? NOTE_BAND_HEIGHT + 3 : 0) +
+                  (rowCancelled.length > 0 ? CANCELLED_BAND_HEIGHT + 3 : 0) +
+                  (rowServices.length > 0 ? SERVICE_BAND_HEIGHT + 3 : 0);
+                // Back-to-back trips on this car with only hours between
+                // them: the car has to be turned around -- cleaned,
+                // charged, checked -- in that gap. Overlaps are already
+                // red; this is the tight-but-legal case.
+                const turnarounds: Array<{ key: string; left: number; top: number; hours: number }> = [];
+                // Not while searching: the bars dim, and a bright marker
+                // between two dimmed trips pointed at nothing.
+                if (!compact && !normalizedCalendarSearchQuery) {
+                  const ordered = [...bars].sort(
+                    (a, b) =>
+                      new Date(a.order.pickupDatetime).getTime() -
+                      new Date(b.order.pickupDatetime).getTime(),
+                  );
+                  // Against the latest return so far, not just the trip
+                  // before: when two trips overlap, the next one out
+                  // waits for whichever comes back last.
+                  let latest = ordered[0];
+                  for (let position = 1; position < ordered.length; position += 1) {
+                    const next = ordered[position];
+                    const latestReturn = new Date(latest.order.returnDatetime).getTime();
+                    const gapMs = new Date(next.order.pickupDatetime).getTime() - latestReturn;
+                    if (gapMs >= 0 && gapMs <= TURNAROUND_ALERT_MS) {
+                      turnarounds.push({
+                        key: `${latest.order.id}:${next.order.id}`,
+                        left: next.left,
+                        top: barTopOffset + Math.max(latest.lane, next.lane) * laneHeight + barHeight - 6,
+                        hours: gapMs / 3_600_000,
+                      });
+                    }
+                    if (new Date(next.order.returnDatetime).getTime() > latestReturn) latest = next;
+                  }
+                }
                 const alternateRow = index % 2 === 1;
                 const rowSelection =
                   daySelection?.vehicleId === vehicle.id ? daySelection.days : null;
@@ -3119,7 +3348,7 @@ export function CalendarView({
                 return (
                   <div
                     key={vehicle.id}
-                    className="grid border-b border-[color:var(--line)] last:border-b-0"
+                    className="group/row grid border-b border-[color:var(--line)] last:border-b-0"
                     style={{
                       gridTemplateColumns: `${vehicleColumnWidth}px ${timelineWidth}px`,
                     }}
@@ -3134,6 +3363,10 @@ export function CalendarView({
                         // and five percent of that was enough to read
                         // as ghost text through the plate numbers.
                         alternateRow ? "bg-[#faf4eb]" : "bg-white",
+                        // The row under the pointer lights its plate, so
+                        // a bar far to the right is read against the
+                        // right car without tracing the line back.
+                        "transition-colors group-hover/row:bg-[var(--accent-soft-strong)]",
                       )}
                       style={{ height: rowHeight }}
                       title={[vehicle.plateNumber, vehicle.secondaryLabel, vehicle.ownerName]
@@ -3298,14 +3531,18 @@ export function CalendarView({
                                 key={`price-${key}`}
                                 aria-hidden
                                 className={cn(
-                                  "pointer-events-none absolute bottom-0.5 text-center text-[9px] leading-none tabular-nums",
+                                  "pointer-events-none absolute text-center text-[9px] leading-none tabular-nums",
                                   resolved.dynamic
                                     ? "font-bold text-[color:var(--brand)]"
                                     : resolved.fixed
                                       ? "font-bold text-[color:var(--ink)]"
                                       : "text-[color:var(--ink-soft)]",
                                 )}
-                                style={{ left: index * dayColumnWidth, width: dayColumnWidth }}
+                                // Above the note, cancelled and service
+                                // bands: at the foot of the row they ran
+                                // underneath them, "$64" through a
+                                // struck-out renter's name.
+                                style={{ left: index * dayColumnWidth, width: dayColumnWidth, bottom: bandsHeight + 2 }}
                               >
                                 {dayPriceFormat.formatToParts(resolved.price).map((part, partIndex) =>
                                   part.type === "currency" ? (
@@ -3327,6 +3564,18 @@ export function CalendarView({
                           aria-hidden
                           className="pointer-events-none absolute inset-y-0 bg-[rgba(89,60,251,0.08)]"
                           style={{ left: todayColumnOffset, width: dayColumnWidth }}
+                        />
+                      ) : null}
+                      {/* Now, to the minute. Which trips are out, which
+                          have just come back and which go next is read
+                          off which side of this line a bar is on. Over
+                          the bars, under the bands and anything clickable
+                          on them. */}
+                      {nowOffset !== null ? (
+                        <div
+                          aria-hidden
+                          className="pointer-events-none absolute inset-y-0 z-[5] w-[2px] -translate-x-1/2 bg-[var(--accent)]/70"
+                          style={{ left: nowOffset }}
                         />
                       ) : null}
 
@@ -3390,8 +3639,12 @@ export function CalendarView({
                         const from = Math.max(start, canvasStart.getTime());
                         const to = Math.min(end, rangeEndExclusive.getTime());
                         if (to <= from) return null;
-                        const left = ((from - canvasStart.getTime()) / DAY_IN_MS) * dayColumnWidth;
-                        const width = Math.max(((to - from) / DAY_IN_MS) * dayColumnWidth, 14);
+                        const left = columnPosition(from, canvasStart.getTime()) * dayColumnWidth;
+                        const width = Math.max(
+                          (columnPosition(to, canvasStart.getTime()) - columnPosition(from, canvasStart.getTime())) *
+                            dayColumnWidth,
+                          14,
+                        );
                         return (
                           <button
                             key={order.id}
@@ -3528,6 +3781,7 @@ export function CalendarView({
                               compact,
                               !orderMatchesSearch(bar.order),
                               bulkSelection.has(bar.order.id),
+                              nowMs !== null && new Date(bar.order.returnDatetime).getTime() < nowMs,
                             )}
                             style={{
                               left: bar.left,
@@ -3572,6 +3826,17 @@ export function CalendarView({
                           </button>
                         );
                       })}
+
+                      {turnarounds.map((turnaround) => (
+                        <span
+                          key={turnaround.key}
+                          aria-hidden
+                          className="pointer-events-none absolute z-[6] -translate-x-1/2 whitespace-nowrap rounded-full border border-amber-400 bg-amber-100 px-1 text-[9px] font-bold leading-[12px] text-amber-900 tabular-nums"
+                          style={{ left: turnaround.left, top: turnaround.top }}
+                        >
+                          {calendarMessages.turnaroundLabel(turnaround.hours)}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 );

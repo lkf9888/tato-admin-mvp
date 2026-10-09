@@ -6,6 +6,7 @@ import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { dateToDateOnly } from "@/lib/direct-booking";
 import { MobileCalendarSwitch } from "@/components/mobile-calendar-switch";
 import { MobileScheduleList } from "@/components/mobile-schedule-list";
+import { userRole } from "@/lib/access";
 import { requireAccessContext } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
@@ -39,7 +40,10 @@ function initialWindow() {
 }
 
 export default async function CalendarPage() {
-  const { workspace, vehicleIds } = await requireAccessContext();
+  const { user, workspace, vehicleIds } = await requireAccessContext();
+  // A viewer can open the calendar but every save is refused for them,
+  // so they get the read-only grid rather than buttons that fail.
+  const viewOnly = userRole(user) === "VIEWER";
   // A car-limited member sees their cars, their trips and those cars' owners.
   const carFilter = vehicleIds ? { id: { in: vehicleIds } } : {};
   const { from, to, indexes } = initialWindow();
@@ -135,6 +139,8 @@ export default async function CalendarPage() {
   const calendarView = (
     <CalendarView
       locale={locale}
+      limitedToVehicles={Boolean(vehicleIds)}
+      readOnly={viewOnly}
       pricing={{
         seasonality,
         overrides: priceOverrides,

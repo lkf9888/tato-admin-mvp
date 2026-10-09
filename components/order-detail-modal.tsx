@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ExternalLink, Pencil, ReceiptText, Save, Share2, Trash2, X } from "lucide-react";
+import { ArrowRight, Check, ExternalLink, MapPin, Pencil, Phone, Plus, ReceiptText, Save, Share2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { BookingExtraChargePanel } from "@/components/booking-extra-charge-panel";
@@ -11,7 +11,7 @@ import { OrderAttachments } from "@/components/order-attachments";
 import { rememberOrder } from "@/components/remember-order";
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
-import { getOrderStatusOptions, getStatusLabel, type Locale } from "@/lib/i18n";
+import { getLocaleTag, getMessages, getOrderStatusOptions, getStatusLabel, type Locale } from "@/lib/i18n";
 import {
   cn,
   formatCurrency,
@@ -80,6 +80,8 @@ type FieldKey =
   | "returnTime"
   | "pickupLocation"
   | "returnLocation"
+  /** Pick-up and return place at once, while they are the same. */
+  | "locations"
   | "totalPrice"
   | "depositAmount"
   | "paymentMethod"
@@ -131,166 +133,6 @@ function buildDraft(order: EditableOrder): OrderDraft {
   };
 }
 
-function labels(locale: Locale) {
-  return locale === "zh"
-    ? {
-        title: "订单详情与编辑",
-        close: "关闭",
-        edit: "编辑",
-        save: "保存",
-        saving: "保存中...",
-        cancel: "取消",
-        delete: "删除订单",
-        deleting: "删除中...",
-        deleteConfirm: "确认要从日历中删除这条订单吗？照片和文件会保留，可以在回收站里恢复。",
-        duplicate: "复制订单",
-        duplicating: "复制中…",
-        duplicateHint: "在这一单结束之后新建一张同样长度的订单",
-        duplicateFailed: "复制失败，请重试。",
-        duplicated: "已复制：新订单从本单结束时开始。",
-        conflictHeading: "这段时间该车已有订单：",
-        conflictRow: (renter: string, range: string) => `${renter} · ${range}`,
-        payments: "分期付款",
-        paymentsAdd: "+ 添加一笔",
-        paymentsAmount: "金额",
-        paymentsPaidAt: "付款日",
-        paymentsPayer: "付款人",
-        paymentsMethod: "方式",
-        paymentsRemove: "删除",
-        paymentsSave: "保存付款计划",
-        paymentsSaving: "保存中…",
-        paymentsSaved: "付款计划已保存。",
-        paymentsFailed: "付款计划没能保存，请重试。",
-        paymentsTotalPaid: "已付",
-        paymentsRemaining: "未付",
-        paymentsSettled: "已付清",
-        saveError: "订单暂时无法保存，请检查必填项后重试。",
-        deleteError: "订单暂时无法删除，请稍后再试。",
-        paidDirectBooking: "这笔是客人在线付过款的订单，不能直接取消或删除。请用下面的「取消并退款」处理，先决定给客人退多少。",
-        validationError: "请填写租客、车辆与正确的取还车时间。",
-        vehicle: "车辆",
-        status: "状态",
-        renter: "租客姓名",
-        phone: "电话",
-        pickupTime: "取车时间",
-        returnTime: "还车时间",
-        totalPrice: "订单金额",
-        deposit: "押金",
-        pickupLocation: "取车地点",
-        returnLocation: "还车地点",
-        paymentMethod: "付款方式",
-        contractNumber: "合同编号",
-        notes: "备注",
-        owner: "车主",
-        source: "来源",
-        createdBy: "创建人",
-        externalOrderId: "外部订单号",
-        attachments: "照片 / 视频 / 合约文件",
-        readOnly: "共享视图只读",
-        ownerShare: "车主共享",
-        ownerShareHelp: "同步后，这条订单会出现在车主共享日历和车主分成流水账中。",
-        ownerShareNotAssigned: "车辆还没有绑定车主，暂时无法同步。",
-        ownerShareUnsynced: "未同步给车主",
-        ownerShareSynced: "已同步给车主",
-        ownerShareSync: "同步给车主共享",
-        viewOnTuro: "查看Turo订单",
-        viewTuroReceipt: "查看Turo订单收据",
-        ownerShareResync: "重新同步",
-        ownerShareSyncing: "同步中...",
-        ownerShareSyncSuccess: "已同步到车主共享。",
-        ownerShareSyncError: "同步失败，请稍后再试。",
-        ownerShareSyncOwnerRequired: "请先给车辆绑定车主。",
-        ownerShareLastSynced: "最后同步",
-        accounting: "会计信息",
-        feeBreakdown: "费用明细(来自 Turo CSV)",
-        cleaningFee: "洗车费",
-        cleaningFeeFrom: "生效日",
-        cleaningFeeHint:
-          "洗车费是车辆的价格,不是这一单的属性。保存后,这台车在生效日当天及以后开始的所有订单都按这个金额计费,之前的订单不受影响。",
-        cleaningFeeOnTrip: (amount: string) =>
-          `这一单按 ${amount} 计费 —— 它开始于生效日之前,所以用的是当时的价格。上面的金额是这台车现在的洗车费。`,
-      }
-    : {
-        title: "Order details and edits",
-        close: "Close",
-        edit: "Edit",
-        save: "Save",
-        saving: "Saving...",
-        cancel: "Cancel",
-        delete: "Delete order",
-        deleting: "Deleting...",
-        deleteConfirm:
-          "Delete this order from the calendar? Photos and files are preserved, and you can restore it from Trash.",
-        duplicate: "Duplicate",
-        duplicating: "Duplicating...",
-        duplicateHint: "Create the same trip again, starting when this one ends",
-        duplicateFailed: "That order could not be duplicated. Please try again.",
-        duplicated: "Duplicated: the new trip starts when this one ends.",
-        conflictHeading: "This car already has trips over those dates:",
-        conflictRow: (renter: string, range: string) => `${renter} · ${range}`,
-        payments: "Payment schedule",
-        paymentsAdd: "+ Add instalment",
-        paymentsAmount: "Amount",
-        paymentsPaidAt: "Paid on",
-        paymentsPayer: "Payer",
-        paymentsMethod: "Method",
-        paymentsRemove: "Remove",
-        paymentsSave: "Save schedule",
-        paymentsSaving: "Saving...",
-        paymentsSaved: "Payment schedule saved.",
-        paymentsFailed: "The schedule could not be saved. Please try again.",
-        paymentsTotalPaid: "Paid",
-        paymentsRemaining: "Outstanding",
-        paymentsSettled: "Paid off",
-        saveError: "We could not save this order. Check the required fields and try again.",
-        deleteError: "We could not delete this order right now. Please try again.",
-        paidDirectBooking:
-          "The renter paid for this booking online, so it cannot be cancelled or deleted here. Use Cancel and refund below to decide the refund first.",
-        validationError: "Complete renter, vehicle, and a valid pickup/return window.",
-        vehicle: "Vehicle",
-        status: "Status",
-        renter: "Renter name",
-        phone: "Phone",
-        pickupTime: "Pickup time",
-        returnTime: "Return time",
-        totalPrice: "Total price",
-        deposit: "Deposit",
-        pickupLocation: "Pickup location",
-        returnLocation: "Return location",
-        paymentMethod: "Payment method",
-        contractNumber: "Contract number",
-        notes: "Notes",
-        owner: "Owner",
-        source: "Source",
-        createdBy: "Created by",
-        externalOrderId: "External order ID",
-        attachments: "Photos / videos / contract files",
-        readOnly: "Shared view is read-only",
-        ownerShare: "Owner share",
-        ownerShareHelp: "After sync, this order appears in the owner share calendar and owner ledger.",
-        ownerShareNotAssigned: "Assign this vehicle to an owner before syncing.",
-        ownerShareUnsynced: "Not shared with owner",
-        ownerShareSynced: "Shared with owner",
-        ownerShareSync: "Sync to owner share",
-        viewOnTuro: "View on Turo",
-        viewTuroReceipt: "View Turo receipt",
-        ownerShareResync: "Resync",
-        ownerShareSyncing: "Syncing...",
-        ownerShareSyncSuccess: "Synced to owner share.",
-        ownerShareSyncError: "Sync failed. Please try again.",
-        ownerShareSyncOwnerRequired: "Assign this vehicle to an owner first.",
-        ownerShareLastSynced: "Last synced",
-        accounting: "Accounting",
-        feeBreakdown: "Charges on this trip (from the Turo CSV)",
-        cleaningFee: "Cleaning fee",
-        cleaningFeeFrom: "From",
-        cleaningFeeHint:
-          "The cleaning fee is a price on the car, not a property of this order. Saving it charges this amount on every trip that car starts on or after the chosen date. Earlier trips are untouched.",
-        cleaningFeeOnTrip: (amount: string) =>
-          `This trip is charged ${amount} — it started before the date above, so it keeps the price from then. The figure above is the car's fee today.`,
-      };
-}
-
 /**
  * One field's chrome: its label, and a pencil that turns into a save
  * and a cancel once clicked.
@@ -312,6 +154,7 @@ function labels(locale: Locale) {
  */
 function EditableField({
   className,
+  variant = "box",
   labelText,
   canEdit,
   editing,
@@ -327,6 +170,9 @@ function EditableField({
   children,
 }: {
   className?: string;
+  /** `bare` drops the box for fields that sit inside a card of their
+   *  own (the trip's times and places); the box comes back while editing. */
+  variant?: "box" | "bare" | "note";
   labelText: string;
   canEdit: boolean;
   editing: boolean;
@@ -350,7 +196,11 @@ function EditableField({
         "grid min-w-0 gap-0 rounded-md border px-2.5 py-1 transition [&_input[readonly]]:min-h-0",
         editing
           ? "border-[var(--accent)] bg-white shadow-[0_0_0_3px_rgba(89,60,251,0.1)]"
-          : "border-[rgba(17,19,24,0.1)] bg-white/84 focus-within:border-[rgba(17,19,24,0.28)]",
+          : variant === "bare"
+            ? "border-transparent bg-transparent px-1.5 hover:bg-[var(--surface-muted)]/60"
+            : variant === "note"
+              ? "border-amber-200 bg-amber-50/70"
+              : "border-[rgba(17,19,24,0.1)] bg-white/84 focus-within:border-[rgba(17,19,24,0.28)]",
         className,
       )}
       onKeyDown={onKeyDown}
@@ -409,6 +259,124 @@ function EditableField({
   );
 }
 
+type PanelCopy = ReturnType<typeof getMessages>["orderPanel"];
+
+/** A trip's length the way Turo bills it: whole days, then hours. */
+function tripLength(fromIso: string, toIso: string) {
+  const hours = Math.max(
+    0,
+    Math.round((new Date(toIso).getTime() - new Date(fromIso).getTime()) / 3_600_000),
+  );
+  return { days: Math.floor(hours / 24), hours: hours % 24 };
+}
+
+/** Days since the epoch for a local calendar day -- only ever subtracted. */
+function localDayNumber(value: Date) {
+  return Math.round(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()) / 86_400_000);
+}
+
+type TripPhaseTone = "today" | "upcoming" | "ongoing" | "ended" | "cancelled";
+
+const PHASE_TONE_CLASSES: Record<TripPhaseTone, string> = {
+  today: "bg-amber-100 text-amber-900",
+  upcoming: "bg-sky-50 text-sky-800",
+  ongoing: "bg-emerald-50 text-emerald-800",
+  ended: "bg-[var(--surface-muted)] text-[color:var(--ink-mid)]",
+  cancelled: "bg-rose-50 text-rose-700",
+};
+
+/**
+ * Where this trip stands relative to now, in the words an operator
+ * would use: "pick-up tomorrow 19:00", "on trip, 2 days left". The
+ * stored status says booked/ongoing/completed, which is right for the
+ * books but only as fresh as the last sync; the clock is always right.
+ * A handover today or tomorrow is called out by its time, since that
+ * is the thing to act on.
+ */
+function tripPhase(
+  order: Pick<EditableOrder, "status" | "pickupDatetime" | "returnDatetime">,
+  now: Date,
+  t: PanelCopy,
+  locale: Locale,
+): { tone: TripPhaseTone; label: string } {
+  if (order.status === "cancelled") {
+    return { tone: "cancelled", label: getStatusLabel("cancelled", locale) };
+  }
+  const pickup = new Date(order.pickupDatetime);
+  const end = new Date(order.returnDatetime);
+  const today = localDayNumber(now);
+  if (now < pickup) {
+    const days = localDayNumber(pickup) - today;
+    if (days === 0) return { tone: "today", label: t.phasePickupToday(formatTimeInputDisplay(pickup)) };
+    if (days === 1) return { tone: "upcoming", label: t.phasePickupTomorrow(formatTimeInputDisplay(pickup)) };
+    return { tone: "upcoming", label: t.phasePickupIn(days) };
+  }
+  if (now < end) {
+    const days = localDayNumber(end) - today;
+    if (days === 0) return { tone: "today", label: t.phaseReturnToday(formatTimeInputDisplay(end)) };
+    if (days === 1) return { tone: "ongoing", label: t.phaseReturnTomorrow(formatTimeInputDisplay(end)) };
+    const left = tripLength(now.toISOString(), order.returnDatetime);
+    return { tone: "ongoing", label: t.phaseOngoing(t.duration(left.days, left.hours)) };
+  }
+  return { tone: "ended", label: t.phaseEnded(today - localDayNumber(end)) };
+}
+
+/** A handover moment: the day on one line, the clock time large under it. */
+function TripMoment({ value, locale }: { value: string; locale: Locale }) {
+  const date = new Date(value);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  const tag = getLocaleTag(locale);
+  // English reads "Thu, Oct 8" in one go; Chinese runs "10/8周四"
+  // together, so the weekday is set apart: "10月8日 周四".
+  const day =
+    locale === "en"
+      ? new Intl.DateTimeFormat(tag, {
+          ...(sameYear ? {} : { year: "numeric" }),
+          month: "short",
+          day: "numeric",
+          weekday: "short",
+        }).format(date)
+      : `${new Intl.DateTimeFormat(tag, {
+          ...(sameYear ? {} : { year: "numeric" }),
+          month: "long",
+          day: "numeric",
+        }).format(date)} ${new Intl.DateTimeFormat(tag, { weekday: "short" }).format(date)}`;
+  return (
+    <span className="block min-w-0 pb-0.5">
+      <span className="block truncate text-[13px] font-medium leading-5 text-[color:var(--ink-mid)]">{day}</span>
+      <span className="block text-[22px] font-semibold leading-7 tabular-nums tracking-[-0.01em] text-[color:var(--ink)]">
+        {formatTimeInputDisplay(date)}
+      </span>
+    </span>
+  );
+}
+
+function LocationInput({
+  value,
+  onChange,
+  editing,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  editing: boolean;
+  className: string;
+}) {
+  return (
+    <span className="flex min-w-0 items-center gap-1">
+      <MapPin className="h-3.5 w-3.5 shrink-0 text-[color:var(--ink-soft)]" aria-hidden />
+      <input
+        value={value}
+        title={value || undefined}
+        onChange={(event) => onChange(event.target.value)}
+        readOnly={!editing}
+        autoFocus={editing}
+        className={className}
+      />
+    </span>
+  );
+}
+
 export function OrderDetailModal({
   order,
   vehicleOptions,
@@ -429,7 +397,7 @@ export function OrderDetailModal({
   onDeleted?: (orderId: string) => void;
 }) {
   const router = useRouter();
-  const t = labels(locale);
+  const t = getMessages(locale).orderPanel;
   const statusOptions = getOrderStatusOptions(locale);
   const [currentOrder, setCurrentOrder] = useState(order);
   const [draft, setDraft] = useState<OrderDraft>(() => buildDraft(order));
@@ -498,6 +466,49 @@ export function OrderDetailModal({
   const turoTripUrl = turoReservationUrl({ source: currentOrder.source, externalOrderId: currentOrder.externalOrderId ?? null });
   const turoReceiptUrl = turoReservationUrl({ source: currentOrder.source, externalOrderId: currentOrder.externalOrderId ?? null }, "receipt");
   const ownerShareSyncedAt = currentOrder.ownerLedgerSyncedAt ?? null;
+  const ownerName = selectedVehicle?.ownerName ?? currentOrder.ownerName ?? null;
+  const phase = tripPhase(currentOrder, new Date(), t, locale);
+  const length = tripLength(currentOrder.pickupDatetime, currentOrder.returnDatetime);
+  const editingTime = editingField === "pickupTime" || editingField === "returnTime";
+
+  const pickupLocation = currentOrder.pickupLocation?.trim() ?? "";
+  const returnLocation = currentOrder.returnLocation?.trim() ?? "";
+  const editingOneLocation = editingField === "pickupLocation" || editingField === "returnLocation";
+  const showCombinedLocation =
+    editingField === "locations" ||
+    (!editingOneLocation && pickupLocation !== "" && pickupLocation === returnLocation);
+  const showPickupLocation = pickupLocation !== "" || editingOneLocation;
+  const showReturnLocation = returnLocation !== "" || editingOneLocation;
+
+  /** Optional fields take a box only when they hold something. */
+  const filled: Partial<Record<FieldKey, boolean>> = {
+    renterPhone: Boolean(currentOrder.renterPhone?.trim()),
+    depositAmount: currentOrder.depositAmount != null,
+    paymentMethod: Boolean(currentOrder.paymentMethod?.trim()),
+    contractNumber: Boolean(currentOrder.contractNumber?.trim()),
+    cleaningFee: (currentOrder.cleaningFee ?? 0) > 0,
+    notes: Boolean(currentOrder.notes?.trim()),
+  };
+  const showField = (field: FieldKey) => filled[field] !== false || editingField === field;
+  const addChips: Array<[FieldKey, string]> = [
+    ...(pickupLocation === "" && returnLocation === "" && editingField !== "locations"
+      ? ([["locations", t.sameLocation]] as Array<[FieldKey, string]>)
+      : []),
+    // Same place both ways shows one line; a different return is added here.
+    ...(showCombinedLocation && editingField !== "locations"
+      ? ([["returnLocation", t.differentReturn]] as Array<[FieldKey, string]>)
+      : []),
+    ...(
+      [
+        ["renterPhone", t.phone],
+        ["notes", t.notes],
+        ["depositAmount", t.deposit],
+        ["paymentMethod", t.paymentMethod],
+        ["contractNumber", t.contractNumber],
+        ["cleaningFee", t.cleaningFee],
+      ] as Array<[FieldKey, string]>
+    ).filter(([field]) => !showField(field)),
+  ];
 
   const updateDraft = (patch: Partial<OrderDraft>) => {
     setDraft((current) => ({ ...current, ...patch }));
@@ -883,10 +894,13 @@ export function OrderDetailModal({
         )}
         onClick={(event) => event.stopPropagation()}
       >
-        {/* One compact header: what car, whose, which state, and the
-            actions that leave this panel (Turo, owner share, close). The
-            row of four summary cards that sat under it repeated fields
-            shown again below and cost a third of a phone screen. */}
+        {/* One compact header: what car, and a line of chips that says
+            where this trip stands -- when it starts or ends relative to
+            now, whether it clashes, and whether its owner has it. Those
+            were a status word ("Booked"), an owner line reading "-", and
+            a bold sentence under them; the chips say the same in a
+            glance, and the sentence read like an error on every trip of
+            a car with no owner. */}
         <div className="sticky top-0 z-10 border-b border-[var(--line)] bg-[rgba(255,255,255,0.94)] px-3 py-2 backdrop-blur sm:px-4 sm:py-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -897,11 +911,46 @@ export function OrderDetailModal({
               </h3>
               <div className="mt-1 flex flex-wrap items-center gap-1">
                 <StatusBadge value={currentOrder.source} locale={locale} />
-                <StatusBadge value={draft.status} locale={locale} />
-                {currentOrder.hasConflict ? <StatusBadge value="conflict" locale={locale} /> : null}
-                <span className="truncate text-[11px] text-[color:var(--ink-soft)]">
-                  {t.owner}: {selectedVehicle?.ownerName ?? currentOrder.ownerName ?? "-"}
+                <span
+                  className={cn(
+                    "inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-semibold tracking-[0.02em]",
+                    PHASE_TONE_CLASSES[phase.tone],
+                  )}
+                >
+                  {phase.label}
                 </span>
+                {currentOrder.hasConflict ? (
+                  <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-semibold", PHASE_TONE_CLASSES.cancelled)}>
+                    {t.conflict}
+                  </span>
+                ) : null}
+                {ownerName ? (
+                  <span
+                    title={ownerShareSyncedAt ? `${t.ownerShareLastSynced} ${formatDateTime(ownerShareSyncedAt, locale)}` : undefined}
+                    className={cn(
+                      "inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-0.5 text-[10.5px] font-semibold",
+                      !readOnly && ownerShareSyncedAt
+                        ? "bg-emerald-50 text-emerald-800"
+                        : "bg-[var(--surface-muted)] text-[color:var(--ink-mid)]",
+                    )}
+                  >
+                    {!readOnly && ownerShareSyncedAt ? <Check className="h-3 w-3 shrink-0" aria-hidden /> : null}
+                    <span className="truncate">
+                      {t.ownerChip(ownerName)}
+                      {readOnly ? "" : ` · ${ownerShareSyncedAt ? t.ownerShareSynced : t.ownerShareUnsynced}`}
+                    </span>
+                  </span>
+                ) : (
+                  <span
+                    title={readOnly ? undefined : t.ownerShareNotAssigned}
+                    className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-900"
+                  >
+                    {t.noOwner}
+                  </span>
+                )}
+                {ownerSyncMessage ? (
+                  <span className="text-[11px] font-semibold text-emerald-700">{ownerSyncMessage}</span>
+                ) : null}
               </div>
               {/* Only the read-only notice: the caption for editors
                   ("Calendar and Orders open the same detail panel")
@@ -966,28 +1015,218 @@ export function OrderDetailModal({
               </button>
             </div>
           </div>
-          {!readOnly ? (
-            <p className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] leading-4 text-[color:var(--ink-soft)]">
-              <span className="font-semibold text-[color:var(--ink)]">
-                {ownerShareSyncedAt
-                  ? t.ownerShareSynced
-                  : selectedOwnerId
-                    ? t.ownerShareUnsynced
-                    : t.ownerShareNotAssigned}
-              </span>
-              {ownerShareSyncedAt ? <span>{formatDateTime(ownerShareSyncedAt, locale)}</span> : null}
-              {ownerSyncMessage ? <span className="font-semibold text-emerald-700">{ownerSyncMessage}</span> : null}
-            </p>
-          ) : null}
         </div>
 
         <div className="px-3 py-3 sm:px-4">
-          {/* Two columns from the narrowest phone up: a name, a phone
-              number or a status needs half a row, and a whole row each
-              is what made this panel three screens long. Fields with long
-              content, and any field being edited, take the full row. */}
-          <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:gap-2 lg:grid-cols-4">
-            <EditableField className="col-span-2 sm:col-span-1" labelText={t.vehicle} {...fieldChrome("vehicleId")}>
+          {/* The trip itself, as one card: when the car goes out, how
+              long, when it comes back, and where. These were four equal
+              boxes among twelve, so the two facts every visit to this
+              panel is about -- the handover times -- read no louder than
+              the contract number. The times are the largest type here;
+              each part still edits in place. While a time is being
+              edited the card stacks, because a date and a clock field do
+              not fit in half a phone. */}
+          <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-1.5 sm:p-2">
+            <div
+              className={cn(
+                "grid min-w-0 items-stretch gap-1",
+                editingTime ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-2",
+              )}
+            >
+              <EditableField variant="bare" labelText={t.pickupShort} {...fieldChrome("pickupTime")}>
+                {editingField === "pickupTime" ? (
+                  /* One field, two parts. The date and the clock time are
+                     a single fact -- when the car changes hands -- and two
+                     separate boxes made it read as two. Divided by a rule
+                     rather than a border so it stays one control. */
+                  <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_4.5rem] items-center gap-2">
+                    <input
+                      value={draft.pickupDate}
+                      onChange={(event) => updateDraft({ pickupDate: event.target.value })}
+                      inputMode="numeric"
+                      placeholder="yyyy/mm/dd"
+                      autoFocus
+                      className={inputClass}
+                    />
+                    <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
+                    <input
+                      value={draft.pickupTime}
+                      onChange={(event) => updateDraft({ pickupTime: event.target.value })}
+                      inputMode="numeric"
+                      placeholder="HH:mm"
+                      className={inputClass}
+                    />
+                  </div>
+                ) : (
+                  <TripMoment value={currentOrder.pickupDatetime} locale={locale} />
+                )}
+              </EditableField>
+
+              {!editingTime ? (
+                <div className="flex flex-col items-center justify-center gap-0.5 pt-3">
+                  <span className="whitespace-nowrap rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[color:var(--ink)]">
+                    {t.duration(length.days, length.hours)}
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-[color:var(--ink-soft)]" aria-hidden />
+                </div>
+              ) : null}
+
+              <EditableField variant="bare" labelText={t.returnShort} {...fieldChrome("returnTime")}>
+                {editingField === "returnTime" ? (
+                  <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_4.5rem] items-center gap-2">
+                    <input
+                      value={draft.returnDate}
+                      onChange={(event) => updateDraft({ returnDate: event.target.value })}
+                      inputMode="numeric"
+                      placeholder="yyyy/mm/dd"
+                      autoFocus
+                      className={inputClass}
+                    />
+                    <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
+                    <input
+                      value={draft.returnTime}
+                      onChange={(event) => updateDraft({ returnTime: event.target.value })}
+                      inputMode="numeric"
+                      placeholder="HH:mm"
+                      className={inputClass}
+                    />
+                  </div>
+                ) : (
+                  <TripMoment value={currentOrder.returnDatetime} locale={locale} />
+                )}
+              </EditableField>
+            </div>
+
+            {/* Where. One line when the car comes back to where it left,
+                which is most trips -- the same airport twice was a whole
+                row of repetition. Editing that line moves both. */}
+            {showCombinedLocation ? (
+              <div className="mt-1 border-t border-[var(--line)] pt-1">
+                <EditableField variant="bare" labelText={t.sameLocation} {...fieldChrome("locations")}>
+                  <LocationInput
+                    value={editingField === "locations" ? draft.pickupLocation : pickupLocation}
+                    onChange={(value) => updateDraft({ pickupLocation: value, returnLocation: value })}
+                    editing={editingField === "locations"}
+                    className={inputClass}
+                  />
+                </EditableField>
+              </div>
+            ) : showPickupLocation || showReturnLocation ? (
+              <div className="mt-1 grid min-w-0 grid-cols-2 gap-1 border-t border-[var(--line)] pt-1 sm:gap-2">
+                {showPickupLocation ? (
+                  <EditableField
+                    variant="bare"
+                    className={cn(!showReturnLocation && "col-span-2")}
+                    labelText={t.pickupLocation}
+                    {...fieldChrome("pickupLocation")}
+                  >
+                    <LocationInput
+                      value={editingField === "pickupLocation" ? draft.pickupLocation : pickupLocation}
+                      onChange={(value) => updateDraft({ pickupLocation: value })}
+                      editing={editingField === "pickupLocation"}
+                      className={inputClass}
+                    />
+                  </EditableField>
+                ) : null}
+                {showReturnLocation ? (
+                  <EditableField
+                    variant="bare"
+                    className={cn(!showPickupLocation && "col-span-2")}
+                    labelText={t.returnLocation}
+                    {...fieldChrome("returnLocation")}
+                  >
+                    <LocationInput
+                      value={editingField === "returnLocation" ? draft.returnLocation : returnLocation}
+                      onChange={(value) => updateDraft({ returnLocation: value })}
+                      editing={editingField === "returnLocation"}
+                      className={inputClass}
+                    />
+                  </EditableField>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+
+          {/* A note is an instruction for the handover ("child seat",
+              "late return approved"), so it sits right under the trip
+              rather than below the accounting where it was easy to miss. */}
+          {showField("notes") ? (
+            <div className="mt-2">
+              <EditableField variant="note" labelText={t.notes} {...fieldChrome("notes")}>
+                <textarea
+                  value={editingField === "notes" ? draft.notes : currentOrder.notes ?? ""}
+                  onChange={(event) => updateDraft({ notes: event.target.value })}
+                  readOnly={editingField !== "notes"}
+                  autoFocus={editingField === "notes"}
+                  rows={editingField === "notes" ? 4 : Math.min(4, Math.max(1, (currentOrder.notes ?? "").split("\n").length))}
+                  className="w-full min-w-0 max-w-full resize-none border-0 bg-transparent p-0 text-[13px] text-[color:var(--ink)] outline-none"
+                />
+              </EditableField>
+            </div>
+          ) : null}
+
+          {/* Who, and the two fields that change what the trip is: its
+              status and its car. Two columns from the narrowest phone
+              up; the phone is only here when there is one. */}
+          <div className="mt-2 grid min-w-0 grid-cols-2 gap-1.5 sm:gap-2 lg:grid-cols-4">
+            <EditableField labelText={t.renter} {...fieldChrome("renterName")}>
+              <input
+                value={editingField === "renterName" ? draft.renterName : currentOrder.renterName}
+                onChange={(event) => updateDraft({ renterName: event.target.value })}
+                readOnly={editingField !== "renterName"}
+                autoFocus={editingField === "renterName"}
+                className={inputClass}
+              />
+            </EditableField>
+
+            {showField("renterPhone") ? (
+              <EditableField labelText={t.phone} {...fieldChrome("renterPhone")}>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <input
+                    type="tel"
+                    value={editingField === "renterPhone" ? draft.renterPhone : displayPhone}
+                    onChange={(event) => updateDraft({ renterPhone: event.target.value })}
+                    readOnly={editingField !== "renterPhone"}
+                    autoFocus={editingField === "renterPhone"}
+                    className={inputClass}
+                  />
+                  {editingField !== "renterPhone" && !maskSensitive && currentOrder.renterPhone ? (
+                    <a
+                      href={`tel:${currentOrder.renterPhone.replace(/[^\d+]/g, "")}`}
+                      title={t.call}
+                      aria-label={t.call}
+                      className="tap-compact inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--accent)] transition hover:bg-[var(--surface-muted)]"
+                    >
+                      <Phone className="h-3.5 w-3.5" aria-hidden />
+                    </a>
+                  ) : null}
+                </span>
+              </EditableField>
+            ) : null}
+
+            <EditableField labelText={t.status} {...fieldChrome("status")}>
+              {editingField === "status" ? (
+                <SearchableSelect
+                  value={draft.status}
+                  onChange={(value) => updateDraft({ status: value as EditableOrder["status"] })}
+                  options={statusOptions.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  placeholder={t.status}
+                  searchPlaceholder={t.status}
+                  className={selectInputClass}
+                />
+              ) : (
+                <span className={cn(inputClass, "flex items-center")}>{getStatusLabel(currentOrder.status, locale)}</span>
+              )}
+            </EditableField>
+
+            <EditableField
+              className={cn(!showField("renterPhone") && "col-span-2 lg:col-span-2", editingField === "vehicleId" && "col-span-2")}
+              labelText={t.vehicle}
+              {...fieldChrome("vehicleId")}
+            >
               {editingField === "vehicleId" ? (
                 <SearchableSelect
                   value={draft.vehicleId}
@@ -1008,111 +1247,6 @@ export function OrderDetailModal({
                   {currentOrder.vehiclePlateNumber
                     ? `${currentOrder.vehiclePlateNumber} · ${currentOrder.vehicleName}`
                     : currentOrder.vehicleName}
-                </span>
-              )}
-            </EditableField>
-
-            <EditableField labelText={t.status} {...fieldChrome("status")}>
-              {editingField === "status" ? (
-                <SearchableSelect
-                  value={draft.status}
-                  onChange={(value) => updateDraft({ status: value as EditableOrder["status"] })}
-                  options={statusOptions.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  placeholder={t.status}
-                  searchPlaceholder={t.status}
-                  className={selectInputClass}
-                />
-              ) : (
-                <span className={cn(inputClass, "flex items-center")}>{getStatusLabel(currentOrder.status, locale)}</span>
-              )}
-            </EditableField>
-
-            <EditableField labelText={t.renter} {...fieldChrome("renterName")}>
-              <input
-                value={editingField === "renterName" ? draft.renterName : currentOrder.renterName}
-                onChange={(event) => updateDraft({ renterName: event.target.value })}
-                readOnly={editingField !== "renterName"}
-                autoFocus={editingField === "renterName"}
-                className={inputClass}
-              />
-            </EditableField>
-
-            <EditableField labelText={t.phone} {...fieldChrome("renterPhone")}>
-              <input
-                type="tel"
-                value={editingField === "renterPhone" ? draft.renterPhone : displayPhone}
-                onChange={(event) => updateDraft({ renterPhone: event.target.value })}
-                readOnly={editingField !== "renterPhone"}
-                autoFocus={editingField === "renterPhone"}
-                className={inputClass}
-              />
-            </EditableField>
-
-            <EditableField
-              className={cn(editingField === "pickupTime" ? "col-span-2" : "", "lg:col-span-2")}
-              labelText={t.pickupTime}
-              {...fieldChrome("pickupTime")}
-            >
-              {editingField === "pickupTime" ? (
-                /* One field, two parts. The date and the clock time are
-                   a single fact -- when the car changes hands -- and two
-                   separate boxes made it read as two. Divided by a rule
-                   rather than a border so it stays one control. */
-                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_4.5rem] items-center gap-2">
-                  <input
-                    value={draft.pickupDate}
-                    onChange={(event) => updateDraft({ pickupDate: event.target.value })}
-                    inputMode="numeric"
-                    placeholder="yyyy/mm/dd"
-                    autoFocus
-                    className={inputClass}
-                  />
-                  <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
-                  <input
-                    value={draft.pickupTime}
-                    onChange={(event) => updateDraft({ pickupTime: event.target.value })}
-                    inputMode="numeric"
-                    placeholder="HH:mm"
-                    className={inputClass}
-                  />
-                </div>
-              ) : (
-                <span className={cn(inputClass, "flex items-center")}>
-                  {formatDateTime(currentOrder.pickupDatetime, locale)}
-                </span>
-              )}
-            </EditableField>
-
-            <EditableField
-              className={cn(editingField === "returnTime" ? "col-span-2" : "", "lg:col-span-2")}
-              labelText={t.returnTime}
-              {...fieldChrome("returnTime")}
-            >
-              {editingField === "returnTime" ? (
-                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_4.5rem] items-center gap-2">
-                  <input
-                    value={draft.returnDate}
-                    onChange={(event) => updateDraft({ returnDate: event.target.value })}
-                    inputMode="numeric"
-                    placeholder="yyyy/mm/dd"
-                    autoFocus
-                    className={inputClass}
-                  />
-                  <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
-                  <input
-                    value={draft.returnTime}
-                    onChange={(event) => updateDraft({ returnTime: event.target.value })}
-                    inputMode="numeric"
-                    placeholder="HH:mm"
-                    className={inputClass}
-                  />
-                </div>
-              ) : (
-                <span className={cn(inputClass, "flex items-center")}>
-                  {formatDateTime(currentOrder.returnDatetime, locale)}
                 </span>
               )}
             </EditableField>
@@ -1161,147 +1295,133 @@ export function OrderDetailModal({
                 <DirectBookingHandoverPanel locale={locale} orderId={currentOrder.id} />
               </div>
             ) : null}
-
-            <EditableField
-              className={cn(editingField === "pickupLocation" && "col-span-2")}
-              labelText={t.pickupLocation}
-              {...fieldChrome("pickupLocation")}
-            >
-              <input
-                value={editingField === "pickupLocation" ? draft.pickupLocation : currentOrder.pickupLocation ?? ""}
-                title={currentOrder.pickupLocation ?? undefined}
-                onChange={(event) => updateDraft({ pickupLocation: event.target.value })}
-                readOnly={editingField !== "pickupLocation"}
-                autoFocus={editingField === "pickupLocation"}
-                className={inputClass}
-              />
-            </EditableField>
-
-            <EditableField
-              className={cn(editingField === "returnLocation" && "col-span-2")}
-              labelText={t.returnLocation}
-              {...fieldChrome("returnLocation")}
-            >
-              <input
-                value={editingField === "returnLocation" ? draft.returnLocation : currentOrder.returnLocation ?? ""}
-                title={currentOrder.returnLocation ?? undefined}
-                onChange={(event) => updateDraft({ returnLocation: event.target.value })}
-                readOnly={editingField !== "returnLocation"}
-                autoFocus={editingField === "returnLocation"}
-                className={inputClass}
-              />
-            </EditableField>
           </div>
 
-          {/* Accounting on its own. These four are what a bookkeeper
-              reconciles against a bank statement, and they were mixed in
-              among renter name and pickup address, which are operations.
-              The cleaning fee sits here because it is the one number on
+          {/* Accounting on its own. These are what a bookkeeper
+              reconciles against a bank statement. A Turo trip's figure is
+              its earnings after Turo's cut, which arrive with the CSV --
+              until then the box says so instead of standing empty. The
+              cleaning fee sits here because it is the one number on
               this panel that is not a property of the order at all --
               it is a price on the car, and saving it prices every trip
-              that car runs from the chosen date onward. */}
+              that car runs from the chosen date onward. Deposit, payment
+              method, contract number and cleaning fee only take a box
+              once they hold something; empty, they are an Add chip
+              below. */}
           <div className="mt-2.5 rounded-lg border border-[rgba(17,19,24,0.1)] bg-[var(--surface-muted)]/50 p-2 sm:p-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
               {t.accounting}
             </p>
             <div className="mt-1.5 grid min-w-0 grid-cols-2 gap-1.5 sm:gap-2 lg:grid-cols-4">
-              <EditableField labelText={t.totalPrice} {...fieldChrome("totalPrice")}>
+              <EditableField
+                labelText={currentOrder.source === "turo" ? t.earnings : t.totalPrice}
+                {...fieldChrome("totalPrice")}
+              >
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   value={editingField === "totalPrice" ? draft.totalPrice : formatCurrencyInputValue(currentOrder.totalPrice)}
+                  placeholder={currentOrder.source === "turo" && editingField !== "totalPrice" ? t.earningsPending : undefined}
                   onChange={(event) => updateDraft({ totalPrice: event.target.value })}
                   onBlur={(event) => updateDraft({ totalPrice: formatCurrencyInputText(event.target.value) })}
                   readOnly={editingField !== "totalPrice"}
                   autoFocus={editingField === "totalPrice"}
-                  className={inputClass}
+                  className={cn(inputClass, "font-semibold tabular-nums")}
                 />
               </EditableField>
 
-              <EditableField labelText={t.deposit} {...fieldChrome("depositAmount")}>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={
-                    editingField === "depositAmount"
-                      ? draft.depositAmount
-                      : formatCurrencyInputValue(currentOrder.depositAmount)
-                  }
-                  onChange={(event) => updateDraft({ depositAmount: event.target.value })}
-                  onBlur={(event) => updateDraft({ depositAmount: formatCurrencyInputText(event.target.value) })}
-                  readOnly={editingField !== "depositAmount"}
-                  autoFocus={editingField === "depositAmount"}
-                  className={inputClass}
-                />
-              </EditableField>
-
-              <EditableField labelText={t.paymentMethod} {...fieldChrome("paymentMethod")}>
-                <input
-                  value={editingField === "paymentMethod" ? draft.paymentMethod : currentOrder.paymentMethod ?? ""}
-                  onChange={(event) => updateDraft({ paymentMethod: event.target.value })}
-                  readOnly={editingField !== "paymentMethod"}
-                  autoFocus={editingField === "paymentMethod"}
-                  className={inputClass}
-                />
-              </EditableField>
-
-              <EditableField labelText={t.contractNumber} {...fieldChrome("contractNumber")}>
-                <input
-                  value={editingField === "contractNumber" ? draft.contractNumber : currentOrder.contractNumber ?? ""}
-                  onChange={(event) => updateDraft({ contractNumber: event.target.value })}
-                  readOnly={editingField !== "contractNumber"}
-                  autoFocus={editingField === "contractNumber"}
-                  className={inputClass}
-                />
-              </EditableField>
-
-              <EditableField
-                className="col-span-2"
-                labelText={t.cleaningFee}
-                {...fieldChrome("cleaningFee")}
-              >
-                <div className="grid min-w-0 grid-cols-[minmax(0,7rem)_auto_minmax(0,1fr)] items-center gap-2">
+              {showField("depositAmount") ? (
+                <EditableField labelText={t.deposit} {...fieldChrome("depositAmount")}>
                   <input
-                    value={
-                      editingField === "cleaningFee"
-                        ? draft.cleaningFee
-                        : formatCurrencyInputValue(currentOrder.cleaningFee)
-                    }
-                    onChange={(event) => updateDraft({ cleaningFee: event.target.value })}
-                    readOnly={editingField !== "cleaningFee"}
-                    autoFocus={editingField === "cleaningFee"}
                     type="number"
                     step="0.01"
                     min="0"
+                    value={
+                      editingField === "depositAmount"
+                        ? draft.depositAmount
+                        : formatCurrencyInputValue(currentOrder.depositAmount)
+                    }
+                    onChange={(event) => updateDraft({ depositAmount: event.target.value })}
+                    onBlur={(event) => updateDraft({ depositAmount: formatCurrencyInputText(event.target.value) })}
+                    readOnly={editingField !== "depositAmount"}
+                    autoFocus={editingField === "depositAmount"}
                     className={inputClass}
                   />
-                  {editingField === "cleaningFee" ? (
-                    <>
-                      <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="shrink-0 text-[10px] uppercase tracking-[0.13em] text-[color:var(--ink-soft)]">
-                          {t.cleaningFeeFrom}
+                </EditableField>
+              ) : null}
+
+              {showField("paymentMethod") ? (
+                <EditableField labelText={t.paymentMethod} {...fieldChrome("paymentMethod")}>
+                  <input
+                    value={editingField === "paymentMethod" ? draft.paymentMethod : currentOrder.paymentMethod ?? ""}
+                    onChange={(event) => updateDraft({ paymentMethod: event.target.value })}
+                    readOnly={editingField !== "paymentMethod"}
+                    autoFocus={editingField === "paymentMethod"}
+                    className={inputClass}
+                  />
+                </EditableField>
+              ) : null}
+
+              {showField("contractNumber") ? (
+                <EditableField labelText={t.contractNumber} {...fieldChrome("contractNumber")}>
+                  <input
+                    value={editingField === "contractNumber" ? draft.contractNumber : currentOrder.contractNumber ?? ""}
+                    onChange={(event) => updateDraft({ contractNumber: event.target.value })}
+                    readOnly={editingField !== "contractNumber"}
+                    autoFocus={editingField === "contractNumber"}
+                    className={inputClass}
+                  />
+                </EditableField>
+              ) : null}
+
+              {showField("cleaningFee") ? (
+                <EditableField
+                  className="col-span-2"
+                  labelText={t.cleaningFee}
+                  {...fieldChrome("cleaningFee")}
+                >
+                  <div className="grid min-w-0 grid-cols-[minmax(0,7rem)_auto_minmax(0,1fr)] items-center gap-2">
+                    <input
+                      value={
+                        editingField === "cleaningFee"
+                          ? draft.cleaningFee
+                          : formatCurrencyInputValue(currentOrder.cleaningFee)
+                      }
+                      onChange={(event) => updateDraft({ cleaningFee: event.target.value })}
+                      readOnly={editingField !== "cleaningFee"}
+                      autoFocus={editingField === "cleaningFee"}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className={inputClass}
+                    />
+                    {editingField === "cleaningFee" ? (
+                      <>
+                        <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="shrink-0 text-[10px] uppercase tracking-[0.13em] text-[color:var(--ink-soft)]">
+                            {t.cleaningFeeFrom}
+                          </span>
+                          <input
+                            value={draft.cleaningFeeFrom}
+                            onChange={(event) => updateDraft({ cleaningFeeFrom: event.target.value })}
+                            type="date"
+                            className={inputClass}
+                          />
                         </span>
-                        <input
-                          value={draft.cleaningFeeFrom}
-                          onChange={(event) => updateDraft({ cleaningFeeFrom: event.target.value })}
-                          type="date"
-                          className={inputClass}
-                        />
-                      </span>
-                    </>
-                  ) : (
-                    <span />
-                  )}
-                </div>
-                {editingField === "cleaningFee" ? (
-                  <p className="mt-1.5 text-[11px] leading-4 text-[color:var(--ink-soft)]">
-                    {t.cleaningFeeHint}
-                  </p>
-                ) : null}
-              </EditableField>
+                      </>
+                    ) : (
+                      <span />
+                    )}
+                  </div>
+                  {editingField === "cleaningFee" ? (
+                    <p className="mt-1.5 text-[11px] leading-4 text-[color:var(--ink-soft)]">
+                      {t.cleaningFeeHint}
+                    </p>
+                  ) : null}
+                </EditableField>
+              ) : null}
             </div>
             {/* What the trip was actually made of. Turo bundles a
                 dozen possible charges into one earnings figure, and
@@ -1350,18 +1470,27 @@ export function OrderDetailModal({
             ) : null}
           </div>
 
-          <div className="mt-2.5 grid min-w-0 gap-2">
-            <EditableField labelText={t.notes} {...fieldChrome("notes")}>
-              <textarea
-                value={editingField === "notes" ? draft.notes : currentOrder.notes ?? ""}
-                onChange={(event) => updateDraft({ notes: event.target.value })}
-                readOnly={editingField !== "notes"}
-                autoFocus={editingField === "notes"}
-                rows={editingField === "notes" ? 4 : Math.min(4, Math.max(1, (currentOrder.notes ?? "").split("\n").length))}
-                className="w-full min-w-0 max-w-full resize-none border-0 bg-transparent p-0 text-[13px] text-[color:var(--ink)] outline-none"
-              />
-            </EditableField>
-          </div>
+          {/* Every field that is empty, as one row of chips. Pressing one
+              opens that field for editing in its usual place. Before, a
+              Turo trip showed four blank boxes -- deposit, payment
+              method, contract, notes -- that Turo never fills. */}
+          {!readOnly && addChips.length > 0 ? (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 px-0.5">
+              <span className="text-[11px] text-[color:var(--ink-soft)]">{t.addField}</span>
+              {addChips.map(([field, label]) => (
+                <button
+                  key={field}
+                  type="button"
+                  onClick={() => openField(field)}
+                  disabled={isSaving}
+                  className="tap-compact inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-[var(--line-strong)] px-2.5 text-[12px] text-[color:var(--ink-mid)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+                >
+                  <Plus className="h-3 w-3" aria-hidden />
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 px-1 text-[11px] text-[color:var(--ink-soft)]">
             {currentOrder.createdBy ? (

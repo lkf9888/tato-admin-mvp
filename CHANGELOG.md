@@ -1,5 +1,63 @@
 # Changelog
 
+## v1.58.0 - 2026-10-08
+
+### The calendar and the order panel say where things stand at a glance
+
+**Order panel.** The header is one line of chips: source, where the trip
+stands against the clock ("pick-up tomorrow 19:00", "on trip, 3 days
+left", "ended 2 days ago", amber when a handover is today), an overlap
+chip, and the owner with their sync state -- replacing a status word, an
+owner line reading "-" and a bold sentence that read like an error on
+every trip of a car with no owner. The trip is one card: pick-up, length,
+return, with the times as the largest type, and one place line when the
+car comes back where it left (editing it moves both). A note sits under
+the trip in amber, where a handover instruction is seen. Empty optional
+fields -- phone, deposit, payment method, contract number, cleaning fee,
+notes -- are a row of Add chips instead of blank boxes; a Turo trip's
+earnings say "shows after the CSV import" instead of standing empty; an
+order with no files shows one line instead of two empty boxes. The
+panel's copy moved into `messages/order-detail.ts`, so zh-Hant gets
+Traditional Chinese -- it was reading the panel in English.
+
+**Calendar.** A line marks now, to the minute, and today's column says
+so in words; both move with the clock, where today used to stay frozen
+at whatever day the tab was opened. Trips that are over are faded. Two
+trips on one car less than six hours apart get a turnaround marker at
+the junction. A legend says what the colours mean, and the row under the
+pointer lights its plate.
+
+**Fixed:**
+- The owner share link's calendar showed no trips. Without
+  `loadedChunkIndexes` it fell through to a default `[]`, new every
+  render: every order was dropped as outside a covered chunk, and the
+  memo, the reset effect and the render looped on failing fetches.
+- Bars sat an hour off after a clock change: positions divided elapsed
+  milliseconds by 24h, but columns are local days. From 1 November every
+  bar was an hour right and a handover after 23:00 drew in the next
+  day. `columnPosition` (lib/calendar-window) counts local days; the
+  month view uses it too.
+- Escape while editing a field closed the whole order panel.
+- Changing the column width -- the zoom slider, turning a phone, or
+  crossing the phone breakpoint -- kept the scroll pixel and moved the
+  date (1440px to 375px jumped from October to January).
+- The month view's Earlier/Later always failed: it fetched a year of the
+  whole fleet and the next step passed the 420-day cap. It now asks the
+  orders route for one car (`vehicleId`), which allows a wider window.
+  Clicking a trip months away there did nothing; it opens now.
+- A chunk response from before a refresh could overwrite the fresh one,
+  and every scroll re-requested chunks already in flight.
+- Saving a field flashed the panel back to the pre-save values.
+- Cancelled, note and service strips ran across the day prices.
+- Escape closing a menu or dialog in bulk mode also dropped bulk mode.
+- The search summary counted every trip on the remaining rows, and ten
+  off-screen days either side; it counts the matches on screen.
+- Viewers get a read-only calendar instead of buttons whose saves are
+  refused; members limited to some cars no longer see search across all
+  history, notes, recurring orders, feeds, bulk sync or Add vehicle,
+  each of which the server refuses them.
+- zh-Hant weekday names and month titles in the calendar were English.
+
 ## v1.57.4 - 2026-10-08
 
 ### A Turo trip's receipt is one tap from its detail panel

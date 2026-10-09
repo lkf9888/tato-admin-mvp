@@ -21,7 +21,8 @@ type OrderAttachment = {
 };
 
 function labels(locale: Locale) {
-  return locale === "zh"
+  // Both Chinese locales: zh-Hant read this panel in English.
+  return locale !== "en"
     ? {
         title: "照片、视频和合约文件",
         photos: "照片 / 视频",
@@ -32,6 +33,7 @@ function labels(locale: Locale) {
         loading: "读取附件中...",
         emptyPhotos: "还没有照片或视频。",
         emptyDocs: "还没有合约文件。",
+        emptyAll: "还没有照片、视频或合约文件。",
         delete: "删除",
         deleteConfirm: "确定隐藏这个附件吗？记录会保留在后台。",
         error: "附件暂时无法处理，请稍后再试。",
@@ -70,6 +72,7 @@ function labels(locale: Locale) {
         loading: "Loading attachments...",
         emptyPhotos: "No photos or videos yet.",
         emptyDocs: "No contract files yet.",
+        emptyAll: "No photos, videos or contract files yet.",
         delete: "Delete",
         deleteConfirm: "Hide this attachment? The backend record will be preserved.",
         error: "We could not process attachments right now. Please try again.",
@@ -273,13 +276,21 @@ export function OrderAttachments({
   const documents = attachments.filter((attachment) => attachment.kind === "document");
 
   return (
-    <section className={cn("rounded-lg border border-[var(--line)] bg-[var(--surface)]", compact ? "p-3" : "p-4")}>
+    <section className={cn(compact ? "" : "rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4")}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-            {copy.title}
-          </p>
+          {/* In the order panel the fold above already names this. */}
+          {!compact ? (
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+              {copy.title}
+            </p>
+          ) : null}
           {loading ? <p className="mt-1 text-[12px] text-[var(--ink-soft)]">{copy.loading}</p> : null}
+          {/* Compact and empty: one line, not two empty dashed boxes
+              that were the tallest thing in the order panel. */}
+          {compact && !loading && attachments.length === 0 ? (
+            <p className="text-[12px] text-[var(--ink-soft)]">{copy.emptyAll}</p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <input
@@ -322,7 +333,15 @@ export function OrderAttachments({
         </p>
       ) : null}
 
-      <div className={cn("mt-3 grid gap-3", compact ? "xl:grid-cols-1" : "xl:grid-cols-2")}>
+      <div
+        className={cn(
+          "mt-3 grid gap-3",
+          compact ? "xl:grid-cols-1" : "xl:grid-cols-2",
+          // Not while loading either: drawing two empty boxes and then
+          // folding them away made the order panel jump under the reader.
+          compact && (loading || attachments.length === 0) && "hidden",
+        )}
+      >
         {photos.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
             {tripPhotoToken ? (

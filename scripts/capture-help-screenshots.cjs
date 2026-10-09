@@ -12,7 +12,8 @@
  * Needs Playwright, which this repo does not install:
  *   PLAYWRIGHT=/path/to/node_modules/playwright node scripts/capture-help-screenshots.cjs
  * Options: BASE (default http://localhost:3000), PAGES=calendar,orders,
- * LOCALES=zh,en, TEXT_DIR (default: a temp folder).
+ * LOCALES=zh,en, TEXT_DIR (default: a temp folder), RESCAN=0 to keep the
+ * assistant alerts as they are rather than rescanning first.
  */
 const { chromium } = require(process.env.PLAYWRIGHT || "playwright");
 const fs = require("fs");
@@ -47,6 +48,11 @@ const LOCALES = (process.env.LOCALES || "zh,en").split(",");
         await page.goto(`${BASE}/${key}`, { waitUntil: "load", timeout: 120000 });
         await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
         if (key === "calendar") await page.waitForSelector("[data-calendar-order-bar]", { timeout: 60000 }).catch(() => {});
+        // Alerts are written by a scan; rescan so they are in this language.
+        if (key === "assistant" && process.env.RESCAN !== "0") {
+          await page.getByRole("button", { name: /Rescan|重新扫描/ }).click().catch(() => {});
+          await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+        }
         await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
         // Notices only a server without production keys shows; a real
         // account never sees them, so they stay out of the manual.

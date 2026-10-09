@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.59.2 - 2026-10-09
+
+### Pickup-prep alerts say each gap once; overdue tasks read in English
+
+- A pickup-prep alert listed what was missing in its title and again in its body, so a one-gap alert read the same line twice. The title now says whose pickup is not ready, and only the body lists the gaps. The title wording changed, so prep alerts already acknowledged surface once more; they only cover the next three days.
+- On an English screen, overdue staff tasks began with the Chinese kind TATO writes into return-task titles ("还车 · SD101B · …"). That leading word now reads Return (or Pickup). Titles a person typed are shown as typed.
+
 ## v1.59.1 - 2026-10-09
 
 ### Assistant alerts follow the viewer's language

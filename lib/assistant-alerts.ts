@@ -351,6 +351,16 @@ async function detectUnansweredGuestMessages(workspaceId: string): Promise<Alert
   }));
 }
 
+/**
+ * A task title for an English screen. Titles are stored text, and the
+ * ones TATO writes itself start with a Chinese kind ("还车 · SD101B ·
+ * …", see lib/staff-order-tasks.ts); that word is swapped. Anything a
+ * person typed is shown as typed.
+ */
+function taskTitleEn(title: string) {
+  return title.replace(/^还车(?= ·)/, "Return").replace(/^取车(?= ·)/, "Pickup");
+}
+
 /** Staff tasks past their due time and still open. */
 async function detectOverdueTasks(workspaceId: string): Promise<AlertDraft[]> {
   const overdue = await prisma.staffTask.findMany({
@@ -383,7 +393,7 @@ async function detectOverdueTasks(workspaceId: string): Promise<AlertDraft[]> {
         .slice(0, 5)
         .map(
           (task) =>
-            `${task.title} · ${task.staff?.name ?? "Unassigned"}${task.dueDatetime ? ` · due ${formatDateTime(task.dueDatetime, "en")}` : ""}`,
+            `${taskTitleEn(task.title)} · ${task.staff?.name ?? "Unassigned"}${task.dueDatetime ? ` · due ${formatDateTime(task.dueDatetime, "en")}` : ""}`,
         )
         .join("\n"),
       href: "/staff-schedule",
@@ -968,9 +978,11 @@ async function detectPickupsMissingPrep(workspaceId: string): Promise<AlertDraft
     drafts.push({
       dedupeKey: `pickup_prep:${order.id}`,
       severity: urgent ? AssistantAlertSeverity.WARNING : AssistantAlertSeverity.INFO,
-      title: `${order.renterName} ${formatDateTime(order.pickupDatetime)} 取 ${vehicleLabel(order.vehicle)}，还缺：${missing.join("、")}`,
+      // The title says whose pickup; the body says what it lacks. Both
+      // used to list the gaps, so a one-gap alert read the same line twice.
+      title: `${order.renterName} ${formatDateTime(order.pickupDatetime)} 取 ${vehicleLabel(order.vehicle)}，还没准备好`,
       body: missing.map((item) => `· ${item}`).join("\n"),
-      titleEn: `${order.renterName} picks up ${vehicleLabel(order.vehicle)} ${formatDateTime(order.pickupDatetime, "en")} — missing: ${missingEn.join(", ")}`,
+      titleEn: `${order.renterName} picks up ${vehicleLabel(order.vehicle)} ${formatDateTime(order.pickupDatetime, "en")} — not ready yet`,
       bodyEn: missingEn.map((item) => `· ${item}`).join("\n"),
       href: `/orders/${order.id}`,
     });

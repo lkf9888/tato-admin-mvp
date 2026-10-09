@@ -13,6 +13,7 @@ import {
 import { formatBytes, getDiskUsage } from "@/lib/disk";
 import { listDueMessages } from "@/lib/message-rules";
 import { prisma } from "@/lib/prisma";
+import { convertUiToTraditional } from "@/lib/zh-hant-convert";
 
 /**
  * Proactive alerts.
@@ -64,8 +65,14 @@ const DIRECT_BOOKING_CHANNEL_MARKER = '"channel":"direct-booking"';
 export type AlertDraft = {
   dedupeKey: string;
   severity: AssistantAlertSeverity;
+  /** Chinese: what the scan compares, what email and the model read. */
   title: string;
   body: string;
+  /** The same in English, for an English screen. Written alongside the
+   *  Chinese rather than translated later: these are short templated
+   *  sentences, and a model call per scan would cost more than it saves. */
+  titleEn: string;
+  bodyEn: string;
   href?: string;
 };
 
@@ -84,10 +91,13 @@ function daysAgo(days: number) {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
 
-function formatDateTime(value: Date) {
-  return value.toLocaleString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
+type TextLocale = "zh" | "en";
+
+function formatDateTime(value: Date, locale: TextLocale = "zh") {
+  return value.toLocaleString(locale === "en" ? "en-CA" : "zh-CN", {
+    // "Oct 9, 19:00" in English; "10-09" reads as a code there.
+    month: locale === "en" ? "short" : "2-digit",
+    day: locale === "en" ? "numeric" : "2-digit",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -102,8 +112,8 @@ function formatDateTime(value: Date) {
  * invents a precision the booking never had -- and in Vancouver it
  * would read 05:00, which looks like a bug.
  */
-function formatDateOnly(value: Date) {
-  return value.toLocaleDateString("zh-CN", {
+function formatDateOnly(value: Date, locale: TextLocale = "zh") {
+  return value.toLocaleDateString(locale === "en" ? "en-CA" : "zh-CN", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -170,6 +180,14 @@ async function detectDiskPressure(): Promise<AlertDraft[]> {
           ? "磁盘写满会让上传失败，并可能导致部署中断。请尽快清理或扩容。"
           : "现在还有余量，但这个数字只会上升。",
       ].join("\n"),
+      titleEn: `Storage ${usage.usedPercent}% used`,
+      bodyEn: [
+        `${formatBytes(usage.usedBytes)} used of ${formatBytes(usage.totalBytes)}, ${formatBytes(usage.freeBytes)} free.`,
+        "Uploaded photos, receipts and contracts are never cleaned up automatically — deleting in the app only hides them, and the files still take space.",
+        critical
+          ? "A full disk makes uploads fail and can break a deploy. Clean up or add space soon."
+          : "There is still room, but this number only goes up.",
+      ].join("\n"),
       href: "/documents",
     },
   ];
@@ -205,21 +223,27 @@ async function detectConflicts(workspaceId: string): Promise<AlertDraft[]> {
         ? `${vehicle.plateNumber} · ${vehicle.nickname}`
         : vehicle.nickname;
 
-      const lines = orders
-        .slice(0, CONFLICT_SAMPLE)
-        .map(
-          (order) =>
-            `${order.renterName} ${formatDateTime(order.pickupDatetime)} → ${formatDateTime(order.returnDatetime)}${order.externalOrderId ? ` (${order.externalOrderId})` : ""}`,
-        );
-      if (orders.length > CONFLICT_SAMPLE) {
-        lines.push(`…还有 ${orders.length - CONFLICT_SAMPLE} 笔`);
-      }
+      const linesIn = (locale: TextLocale) => {
+        const lines = orders
+          .slice(0, CONFLICT_SAMPLE)
+          .map(
+            (order) =>
+              `${order.renterName} ${formatDateTime(order.pickupDatetime, locale)} → ${formatDateTime(order.returnDatetime, locale)}${order.externalOrderId ? ` (${order.externalOrderId})` : ""}`,
+          );
+        if (orders.length > CONFLICT_SAMPLE) {
+          const more = orders.length - CONFLICT_SAMPLE;
+          lines.push(locale === "en" ? `…and ${more} more` : `…还有 ${more} 笔`);
+        }
+        return lines.join("\n");
+      };
 
       return {
         dedupeKey: `conflict:${vehicleId}`,
         severity: AssistantAlertSeverity.CRITICAL,
         title: `${label} 有 ${orders.length} 笔订单时间冲突`,
-        body: lines.join("\n"),
+        body: linesIn("zh"),
+        titleEn: `${label}: ${orders.length} bookings overlap`,
+        bodyEn: linesIn("en"),
         href: "/calendar",
       };
     });
@@ -294,6 +318,16 @@ async function detectUnansweredGuestMessages(workspaceId: string): Promise<Alert
   if (needsReply.length === 0) return [];
 
   const oldest = needsReply[0];
+  const needsReplyLines = (locale: TextLocale) =>
+    needsReply
+      .slice(0, 5)
+      .map((email) => {
+        const summary = email.parsed
+          ? ((JSON.parse(email.parsed) as { summary?: string }).summary ?? email.subject)
+          : email.subject;
+        return `${formatDateTime(email.receivedAt, locale)} · ${summary}`;
+      })
+      .join("\n");
   return [
     {
       dedupeKey: "guest_messages_unanswered",
@@ -301,15 +335,9 @@ async function detectUnansweredGuestMessages(workspaceId: string): Promise<Alert
       // `+` when the scan hit its ceiling, so a capped number never
       // reads as an exact count.
       title: `${needsReply.length}${pending.length >= GUEST_MESSAGE_SCAN_CAP ? "+" : ""} 条 Turo 消息等待回复`,
-      body: needsReply
-        .slice(0, 5)
-        .map((email) => {
-          const summary = email.parsed
-            ? ((JSON.parse(email.parsed) as { summary?: string }).summary ?? email.subject)
-            : email.subject;
-          return `${formatDateTime(email.receivedAt)} · ${summary}`;
-        })
-        .join("\n"),
+      body: needsReplyLines("zh"),
+      titleEn: `${needsReply.length}${pending.length >= GUEST_MESSAGE_SCAN_CAP ? "+" : ""} Turo message${needsReply.length === 1 ? "" : "s"} waiting for a reply`,
+      bodyEn: needsReplyLines("en"),
       href: "/assistant",
     },
   ].map((draft) => ({
@@ -350,6 +378,14 @@ async function detectOverdueTasks(workspaceId: string): Promise<AlertDraft[]> {
             `${task.title} · ${task.staff?.name ?? "未指派"}${task.dueDatetime ? ` · 应于 ${formatDateTime(task.dueDatetime)}` : ""}`,
         )
         .join("\n"),
+      titleEn: `${overdue.length} staff task${overdue.length === 1 ? "" : "s"} overdue`,
+      bodyEn: overdue
+        .slice(0, 5)
+        .map(
+          (task) =>
+            `${task.title} · ${task.staff?.name ?? "Unassigned"}${task.dueDatetime ? ` · due ${formatDateTime(task.dueDatetime, "en")}` : ""}`,
+        )
+        .join("\n"),
       href: "/staff-schedule",
     },
   ];
@@ -379,6 +415,8 @@ async function detectStaleInbox(workspaceId: string): Promise<AlertDraft[]> {
       severity: AssistantAlertSeverity.WARNING,
       title: "Turo 邮件同步已停滞",
       body: `最后一次收到 Turo 邮件是 ${formatDateTime(latest.createdAt)}。可能是 Gmail 应用专用密码失效,或定时任务没有在跑——这段时间的订单变更和房客消息都不会出现在这里。`,
+      titleEn: "Turo mail sync has stalled",
+      bodyEn: `The last Turo email arrived ${formatDateTime(latest.createdAt, "en")}. The Gmail app password may have expired, or the scheduled job is not running — booking changes and guest messages since then are not showing here.`,
       href: "/assistant",
     },
   ];
@@ -402,6 +440,8 @@ async function detectFailedImports(workspaceId: string): Promise<AlertDraft[]> {
       severity: AssistantAlertSeverity.WARNING,
       title: `CSV 导入有 ${batch.failedRows} 行失败`,
       body: `${batch.fileName} · 成功 ${batch.successRows} 行,失败 ${batch.failedRows} 行 · ${formatDateTime(batch.importedAt)}。失败的行不会出现在日历和分账里。`,
+      titleEn: `CSV import: ${batch.failedRows} row${batch.failedRows === 1 ? "" : "s"} failed`,
+      bodyEn: `${batch.fileName} · ${batch.successRows} succeeded, ${batch.failedRows} failed · ${formatDateTime(batch.importedAt, "en")}. Failed rows are not on the calendar or in owner payouts.`,
       href: "/imports",
     },
   ];
@@ -430,6 +470,11 @@ async function detectStaleContracts(workspaceId: string): Promise<AlertDraft[]> 
       body: stale
         .slice(0, 5)
         .map((envelope) => `${envelope.title} · 发出于 ${formatDateTime(envelope.createdAt)}`)
+        .join("\n"),
+      titleEn: `${stale.length} contract${stale.length === 1 ? "" : "s"} unsigned for over ${CONTRACT_STALE_DAYS} days`,
+      bodyEn: stale
+        .slice(0, 5)
+        .map((envelope) => `${envelope.title} · sent ${formatDateTime(envelope.createdAt, "en")}`)
         .join("\n"),
       href: "/contracts",
     },
@@ -533,6 +578,12 @@ async function detectUnblockedTuroDates(workspaceId: string): Promise<AlertDraft
         "这辆车同时在 Turo 上架，而 Turo 没有可写入的接口 —— 需要有人手动把这几天设为不可预订，否则同一台车可能被二次预订。",
         "封锁完成后点「知道了」，这条提醒就会停止；改期会让它重新出现。",
       ].join("\n"),
+      titleEn: `Block ${booking.vehicle.plateNumber} on Turo for ${formatDateOnly(booking.pickupDatetime, "en")}–${formatDateOnly(booking.returnDatetime, "en")}`,
+      bodyEn: [
+        `${booking.vehicle.nickname} was booked by ${booking.renterName} on your own site.`,
+        "This car is also listed on Turo, and Turo has no API to write to — someone has to mark these days unavailable by hand, or the car can be booked twice.",
+        "Tap Got it once they are blocked and this reminder stops; changing the dates brings it back.",
+      ].join("\n"),
       href: `/orders/${booking.id}`,
     }));
 }
@@ -589,6 +640,22 @@ async function detectPendingBookingRequests(workspaceId: string): Promise<AlertD
       ]
         .filter(Boolean)
         .join("\n"),
+      titleEn: isCancel
+        ? `${request.order.renterName} asked to cancel the ${plate} booking`
+        : `${request.order.renterName} asked to change the ${plate} booking`,
+      bodyEn: [
+        `Pickup: ${formatDateOnly(request.order.pickupDatetime, "en")}`,
+        isCancel && request.quotedRefundAmount != null
+          ? `Refund under the policy: $${request.quotedRefundAmount.toFixed(2)} (the renter saw this figure when asking)`
+          : null,
+        !isCancel && request.requestedPickupDate && request.requestedReturnDate
+          ? `Wants: ${formatDateOnly(request.requestedPickupDate, "en")} – ${formatDateOnly(request.requestedReturnDate, "en")}`
+          : null,
+        request.renterNote ? `Renter's note: ${request.renterNote}` : null,
+        "Approve or decline on the Booking requests page.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
       href: "/booking-requests",
     };
   });
@@ -642,6 +709,11 @@ async function detectUnsettledDeposits(workspaceId: string): Promise<AlertDraft[
     body: [
       `${order.vehicle.plateNumber} 已于 ${formatDateOnly(order.returnDatetime)} 还车。`,
       "自建站的押金是实收的，不会自动退回。在订单页决定退多少；扣留的部分需要写原因，原因会发给租客。",
+    ].join("\n"),
+    titleEn: `${order.renterName}'s $${(order.depositAmount ?? 0).toFixed(2)} deposit is not settled`,
+    bodyEn: [
+      `${order.vehicle.plateNumber} was returned ${formatDateOnly(order.returnDatetime, "en")}.`,
+      "Direct-booking deposits are charged, not held, so nothing returns them automatically. Decide the refund on the order page; any amount kept needs a reason, which is sent to the renter.",
     ].join("\n"),
     href: `/orders/${order.id}`,
   }));
@@ -711,8 +783,8 @@ async function detectIdleCars(workspaceId: string): Promise<AlertDraft[]> {
     byVehicle.set(order.vehicleId, list);
   }
 
-  const idle: { label: string; from: string; to: string; startsAt: number }[] = [];
-  const shortGaps: { label: string; line: string; at: number }[] = [];
+  const idle: { label: string; from: string; to: string; fromEn: string; toEn: string; startsAt: number }[] = [];
+  const shortGaps: { label: string; line: string; lineEn: string; at: number }[] = [];
   const day = 24 * 60 * 60 * 1000;
 
   for (const vehicle of vehicles) {
@@ -736,6 +808,8 @@ async function detectIdleCars(workspaceId: string): Promise<AlertDraft[]> {
           label: vehicleLabel(vehicle),
           from: freeFrom ? `${formatDateOnly(freeFrom)} 还车后` : `近 ${IDLE_HISTORY_DAYS} 天没有订单`,
           to: next ? `${formatDateOnly(next.pickupDatetime)} 才有下一单` : "之后暂无订单",
+          fromEn: freeFrom ? `free after the ${formatDateOnly(freeFrom, "en")} return` : `no trips in the last ${IDLE_HISTORY_DAYS} days`,
+          toEn: next ? `next booking ${formatDateOnly(next.pickupDatetime, "en")}` : "nothing booked after",
           startsAt: start.getTime(),
         });
         reportedIdle = true;
@@ -749,6 +823,7 @@ async function detectIdleCars(workspaceId: string): Promise<AlertDraft[]> {
           shortGaps.push({
             label: vehicleLabel(vehicle),
             line: `${formatDateTime(freeFrom)} 还车 → ${formatDateTime(next.pickupDatetime)} 取车（空 ${Math.round(gapHours / 24 * 10) / 10} 天）`,
+            lineEn: `returns ${formatDateTime(freeFrom, "en")} → picked up ${formatDateTime(next.pickupDatetime, "en")} (${Math.round(gapHours / 24 * 10) / 10} days free)`,
             at: freeFrom.getTime(),
           });
         }
@@ -767,11 +842,16 @@ async function detectIdleCars(workspaceId: string): Promise<AlertDraft[]> {
     const lines = idle.slice(0, IDLE_SAMPLE).map((row) => `${row.label}：${row.from}，${row.to}`);
     if (idle.length > IDLE_SAMPLE) lines.push(`…还有 ${idle.length - IDLE_SAMPLE} 台`);
     lines.push("可以在 Turo 上调价，或在自有网站上推这几台车。");
+    const linesEn = idle.slice(0, IDLE_SAMPLE).map((row) => `${row.label}: ${row.fromEn}, ${row.toEn}`);
+    if (idle.length > IDLE_SAMPLE) linesEn.push(`…and ${idle.length - IDLE_SAMPLE} more`);
+    linesEn.push("Adjust the price on Turo, or promote these cars on your own site.");
     drafts.push({
       dedupeKey: "idle_cars",
       severity: AssistantAlertSeverity.INFO,
       title: `${idle.length} 台车未来两周内有 ${IDLE_MIN_DAYS} 天以上没有订单`,
       body: lines.join("\n"),
+      titleEn: `${idle.length} car${idle.length === 1 ? "" : "s"} with ${IDLE_MIN_DAYS}+ days unbooked in the next two weeks`,
+      bodyEn: linesEn.join("\n"),
       href: "/calendar",
     });
   }
@@ -780,11 +860,16 @@ async function detectIdleCars(workspaceId: string): Promise<AlertDraft[]> {
     const lines = shortGaps.slice(0, IDLE_SAMPLE).map((gap) => `${gap.label}：${gap.line}`);
     if (shortGaps.length > IDLE_SAMPLE) lines.push(`…还有 ${shortGaps.length - IDLE_SAMPLE} 处`);
     lines.push("Turo 的最短租期和整备时间可能让这些空档租不出去；可以缩短最短租期，或给相邻订单延期优惠。");
+    const linesEn = shortGaps.slice(0, IDLE_SAMPLE).map((gap) => `${gap.label}: ${gap.lineEn}`);
+    if (shortGaps.length > IDLE_SAMPLE) linesEn.push(`…and ${shortGaps.length - IDLE_SAMPLE} more`);
+    linesEn.push("Turo's minimum trip length and turnaround may leave these unrentable; shorten the minimum trip, or offer the trips either side an extension.");
     drafts.push({
       dedupeKey: "short_gaps",
       severity: AssistantAlertSeverity.INFO,
       title: `${shortGaps.length} 处订单之间只空 1–2 天`,
       body: lines.join("\n"),
+      titleEn: `${shortGaps.length} gap${shortGaps.length === 1 ? "" : "s"} of only 1–2 days between bookings`,
+      bodyEn: linesEn.join("\n"),
       href: "/calendar",
     });
   }
@@ -844,7 +929,11 @@ async function detectPickupsMissingPrep(workspaceId: string): Promise<AlertDraft
   const drafts: AlertDraft[] = [];
   for (const order of upcoming) {
     const missing: string[] = [];
-    if (usesCodes && !order.vehicle.pickupPassword?.trim()) missing.push("这台车没有设取车密码");
+    const missingEn: string[] = [];
+    if (usesCodes && !order.vehicle.pickupPassword?.trim()) {
+      missing.push("这台车没有设取车密码");
+      missingEn.push("no pickup code on the car");
+    }
 
     if (usesPrepTasks) {
       const previous = await prisma.order.findFirst({
@@ -868,7 +957,10 @@ async function detectPickupsMissingPrep(workspaceId: string): Promise<AlertDraft
           dueDatetime: { gte: new Date(windowStart.getTime() - 6 * 3_600_000), lte: order.pickupDatetime },
         },
       });
-      if (prep === 0) missing.push("取车前没有安排整备或清洁任务");
+      if (prep === 0) {
+        missing.push("取车前没有安排整备或清洁任务");
+        missingEn.push("no prep or cleaning task before pickup");
+      }
     }
 
     if (missing.length === 0) continue;
@@ -878,6 +970,8 @@ async function detectPickupsMissingPrep(workspaceId: string): Promise<AlertDraft
       severity: urgent ? AssistantAlertSeverity.WARNING : AssistantAlertSeverity.INFO,
       title: `${order.renterName} ${formatDateTime(order.pickupDatetime)} 取 ${vehicleLabel(order.vehicle)}，还缺：${missing.join("、")}`,
       body: missing.map((item) => `· ${item}`).join("\n"),
+      titleEn: `${order.renterName} picks up ${vehicleLabel(order.vehicle)} ${formatDateTime(order.pickupDatetime, "en")} — missing: ${missingEn.join(", ")}`,
+      bodyEn: missingEn.map((item) => `· ${item}`).join("\n"),
       href: `/orders/${order.id}`,
     });
   }
@@ -951,6 +1045,12 @@ async function detectOverduePaymentsAndEndingSeries(workspaceId: string): Promis
         ...list.map((payment) => `${formatDateOnly(payment.dueAt as Date)} 应收 $${payment.amount.toFixed(2)}`),
         "收到后在订单页标记已收款，这条提醒会自动消失。",
       ].join("\n"),
+      titleEn: `${order.renterName}: ${list.length} instalment${list.length === 1 ? "" : "s"} overdue, $${total.toFixed(2)}`,
+      bodyEn: [
+        `${vehicleLabel(order.vehicle)}`,
+        ...list.map((payment) => `$${payment.amount.toFixed(2)} due ${formatDateOnly(payment.dueAt as Date, "en")}`),
+        "Mark it paid on the order page once received; this alert then clears.",
+      ].join("\n"),
       href: `/orders/${orderId}`,
     });
   }
@@ -972,6 +1072,11 @@ async function detectOverduePaymentsAndEndingSeries(workspaceId: string): Promis
       body: [
         `${vehicleLabel(last.vehicle)} 这一系列的最后一笔订单在 ${formatDateTime(last.returnDatetime)} 还车。`,
         "要续租就在订单页再加一期；不续的话，这台车之后就空出来了。",
+      ].join("\n"),
+      titleEn: `${last.renterName}'s long-term rental ends ${formatDateOnly(last.returnDatetime, "en")} with nothing after it`,
+      bodyEn: [
+        `${vehicleLabel(last.vehicle)}: the last booking in this series returns ${formatDateTime(last.returnDatetime, "en")}.`,
+        "To renew, add another period on the order page; if not, the car is free after that.",
       ].join("\n"),
       href: `/orders/${last.id}`,
     });
@@ -997,12 +1102,22 @@ async function detectDueScheduledMessages(workspaceId: string): Promise<AlertDra
     .map((item) => `${item.renterName} · ${item.ruleName}（${formatDateTime(new Date(item.dueAt))}）`);
   if (due.length > 10) lines.push(`…还有 ${due.length - 10} 条`);
   lines.push("在消息页的「定时」里复制发送，再点「已发」或「跳过」。");
+  const linesEn = due
+    .slice(0, 10)
+    .map((item) => `${item.renterName} · ${item.ruleName} (${formatDateTime(new Date(item.dueAt), "en")})`);
+  if (due.length > 10) linesEn.push(`…and ${due.length - 10} more`);
+  linesEn.push("Copy and send them from Scheduled on the Messages page, then tap Sent or Skip.");
   return [
     {
       dedupeKey: "scheduled_messages",
       severity: late > 0 ? AssistantAlertSeverity.WARNING : AssistantAlertSeverity.INFO,
       title: late > 0 ? `${due.length} 条定时消息该发了，其中 ${late} 条已过点` : `${due.length} 条定时消息该发了`,
       body: lines.join("\n"),
+      titleEn:
+        late > 0
+          ? `${due.length} scheduled message${due.length === 1 ? "" : "s"} due, ${late} overdue`
+          : `${due.length} scheduled message${due.length === 1 ? "" : "s"} due`,
+      bodyEn: linesEn.join("\n"),
       href: "/messages",
     },
   ];
@@ -1057,6 +1172,8 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
           severity: draft.severity,
           title: draft.title,
           body: draft.body,
+          titleEn: draft.titleEn,
+          bodyEn: draft.bodyEn,
           href: draft.href ?? null,
           resolvedAt: null,
           acknowledgedAt: null,
@@ -1068,6 +1185,8 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
           severity: draft.severity,
           title: draft.title,
           body: draft.body,
+          titleEn: draft.titleEn,
+          bodyEn: draft.bodyEn,
           href: draft.href ?? null,
         },
       });
@@ -1090,6 +1209,8 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
           severity: draft.severity,
           title: draft.title,
           body: draft.body,
+          titleEn: draft.titleEn,
+          bodyEn: draft.bodyEn,
           href: draft.href ?? null,
           // Detail changed, so a prior acknowledgement no longer covers
           // what this alert now says. Re-surface it.
@@ -1098,6 +1219,14 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
         },
       });
       updated += 1;
+    } else if (current.titleEn !== draft.titleEn || current.bodyEn !== draft.bodyEn) {
+      // Only the English wording moved (or was missing: rows from before
+      // it existed). Not a change in what the alert says, so the
+      // acknowledgement stands.
+      await prisma.assistantAlert.update({
+        where: { id: current.id },
+        data: { titleEn: draft.titleEn, bodyEn: draft.bodyEn },
+      });
     }
   }
 
@@ -1118,6 +1247,23 @@ export async function runAlertScan(workspaceId: string): Promise<AlertScanResult
     resolved: goneKeys.length,
     active: drafts.length,
   };
+}
+
+/**
+ * An alert's text in the viewer's language. English where the scan
+ * wrote it (rows from before it did fall back to the Chinese until the
+ * next scan fills them in); Traditional Chinese converted from the
+ * Simplified, as the rest of the interface is.
+ */
+export function localizeAlert(
+  alert: { title: string; body: string; titleEn: string | null; bodyEn: string | null },
+  locale: string,
+) {
+  if (locale === "en") return { title: alert.titleEn ?? alert.title, body: alert.bodyEn ?? alert.body };
+  if (locale === "zh-Hant") {
+    return { title: convertUiToTraditional(alert.title), body: convertUiToTraditional(alert.body) };
+  }
+  return { title: alert.title, body: alert.body };
 }
 
 export async function listActiveAlerts(workspaceId: string) {

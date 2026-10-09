@@ -2,7 +2,7 @@ import { AssistantAlertsPanel } from "@/components/assistant-alerts-panel";
 import { AssistantChat } from "@/components/assistant-chat";
 import { TuroInboxPanel } from "@/components/turo-inbox-panel";
 import { AssistantMemoryPanel } from "@/components/assistant-memory-panel";
-import { listActiveAlerts } from "@/lib/assistant-alerts";
+import { listActiveAlerts, localizeAlert } from "@/lib/assistant-alerts";
 import { listAssistantMemory } from "@/lib/assistant-memory";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { isGmailInboxConfigured } from "@/lib/gmail-inbox";
@@ -56,8 +56,7 @@ export default async function AssistantPage() {
         initialAlerts={alerts.map((alert) => ({
           id: alert.id,
           severity: alert.severity,
-          title: alert.title,
-          body: alert.body,
+          ...localizeAlert(alert, locale),
           href: alert.href,
           acknowledged: alert.acknowledgedAt != null,
           updatedAt: alert.updatedAt.toISOString(),

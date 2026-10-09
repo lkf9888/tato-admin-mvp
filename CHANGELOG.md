@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.59.1 - 2026-10-09
+
+### Assistant alerts follow the viewer's language
+
+Alerts were written in Chinese when the scan raised them and stored that way, so on an English screen the cards had English labels around Chinese text. Each detector now writes the alert in English too (`AssistantAlert.titleEn` / `bodyEn`, new nullable columns), and the assistant page and alerts API show the viewer's language: English, Simplified, or Traditional converted from the Simplified. Existing alerts get their English on the next scan without losing "Got it", because only a change to the Chinese text re-surfaces an alert. The email digest and the assistant's own context stay in Chinese.
+
 ## v1.59.0 - 2026-10-09
 
 ### A help manual, one guide per page

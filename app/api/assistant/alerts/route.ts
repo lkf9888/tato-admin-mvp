@@ -2,9 +2,10 @@ import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { listActiveAlerts, runAlertScan } from "@/lib/assistant-alerts";
+import { listActiveAlerts, localizeAlert, runAlertScan } from "@/lib/assistant-alerts";
 import { getCurrentAdminUser, requireCurrentAdminContext } from "@/lib/auth";
 import { sendAlertDigestEmail } from "@/lib/email";
+import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getAppUrl } from "@/lib/stripe";
 import { resolveTuroSyncWorkspace } from "@/lib/turo-sync";
@@ -35,13 +36,12 @@ export async function GET() {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const alerts = await listActiveAlerts(context.workspace.id);
+  const [alerts, { locale }] = await Promise.all([listActiveAlerts(context.workspace.id), getI18n()]);
   return NextResponse.json({
     alerts: alerts.map((alert) => ({
       id: alert.id,
       severity: alert.severity,
-      title: alert.title,
-      body: alert.body,
+      ...localizeAlert(alert, locale),
       href: alert.href,
       acknowledged: alert.acknowledgedAt != null,
       createdAt: alert.createdAt.toISOString(),

@@ -1555,6 +1555,10 @@ model AssistantAlert {
   severity  AssistantAlertSeverity @default(INFO)
   title     String
   body      String
+  /// The same alert in English, for an English screen. Null on rows
+  /// from before it was written; the next scan fills them in.
+  titleEn   String?
+  bodyEn    String?
   // Deep link into the app, e.g. /orders?q=<reservation>.
   href      String?
 

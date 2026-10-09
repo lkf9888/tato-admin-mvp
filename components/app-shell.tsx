@@ -103,6 +103,8 @@ export function AppShell({
         { href: "/payouts", label: messages.shell.nav.payouts, icon: "payouts" },
         { href: "/invoices", label: messages.shell.nav.invoices, icon: "invoices" },
         { href: "/account-settings", label: messages.shell.nav.accountSettings, icon: "accountSettings" },
+        // Last, where people look for it: under the settings.
+        { href: "/help", label: messages.shell.nav.help, icon: "help" },
       ],
     },
   ];

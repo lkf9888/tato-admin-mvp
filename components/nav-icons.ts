@@ -10,6 +10,7 @@ import {
   History,
   Image,
   LayoutGrid,
+  LifeBuoy,
   ListChecks,
   MessageCircle,
   Radio,
@@ -59,6 +60,7 @@ export const NAV_ICONS = {
   payouts: Banknote,
   invoices: ReceiptText,
   accountSettings: Settings,
+  help: LifeBuoy,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof NAV_ICONS;

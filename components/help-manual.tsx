@@ -1,0 +1,211 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Lightbulb, MessageSquare } from "lucide-react";
+
+import type { Guide, HelpCopy } from "@/app/(admin)/help/guides/types";
+import { NAV_ICONS, type NavIconName } from "@/components/nav-icons";
+import { cn } from "@/lib/utils";
+
+/** Each guide's sidebar icon, so the list reads like the nav it explains. */
+const GUIDE_ICONS: Record<string, NavIconName> = {
+  dashboard: "dashboard",
+  assistant: "assistant",
+  messages: "messages",
+  updates: "turoUpdates",
+  calendar: "calendar",
+  orders: "orders",
+  imports: "imports",
+  vehicles: "vehicles",
+  "vehicle-roi": "vehicleRoi",
+  owners: "owners",
+  "direct-booking": "directBooking",
+  "staff-schedule": "staffSchedule",
+  contracts: "contracts",
+  inspections: "photos",
+  photos: "photos",
+  documents: "documents",
+  activity: "activity",
+  trash: "activity",
+  billing: "billing",
+  payouts: "payouts",
+  invoices: "invoices",
+  "account-settings": "accountSettings",
+};
+
+/**
+ * The guide list and the open guide: a list on the left on a desktop,
+ * a picker on a phone. The open guide lives in the address bar
+ * (`?page=calendar`), so a link can point straight at one -- and it is
+ * written with `replaceState`, since the server has already sent every
+ * guide and switching between them needs no round-trip.
+ */
+export function HelpManual({
+  copy,
+  guides,
+  shotSet,
+  initialKey,
+}: {
+  copy: HelpCopy;
+  guides: Guide[];
+  shotSet: "zh" | "en";
+  initialKey: string;
+}) {
+  const [key, setKey] = useState(initialKey);
+  const articleRef = useRef<HTMLElement | null>(null);
+  const guide = guides.find((item) => item.key === key) ?? guides[0];
+
+  const choose = (next: string) => {
+    setKey(next);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("page", next);
+      window.history.replaceState(null, "", url);
+    } catch {
+      // The guide still switches; only the address is left as it was.
+    }
+  };
+
+  // A new guide starts at its top, not wherever the last one was read to.
+  useEffect(() => {
+    const node = articleRef.current;
+    if (!node) return;
+    if (node.getBoundingClientRect().top < 0) node.scrollIntoView({ block: "start" });
+  }, [key]);
+
+  return (
+    <div className="mx-auto w-full max-w-6xl">
+      <header className="mb-5">
+        <h1 className="text-[1.6rem] font-semibold tracking-[-0.01em] text-[var(--ink)]">{copy.title}</h1>
+        <p className="mt-1 max-w-[46rem] text-[14px] leading-6 text-[var(--ink-soft)]">{copy.intro}</p>
+      </header>
+
+      {guide ? (
+        <div className="grid gap-6 md:grid-cols-[13.5rem_minmax(0,1fr)]">
+          {/* Phone: a picker. Desktop: the list. */}
+          <label className="md:hidden">
+            <span className="sr-only">{copy.pick}</span>
+            <select
+              value={guide.key}
+              onChange={(event) => choose(event.target.value)}
+              className="h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 text-[15px] text-[var(--ink)]"
+            >
+              {guides.map((item) => (
+                <option key={item.key} value={item.key}>
+                  {item.title}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <nav className="hidden md:block" aria-label={copy.pick}>
+            <ul className="sticky top-4 space-y-0.5">
+              {guides.map((item) => {
+                const Icon = NAV_ICONS[GUIDE_ICONS[item.key] ?? "help"];
+                const active = item.key === guide.key;
+                return (
+                  <li key={item.key}>
+                    <button
+                      type="button"
+                      onClick={() => choose(item.key)}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13.5px] transition",
+                        active
+                          ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]"
+                          : "text-[var(--ink-mid)] hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]",
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className="min-w-0 truncate">{item.title}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          <article ref={articleRef} className="min-w-0 scroll-mt-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 max-w-[44rem]">
+                <h2 className="text-[1.3rem] font-semibold text-[var(--ink)]">{guide.title}</h2>
+                <p className="mt-1 text-[15px] leading-7 text-[var(--ink-mid)]">{guide.summary}</p>
+              </div>
+              <Link
+                href={`/${guide.key}`}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-3 text-[13px] font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              >
+                {copy.open}
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+              </Link>
+            </div>
+
+            <figure className="mt-4">
+              <a
+                href={`/help/pages/${shotSet}/${guide.key}.jpg`}
+                target="_blank"
+                rel="noreferrer"
+                className="block overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] shadow-[0_18px_40px_-30px_rgba(17,19,24,0.45)]"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- a static screenshot, sized by its own attributes */}
+                <img
+                  key={guide.key}
+                  src={`/help/pages/${shotSet}/${guide.key}.jpg`}
+                  alt={copy.screenshotAlt.replace("{page}", guide.title)}
+                  width={1440}
+                  height={900}
+                  className="block h-auto w-full"
+                />
+              </a>
+              <figcaption className="mt-1.5 text-[12px] text-[var(--ink-soft)]">{copy.screenshotNote}</figcaption>
+            </figure>
+
+            <div className="mt-6 max-w-[46rem] space-y-6">
+              {guide.sections.map((section) => (
+                <section key={section.heading}>
+                  <h3 className="text-[15px] font-semibold text-[var(--ink)]">{section.heading}</h3>
+                  <ol className="mt-2.5 space-y-2.5">
+                    {section.steps.map((step, index) => (
+                      <li key={index} className="flex gap-3 text-[14.5px] leading-6 text-[var(--ink-mid)]">
+                        <span
+                          aria-hidden
+                          className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[11px] font-semibold tabular-nums text-[var(--accent)]"
+                        >
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              ))}
+            </div>
+
+            {guide.tips && guide.tips.length > 0 ? (
+              <aside className="mt-6 max-w-[46rem] rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[14px] leading-6 text-amber-900">
+                <p className="mb-1.5 flex items-center gap-1.5 font-semibold">
+                  <Lightbulb className="h-4 w-4" aria-hidden />
+                  {copy.tips}
+                </p>
+                <ul className="list-disc space-y-1 pl-5">
+                  {guide.tips.map((tip, index) => (
+                    <li key={index}>{tip}</li>
+                  ))}
+                </ul>
+              </aside>
+            ) : null}
+
+            <aside className="mt-8 flex max-w-[46rem] items-start gap-3 border-t border-[var(--line)] pt-5">
+              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-soft)]" aria-hidden />
+              <div className="text-[14px] leading-6">
+                <p className="font-semibold text-[var(--ink)]">{copy.contactTitle}</p>
+                <p className="text-[var(--ink-soft)]">{copy.contactBody}</p>
+              </div>
+            </aside>
+          </article>
+        </div>
+      ) : null}
+    </div>
+  );
+}

@@ -1,6 +1,6 @@
 {
   "name": "turo-admin-mvp",
-  "version": "1.58.0",
+  "version": "1.59.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,6 +10,7 @@
     "check:docs": "tsx scripts/check-launch-checklist.ts",
     "i18n:zh-hant": "tsx scripts/generate-zh-hant.ts",
     "check:zh-hant": "tsx scripts/generate-zh-hant.ts --check",
+    "check:help": "tsx scripts/check-help-guides.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",

@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.59.0 - 2026-10-09
+
+### A help manual, one guide per page
+
+New hosts asked the same "how do I…" questions, and the answers lived
+nowhere in the product. /help (last in the sidebar, under the settings)
+has a guide for each of the 22 sidebar pages: what the page is for, a
+screenshot of it, numbered steps quoting the page's own button labels,
+and the rules the screen does not say (a Turo trip has no amount until
+its CSV is imported, overlapping trips save and turn red, the cleaning
+fee has a start date). The open guide is in the address
+(`/help?page=calendar`), a member sees guides only for pages they can
+open, and questions go through the Contact button the app already has.
+
+- The guides live in `app/(admin)/help/guides/{zh,en}.ts`, not in the
+  app-wide messages: those ship to every page's browser bundle, and the
+  guides are only read on /help, which the server renders. zh-Hant is
+  converted from the Simplified text on the server with the same
+  converter the generated messages use.
+- Screenshots (`public/help/pages/{zh,en}/<page>.jpg`, both Chinese
+  locales share the Chinese set) are of local demo data, never
+  production, whose pages show renters' names and phones. The sidebar
+  is cropped off, and notices only a server without production keys
+  shows are hidden. `scripts/capture-help-screenshots.cjs` retakes them.
+- E-sign Contracts is Chinese-only for now, so its English guide quotes
+  the Chinese button labels.
+- CI checks every sidebar page has a guide in both languages and both
+  screenshots (`npm run check:help`).
+
 ## v1.58.0 - 2026-10-08
 
 ### The calendar and the order panel say where things stand at a glance

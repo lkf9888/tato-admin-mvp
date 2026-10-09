@@ -33,6 +33,8 @@ jobs:
         run: npm run check:docs
       - name: Traditional Chinese messages are regenerated
         run: npm run check:zh-hant
+      - name: Help manual covers every sidebar page
+        run: npm run check:help
       - name: Type check
         run: npx tsc --noEmit
       - name: Production build

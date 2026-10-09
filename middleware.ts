@@ -29,6 +29,7 @@ const protectedPrefixes = [
   "/trash",
   "/invoices",
   "/invoice-print",
+  "/help",
 ];
 
 export function middleware(request: NextRequest) {

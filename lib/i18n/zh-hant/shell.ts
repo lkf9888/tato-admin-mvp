@@ -40,6 +40,7 @@ export const shellMessages = {
         guestMessages: "客人訊息",
         turoUpdates: "動態更新",
         agent: "Turo 讀取器",
+        help: "幫助手冊",
         groupOperations: "運營",
         groupFleet: "車隊",
         groupBookings: "客戶接入",

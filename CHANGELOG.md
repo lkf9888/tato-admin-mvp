@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.60.1 - 2026-10-10
+
+### A trip's statement takes the cleaning fee off, under "Other charges", with one total
+
+- The cleaning fee now comes off the net income, in its own section below
+  the deductions, "Other charges": charges that do not come from Turo.
+  It edits on its own line (with the date it takes effect, as before).
+- Money in and Taken off lost their subtotals. Two more totals beside the
+  net read as rival answers to what the trip made; the net is the one.
+- The net is now worked out from the lines, so its row no longer edits.
+  An offline order's price, or a Turo trip's earnings before its CSV
+  arrives, is the one income line and edits there. With no known amount
+  the net shows a dash rather than the cleaning fee alone as a loss.
+
 ## v1.60.0 - 2026-10-10
 
 ### The help manual shows every dialog and sub-page, with numbered marks on what to press

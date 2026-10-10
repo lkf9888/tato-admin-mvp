@@ -161,7 +161,7 @@ export const orderDetailMessages = {
       ledgerNet: "Net income",
       ledgerOther: "Other Turo adjustments",
       ledgerOtherHint: "What is left between the charges listed and the earnings Turo reports.",
-      cleaningFeeAside: "Charged to the owner, not part of the net income above.",
+      ledgerOtherFees: "Other charges",
       /** Turo's CSV column names in the reader's language; English keeps Turo's own. */
       feeLabels: {} as Record<string, string>,
     },
@@ -320,7 +320,7 @@ export const orderDetailMessages = {
       ledgerNet: "净收入",
       ledgerOther: "其他 Turo 调整",
       ledgerOtherHint: "上面列出的各项和 Turo 报告的收入之间的差额。",
-      cleaningFeeAside: "向车主收取，不计入上面的净收入。",
+      ledgerOtherFees: "其他费用",
       feeLabels: {
         "Trip price": "租金",
         "Boost price": "Boost 加价",

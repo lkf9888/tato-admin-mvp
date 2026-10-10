@@ -155,7 +155,7 @@ export const orderDetailMessages = {
       ledgerNet: "淨收入",
       ledgerOther: "其他 Turo 調整",
       ledgerOtherHint: "上面列出的各項和 Turo 報告的收入之間的差額。",
-      cleaningFeeAside: "向車主收取，不計入上面的淨收入。",
+      ledgerOtherFees: "其他費用",
       feeLabels: {
         "Trip price": "租金",
         "Boost price": "Boost 加價",

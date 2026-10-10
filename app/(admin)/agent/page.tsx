@@ -2,22 +2,15 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getAppUrl } from "@/lib/stripe";
-import { buildBookmarkletSource } from "@/lib/turo-bookmarklet";
 import { AgentSetupPanel } from "@/components/agent-setup-panel";
 
 /**
- * Setting up the Turo reader.
+ * API tokens for an AI agent or a script.
  *
- * The thing this page hands out is a bookmark, which is an unusual
- * answer and worth the paragraph explaining why it is the right one:
- * Turo sits behind Cloudflare, and every automated browser pointed at
- * it was blocked -- bundled Chromium and the real Chrome binary,
- * headed and headless alike. What it recognises is the automation
- * connection itself.
- *
- * A person clicking a bookmark in the browser they are already signed
- * into is not a disguise. It is the operator reading their own
- * conversations, with the reading written down afterwards.
+ * This page used to hand out the Turo reader, a bookmark that read the
+ * operator's own Turo conversations back into TATO. It was removed at
+ * the user's request (v1.63.1); an agent with a read-write token records
+ * the same conversations through POST /api/agent/messages.
  */
 export default async function AgentPage() {
   const [{ messages }, { workspace }] = await Promise.all([
@@ -39,24 +32,15 @@ export default async function AgentPage() {
     },
   });
 
-  const scraped = await prisma.turoConversationMessage.count({
-    where: { workspaceId: workspace.id },
-  });
-  const outbound = await prisma.turoConversationMessage.count({
-    where: { workspaceId: workspace.id, direction: "outbound" },
-  });
-
   return (
     <AgentSetupPanel
       appUrl={getAppUrl()}
-      bookmarklet={`javascript:${encodeURIComponent(buildBookmarkletSource(getAppUrl()))}`}
       tokens={tokens.map((token) => ({
         ...token,
         lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
         revokedAt: token.revokedAt?.toISOString() ?? null,
         createdAt: token.createdAt.toISOString(),
       }))}
-      stats={{ scraped, outbound }}
       title={messages.shell.nav.agent}
     />
   );

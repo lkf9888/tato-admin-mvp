@@ -48,6 +48,14 @@ export async function POST(request: Request) {
     return withCors({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
+  // The Turo reader bookmark was retired (v1.63.1). Its tokens carry
+  // only this scope, which nothing else is issued with, so they are
+  // turned away here rather than revoked row by row; an agent's
+  // read-write token also carries `read` and is unaffected.
+  if (agent.scopes.length === 1 && agent.scopes[0] === "messages:write") {
+    return withCors({ error: "BOOKMARK_RETIRED" }, { status: 401 });
+  }
+
   const parsed = payloadSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return withCors(

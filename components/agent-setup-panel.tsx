@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 type Token = {
   id: string;
@@ -42,62 +42,18 @@ const WRITE_ENDPOINTS: Array<[string, string]> = [
 
 export function AgentSetupPanel({
   appUrl,
-  bookmarklet,
   tokens,
-  stats,
   title,
 }: {
   appUrl: string;
-  bookmarklet: string;
   tokens: Token[];
-  stats: { scraped: number; outbound: number };
   title: string;
 }) {
-  const [minted, setMinted] = useState<string | null>(null);
   const router = useRouter();
   const [mintedRead, setMintedRead] = useState<{ token: string; write: boolean } | null>(null);
   const [revoking, setRevoking] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [busyRead, setBusyRead] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
-
-  /**
-   * The href is set through the DOM, not through JSX.
-   *
-   * React refuses to render a `javascript:` URL and substitutes one
-   * that throws: the bookmark this page handed out contained React's
-   * error rather than the reader, which is why clicking it did
-   * nothing at all. Setting the attribute afterwards is the same
-   * anchor, past the sanitiser -- and the sanitiser is protecting
-   * against untrusted URLs reaching an href, which is not what this
-   * is: the source is built on the server, in this repository.
-   */
-  const linkRef = useRef<HTMLAnchorElement | null>(null);
-  useEffect(() => {
-    linkRef.current?.setAttribute("href", bookmarklet);
-  }, [bookmarklet]);
-
-  async function copyBookmarklet() {
-    await navigator.clipboard.writeText(bookmarklet).catch(() => null);
-    setCopied(true);
-  }
-
-  async function mint() {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const response = await fetch("/api/agent/tokens", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "浏览器书签", scopes: ["messages:write"] }),
-      });
-      const data = (await response.json()) as { token?: string };
-      if (data.token) setMinted(data.token);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   /** Read-only by default; `write` adds `orders:write` for an agent
    *  that imports trips. Two separate tokens rather than one upgraded
@@ -128,7 +84,7 @@ export function AgentSetupPanel({
 
   async function revoke(id: string) {
     if (revoking) return;
-    if (!window.confirm("吊销后，用这个令牌的书签或 Agent 立即失效，不能恢复。继续？")) return;
+    if (!window.confirm("吊销后，用这个令牌的 Agent 立即失效，不能恢复。继续？")) return;
     setRevoking(id);
     try {
       await fetch("/api/agent/tokens", {
@@ -155,122 +111,7 @@ export function AgentSetupPanel({
     <div className="space-y-3">
       <h1 className="sr-only">{title}</h1>
 
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
-        <h2 className="t-title text-[var(--ink)]">已读回</h2>
-        <dl className="mt-2 grid grid-cols-2 gap-3">
-          <div>
-            <dt className="t-eyebrow text-[var(--ink-soft)]">消息总数</dt>
-            <dd className="mt-0.5 text-[20px] font-black tabular-nums text-[var(--ink)]">
-              {stats.scraped}
-            </dd>
-          </div>
-          <div>
-            <dt className="t-eyebrow text-[var(--ink-soft)]">其中你方发出</dt>
-            <dd className="mt-0.5 text-[20px] font-black tabular-nums text-[var(--brand)]">
-              {stats.outbound}
-            </dd>
-          </div>
-        </dl>
-      </section>
-
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
-        <h2 className="t-title text-[var(--ink)]">1 · 令牌</h2>
-        <p className="mt-1 text-[12px] leading-5 text-[var(--ink-soft)]">
-          只显示一次，存的是哈希。丢了就再签一个，旧的吊销即可。
-        </p>
-
-        {minted ? (
-          <div className="mt-2 rounded-md border border-[var(--brand)] bg-[var(--brand-soft)] p-3">
-            <p className="text-[11px] font-bold text-[var(--brand)]">现在复制，之后无法再看到</p>
-            <code className="mt-1 block select-all break-all text-[12px] text-[var(--ink)]">
-              {minted}
-            </code>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={mint}
-            disabled={busy}
-            className="tap-press mt-2 rounded-md bg-[var(--ink)] px-3 py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
-          >
-            {busy ? "签发中…" : "签发新令牌"}
-          </button>
-        )}
-
-        {tokens.length > 0 ? (
-          <ul className="mt-3 space-y-1.5 border-t border-[var(--line)] pt-2">
-            {tokens.map((token) => (
-              <li key={token.id} className="flex items-baseline justify-between gap-2 text-[11.5px]">
-                <span className="text-[var(--ink)]">
-                  <span className="font-bold">{token.name}</span>{" "}
-                  <code className="text-[var(--ink-soft)]">{token.tokenPrefix}…</code>{" "}
-                  <span className="rounded border border-[var(--line)] px-1 py-0.5 text-[10px] text-[var(--ink-soft)]">
-                    {token.scopes}
-                  </span>
-                </span>
-                <span className="flex shrink-0 items-baseline gap-2 text-[var(--ink-soft)]">
-                  {token.revokedAt
-                    ? "已吊销"
-                    : token.lastUsedAt
-                      ? `最后使用 ${new Date(token.lastUsedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
-                      : "未使用"}
-                  {token.revokedAt ? null : (
-                    <button
-                      type="button"
-                      onClick={() => revoke(token.id)}
-                      disabled={revoking === token.id}
-                      className="tap-press font-bold text-[var(--bad-fg)] disabled:opacity-50"
-                    >
-                      {revoking === token.id ? "吊销中…" : "吊销"}
-                    </button>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
-
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
-        <h2 className="t-title text-[var(--ink)]">2 · 书签</h2>
-        <p className="mt-1 text-[12px] leading-5 text-[var(--ink-soft)]">
-          把下面这个链接<strong>拖到浏览器书签栏</strong>。然后在任意 Turo 页面点它一下——
-          它会依次读取最近 25 个会话并推送回来。第一次会问你要令牌，只问一次。
-        </p>
-        <div className="tap-row mt-2 flex flex-wrap items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a
-            ref={linkRef}
-            onClick={(event) => event.preventDefault()}
-            className="inline-flex cursor-grab items-center rounded-md bg-[var(--brand)] px-4 py-2.5 text-[13px] font-bold text-white"
-          >
-            ↕ 读取 Turo 会话
-          </a>
-          <button
-            type="button"
-            onClick={copyBookmarklet}
-            className="tap-press rounded-md border border-[var(--line-strong)] bg-white px-3 py-2.5 text-[12.5px] font-bold text-[var(--ink-mid)]"
-          >
-            {copied ? "已复制" : "复制代码"}
-          </button>
-        </div>
-        <p className="mt-1.5 text-[11px] leading-4 text-[var(--ink-soft)]">
-          拖不动的话用「复制代码」：书签栏右键 → 添加网页，名称随便填，网址栏粘贴。
-        </p>
-        <p className="mt-2 text-[11px] leading-4 text-[var(--ink-soft)]">
-          为什么是书签而不是后台任务：Turo 由 Cloudflare 防护，自动化浏览器全部被拦——
-          自带的 Chromium 和你机器上真正的 Chrome 都试过，有头无头都一样，它认的是自动化连接本身。
-          你本人在已登录的浏览器里点一下，不是伪装，是你在读自己的会话。
-        </p>
-      </section>
-
-      {/* The read API. Separate section, separate token: the bookmarklet
-          writes conversations and this reads the account, and one
-          credential doing both would mean revoking the laptop's token
-          also breaks every automation. */}
-      {/* Anchored, because the way in is a link from account settings
-          and this sits below two screens of bookmarklet setup that
-          have nothing to do with it. */}
+      {/* Anchored: account settings links here to issue a token. */}
       <section
         id="api"
         className="scroll-mt-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4"
@@ -319,6 +160,39 @@ export function AgentSetupPanel({
             </button>
           </div>
         )}
+
+        {tokens.length > 0 ? (
+          <ul className="mt-3 space-y-1.5 border-t border-[var(--line)] pt-2">
+            {tokens.map((token) => (
+              <li key={token.id} className="flex items-baseline justify-between gap-2 text-[11.5px]">
+                <span className="text-[var(--ink)]">
+                  <span className="font-bold">{token.name}</span>{" "}
+                  <code className="text-[var(--ink-soft)]">{token.tokenPrefix}…</code>{" "}
+                  <span className="rounded border border-[var(--line)] px-1 py-0.5 text-[10px] text-[var(--ink-soft)]">
+                    {token.scopes}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-baseline gap-2 text-[var(--ink-soft)]">
+                  {token.revokedAt
+                    ? "已吊销"
+                    : token.lastUsedAt
+                      ? `最后使用 ${new Date(token.lastUsedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+                      : "未使用"}
+                  {token.revokedAt ? null : (
+                    <button
+                      type="button"
+                      onClick={() => revoke(token.id)}
+                      disabled={revoking === token.id}
+                      className="tap-press font-bold text-[var(--bad-fg)] disabled:opacity-50"
+                    >
+                      {revoking === token.id ? "吊销中…" : "吊销"}
+                    </button>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
         <div className="mt-3 border-t border-[var(--line)] pt-2">
           <div className="tap-row flex flex-wrap items-center justify-between gap-2">

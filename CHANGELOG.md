@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.63.1 - 2026-10-10
+
+### The Turo reader bookmark is gone
+
+Removed at the user's request. The /agent page no longer offers the bookmark, its own token or the "read back" counts. It opens on the API section, where the list of every token, with its revoke button, now lives (it used to sit in the bookmark's token section). `lib/turo-bookmarklet.ts` is deleted.
+
+Tokens issued for the bookmark carry only `messages:write`, a scope nothing else is issued alone with. `POST /api/agent/messages` and `GET /api/agent/reservations` now refuse such tokens (401 `BOOKMARK_RETIRED`), so a bookmark already in someone's browser stops working without each token being revoked by hand. Read-write API tokens also carry `read` and are unaffected; an AI agent records host replies through the same endpoint as before.
+
 ## v1.63.0 - 2026-10-10
 
 ### Settings regroup around what people come for; changing the login email takes a code sent to the new address

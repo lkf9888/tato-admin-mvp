@@ -772,8 +772,8 @@ export const guides: Guide[] = [
         heading: "API tokens",
         shot: "settings-agent",
         steps: [
-          "First 「签发新令牌」 (issue a token). It is shown once; if lost, issue another and revoke the old one.",
-          "「签发只读令牌」 (read-only) reads trips, amounts, owner terms and ledgers; 「签发读写令牌」 (read-write) can also import Turo trips and write Turo conversations.",
+          "Press 「签发只读令牌」 (read-only) or 「签发读写令牌」 (read-write). Read-only reads trips, amounts, owner terms and ledgers; read-write can also import Turo trips and write Turo conversations. A token is shown once, so copy it straight away.",
+          "「复制 curl」 (copy curl) gives a test command to try the token with. Issued tokens are listed below; if one is lost or no longer needed, 「吊销」 (revoke) it and issue another.",
         ],
       },
       {

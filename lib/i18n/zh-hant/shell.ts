@@ -39,7 +39,7 @@ export const shellMessages = {
         assistant: "助理",
         guestMessages: "客人訊息",
         turoUpdates: "動態更新",
-        agent: "Turo 讀取器",
+        agent: "API 令牌",
         help: "幫助手冊",
         groupOperations: "運營",
         groupFleet: "車隊",

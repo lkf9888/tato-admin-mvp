@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.63.2 - 2026-10-10
+
+### The /agent page is called API tokens, and the help manual describes it as it now is
+
+- With the Turo reader gone (v1.63.1), /agent holds only API tokens, so
+  its title follows: "API 令牌" / "API tokens" instead of "Turo reader".
+- The help manual's API-token section no longer points at the removed
+  "issue a token" button: it marks the read-only and read-write buttons
+  and "copy curl", and says where tokens are revoked. Pictures retaken.
+
 ## v1.63.1 - 2026-10-10
 
 ### The Turo reader bookmark is gone

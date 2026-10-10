@@ -190,8 +190,8 @@ export const accountShots: Shot[] = [
     id: "settings-agent",
     path: "/agent",
     marks: [
-      { step: 1, target: { role: "button", name: "签发新令牌" } },
-      { step: 2, target: { role: "button", name: "签发只读令牌" } },
+      { step: 1, target: { role: "button", name: "签发只读令牌" } },
+      { step: 2, target: { role: "button", name: "复制 curl" } },
     ],
   },
 ];

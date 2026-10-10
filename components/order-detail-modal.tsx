@@ -321,6 +321,44 @@ function tripPhase(
   return { tone: "ended", label: t.phaseEnded(today - localDayNumber(end)) };
 }
 
+/** One half of the statement: its rows, and their subtotal on the heading. */
+function LedgerGroup({
+  title,
+  lines,
+  locale,
+}: {
+  title: string;
+  lines: Array<{ key: string; label: string; original: string; value: number }>;
+  locale: Locale;
+}) {
+  const total = lines.reduce((sum, line) => sum + line.value, 0);
+  const negative = total < 0;
+  return (
+    <section className="border-b border-[var(--line)] px-3 py-2 last:border-b-0">
+      <div className="flex items-baseline justify-between gap-3">
+        <h4 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">{title}</h4>
+        <span className={cn("text-[11px] font-semibold tabular-nums", negative ? "text-rose-600" : "text-[color:var(--ink-mid)]")}>
+          {negative ? "−" : "+"}
+          {formatCurrency(Math.abs(total), locale)}
+        </span>
+      </div>
+      <ul className="mt-1 space-y-0.5">
+        {lines.map((line) => (
+          <li key={line.key} className="flex items-baseline justify-between gap-3 text-[13px] leading-6">
+            <span className="min-w-0 truncate text-[color:var(--ink-mid)]" title={line.original}>
+              {line.label}
+            </span>
+            <span className={cn("shrink-0 tabular-nums", line.value < 0 ? "text-rose-600" : "text-[color:var(--ink)]")}>
+              {line.value < 0 ? "−" : "+"}
+              {formatCurrency(Math.abs(line.value), locale)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** A handover moment: the day on one line, the clock time large under it. */
 function TripMoment({ value, locale }: { value: string; locale: Locale }) {
   const date = new Date(value);
@@ -490,6 +528,31 @@ export function OrderDetailModal({
     notes: Boolean(currentOrder.notes?.trim()),
   };
   const showField = (field: FieldKey) => filled[field] !== false || editingField === field;
+  // The trip's charges as a statement: each CSV column with its real
+  // sign. A debit column (a discount) is stored positive and subtracts;
+  // a credit column keeps the export's own sign, which is how Sales tax
+  // -- withheld by Turo, stored negative -- lands among the deductions.
+  // Whatever the listed lines do not explain of the reported earnings
+  // becomes one more line, so the column always adds up to the net.
+  const ledger = (() => {
+    const lines = (currentOrder.feeLines ?? []).map((line) => ({
+      key: line.column,
+      label: t.feeLabels[line.column] ?? line.column,
+      original: line.column,
+      value: line.sign === "debit" ? -Math.abs(line.amount) : line.amount,
+    }));
+    if (lines.length > 0 && currentOrder.totalPrice != null) {
+      const listed = lines.reduce((sum, line) => sum + line.value, 0);
+      const gap = Math.round((currentOrder.totalPrice - listed) * 100) / 100;
+      if (Math.abs(gap) >= 0.01) {
+        lines.push({ key: "__other", label: t.ledgerOther, original: t.ledgerOtherHint, value: gap });
+      }
+    }
+    return {
+      income: lines.filter((line) => line.value > 0),
+      deductions: lines.filter((line) => line.value < 0),
+    };
+  })();
   const addChips: Array<[FieldKey, string]> = [
     ...(pickupLocation === "" && returnLocation === "" && editingField !== "locations"
       ? ([["locations", t.sameLocation]] as Array<[FieldKey, string]>)
@@ -1297,163 +1360,208 @@ export function OrderDetailModal({
             ) : null}
           </div>
 
-          {/* Accounting on its own. These are what a bookkeeper
-              reconciles against a bank statement. A Turo trip's figure is
-              its earnings after Turo's cut, which arrive with the CSV --
-              until then the box says so instead of standing empty. The
-              cleaning fee sits here because it is the one number on
-              this panel that is not a property of the order at all --
-              it is a price on the car, and saving it prices every trip
-              that car runs from the chosen date onward. Deposit, payment
-              method, contract number and cleaning fee only take a box
-              once they hold something; empty, they are an Add chip
-              below. */}
+          {/* Accounting, read top to bottom like a statement: what came
+              in, what was taken off, and what is left. A Turo trip's lines
+              come from its CSV row; they were a two-column grid of mixed
+              signs, so checking them against the earnings meant adding up
+              across columns -- and Sales tax, which the export stores as a
+              negative, showed without its minus. The net income is the
+              trip's earnings after Turo's cut and still edits in place.
+              The cleaning fee sits apart because it is not part of that
+              income: it is a price on the car, charged to the owner, and
+              saving it prices every trip the car runs from the chosen
+              date onward. Deposit, payment method and contract number are
+              not money in or out, so they stay boxes below, and only take
+              one once they hold something. */}
           <div className="mt-2.5 rounded-lg border border-[rgba(17,19,24,0.1)] bg-[var(--surface-muted)]/50 p-2 sm:p-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
               {t.accounting}
             </p>
-            <div className="mt-1.5 grid min-w-0 grid-cols-2 gap-1.5 sm:gap-2 lg:grid-cols-4">
-              <EditableField
-                labelText={currentOrder.source === "turo" ? t.earnings : t.totalPrice}
-                {...fieldChrome("totalPrice")}
+            <div className="mt-1.5 overflow-hidden rounded-md border border-[rgba(17,19,24,0.1)] bg-[var(--surface)]">
+              {ledger.income.length > 0 ? (
+                <LedgerGroup title={t.ledgerIncome} lines={ledger.income} locale={locale} />
+              ) : null}
+              {ledger.deductions.length > 0 ? (
+                <LedgerGroup title={t.ledgerDeductions} lines={ledger.deductions} locale={locale} />
+              ) : null}
+              {/* The bottom line, on one line with the figures above it:
+                  label left, amount right-aligned under theirs. */}
+              <div
+                className={cn(
+                  "flex min-w-0 items-center justify-between gap-3 px-3 py-2.5",
+                  ledger.income.length + ledger.deductions.length > 0 && "border-t-2 border-[var(--line-strong)]",
+                  editingField === "totalPrice" && "bg-[var(--accent-soft)]/40",
+                )}
+                onKeyDown={fieldChrome("totalPrice").onKeyDown}
               >
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={editingField === "totalPrice" ? draft.totalPrice : formatCurrencyInputValue(currentOrder.totalPrice)}
-                  placeholder={currentOrder.source === "turo" && editingField !== "totalPrice" ? t.earningsPending : undefined}
-                  onChange={(event) => updateDraft({ totalPrice: event.target.value })}
-                  onBlur={(event) => updateDraft({ totalPrice: formatCurrencyInputText(event.target.value) })}
-                  readOnly={editingField !== "totalPrice"}
-                  autoFocus={editingField === "totalPrice"}
-                  className={cn(inputClass, "font-semibold tabular-nums")}
-                />
-              </EditableField>
-
-              {showField("depositAmount") ? (
-                <EditableField labelText={t.deposit} {...fieldChrome("depositAmount")}>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={
-                      editingField === "depositAmount"
-                        ? draft.depositAmount
-                        : formatCurrencyInputValue(currentOrder.depositAmount)
-                    }
-                    onChange={(event) => updateDraft({ depositAmount: event.target.value })}
-                    onBlur={(event) => updateDraft({ depositAmount: formatCurrencyInputText(event.target.value) })}
-                    readOnly={editingField !== "depositAmount"}
-                    autoFocus={editingField === "depositAmount"}
-                    className={inputClass}
-                  />
-                </EditableField>
-              ) : null}
-
-              {showField("paymentMethod") ? (
-                <EditableField labelText={t.paymentMethod} {...fieldChrome("paymentMethod")}>
-                  <input
-                    value={editingField === "paymentMethod" ? draft.paymentMethod : currentOrder.paymentMethod ?? ""}
-                    onChange={(event) => updateDraft({ paymentMethod: event.target.value })}
-                    readOnly={editingField !== "paymentMethod"}
-                    autoFocus={editingField === "paymentMethod"}
-                    className={inputClass}
-                  />
-                </EditableField>
-              ) : null}
-
-              {showField("contractNumber") ? (
-                <EditableField labelText={t.contractNumber} {...fieldChrome("contractNumber")}>
-                  <input
-                    value={editingField === "contractNumber" ? draft.contractNumber : currentOrder.contractNumber ?? ""}
-                    onChange={(event) => updateDraft({ contractNumber: event.target.value })}
-                    readOnly={editingField !== "contractNumber"}
-                    autoFocus={editingField === "contractNumber"}
-                    className={inputClass}
-                  />
-                </EditableField>
-              ) : null}
-
-              {showField("cleaningFee") ? (
-                <EditableField
-                  className="col-span-2"
-                  labelText={t.cleaningFee}
-                  {...fieldChrome("cleaningFee")}
-                >
-                  <div className="grid min-w-0 grid-cols-[minmax(0,7rem)_auto_minmax(0,1fr)] items-center gap-2">
+                <span className="shrink-0 text-[13px] font-semibold text-[color:var(--ink)]">
+                  {currentOrder.source === "turo" || ledger.income.length > 0 ? t.ledgerNet : t.totalPrice}
+                </span>
+                <span className="flex min-w-0 items-center justify-end gap-1.5">
+                  {/* Controls first, so the amount lines up under the
+                      figures above rather than one pencil to their left. */}
+                  {!readOnly ? (
+                    editingField === "totalPrice" ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void saveField("totalPrice")}
+                          disabled={isSaving}
+                          title={t.save}
+                          aria-label={t.save}
+                          className="tap-compact flex h-7 w-7 items-center justify-center rounded text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40"
+                        >
+                          <Save className="h-3.5 w-3.5" aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelField}
+                          disabled={isSaving}
+                          title={t.cancel}
+                          aria-label={t.cancel}
+                          className="tap-compact flex h-7 w-7 items-center justify-center rounded text-[color:var(--ink-soft)] transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
+                        >
+                          <X className="h-3.5 w-3.5" aria-hidden />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openField("totalPrice")}
+                        disabled={isSaving}
+                        title={t.edit}
+                        aria-label={t.edit}
+                        className={cn(
+                          "tap-compact flex h-7 w-7 items-center justify-center rounded transition hover:bg-[var(--surface-muted)] disabled:opacity-40",
+                          justSavedField === "totalPrice" ? "text-emerald-600" : "text-[color:var(--ink-soft)] hover:text-[var(--ink)]",
+                        )}
+                      >
+                        {justSavedField === "totalPrice" ? (
+                          <Check className="h-3.5 w-3.5" aria-hidden />
+                        ) : (
+                          <Pencil className="h-3.5 w-3.5" aria-hidden />
+                        )}
+                      </button>
+                    )
+                  ) : null}
+                  {editingField === "totalPrice" ? (
                     <input
-                      value={
-                        editingField === "cleaningFee"
-                          ? draft.cleaningFee
-                          : formatCurrencyInputValue(currentOrder.cleaningFee)
-                      }
-                      onChange={(event) => updateDraft({ cleaningFee: event.target.value })}
-                      readOnly={editingField !== "cleaningFee"}
-                      autoFocus={editingField === "cleaningFee"}
                       type="number"
                       step="0.01"
                       min="0"
+                      value={draft.totalPrice}
+                      onChange={(event) => updateDraft({ totalPrice: event.target.value })}
+                      onBlur={(event) => updateDraft({ totalPrice: formatCurrencyInputText(event.target.value) })}
+                      autoFocus
+                      aria-label={t.ledgerNet}
+                      className="h-8 w-32 rounded-md border border-[var(--accent)] bg-white px-2 text-right text-[15px] font-semibold tabular-nums text-[color:var(--ink)] outline-none"
+                    />
+                  ) : currentOrder.totalPrice != null ? (
+                    <span className="text-[19px] font-semibold tabular-nums text-[color:var(--ink)]">
+                      {formatCurrency(currentOrder.totalPrice, locale)}
+                    </span>
+                  ) : (
+                    <span className="text-[13px] text-[color:var(--ink-soft)]">
+                      {currentOrder.source === "turo" ? t.earningsPending : "—"}
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {showField("cleaningFee") ? (
+              <EditableField
+                className="mt-2"
+                labelText={t.cleaningFee}
+                {...fieldChrome("cleaningFee")}
+              >
+                <div className="grid min-w-0 grid-cols-[minmax(0,7rem)_auto_minmax(0,1fr)] items-center gap-2">
+                  <input
+                    value={
+                      editingField === "cleaningFee"
+                        ? draft.cleaningFee
+                        : formatCurrencyInputValue(currentOrder.cleaningFee)
+                    }
+                    onChange={(event) => updateDraft({ cleaningFee: event.target.value })}
+                    readOnly={editingField !== "cleaningFee"}
+                    autoFocus={editingField === "cleaningFee"}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className={cn(inputClass, "tabular-nums")}
+                  />
+                  {editingField === "cleaningFee" ? (
+                    <>
+                      <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="shrink-0 text-[10px] uppercase tracking-[0.13em] text-[color:var(--ink-soft)]">
+                          {t.cleaningFeeFrom}
+                        </span>
+                        <input
+                          value={draft.cleaningFeeFrom}
+                          onChange={(event) => updateDraft({ cleaningFeeFrom: event.target.value })}
+                          type="date"
+                          className={inputClass}
+                        />
+                      </span>
+                    </>
+                  ) : (
+                    <span className="truncate text-[11px] text-[color:var(--ink-soft)]">{t.cleaningFeeAside}</span>
+                  )}
+                </div>
+                {editingField === "cleaningFee" ? (
+                  <p className="mt-1.5 text-[11px] leading-4 text-[color:var(--ink-soft)]">
+                    {t.cleaningFeeHint}
+                  </p>
+                ) : null}
+              </EditableField>
+            ) : null}
+
+            {showField("depositAmount") || showField("paymentMethod") || showField("contractNumber") ? (
+              <div className="mt-2 grid min-w-0 grid-cols-2 gap-1.5 sm:gap-2 lg:grid-cols-3">
+                {showField("depositAmount") ? (
+                  <EditableField labelText={t.deposit} {...fieldChrome("depositAmount")}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={
+                        editingField === "depositAmount"
+                          ? draft.depositAmount
+                          : formatCurrencyInputValue(currentOrder.depositAmount)
+                      }
+                      onChange={(event) => updateDraft({ depositAmount: event.target.value })}
+                      onBlur={(event) => updateDraft({ depositAmount: formatCurrencyInputText(event.target.value) })}
+                      readOnly={editingField !== "depositAmount"}
+                      autoFocus={editingField === "depositAmount"}
                       className={inputClass}
                     />
-                    {editingField === "cleaningFee" ? (
-                      <>
-                        <span aria-hidden className="h-4 w-px bg-[rgba(17,19,24,0.12)]" />
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span className="shrink-0 text-[10px] uppercase tracking-[0.13em] text-[color:var(--ink-soft)]">
-                            {t.cleaningFeeFrom}
-                          </span>
-                          <input
-                            value={draft.cleaningFeeFrom}
-                            onChange={(event) => updateDraft({ cleaningFeeFrom: event.target.value })}
-                            type="date"
-                            className={inputClass}
-                          />
-                        </span>
-                      </>
-                    ) : (
-                      <span />
-                    )}
-                  </div>
-                  {editingField === "cleaningFee" ? (
-                    <p className="mt-1.5 text-[11px] leading-4 text-[color:var(--ink-soft)]">
-                      {t.cleaningFeeHint}
-                    </p>
-                  ) : null}
-                </EditableField>
-              ) : null}
-            </div>
-            {/* What the trip was actually made of. Turo bundles a
-                dozen possible charges into one earnings figure, and
-                until now the panel showed the figure and none of the
-                charges -- so "why is this trip $377" had no answer
-                anywhere in the product. */}
-            {currentOrder.feeLines && currentOrder.feeLines.length > 0 ? (
-              <div className="mt-2 rounded-md border border-[rgba(17,19,24,0.1)] bg-white/70 px-2.5 py-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">
-                  {t.feeBreakdown}
-                </p>
-                <ul className="mt-1 grid gap-x-4 sm:grid-cols-2">
-                  {currentOrder.feeLines.map((line) => (
-                    <li
-                      key={line.column}
-                      className="flex items-baseline justify-between gap-3 text-[11.5px] leading-[1.15rem]"
-                    >
-                      <span className="min-w-0 truncate text-[color:var(--ink-soft)]">
-                        {line.column}
-                      </span>
-                      <span
-                        className={cn(
-                          "shrink-0 tabular-nums",
-                          line.sign === "debit" ? "text-rose-600" : "text-[color:var(--ink)]",
-                        )}
-                      >
-                        {line.sign === "debit" ? "−" : ""}
-                        {formatCurrency(Math.abs(line.amount), locale)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                  </EditableField>
+                ) : null}
+
+                {showField("paymentMethod") ? (
+                  <EditableField labelText={t.paymentMethod} {...fieldChrome("paymentMethod")}>
+                    <input
+                      value={editingField === "paymentMethod" ? draft.paymentMethod : currentOrder.paymentMethod ?? ""}
+                      onChange={(event) => updateDraft({ paymentMethod: event.target.value })}
+                      readOnly={editingField !== "paymentMethod"}
+                      autoFocus={editingField === "paymentMethod"}
+                      className={inputClass}
+                    />
+                  </EditableField>
+                ) : null}
+
+                {showField("contractNumber") ? (
+                  <EditableField labelText={t.contractNumber} {...fieldChrome("contractNumber")}>
+                    <input
+                      value={editingField === "contractNumber" ? draft.contractNumber : currentOrder.contractNumber ?? ""}
+                      onChange={(event) => updateDraft({ contractNumber: event.target.value })}
+                      readOnly={editingField !== "contractNumber"}
+                      autoFocus={editingField === "contractNumber"}
+                      className={inputClass}
+                    />
+                  </EditableField>
+                ) : null}
               </div>
             ) : null}
 

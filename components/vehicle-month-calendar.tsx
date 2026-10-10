@@ -235,7 +235,12 @@ export function VehicleMonthCalendar({
         className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[90vh] w-[min(52rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-lg border border-[var(--line)] bg-white shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={vehicleLabel}
+        className="relative flex max-h-[90vh] w-[min(52rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-lg border border-[var(--line)] bg-white shadow-2xl"
+      >
         <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] px-4 py-3">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold text-[var(--ink)]">{vehicleLabel}</h2>

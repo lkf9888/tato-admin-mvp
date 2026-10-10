@@ -35,8 +35,8 @@
 - `lib/zh-hant-convert.ts`：归底座，但有两个调用方、两种模式——界面文案（`scripts/generate-zh-hant.ts`）转成台湾用语；
   网站运营方自己写的内容（`lib/rental-site-page.tsx`）只转字形，否则「列治文本地」会变成「列治文字地」。改覆盖规则两边都要顾到
 - `components/app-shell.tsx` `nav-icons.ts`：归底座。加页面要同时加导航，并在 `middleware.ts` 的 `protectedPrefixes` 里登记；
-  加进侧边栏的页面还要在 `app/(admin)/help/guides/{zh,en}.ts` 补指南、在 `public/help/pages/{zh,en}/` 补截图
-  （`scripts/capture-help-screenshots.cjs` 用本地演示数据拍），否则 CI 的 `check:help` 红
+  加进侧边栏的页面还要在 `app/(admin)/help/guides/{zh,en}.ts` 补指南，在 `app/(admin)/help/shots/` 登记截图和标注，
+  再用 `scripts/capture-help-screenshots.ts` 拍本地演示数据（中英两套），否则 CI 的 `check:help` 红
 - `middleware.ts`：登录保护归底座，网站多语言路由（`site-locale`）归租车网站
 - `components/calendar-view.tsx`、`app/(admin)/calendar/page.tsx`、`messages/calendar.ts`：网格、订单、备注、选择、订阅归运营；
   **价格层**（v1.1.0「Prices live on the calendar」）归租车网站

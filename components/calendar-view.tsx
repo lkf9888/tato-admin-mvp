@@ -3882,7 +3882,12 @@ export function CalendarView({
       ) : null}
 
       {!readOnly && isOrderDialogOpen ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--ink)]/35 p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={calendarMessages.createDialogTitle}
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--ink)]/35 p-4"
+        >
           <div className="w-full max-w-2xl rounded-lg border border-[color:var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,247,247,0.98))] p-5 shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)]">
             <div className="flex items-start justify-between gap-4">
               <div>

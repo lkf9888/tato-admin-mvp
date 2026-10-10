@@ -2536,7 +2536,12 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button className="staff-modal-backdrop absolute inset-0 bg-black/40" onClick={onClose} aria-label="Close" />
-      <div className="relative max-h-[88vh] w-[min(42rem,calc(100vw-2rem))] overflow-y-auto rounded-lg bg-white shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="relative max-h-[88vh] w-[min(42rem,calc(100vw-2rem))] overflow-y-auto rounded-lg bg-white shadow-2xl"
+      >
         <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
           <h2 className="text-base font-semibold">{title}</h2>
           <button className="btn-secondary px-2 py-1 text-xs" onClick={onClose}>×</button>

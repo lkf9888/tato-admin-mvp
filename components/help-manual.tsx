@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Lightbulb, MessageSquare } from "lucide-react";
+import { ArrowRight, Lightbulb, MessageSquare, X } from "lucide-react";
 
-import type { Guide, HelpCopy } from "@/app/(admin)/help/guides/types";
+import type { HelpCopy, ResolvedGuide, ResolvedShot } from "@/app/(admin)/help/guides/types";
 import { NAV_ICONS, type NavIconName } from "@/components/nav-icons";
 import { cn } from "@/lib/utils";
 
@@ -44,16 +44,15 @@ const GUIDE_ICONS: Record<string, NavIconName> = {
 export function HelpManual({
   copy,
   guides,
-  shotSet,
   initialKey,
 }: {
   copy: HelpCopy;
-  guides: Guide[];
-  shotSet: "zh" | "en";
+  guides: ResolvedGuide[];
   initialKey: string;
 }) {
   const [key, setKey] = useState(initialKey);
   const articleRef = useRef<HTMLElement | null>(null);
+  const [enlarged, setEnlarged] = useState<{ shot: ResolvedShot; alt: string } | null>(null);
   const guide = guides.find((item) => item.key === key) ?? guides[0];
 
   const choose = (next: string) => {
@@ -141,42 +140,53 @@ export function HelpManual({
               </Link>
             </div>
 
-            <figure className="mt-4">
-              <a
-                href={`/help/pages/${shotSet}/${guide.key}.jpg`}
-                target="_blank"
-                rel="noreferrer"
-                className="block overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] shadow-[0_18px_40px_-30px_rgba(17,19,24,0.45)]"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- a static screenshot, sized by its own attributes */}
-                <img
-                  key={guide.key}
-                  src={`/help/pages/${shotSet}/${guide.key}.jpg`}
-                  alt={copy.screenshotAlt.replace("{page}", guide.title)}
-                  width={1440}
-                  height={900}
-                  className="block h-auto w-full"
-                />
-              </a>
-              <figcaption className="mt-1.5 text-[12px] text-[var(--ink-soft)]">{copy.screenshotNote}</figcaption>
-            </figure>
-
-            <div className="mt-6 max-w-[46rem] space-y-6">
+            <div className="mt-6 space-y-9">
               {guide.sections.map((section) => (
-                <section key={section.heading}>
-                  <h3 className="text-[15px] font-semibold text-[var(--ink)]">{section.heading}</h3>
-                  <ol className="mt-2.5 space-y-2.5">
-                    {section.steps.map((step, index) => (
-                      <li key={index} className="flex gap-3 text-[14.5px] leading-6 text-[var(--ink-mid)]">
-                        <span
-                          aria-hidden
-                          className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[11px] font-semibold tabular-nums text-[var(--accent)]"
-                        >
-                          {index + 1}
-                        </span>
-                        <span className="min-w-0">{step}</span>
-                      </li>
-                    ))}
+                <section key={section.heading} className="min-w-0">
+                  <h3 className="text-[16px] font-semibold text-[var(--ink)]">{section.heading}</h3>
+                  {section.shot ? (
+                    <figure className="mt-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEnlarged({
+                            shot: section.shot!,
+                            alt: copy.screenshotAlt.replace("{page}", `${guide.title} · ${section.heading}`),
+                          })
+                        }
+                        className="block w-full cursor-zoom-in overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] text-left shadow-[0_18px_40px_-30px_rgba(17,19,24,0.45)]"
+                        style={{ maxWidth: Math.min(section.shot.width, 1100) }}
+                      >
+                        <MarkedShot
+                          shot={section.shot}
+                          alt={copy.screenshotAlt.replace("{page}", `${guide.title} · ${section.heading}`)}
+                        />
+                      </button>
+                      <figcaption className="mt-1.5 text-[12px] text-[var(--ink-soft)]">{copy.screenshotNote}</figcaption>
+                    </figure>
+                  ) : null}
+                  <ol className="mt-3 max-w-[46rem] space-y-2.5">
+                    {section.steps.map((step, index) => {
+                      const marked = section.shot?.marks.some((mark) => mark.step === index + 1);
+                      return (
+                        <li key={index} className="flex gap-3 text-[14.5px] leading-6 text-[var(--ink-mid)]">
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums",
+                              // The same red as the box on the picture, so
+                              // step and box read as one pair.
+                              marked
+                                ? "bg-[#ff4d4f] text-white"
+                                : "bg-[var(--surface-muted)] text-[var(--ink-mid)]",
+                            )}
+                          >
+                            {index + 1}
+                          </span>
+                          <span className="min-w-0">{step}</span>
+                        </li>
+                      );
+                    })}
                   </ol>
                 </section>
               ))}
@@ -206,6 +216,67 @@ export function HelpManual({
           </article>
         </div>
       ) : null}
+
+      {enlarged ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={enlarged.alt}
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-3 sm:p-6"
+          onClick={() => setEnlarged(null)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setEnlarged(null);
+          }}
+        >
+          <button
+            type="button"
+            autoFocus
+            onClick={() => setEnlarged(null)}
+            aria-label={copy.close}
+            className="absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[var(--ink)] shadow"
+          >
+            <X className="h-5 w-5" aria-hidden />
+          </button>
+          <div
+            className="max-h-full w-full overflow-auto rounded-lg bg-white"
+            style={{ maxWidth: enlarged.shot.width }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <MarkedShot shot={enlarged.shot} alt={enlarged.alt} />
+          </div>
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * A screenshot with numbered boxes over what to press. The boxes are drawn
+ * here rather than burnt into the picture, so they stay sharp at any size
+ * and a retake moves them with the buttons (see the capture script).
+ */
+function MarkedShot({ shot, alt }: { shot: ResolvedShot; alt: string }) {
+  return (
+    <span className="relative block">
+      {/* eslint-disable-next-line @next/next/no-img-element -- a static screenshot, sized by its own attributes */}
+      <img src={shot.src} alt={alt} width={shot.width} height={shot.height} className="block h-auto w-full" />
+      {shot.marks.map((mark) => (
+        <span
+          key={`${mark.step}-${mark.x}-${mark.y}`}
+          aria-hidden
+          className="pointer-events-none absolute rounded-md border-2 border-[#ff4d4f] shadow-[0_0_0_3px_rgba(255,77,79,0.22)]"
+          style={{
+            left: `calc(${mark.x}% - 3px)`,
+            top: `calc(${mark.y}% - 3px)`,
+            width: `calc(${mark.w}% + 6px)`,
+            height: `calc(${mark.h}% + 6px)`,
+          }}
+        >
+          <span className="absolute -left-2.5 -top-2.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#ff4d4f] text-[11px] font-bold leading-none text-white shadow">
+            {mark.step}
+          </span>
+        </span>
+      ))}
+    </span>
   );
 }

@@ -146,7 +146,11 @@ export function RecurringOrderDialog({
     "h-9 w-full rounded-md border border-[var(--line)] bg-white px-2.5 text-[12px] text-[color:var(--ink)] outline-none focus:border-[var(--accent)]";
 
   return (
-    <div className="fixed inset-0 z-[85] flex items-end justify-center bg-[var(--ink)]/40 backdrop-blur-sm sm:items-center sm:p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[85] flex items-end justify-center bg-[var(--ink)]/40 backdrop-blur-sm sm:items-center sm:p-4"
+    >
       <button type="button" aria-label={labels.cancel} className="absolute inset-0" onClick={onClose} />
       <div className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--line)] bg-white shadow-2xl sm:max-h-[90vh] sm:w-[min(44rem,calc(100vw-2rem))] sm:rounded-lg">
         <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] px-4 py-3">

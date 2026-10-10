@@ -1,5 +1,52 @@
 # Changelog
 
+## v1.60.0 - 2026-10-10
+
+### The help manual shows every dialog and sub-page, with numbered marks on what to press
+
+The first manual had one screenshot per sidebar page and described only
+the page itself; the dialogs, menus and sub-pages most of the work happens
+in -- an owner's terms and ledger, the eleven direct-booking tabs, the
+calendar's trip panel, staff pay -- were not in it. It now has 67
+sections across the 22 pages, each with its own picture, in both
+languages.
+
+- Each picture has red numbered boxes on what its steps say to press, and
+  the steps carry the same numbers. The boxes are drawn by the page over
+  the picture, not burnt in, so they stay sharp in the enlarged view.
+- The pictures and their marks come from one list,
+  `app/(admin)/help/shots/`: the page to open, what to click first, and
+  the elements to mark. `scripts/capture-help-screenshots.ts` opens each
+  in both languages against local demo data, measures the marked elements
+  and writes their boxes to `marks.json`, so a retake after a redesign
+  moves the marks with the buttons. Pictures are trimmed to what the page
+  draws.
+- `check:help` also checks that every section's picture exists in both
+  languages, that no mark points past its section's last step, and that
+  the two languages have the same sections and step counts.
+- The calendar's new-order, month-view, recurring-order and feed dialogs,
+  the vehicle editor, the staff-schedule dialogs and quick reimbursement
+  now say `role="dialog"`, which screen readers needed and the capture
+  script finds dialogs by.
+
+### A trip's accounting reads as a statement
+
+The accounting box showed the earnings, the cleaning fee and a two-column
+grid of the CSV's charges with mixed signs, so checking a trip against
+Turo's receipt meant adding across columns. It now reads top to bottom:
+money in (rent, boost, delivery…), money taken off (discounts, sales
+tax…), each with a subtotal, and the net income on its own line at the
+bottom, editable in place. Charge names read in the viewer's language,
+with Turo's column name on hover.
+
+- Sales tax is withheld by Turo and stored negative in the export; the old
+  grid printed it without its minus, as if it were income. Each line now
+  keeps its real sign, so the column adds up to the net.
+- Whatever the listed charges do not explain of the net (an edited net, a
+  Turo adjustment) shows as one "Other Turo adjustments" line.
+- The cleaning fee sits apart, marked as charged to the owner and outside
+  the net income.
+
 ## v1.59.2 - 2026-10-09
 
 ### Pickup-prep alerts say each gap once; overdue tasks read in English

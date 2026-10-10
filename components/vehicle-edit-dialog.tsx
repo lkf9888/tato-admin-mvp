@@ -98,7 +98,11 @@ export function VehicleEditDialog({
         onClick={() => setOpen(false)}
         aria-label={closeLabel}
       />
-      <div className="relative max-h-[90vh] w-[min(58rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-[var(--line)] bg-white shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative max-h-[90vh] w-[min(58rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-[var(--line)] bg-white shadow-2xl"
+      >
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
           <div className="min-w-0">
             {/* The same dialog creates and edits -- `saveVehicleAction`

@@ -7,6 +7,9 @@ import {
 
 import {
   applyLineAmounts,
+  correctedNetEarning,
+  customLineShares,
+  resolveTripCommission,
   CLEANING_LINE,
   getManagerRetentionByFee,
   retentionBasisFor,
@@ -19,7 +22,6 @@ import {
 } from "@/lib/ledger-policy";
 import { prisma } from "@/lib/prisma";
 import { resolveCleaningFee, resolveCommission } from "@/lib/owner-commission";
-import { getOrderNetEarning } from "@/lib/utils";
 
 type Tx = typeof prisma | Prisma.TransactionClient;
 
@@ -72,10 +74,18 @@ export type OrderOwnerShare = {
   ownerRevenue: number;
   commission: number;
   commissionRate: number;
+  /** What the commission is charged on: the owner's revenue. */
+  commissionBase: number;
+  /** The owner's own rate for the trip's date, before the trip's. */
+  defaultCommissionRate: number;
+  /** Set on the trip itself, as a rate or as an amount. */
+  commissionOverride: "rate" | "amount" | null;
   /** The trip's cleaning fee, unless the trip leaves it off the owner. */
   cleaningFee: number;
+  /** Charges added by hand on the trip that the owner bears. */
+  otherCharges: number;
   /** What the owner ends up with from this trip: revenue, less
-   *  commission, less the cleaning fee. */
+   *  commission, the cleaning fee and the other charges. */
   ownerNet: number;
   rows: DesiredRow[];
 };
@@ -83,9 +93,29 @@ export type OrderOwnerShare = {
 async function loadAdjustments(db: Tx, orderId: string): Promise<OrderLineAdjustment[]> {
   const rows = await db.orderLedgerAdjustment.findMany({
     where: { orderId },
-    select: { line: true, amount: true, ownerShare: true },
+    select: { line: true, amount: true, ownerShare: true, label: true },
   });
   return rows;
+}
+
+/**
+ * Many trips' own corrections at once, by trip -- for the totals that
+ * sum trips' earnings (dashboard, owner's page). A trip with none is
+ * simply absent; look it up with `?? []`.
+ */
+export async function loadOrderAdjustments(orderIds: readonly string[], tx?: Tx) {
+  const byOrder = new Map<string, OrderLineAdjustment[]>();
+  if (orderIds.length === 0) return byOrder;
+  const rows = await (tx ?? prisma).orderLedgerAdjustment.findMany({
+    where: { orderId: { in: [...orderIds] } },
+    select: { orderId: true, line: true, amount: true, ownerShare: true, label: true },
+  });
+  for (const { orderId, ...adjustment } of rows) {
+    const list = byOrder.get(orderId);
+    if (list) list.push(adjustment);
+    else byOrder.set(orderId, [adjustment]);
+  }
+  return byOrder;
 }
 
 /**
@@ -113,8 +143,8 @@ export async function planOrderOwnerShare(orderId: string, tx?: Tx): Promise<Ord
   // ticked in or out of the owner's share on this trip only.
   const adjustments = await loadAdjustments(db, orderId);
   const corrected = applyLineAmounts(order.sourceMetadata, adjustments);
-  const reported = getOrderNetEarning(order.sourceMetadata, order.totalPrice);
-  const netEarning = reported == null ? null : roundLedgerAmount(reported + corrected.delta);
+  const earning = correctedNetEarning(order.sourceMetadata, order.totalPrice, adjustments);
+  const netEarning = earning == null ? null : roundLedgerAmount(earning);
   const tripAmountExcluded = adjustments.some(
     (adjustment) => adjustment.line === TRIP_AMOUNT_LINE && adjustment.ownerShare === false,
   );
@@ -159,10 +189,13 @@ export async function planOrderOwnerShare(orderId: string, tx?: Tx): Promise<Ord
   );
   // A trip with no CSV row is one amount; left out of the owner's share,
   // all of it stays with the company.
+  // Charges added by hand: income or deductions left out of the owner's
+  // share stay with the company; other charges ticked are the owner's.
+  const handAdded = customLineShares(adjustments);
   const retainedAmount = roundLedgerAmount(
     tripAmountExcluded
       ? Math.max(0, netEarning ?? 0)
-      : Math.min(retention.total, Math.max(0, netEarning ?? 0)),
+      : Math.min(retention.total + handAdded.retained, Math.max(0, netEarning ?? 0)),
   );
 
   // Terms as of the day the trip started, not as of today. A rate
@@ -178,12 +211,15 @@ export async function planOrderOwnerShare(orderId: string, tx?: Tx): Promise<Ord
     order.pickupDatetime,
     order.vehicle.ownerCommissionRate,
   );
-  const commissionRate = terms.rate;
   // Commission is charged on what actually reaches the owner. Charging
   // it on the full `Total earnings` while also retaining part of that
-  // total would take the same money twice.
-  const commissionBase = Math.max(0, (netEarning ?? 0) - retainedAmount);
-  const commission = +(commissionBase * commissionRate).toFixed(2);
+  // total would take the same money twice. A trip can set its own rate
+  // or amount over the owner's terms.
+  const commissionBase = roundLedgerAmount(Math.max(0, (netEarning ?? 0) - retainedAmount));
+  const tripCommission = resolveTripCommission(commissionBase, terms.rate, adjustments);
+  const commissionRate = tripCommission.rate;
+  const commission = tripCommission.amount;
+  const otherCharges = handAdded.ownerCharges;
   const sourceLabel = order.source === "turo" ? "Turo" : "Offline";
   const operatorName = order.workspace?.name?.trim() || "TATO";
   const vehicleLabel = order.vehicle.plateNumber
@@ -202,11 +238,15 @@ export async function planOrderOwnerShare(orderId: string, tx?: Tx): Promise<Ord
     ownerRevenue,
     commission,
     commissionRate,
+    commissionBase,
+    defaultCommissionRate: terms.rate,
+    commissionOverride: tripCommission.override,
     cleaningFee,
-    ownerNet: roundLedgerAmount(ownerRevenue - commission - cleaningFee),
+    otherCharges,
+    ownerNet: roundLedgerAmount(ownerRevenue - commission - cleaningFee - otherCharges),
   };
 
-  if ((netEarning == null || Math.abs(netEarning) < 0.005) && !shouldChargeCleaningFee) {
+  if ((netEarning == null || Math.abs(netEarning) < 0.005) && !shouldChargeCleaningFee && otherCharges === 0) {
     return { ...summary, rows: [] };
   }
 
@@ -262,6 +302,17 @@ export async function planOrderOwnerShare(orderId: string, tx?: Tx): Promise<Ord
       amount: -cleaningFee,
       occurredAt: order.returnDatetime,
       note: `Cleaning fee after return · ${order.renterName} · ${vehicleLabel}`,
+    });
+  }
+
+  // One line for whatever was added by hand and charged to the owner,
+  // named so the owner can see what it was for.
+  if (Math.abs(otherCharges) >= 0.005) {
+    desired.push({
+      kind: OwnerLedgerKind.EXPENSE_REIMBURSEMENT,
+      amount: -otherCharges,
+      occurredAt: order.pickupDatetime,
+      note: `${handAdded.ownerChargeLabels.join(", ")} · ${order.renterName} · ${vehicleLabel}`,
     });
   }
 

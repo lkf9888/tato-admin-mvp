@@ -59,7 +59,7 @@ export const dashboardMessages = {
       monthly: {
         title: (label: string) => `${label} overview`,
         netLabel: "Net earnings (MTD)",
-        netHint: "Sum of net earnings for trips starting this month.",
+        netHint: "Sum of net earnings for trips starting this month, with any amounts corrected on a trip.",
         deltaUp: (pct: string) => `▲ ${pct} vs last month`,
         deltaDown: (pct: string) => `▼ ${pct} vs last month`,
         deltaFlat: "No change vs last month",
@@ -164,7 +164,7 @@ export const dashboardMessages = {
       monthly: {
         title: (label: string) => `${label} 概览`,
         netLabel: "本月净收益",
-        netHint: "本月开始的订单净收益总和。",
+        netHint: "本月开始的订单净收益总和，含在订单里改过的金额。",
         deltaUp: (pct: string) => `▲ 较上月 ${pct}`,
         deltaDown: (pct: string) => `▼ 较上月 ${pct}`,
         deltaFlat: "与上月持平",

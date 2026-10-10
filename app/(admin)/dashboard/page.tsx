@@ -11,7 +11,6 @@ import {
   formatTime,
   formatNumber,
   formatPercentage,
-  getOrderNetEarning,
   turoReservationUrl,
 } from "@/lib/utils";
 import { CsvQuickImportButton } from "@/components/csv-quick-import-button";
@@ -21,6 +20,8 @@ import { StatusBadge } from "@/components/status-badge";
 import { requireAccessContext } from "@/lib/auth";
 import { userRole } from "@/lib/access";
 import { getOnboardingProgress, ONBOARDING_LINKS, ONBOARDING_STEPS } from "@/lib/onboarding";
+import { correctedNetEarning } from "@/lib/ledger-policy";
+import { loadOrderAdjustments } from "@/lib/owner-ledger";
 import { recentOrderViews } from "@/lib/recent-orders";
 import { getActivityActionLabel, getLocaleTag, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
@@ -167,6 +168,7 @@ export default async function DashboardPage() {
         pickupDatetime: { gte: lastMonthStart, lt: nextMonthStart },
       },
       select: {
+        id: true,
         vehicleId: true,
         pickupDatetime: true,
         totalPrice: true,
@@ -198,9 +200,13 @@ export default async function DashboardPage() {
     (order) =>
       order.pickupDatetime >= lastMonthStart && order.pickupDatetime < currentMonthStart,
   );
+  // Each trip as its statement shows it, with the amounts typed over
+  // its CSV lines -- the same figure the order panel calls net income.
+  const monthlyAdjustments = await loadOrderAdjustments(monthlyOrders.map((order) => order.id));
   const sumNetEarnings = (rows: typeof monthlyOrders) =>
     rows.reduce(
-      (sum, order) => sum + (getOrderNetEarning(order.sourceMetadata, order.totalPrice) ?? 0),
+      (sum, order) =>
+        sum + (correctedNetEarning(order.sourceMetadata, order.totalPrice, monthlyAdjustments.get(order.id) ?? []) ?? 0),
       0,
     );
   const currentMonthNet = sumNetEarnings(currentMonthOrders);

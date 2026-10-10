@@ -57,7 +57,7 @@ export const dashboardMessages = {
       monthly: {
         title: (label: string) => `${label} 概覽`,
         netLabel: "本月淨收益",
-        netHint: "本月開始的訂單淨收益總和。",
+        netHint: "本月開始的訂單淨收益總和，含在訂單裡改過的金額。",
         deltaUp: (pct: string) => `▲ 較上月 ${pct}`,
         deltaDown: (pct: string) => `▼ 較上月 ${pct}`,
         deltaFlat: "與上月持平",

@@ -335,6 +335,10 @@ type LedgerLine = {
   edit?: RowEdit;
   /** The owner-share tick, on a trip whose car has an owner. */
   share?: { checked: boolean; busy: boolean; onToggle: () => void };
+  /** Beside the label, e.g. the commission's editable percentage. */
+  labelExtra?: React.ReactNode;
+  /** Drawn quieter: a line that does not come off the net. */
+  muted?: boolean;
 };
 
 type RowEdit = {
@@ -346,11 +350,14 @@ type RowEdit = {
   onEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
-  /** Back to the CSV's amount, for a line typed over. */
+  /** Back to the CSV's amount (or the owner's terms), for a line typed over. */
   onReset?: () => void;
+  resetLabel?: string;
+  /** Takes a charge added by hand off the trip. */
+  onDelete?: () => void;
 };
 
-type RowCopy = { edit: string; save: string; cancel: string; ledgerShareToggle: string; ledgerReset: string };
+type RowCopy = { edit: string; save: string; cancel: string; ledgerShareToggle: string; ledgerDelete: string };
 
 /**
  * One line of the statement: a pencil, the label, the signed amount,
@@ -389,11 +396,14 @@ function LedgerRow({
           }
         }}
       >
-        <span
-          className={cn("min-w-0 truncate", line.share && !line.share.checked ? "text-[color:var(--ink-soft)]" : "text-[color:var(--ink-mid)]")}
-          title={line.original}
-        >
-          {line.label}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span
+            className={cn("min-w-0 truncate", line.share && !line.share.checked ? "text-[color:var(--ink-soft)]" : "text-[color:var(--ink-mid)]")}
+            title={line.original}
+          >
+            {line.label}
+          </span>
+          {line.labelExtra}
         </span>
         <span className="flex shrink-0 items-center gap-1">
           {edit ? (
@@ -406,7 +416,19 @@ function LedgerRow({
                     disabled={edit.saving}
                     className="tap-compact rounded px-1 text-[11px] text-[var(--accent)] underline-offset-2 hover:underline disabled:opacity-40"
                   >
-                    {copy.ledgerReset}
+                    {edit.resetLabel}
+                  </button>
+                ) : null}
+                {edit.onDelete ? (
+                  <button
+                    type="button"
+                    onClick={edit.onDelete}
+                    disabled={edit.saving}
+                    title={copy.ledgerDelete}
+                    aria-label={`${copy.ledgerDelete} ${line.label}`}
+                    className="tap-compact flex h-6 w-6 items-center justify-center rounded text-rose-500 transition hover:bg-rose-50 disabled:opacity-40"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
                   </button>
                 ) : null}
                 <button
@@ -458,6 +480,7 @@ function LedgerRow({
                 onChange={(event) => edit.setDraft(event.target.value)}
                 onBlur={(event) => edit.setDraft(formatCurrencyInputText(event.target.value))}
                 autoFocus
+                onFocus={(event) => event.currentTarget.select()}
                 aria-label={line.label}
                 className="h-7 w-28 rounded-md border border-[var(--accent)] bg-white px-2 text-right text-[13px] tabular-nums text-[color:var(--ink)] outline-none"
               />
@@ -465,13 +488,13 @@ function LedgerRow({
               <span
                 className={cn(
                   "tabular-nums",
-                  negative ? "text-rose-600" : "text-[color:var(--ink)]",
+                  line.muted ? "text-[color:var(--ink-soft)]" : negative ? "text-rose-600" : "text-[color:var(--ink)]",
                   line.adjusted && "underline decoration-dotted decoration-[var(--accent)] underline-offset-4",
                   line.share && !line.share.checked && "opacity-55",
                 )}
                 title={line.adjusted ? line.original : undefined}
               >
-                {negative ? "−" : "+"}
+                {line.value === 0 ? "" : negative ? "−" : "+"}
                 {formatCurrency(Math.abs(line.value), locale)}
               </span>
             ) : (
@@ -571,13 +594,35 @@ type LedgerData = {
   }>;
   amountLine: { ownerShare: boolean; ownerShareDefault: boolean };
   cleaning: { amount: number; ownerShare: boolean; ownerShareDefault: boolean };
+  /** Charges added by hand on the trip; amounts signed as the trip sees them. */
+  custom: Array<{
+    line: string;
+    section: LedgerSection;
+    label: string;
+    amount: number;
+    ownerShare: boolean;
+  }>;
   ownerShare: {
     ownerNet: number;
     ownerRevenue: number;
     commission: number;
     commissionRate: number;
+    commissionBase: number;
+    defaultCommissionRate: number;
+    commissionOverride: "rate" | "amount" | null;
     cleaningFee: number;
+    otherCharges: number;
   } | null;
+};
+
+type LedgerSection = "income" | "deduction" | "other";
+
+const COMMISSION_RATE_LINE = "__commission_rate";
+const COMMISSION_AMOUNT_LINE = "__commission";
+
+const formatRate = (rate: number) => {
+  const percent = Math.round(rate * 10000) / 100;
+  return `${Number.isInteger(percent) ? percent : percent.toFixed(Number.isInteger(percent * 10) ? 1 : 2)}%`;
 };
 
 export function OrderDetailModal({
@@ -879,6 +924,10 @@ export function OrderDetailModal({
   const [lineDraft, setLineDraft] = useState("");
   const [lineBusy, setLineBusy] = useState<string | null>(null);
   const [lineSaved, setLineSaved] = useState<string | null>(null);
+  // A charge being added by hand, under one of the three headings.
+  const [adding, setAdding] = useState<LedgerSection | null>(null);
+  const [addLabel, setAddLabel] = useState("");
+  const [addAmount, setAddAmount] = useState("");
   useEffect(() => {
     if (readOnly || !currentOrder.id) return;
     let cancelled = false;
@@ -893,7 +942,12 @@ export function OrderDetailModal({
     };
   }, [currentOrder, readOnly]);
 
-  const saveLine = async (line: string, body: { amount?: number | null; ownerShare?: boolean }) => {
+  const saveLine = async (
+    line: string,
+    body:
+      | { amount?: number | null; ownerShare?: boolean; remove?: true }
+      | { add: { section: LedgerSection; label: string; amount: number } },
+  ) => {
     if (lineBusy) return;
     setLineBusy(line);
     setError(null);
@@ -901,12 +955,16 @@ export function OrderDetailModal({
       const response = await fetch(`/api/orders/${currentOrder.id}/ledger`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ line, ...body }),
+        body: JSON.stringify("add" in body ? body : { line, ...body }),
       });
       if (!response.ok) throw new Error(String(response.status));
       setLedgerData((await response.json()) as LedgerData);
       setLineEditing(null);
-      if (body.amount !== undefined) {
+      if ("add" in body) {
+        setAdding(null);
+        setAddLabel("");
+        setAddAmount("");
+      } else if (body.amount !== undefined) {
         setLineSaved(line);
         window.setTimeout(() => setLineSaved((current) => (current === line ? null : current)), 1800);
       }
@@ -935,18 +993,25 @@ export function OrderDetailModal({
   // fee rules; unticking leaves it out for this trip only.
   const ledger = (() => {
     const hasOwner = Boolean(ledgerData?.owner);
+    const canAdd = !readOnly && ledgerData != null;
     const formatOriginal = (value: number) => `${value < 0 ? "−" : ""}${formatCurrency(Math.abs(value), locale)}`;
     const shareFor = (line: string, checked: boolean | undefined) =>
       hasOwner && checked !== undefined && !readOnly
         ? { checked, busy: lineBusy === line, onToggle: () => void saveLine(line, { ownerShare: !checked }) }
         : undefined;
-    const csvEdit = (line: string, value: number, adjusted: boolean): RowEdit | undefined =>
+    // An amount typed in on the trip: a CSV line, a charge added by hand,
+    // or the commission. Saved without its sign; the line knows its own.
+    const amountEdit = (
+      line: string,
+      value: number,
+      options: { saveAs?: string; onReset?: () => void; resetLabel?: string; onDelete?: () => void } = {},
+    ): RowEdit | undefined =>
       readOnly || !ledgerData
         ? undefined
         : {
             editing: lineEditing === line,
-            saving: lineBusy === line,
-            justSaved: lineSaved === line,
+            saving: lineBusy === line || lineBusy === options.saveAs,
+            justSaved: lineSaved === line || lineSaved === options.saveAs,
             draft: lineDraft,
             setDraft: setLineDraft,
             onEdit: () => {
@@ -956,11 +1021,13 @@ export function OrderDetailModal({
             },
             onSave: () => {
               const amount = Number(lineDraft);
-              if (!Number.isFinite(amount) || amount < 0) return;
-              void saveLine(line, { amount });
+              if (lineDraft.trim() === "" || !Number.isFinite(amount) || amount < 0) return;
+              void saveLine(options.saveAs ?? line, { amount });
             },
             onCancel: () => setLineEditing(null),
-            onReset: adjusted ? () => void saveLine(line, { amount: null }) : undefined,
+            onReset: options.onReset,
+            resetLabel: options.resetLabel,
+            onDelete: options.onDelete,
           };
     const fieldEdit = (field: "totalPrice" | "cleaningFee"): RowEdit | undefined => {
       if (readOnly) return undefined;
@@ -980,14 +1047,17 @@ export function OrderDetailModal({
       };
     };
 
-    const lines: LedgerLine[] = ledgerData
+    const csvLines: LedgerLine[] = ledgerData
       ? ledgerData.lines.map((line) => ({
           key: line.line,
           label: t.feeLabels[line.line] ?? line.line,
           original: line.adjusted ? t.ledgerAdjusted(formatOriginal(line.original)) : line.line,
           value: line.amount,
           adjusted: line.adjusted,
-          edit: csvEdit(line.line, line.amount, line.adjusted),
+          edit: amountEdit(line.line, line.amount, {
+            onReset: line.adjusted ? () => void saveLine(line.line, { amount: null }) : undefined,
+            resetLabel: t.ledgerReset,
+          }),
           share: shareFor(line.line, line.ownerShare),
         }))
       : (currentOrder.feeLines ?? []).map((line) => ({
@@ -996,16 +1066,8 @@ export function OrderDetailModal({
           original: line.column,
           value: line.sign === "debit" ? -Math.abs(line.amount) : line.amount,
         }));
-    const tripNet = ledgerData ? ledgerData.tripNet : currentOrder.totalPrice ?? null;
-    if (lines.length > 0 && tripNet != null) {
-      const listed = lines.reduce((sum, line) => sum + (line.value ?? 0), 0);
-      const gap = Math.round((tripNet - listed) * 100) / 100;
-      if (Math.abs(gap) >= 0.01) {
-        lines.push({ key: "__other", label: t.ledgerOther, original: t.ledgerOtherHint, value: gap });
-      }
-    }
-    if (lines.length === 0) {
-      lines.push({
+    if (csvLines.length === 0) {
+      csvLines.push({
         key: "__amount",
         label: currentOrder.source === "turo" ? t.earnings : t.totalPrice,
         value: currentOrder.totalPrice ?? null,
@@ -1014,9 +1076,34 @@ export function OrderDetailModal({
         share: shareFor("__amount", ledgerData?.amountLine.ownerShare),
       });
     }
+    const custom = (section: LedgerSection): LedgerLine[] =>
+      (ledgerData?.custom ?? [])
+        .filter((line) => line.section === section)
+        .map((line) => ({
+          key: line.line,
+          label: line.label,
+          original: t.ledgerAddedByHand,
+          value: line.amount,
+          edit: amountEdit(line.line, line.amount, { onDelete: () => void saveLine(line.line, { remove: true }) }),
+          share: shareFor(line.line, line.ownerShare),
+        }));
+    const addedIncome = custom("income");
+    const addedDeductions = custom("deduction");
+    const tripLines = [...csvLines, ...addedIncome, ...addedDeductions];
+    const tripNet = ledgerData ? ledgerData.tripNet : currentOrder.totalPrice ?? null;
+    const gapLines: LedgerLine[] = [];
+    if (tripLines.every((line) => line.value != null) && tripNet != null) {
+      const listed = tripLines.reduce((sum, line) => sum + (line.value ?? 0), 0);
+      const gap = Math.round((tripNet - listed) * 100) / 100;
+      if (Math.abs(gap) >= 0.01) {
+        gapLines.push({ key: "__other", label: t.ledgerOther, original: t.ledgerOtherHint, value: gap });
+      }
+    }
+    const turoLines = [...csvLines, ...gapLines];
+
     const cleaning = ledgerData?.cleaning.amount ?? currentOrder.cleaningFeeOnTrip ?? currentOrder.cleaningFee ?? 0;
-    const other: LedgerLine[] =
-      cleaning > 0 || editingField === "cleaningFee"
+    const other: LedgerLine[] = [
+      ...(cleaning > 0 || editingField === "cleaningFee"
         ? [
             {
               key: "__cleaning",
@@ -1027,20 +1114,145 @@ export function OrderDetailModal({
               share: shareFor("__cleaning", ledgerData?.cleaning.ownerShare),
             },
           ]
-        : [];
+        : []),
+      ...custom("other"),
+    ];
+
+    // The owner's commission: listed among the other charges, but it is
+    // the owner's to pay out of their share, so it does not come off the
+    // trip's net. Its percentage and its amount both edit; either one
+    // replaces the owner's terms on this trip.
+    const share = ledgerData?.ownerShare ?? null;
+    const commissionLine: LedgerLine | null = share
+      ? (() => {
+          const override = share.commissionOverride;
+          const reset = override
+            ? () => void saveLine(override === "rate" ? COMMISSION_RATE_LINE : COMMISSION_AMOUNT_LINE, { amount: null })
+            : undefined;
+          const editingRate = lineEditing === COMMISSION_RATE_LINE;
+          const saveRate = () => {
+            const percent = Number(lineDraft);
+            if (lineDraft.trim() === "" || !Number.isFinite(percent) || percent < 0 || percent > 100) return;
+            void saveLine(COMMISSION_RATE_LINE, { amount: percent });
+          };
+          return {
+            key: COMMISSION_AMOUNT_LINE,
+            label: t.ledgerCommission,
+            original: override
+              ? t.ledgerCommissionOverridden(formatRate(share.defaultCommissionRate))
+              : t.ledgerCommissionHint,
+            value: -share.commission,
+            muted: true,
+            adjusted: override === "amount",
+            edit: amountEdit(COMMISSION_AMOUNT_LINE, share.commission, {
+              onReset: reset,
+              resetLabel: t.ledgerCommissionReset,
+            }),
+            labelExtra: readOnly ? (
+              <span className="text-[12px] tabular-nums text-[color:var(--ink-soft)]">{formatRate(share.commissionRate)}</span>
+            ) : editingRate ? (
+              <span className="flex items-center gap-0.5">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={lineDraft}
+                  onChange={(event) => setLineDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      saveRate();
+                    } else if (event.key === "Escape") {
+                      event.preventDefault();
+                      setLineEditing(null);
+                    }
+                  }}
+                  autoFocus
+                  onFocus={(event) => event.currentTarget.select()}
+                  aria-label={t.ledgerCommissionRate}
+                  className="h-6 w-14 rounded-md border border-[var(--accent)] bg-white px-1.5 text-right text-[12px] tabular-nums text-[color:var(--ink)] outline-none"
+                />
+                <span className="text-[12px] text-[color:var(--ink-soft)]">%</span>
+                <button
+                  type="button"
+                  onClick={saveRate}
+                  disabled={lineBusy === COMMISSION_RATE_LINE}
+                  title={t.save}
+                  aria-label={t.save}
+                  className="tap-compact flex h-6 w-6 items-center justify-center rounded text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40"
+                >
+                  <Save className="h-3.5 w-3.5" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLineEditing(null)}
+                  title={t.cancel}
+                  aria-label={t.cancel}
+                  className="tap-compact flex h-6 w-6 items-center justify-center rounded text-[color:var(--ink-soft)] transition hover:bg-[var(--surface-muted)]"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (editingField) cancelField();
+                  setLineEditing(COMMISSION_RATE_LINE);
+                  setLineDraft(String(Math.round(share.commissionRate * 10000) / 100));
+                }}
+                title={t.ledgerCommissionRate}
+                aria-label={t.ledgerCommissionRate}
+                className={cn(
+                  "tap-compact inline-flex items-center gap-1 rounded border border-[var(--line)] px-1.5 text-[12px] leading-5 tabular-nums transition hover:border-[var(--accent)] hover:text-[var(--ink)]",
+                  override === "rate" ? "text-[var(--accent)]" : "text-[color:var(--ink-mid)]",
+                  lineSaved === COMMISSION_RATE_LINE && "border-emerald-500 text-emerald-700",
+                )}
+              >
+                {formatRate(share.commissionRate)}
+                <Pencil className="h-2.5 w-2.5 opacity-60" aria-hidden />
+              </button>
+            ),
+          };
+        })()
+      : null;
+
     // No net while the trip's own amount is unknown: the cleaning fee
     // alone would read as a loss.
-    const tripKnown = lines.every((line) => line.value != null);
-    const known = [...lines, ...other].filter((line) => line.value != null);
+    const tripKnown = tripLines.every((line) => line.value != null);
+    const known = [...tripLines, ...gapLines, ...other].filter((line) => line.value != null);
     return {
       hasOwner,
-      income: lines.filter((line) => line.value == null || line.value > 0),
-      deductions: lines.filter((line) => line.value != null && line.value < 0),
-      other,
+      canAdd,
+      sections: [
+        {
+          section: "income" as const,
+          title: t.ledgerIncome,
+          lines: [...turoLines.filter((line) => line.value == null || line.value > 0), ...addedIncome],
+        },
+        {
+          section: "deduction" as const,
+          title: t.ledgerDeductions,
+          lines: [...turoLines.filter((line) => line.value != null && line.value < 0), ...addedDeductions],
+        },
+        {
+          section: "other" as const,
+          title: t.ledgerOtherFees,
+          lines: commissionLine ? [...other, commissionLine] : other,
+        },
+      ],
       net: tripKnown && known.length > 0 ? Math.round(known.reduce((sum, line) => sum + (line.value ?? 0), 0) * 100) / 100 : null,
-      ownerShare: ledgerData?.ownerShare ?? null,
+      ownerShare: share,
     };
   })();
+  const submitAdd = () => {
+    if (!adding) return;
+    const amount = Number(addAmount);
+    const label = addLabel.trim();
+    if (!label || addAmount.trim() === "" || !Number.isFinite(amount) || amount < 0) return;
+    void saveLine(`__add:${adding}`, { add: { section: adding, label, amount } });
+  };
   const syncOwnerShare = async () => {
     if (readOnly || isSaving || isSyncingOwner) return;
     if (!selectedOwnerId) {
@@ -1694,16 +1906,35 @@ export function OrderDetailModal({
               ) : null}
             </div>
             <div className="mt-1.5 overflow-hidden rounded-md border border-[rgba(17,19,24,0.1)] bg-[var(--surface)]">
-              {(
-                [
-                  [t.ledgerIncome, ledger.income],
-                  [t.ledgerDeductions, ledger.deductions],
-                  [t.ledgerOtherFees, ledger.other],
-                ] as const
-              ).map(([title, lines]) =>
-                lines.length > 0 ? (
-                  <section key={title} className="border-b border-[var(--line)] px-3 py-2">
-                    <h4 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">{title}</h4>
+              {ledger.sections.map(({ section, title, lines }) =>
+                lines.length > 0 || ledger.canAdd ? (
+                  <section key={section} className="border-b border-[var(--line)] px-3 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">{title}</h4>
+                      {ledger.canAdd ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingField) cancelField();
+                            setLineEditing(null);
+                            setAdding(adding === section ? null : section);
+                            setAddLabel("");
+                            setAddAmount("");
+                          }}
+                          title={t.ledgerAddLine(title)}
+                          aria-label={t.ledgerAddLine(title)}
+                          aria-expanded={adding === section}
+                          className={cn(
+                            "tap-compact flex h-5 w-5 items-center justify-center rounded-full border transition",
+                            adding === section
+                              ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                              : "border-[var(--line)] text-[color:var(--ink-soft)] hover:border-[var(--accent)] hover:text-[var(--accent)]",
+                          )}
+                        >
+                          <Plus className="h-3 w-3" aria-hidden />
+                        </button>
+                      ) : null}
+                    </div>
                     <ul className="mt-1 space-y-0.5">
                       {lines.map((line) => (
                         <LedgerRow key={line.key} line={line} locale={locale} copy={t} showShareColumn={ledger.hasOwner}>
@@ -1725,6 +1956,63 @@ export function OrderDetailModal({
                           ) : null}
                         </LedgerRow>
                       ))}
+                      {adding === section ? (
+                        <li
+                          className="flex min-w-0 items-center gap-1.5 py-0.5"
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              submitAdd();
+                            } else if (event.key === "Escape") {
+                              event.preventDefault();
+                              setAdding(null);
+                            }
+                          }}
+                        >
+                          <input
+                            value={addLabel}
+                            onChange={(event) => setAddLabel(event.target.value)}
+                            placeholder={t.ledgerAddName}
+                            aria-label={t.ledgerAddName}
+                            maxLength={80}
+                            autoFocus
+                            className="h-7 min-w-0 flex-1 rounded-md border border-[var(--line-strong)] bg-white px-2 text-[13px] text-[color:var(--ink)] outline-none focus:border-[var(--accent)]"
+                          />
+                          <span className="shrink-0 text-[13px] text-[color:var(--ink-soft)]">{section === "income" ? "+" : "−"}</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={addAmount}
+                            onChange={(event) => setAddAmount(event.target.value)}
+                            placeholder="0.00"
+                            aria-label={t.ledgerAddAmount}
+                            className="h-7 w-24 shrink-0 rounded-md border border-[var(--line-strong)] bg-white px-2 text-right text-[13px] tabular-nums text-[color:var(--ink)] outline-none focus:border-[var(--accent)]"
+                          />
+                          <button
+                            type="button"
+                            onClick={submitAdd}
+                            disabled={lineBusy === `__add:${section}` || !addLabel.trim() || addAmount.trim() === ""}
+                            title={t.save}
+                            aria-label={t.save}
+                            className="tap-compact flex h-6 w-6 shrink-0 items-center justify-center rounded text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40"
+                          >
+                            <Save className="h-3.5 w-3.5" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAdding(null)}
+                            title={t.cancel}
+                            aria-label={t.cancel}
+                            className="tap-compact flex h-6 w-6 shrink-0 items-center justify-center rounded text-[color:var(--ink-soft)] transition hover:bg-[var(--surface-muted)]"
+                          >
+                            <X className="h-3.5 w-3.5" aria-hidden />
+                          </button>
+                        </li>
+                      ) : null}
+                      {lines.length === 0 && adding !== section ? (
+                        <li className="text-[12px] leading-6 text-[color:var(--ink-soft)]">—</li>
+                      ) : null}
                     </ul>
                   </section>
                 ) : null,
@@ -1744,17 +2032,8 @@ export function OrderDetailModal({
                 </span>
               </div>
               {ledger.ownerShare ? (
-                <div className="flex min-w-0 items-start justify-between gap-3 border-t border-dashed border-[var(--line)] bg-emerald-50/60 px-3 py-2">
-                  <span className="min-w-0">
-                    <span className="block text-[13px] font-semibold text-emerald-800">{t.ledgerOwnerNet}</span>
-                    <span className="block text-[11px] leading-4 text-[color:var(--ink-soft)]">
-                      {t.ledgerOwnerNetHint(
-                        `${(ledger.ownerShare.commissionRate * 100).toFixed(
-                          Number.isInteger(ledger.ownerShare.commissionRate * 100) ? 0 : 1,
-                        )}%`,
-                      )}
-                    </span>
-                  </span>
+                <div className="flex min-w-0 items-center justify-between gap-3 border-t border-dashed border-[var(--line)] bg-emerald-50/60 px-3 py-2">
+                  <span className="min-w-0 text-[13px] font-semibold text-emerald-800">{t.ledgerOwnerNet}</span>
                   <span className="flex shrink-0 items-center">
                     <span className="text-[17px] font-semibold tabular-nums text-emerald-800">
                       {ledger.ownerShare.ownerNet < 0 ? "−" : ""}

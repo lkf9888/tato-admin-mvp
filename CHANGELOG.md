@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.62.0 - 2026-10-10
+
+### A trip's statement takes charges added by hand and its own commission, and every total counts the corrections
+
+- A + beside Money in, Taken off and Other charges adds a charge to the
+  trip: a name and an amount, signed by the heading it sits under. It
+  edits and deletes like any line and carries the owner tick (ticked by
+  default). Income and deductions added this way are part of the trip's
+  earnings, so they move the net, the owner's revenue and the dashboard;
+  other charges come off the net like the cleaning fee and, when ticked,
+  reach the owner's ledger as one "Expense reimbursement" line named
+  after them. They are stored in `OrderLedgerAdjustment` under
+  `__custom:<section>:<id>` with a new nullable `label` column.
+- Other charges list the owner's commission, on cars with an owner. The
+  percentage and the amount both edit, for this trip only, and either
+  replaces the other; an amount reads back as the rate it comes to.
+  The commission comes out of the owner's share, not off the trip's net:
+  it is the company's income from the owner, and taking it off the net
+  would count it as a cost. The ledger's commission line follows.
+- The grey note under the owner's share is gone.
+- The dashboard's monthly net earnings and the owner page's net-earning
+  calculator now count each trip as its statement shows it: amounts
+  typed over the CSV, charges added by hand, and lines ticked in or out
+  of the owner's share on a single trip. One function,
+  `correctedNetEarning`, gives a trip's earnings to the dashboard, the
+  owner page, the order panel and the ledger sync.
+- Amount and rate fields select their contents when opened, so typing
+  replaces the old figure.
+
 ## v1.61.0 - 2026-10-10
 
 ### Every amount on a trip's statement edits in place, and ticks say what counts toward the owner's share

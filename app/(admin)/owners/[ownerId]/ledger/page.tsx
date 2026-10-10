@@ -11,6 +11,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import {
   applyLineAmounts,
+  getCustomLines,
   getManagerRetentionByFee,
   retentionBasisFor,
   withTripShareOverrides,
@@ -114,7 +115,7 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
         in: ledgerItems.flatMap((item) => (item.kind === "OWNER_NET_EARNING" && item.orderId ? [item.orderId] : [])),
       },
     },
-    select: { orderId: true, line: true, amount: true, ownerShare: true },
+    select: { orderId: true, line: true, amount: true, ownerShare: true, label: true },
   });
 
   for (const item of ledgerItems) {
@@ -133,10 +134,18 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
       withTripShareOverrides(overrides, adjustments),
       retentionBasisFor(owner.retentionBasis, item.order.vehicle?.turoPlanPercent, item.order.sourceMetadata),
     );
-    if (retention.lines.length === 0) continue;
+    // Income or deductions added by hand on the trip and left out of
+    // the owner's share are kept like a column, under their own name.
+    const withheld = [
+      ...retention.lines,
+      ...getCustomLines(adjustments)
+        .filter((line) => line.section !== "other" && !line.ownerShare)
+        .map((line) => ({ column: line.label, amount: line.amount })),
+    ];
+    if (withheld.length === 0) continue;
     breakdownByItemId[item.id] = {
       gross,
-      withheld: retention.lines,
+      withheld,
       net: item.amount,
     };
   }

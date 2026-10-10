@@ -11,6 +11,7 @@ import {
 import {
   OwnerFeeSharingPanel,
   type FeeShareRow,
+  type TripCorrections,
 } from "@/components/owner-fee-sharing-panel";
 import type { Locale } from "@/lib/i18n";
 import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
@@ -136,6 +137,7 @@ export function OwnerEditor({
   retentionBasis,
   payoutTotal,
   feeOrderCount,
+  feeTripCorrections,
   locale,
 }: {
   owner: Owner;
@@ -148,6 +150,7 @@ export function OwnerEditor({
   retentionBasis: "payout" | "guest";
   payoutTotal: number;
   feeOrderCount: number;
+  feeTripCorrections: TripCorrections;
   locale: Locale;
 }) {
   const labels = copy(locale);
@@ -357,6 +360,7 @@ export function OwnerEditor({
         retentionBasis={retentionBasis}
         payoutTotal={payoutTotal}
         orderCount={feeOrderCount}
+        tripCorrections={feeTripCorrections}
       />
 
       <section className="card space-y-3 p-6">

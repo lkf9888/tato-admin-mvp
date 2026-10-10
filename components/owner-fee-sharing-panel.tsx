@@ -19,6 +19,22 @@ export type FeeShareRow = {
   isOverride: boolean;
 };
 
+/**
+ * What trips decided for themselves, from the order panel: amounts
+ * ticked into (`owner`) or out of (`manager`) the owner's share on that
+ * trip only, by column, at payout and at guest price. The calculator
+ * starts from the rule for each column and moves these, as the ledger
+ * does.
+ */
+export type TripCorrections = {
+  payout: { owner: Record<string, number>; manager: Record<string, number> };
+  guest: { owner: Record<string, number>; manager: Record<string, number> };
+  /** Trips with a tick of their own. */
+  tickedOrders: number;
+  /** Trips with an amount typed over the CSV's. */
+  amendedOrders: number;
+};
+
 function copy(locale: Locale) {
   return locale !== "en"
     ? {
@@ -54,6 +70,14 @@ function copy(locale: Locale) {
           "这位车主名下还没有已导入的订单,所以暂时算不出金额。上面的设置照样会生效,等 CSV 导入后就会按这套规则计算。",
         calcAbsorb: "负数表示这一项是折扣或退款,由公司承担,所以会把车主的净收益抬高。",
         calcNote: "佣金和洗车费在净收益之后单独计算,不在这道算式里。",
+        calcTripAdjusted: "含单笔订单的勾选",
+        calcCorrections: (amended: number, ticked: number) =>
+          [
+            amended > 0 ? `${amended} 笔订单在订单里改过金额` : "",
+            ticked > 0 ? `${ticked} 笔订单单独改过车主勾选` : "",
+          ]
+            .filter(Boolean)
+            .join(",") + ",已按订单里的设置计算。",
         onlyUsed: "只看有金额的项目",
         zeroHidden: (count: number) => `已折叠 ${count} 项金额为 0 的收费`,
         groups: {
@@ -101,6 +125,14 @@ function copy(locale: Locale) {
           "A negative line is a discount or refund the company carries, so it raises the owner's net rather than lowering it.",
         calcNote:
           "Commission and the cleaning fee are settled after this figure and are not part of it.",
+        calcTripAdjusted: "includes ticks on single trips",
+        calcCorrections: (amended: number, ticked: number) =>
+          [
+            amended > 0 ? `${amended} ${amended === 1 ? "trip has" : "trips have"} amounts corrected on the trip` : "",
+            ticked > 0 ? `${ticked} ${ticked === 1 ? "trip has" : "trips have"} the owner's share ticked on the trip` : "",
+          ]
+            .filter(Boolean)
+            .join("; ") + ". Those trips are counted as set there.",
         onlyUsed: "Only charges with money in them",
         zeroHidden: (count: number) => `${count} charges at zero are folded away`,
         groups: {
@@ -151,6 +183,7 @@ export function OwnerFeeSharingPanel({
   retentionBasis,
   payoutTotal,
   orderCount,
+  tripCorrections,
 }: {
   locale: Locale;
   ownerId: string;
@@ -161,6 +194,7 @@ export function OwnerFeeSharingPanel({
   retentionBasis: "payout" | "guest";
   payoutTotal: number;
   orderCount: number;
+  tripCorrections: TripCorrections;
 }) {
   const t = copy(locale);
 
@@ -201,10 +235,29 @@ export function OwnerFeeSharingPanel({
   // The deduction list, live. Every column the company keeps comes off
   // the payout with the sign the export gave it: a positive amount is
   // money the operator takes, a negative one is a discount it carries.
+  //
+  // A trip ticked one way or the other in the order panel overrides the
+  // rule for that trip, so a column the company keeps comes off less
+  // what trips gave the owner, and a shared one comes off by what trips
+  // kept. Rent has no rule here but can be unticked on a trip.
   const calculation = useMemo(() => {
-    const deductions = rows
-      .filter((row) => choices[row.column] === "MANAGER" && hasAmount(row.column))
-      .map((row) => ({ column: row.column, amount: amountOf(row.column) }));
+    const trip = basis === "guest" ? tripCorrections.guest : tripCorrections.payout;
+    const columns = [
+      ...rows.map((row) => row.column),
+      ...Object.keys(trip.manager).filter((column) => !rows.some((row) => row.column === column)),
+    ];
+    const deductions = columns
+      .map((column) => {
+        const toOwner = trip.owner[column] ?? 0;
+        const toCompany = trip.manager[column] ?? 0;
+        const amount = choices[column] === "MANAGER" ? amountOf(column) - toOwner : toCompany;
+        return {
+          column,
+          amount: Math.round(amount * 100) / 100,
+          tripAdjusted: Math.abs(choices[column] === "MANAGER" ? toOwner : toCompany) >= 0.005,
+        };
+      })
+      .filter((line) => Math.abs(line.amount) >= 0.005);
     const withheld = deductions.reduce((sum, line) => sum + line.amount, 0);
     return {
       deductions,
@@ -212,7 +265,7 @@ export function OwnerFeeSharingPanel({
       net: Math.round((payoutTotal - withheld) * 100) / 100,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [choices, rows, totals, payoutTotal, basis]);
+  }, [choices, rows, totals, payoutTotal, basis, tripCorrections]);
 
   const hasAbsorbed = calculation.deductions.some((line) => line.amount < 0);
 
@@ -398,7 +451,12 @@ export function OwnerFeeSharingPanel({
                     key={line.column}
                     className="flex items-baseline justify-between gap-3 pl-3"
                   >
-                    <dt className="min-w-0 text-[var(--ink-mid)]">{line.column}</dt>
+                    <dt className="min-w-0 text-[var(--ink-mid)]">
+                      {line.column}
+                      {line.tripAdjusted ? (
+                        <span className="ml-1.5 text-[10px] text-[var(--ink-soft)]">· {t.calcTripAdjusted}</span>
+                      ) : null}
+                    </dt>
                     <dd
                       className={`shrink-0 tabular-nums ${
                         line.amount < 0 ? "text-emerald-700" : "text-[var(--ink)]"
@@ -423,6 +481,11 @@ export function OwnerFeeSharingPanel({
 
         {hasAbsorbed ? (
           <p className="mt-2 text-[11px] leading-4 text-[var(--ink-soft)]">{t.calcAbsorb}</p>
+        ) : null}
+        {orderCount > 0 && (tripCorrections.amendedOrders > 0 || tripCorrections.tickedOrders > 0) ? (
+          <p className="mt-2 text-[11px] leading-4 text-[var(--ink-soft)]">
+            {t.calcCorrections(tripCorrections.amendedOrders, tripCorrections.tickedOrders)}
+          </p>
         ) : null}
       </section>
     </section>

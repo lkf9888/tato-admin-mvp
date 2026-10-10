@@ -95,7 +95,9 @@ export const operationsShots: Shot[] = [
     id: "calendar-order",
     path: "/calendar",
     viewportHeight: 1400,
-    setup: [{ click: { css: ORDER_BAR } }, { wait: 1200 }],
+    // Long enough for the statement's own data (ticks, pencils, the
+    // owner's share) to land after the panel opens.
+    setup: [{ click: { css: ORDER_BAR } }, { wait: 3500 }],
     clip: { dialog: true },
     marks: [
       { step: 1, target: { css: '[role="dialog"] h3 + div' } },

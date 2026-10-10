@@ -1,6 +1,6 @@
 import { LedgerShareTarget } from "@prisma/client";
 
-import { parseImportedOrderMetadata, parseNumberValue } from "@/lib/utils";
+import { getOrderNetEarning, parseImportedOrderMetadata, parseNumberValue } from "@/lib/utils";
 
 /**
  * Owner revenue-split policy.
@@ -573,8 +573,116 @@ export function hostShareOf(column: string, planPercent: number) {
 export const TRIP_AMOUNT_LINE = "__amount";
 export const CLEANING_LINE = "__cleaning";
 
+/** The owner's commission on one trip, set on the trip: a rate (stored
+ *  as a fraction) or a fixed amount. One replaces the other. */
+export const COMMISSION_RATE_LINE = "__commission_rate";
+export const COMMISSION_AMOUNT_LINE = "__commission";
+
 /** One line of one trip's own corrections (OrderLedgerAdjustment). */
-export type OrderLineAdjustment = { line: string; amount: number | null; ownerShare: boolean | null };
+export type OrderLineAdjustment = {
+  line: string;
+  amount: number | null;
+  ownerShare: boolean | null;
+  /** The name of a charge added by hand on the trip. */
+  label?: string | null;
+};
+
+/**
+ * Charges added by hand on a trip, under the statement's three headings.
+ * Stored signed as the trip sees them: money in is positive, a deduction
+ * or another charge negative. Income and deductions are part of the
+ * trip's earnings; other charges are costs taken off after them, like
+ * the cleaning fee.
+ */
+export const CUSTOM_LINE_SECTIONS = ["income", "deduction", "other"] as const;
+export type CustomLineSection = (typeof CUSTOM_LINE_SECTIONS)[number];
+const CUSTOM_LINE_PATTERN = /^__custom:(income|deduction|other):[a-z0-9]{6,32}$/;
+
+export function customLineKey(section: CustomLineSection, id: string) {
+  return `__custom:${section}:${id}`;
+}
+
+export function customLineSection(line: string): CustomLineSection | null {
+  const match = CUSTOM_LINE_PATTERN.exec(line);
+  return match ? (match[1] as CustomLineSection) : null;
+}
+
+export type CustomLine = {
+  line: string;
+  section: CustomLineSection;
+  label: string;
+  /** Signed: positive is money in. */
+  amount: number;
+  /** Counted toward the owner's share unless the trip says not. */
+  ownerShare: boolean;
+};
+
+export function getCustomLines(adjustments: readonly OrderLineAdjustment[]): CustomLine[] {
+  return adjustments.flatMap((adjustment) => {
+    const section = customLineSection(adjustment.line);
+    if (!section || adjustment.amount == null) return [];
+    return [
+      {
+        line: adjustment.line,
+        section,
+        label: adjustment.label?.trim() || "—",
+        amount: adjustment.amount,
+        ownerShare: adjustment.ownerShare !== false,
+      },
+    ];
+  });
+}
+
+/**
+ * What the trip's hand-added charges do to the owner: income and
+ * deductions left out of the owner's share stay with the company
+ * (`retained`, signed like the earnings), and other charges the owner
+ * bears come off their net (`ownerCharges`, positive).
+ */
+export function customLineShares(adjustments: readonly OrderLineAdjustment[]) {
+  let retained = 0;
+  let ownerCharges = 0;
+  const ownerChargeLabels: string[] = [];
+  for (const line of getCustomLines(adjustments)) {
+    if (line.section === "other") {
+      if (line.ownerShare) {
+        ownerCharges += -line.amount;
+        ownerChargeLabels.push(line.label);
+      }
+    } else if (!line.ownerShare) {
+      retained += line.amount;
+    }
+  }
+  return {
+    retained: Math.round(retained * 100) / 100,
+    ownerCharges: Math.round(ownerCharges * 100) / 100,
+    ownerChargeLabels,
+  };
+}
+
+/**
+ * The commission on one trip: the owner's terms, unless the trip sets
+ * its own rate or amount. `rate` is what the amount comes to on the
+ * base, so a fixed amount still reads as a percentage.
+ */
+export function resolveTripCommission(
+  base: number,
+  defaultRate: number,
+  adjustments: readonly OrderLineAdjustment[],
+): { rate: number; amount: number; override: "rate" | "amount" | null } {
+  const fixed = adjustments.find((adjustment) => adjustment.line === COMMISSION_AMOUNT_LINE)?.amount;
+  if (fixed != null) {
+    const amount = Math.round(fixed * 100) / 100;
+    return { rate: base > 0 ? amount / base : 0, amount, override: "amount" };
+  }
+  const rate = adjustments.find((adjustment) => adjustment.line === COMMISSION_RATE_LINE)?.amount;
+  const effective = rate ?? defaultRate;
+  return {
+    rate: effective,
+    amount: +(Math.max(0, base) * effective).toFixed(2),
+    override: rate != null ? "rate" : null,
+  };
+}
 
 /**
  * A trip's CSV row with its typed-over amounts in place, and how far
@@ -587,18 +695,24 @@ export function applyLineAmounts(
   sourceMetadata: string | null | undefined,
   adjustments: readonly OrderLineAdjustment[],
 ): { sourceMetadata: string | null; delta: number } {
+  // Income and deductions added by hand on the trip are earnings too.
+  const added = getCustomLines(adjustments)
+    .filter((line) => line.section !== "other")
+    .reduce((sum, line) => sum + line.amount, 0);
   const typed = adjustments.filter(
     (adjustment) => adjustment.amount != null && FEE_CATALOGUE.some((fee) => fee.column === adjustment.line),
   );
-  if (!sourceMetadata || typed.length === 0) return { sourceMetadata: sourceMetadata ?? null, delta: 0 };
+  if (!sourceMetadata || typed.length === 0) {
+    return { sourceMetadata: sourceMetadata ?? null, delta: Math.round(added * 100) / 100 };
+  }
   let parsed: { financials?: Record<string, string> } & Record<string, unknown>;
   try {
     parsed = JSON.parse(sourceMetadata);
   } catch {
-    return { sourceMetadata, delta: 0 };
+    return { sourceMetadata, delta: Math.round(added * 100) / 100 };
   }
   const financials = { ...(parsed.financials ?? {}) };
-  let delta = 0;
+  let delta = added;
   for (const adjustment of typed) {
     const before = parseNumberValue(financials[adjustment.line]) ?? 0;
     delta += (adjustment.amount ?? 0) - before;
@@ -608,6 +722,23 @@ export function applyLineAmounts(
     sourceMetadata: JSON.stringify({ ...parsed, financials }),
     delta: Math.round(delta * 100) / 100,
   };
+}
+
+/**
+ * A trip's earnings as its statement shows them: what Turo reported,
+ * moved by the amounts typed over the trip's CSV lines. Every total
+ * that sums trips' earnings goes through this, so a corrected trip
+ * counts the same on the dashboard, the owner's page and the panel.
+ */
+export function correctedNetEarning(
+  sourceMetadata: string | null | undefined,
+  totalPrice: number | null | undefined,
+  adjustments: readonly OrderLineAdjustment[],
+): number | null {
+  const reported = getOrderNetEarning(sourceMetadata, totalPrice);
+  if (reported == null) return null;
+  const { delta } = applyLineAmounts(sourceMetadata, adjustments);
+  return delta === 0 ? reported : Math.round((reported + delta) * 100) / 100;
 }
 
 /**
@@ -628,4 +759,50 @@ export function withTripShareOverrides(
     merged[adjustment.line] = adjustment.ownerShare ? LedgerShareTarget.OWNER : LedgerShareTarget.MANAGER;
   }
   return merged;
+}
+
+/**
+ * The fee amounts whose share a trip decides for itself, summed over
+ * trips: `owner` holds what trips ticked into the owner's share,
+ * `manager` what they ticked out of it. The owner's page calculator
+ * starts from the owner's rule for each column and moves these, so it
+ * adds up to what the ledger rows were written with. Pass each trip's
+ * metadata with its typed-over amounts already applied.
+ */
+export function sumTripShareOverrides(
+  orders: Array<{
+    sourceMetadata: string | null;
+    planPercent?: number | null;
+    adjustments: readonly OrderLineAdjustment[];
+  }>,
+  atGuestPrice: boolean,
+): { owner: Record<string, number>; manager: Record<string, number>; orderCount: number } {
+  const owner: Record<string, number> = {};
+  const manager: Record<string, number> = {};
+  let orderCount = 0;
+  for (const order of orders) {
+    const ticked = order.adjustments.filter(
+      (adjustment) => adjustment.ownerShare != null && FEE_CATALOGUE.some((fee) => fee.column === adjustment.line),
+    );
+    // Hand-added income and deductions left out of the owner's share
+    // are kept by the company like an unticked column, under their name.
+    const keptByHand = getCustomLines(order.adjustments).filter(
+      (line) => line.section !== "other" && !line.ownerShare,
+    );
+    for (const line of keptByHand) {
+      manager[line.label] = Math.round(((manager[line.label] ?? 0) + line.amount) * 100) / 100;
+    }
+    const financials = parseImportedOrderMetadata(order.sourceMetadata)?.financials;
+    if (ticked.length > 0 || keptByHand.length > 0) orderCount += 1;
+    if (ticked.length === 0 || !financials) continue;
+    const basis = atGuestPrice ? retentionBasisFor("guest", order.planPercent, order.sourceMetadata) : null;
+    const plan = basis?.kind === "guest" ? basis.planPercent : DEFAULT_TURO_PLAN_PERCENT;
+    for (const adjustment of ticked) {
+      const raw = parseNumberValue(financials[adjustment.line]) ?? 0;
+      const amount = atGuestPrice ? raw / hostShareOf(adjustment.line, plan) : raw;
+      const bucket = adjustment.ownerShare ? owner : manager;
+      bucket[adjustment.line] = Math.round(((bucket[adjustment.line] ?? 0) + amount) * 100) / 100;
+    }
+  }
+  return { owner, manager, orderCount };
 }

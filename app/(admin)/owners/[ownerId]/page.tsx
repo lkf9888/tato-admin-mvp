@@ -6,14 +6,17 @@ import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getOwnerCommissionRules, pickCommissionRule } from "@/lib/owner-commission";
 import {
+  applyLineAmounts,
+  correctedNetEarning,
   FEE_CATALOGUE,
   parseFeeShareOverrides,
   resolveFeeTarget,
   resolveWorkspaceLedgerPolicy,
   sumFeeColumns,
   sumFeeColumnsAtGuestPrice,
+  sumTripShareOverrides,
 } from "@/lib/ledger-policy";
-import { getOrderNetEarning } from "@/lib/utils";
+import { loadOrderAdjustments } from "@/lib/owner-ledger";
 
 type Params = Promise<{ ownerId: string }>;
 
@@ -71,25 +74,40 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
   // an offline booking has a price typed straight in and no component
   // columns to divide, so including them would inflate the payout side
   // of an arithmetic the fee rows cannot balance.
-  const ownerOrders = await prisma.order.findMany({
+  const importedOrders = await prisma.order.findMany({
     where: {
       workspaceId: workspace.id,
       vehicle: { ownerId: owner.id },
       sourceMetadata: { not: null },
     },
-    select: { sourceMetadata: true, totalPrice: true, vehicle: { select: { turoPlanPercent: true } } },
+    select: { id: true, sourceMetadata: true, totalPrice: true, vehicle: { select: { turoPlanPercent: true } } },
+  });
+  // Each trip as its statement reads, with the amounts typed over its
+  // CSV lines and the lines ticked in or out of the owner's share on
+  // that trip -- the same corrections its ledger rows were written with.
+  const adjustmentsByOrder = await loadOrderAdjustments(importedOrders.map((order) => order.id));
+  const ownerOrders = importedOrders.map((order) => {
+    const adjustments = adjustmentsByOrder.get(order.id) ?? [];
+    return {
+      sourceMetadata: applyLineAmounts(order.sourceMetadata, adjustments).sourceMetadata,
+      planPercent: order.vehicle.turoPlanPercent,
+      netEarning: correctedNetEarning(order.sourceMetadata, order.totalPrice, adjustments),
+      adjustments,
+    };
   });
   const feeTotals = sumFeeColumns(ownerOrders);
-  const feeGuestTotals = sumFeeColumnsAtGuestPrice(
-    ownerOrders.map((order) => ({ sourceMetadata: order.sourceMetadata, planPercent: order.vehicle.turoPlanPercent })),
-  );
+  const feeGuestTotals = sumFeeColumnsAtGuestPrice(ownerOrders);
   const payoutTotal =
-    Math.round(
-      ownerOrders.reduce(
-        (sum, order) => sum + (getOrderNetEarning(order.sourceMetadata, order.totalPrice) ?? 0),
-        0,
-      ) * 100,
-    ) / 100;
+    Math.round(ownerOrders.reduce((sum, order) => sum + (order.netEarning ?? 0), 0) * 100) / 100;
+  const payoutShares = sumTripShareOverrides(ownerOrders, false);
+  const guestShares = sumTripShareOverrides(ownerOrders, true);
+  const tripCorrections = {
+    payout: { owner: payoutShares.owner, manager: payoutShares.manager },
+    guest: { owner: guestShares.owner, manager: guestShares.manager },
+    tickedOrders: payoutShares.orderCount,
+    amendedOrders: ownerOrders.filter((order) => order.adjustments.some((adjustment) => adjustment.amount != null))
+      .length,
+  };
 
   const allVehicles = await prisma.vehicle.findMany({
     where: { workspaceId: workspace.id },
@@ -137,6 +155,7 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
       retentionBasis={owner.retentionBasis === "guest" ? "guest" : "payout"}
       payoutTotal={payoutTotal}
       feeOrderCount={ownerOrders.length}
+      feeTripCorrections={tripCorrections}
       assignedVehicleIds={owner.vehicles.map((vehicle) => vehicle.id)}
       allVehicles={allVehicles.map((vehicle) => ({
         id: vehicle.id,

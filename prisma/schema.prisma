@@ -639,6 +639,31 @@ model TuroTripSnapshot {
   @@index([workspaceId])
 }
 
+/// One trip's own corrections to its statement, line by line: an amount
+/// typed over the CSV's, or whether the line counts toward the owner's
+/// share on this trip only. Kept apart from the order because the Turo
+/// CSV is re-imported daily and rewrites the order's amounts; these stay.
+/// `line` is a CSV column name, `__amount` (the trip's own amount when it
+/// has no CSV row) or `__cleaning`. No relation to Order on purpose, so
+/// the Order model is untouched; rows are read by orderId.
+model OrderLedgerAdjustment {
+  id          String   @id @default(cuid())
+  workspaceId String
+  orderId     String
+  line        String
+  /// Replaces the CSV amount for this line; null keeps the CSV's.
+  amount      Float?
+  /// false leaves the line out of the owner's share, true puts it in;
+  /// null follows the owner's fee-sharing rules.
+  ownerShare  Boolean?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([orderId, line])
+  @@index([workspaceId])
+}
+
 model OwnerLedgerItem {
   workspaceId        String?
   id                 String               @id @default(cuid())

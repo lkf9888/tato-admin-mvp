@@ -435,7 +435,10 @@ export function getManagerRetentionByFee(
   const lines: Array<{ column: string; amount: number; payoutAmount: number }> = [];
   let total = 0;
 
-  for (const column of SHAREABLE_FEE_COLUMNS) {
+  // Every column, Trip price included: the owner-level rules never
+  // reach it (it has no category and is not offered there), so it only
+  // moves when one trip's own statement leaves the rent out.
+  for (const { column } of FEE_CATALOGUE) {
     const payoutAmount = parseNumberValue(financials[column]) ?? 0;
     if (Math.abs(payoutAmount) < 0.005) continue;
     if (resolveFeeTarget(column, policy, overrides) !== LedgerShareTarget.MANAGER) continue;
@@ -564,4 +567,65 @@ export function hostShareOf(column: string, planPercent: number) {
   if (FLAT_TEN_PERCENT_COLUMNS.has(column)) return 0.9;
   if (PLAN_COLUMNS.has(column)) return planPercent / 100;
   return 1;
+}
+
+/** A trip's statement lines that are not CSV columns. */
+export const TRIP_AMOUNT_LINE = "__amount";
+export const CLEANING_LINE = "__cleaning";
+
+/** One line of one trip's own corrections (OrderLedgerAdjustment). */
+export type OrderLineAdjustment = { line: string; amount: number | null; ownerShare: boolean | null };
+
+/**
+ * A trip's CSV row with its typed-over amounts in place, and how far
+ * they move the trip's earnings. Turo's `Total earnings` is the sum of
+ * the columns, so the corrected earnings are the reported ones plus the
+ * corrections' difference -- which survives the daily re-import, since
+ * that rewrites the reported figure and not these.
+ */
+export function applyLineAmounts(
+  sourceMetadata: string | null | undefined,
+  adjustments: readonly OrderLineAdjustment[],
+): { sourceMetadata: string | null; delta: number } {
+  const typed = adjustments.filter(
+    (adjustment) => adjustment.amount != null && FEE_CATALOGUE.some((fee) => fee.column === adjustment.line),
+  );
+  if (!sourceMetadata || typed.length === 0) return { sourceMetadata: sourceMetadata ?? null, delta: 0 };
+  let parsed: { financials?: Record<string, string> } & Record<string, unknown>;
+  try {
+    parsed = JSON.parse(sourceMetadata);
+  } catch {
+    return { sourceMetadata, delta: 0 };
+  }
+  const financials = { ...(parsed.financials ?? {}) };
+  let delta = 0;
+  for (const adjustment of typed) {
+    const before = parseNumberValue(financials[adjustment.line]) ?? 0;
+    delta += (adjustment.amount ?? 0) - before;
+    financials[adjustment.line] = String(adjustment.amount);
+  }
+  return {
+    sourceMetadata: JSON.stringify({ ...parsed, financials }),
+    delta: Math.round(delta * 100) / 100,
+  };
+}
+
+/**
+ * The owner's fee rules with one trip's own ticks on top: a line ticked
+ * on the trip goes to the owner, an unticked one stays with the company,
+ * whatever the owner's rule for that column says.
+ */
+export function withTripShareOverrides(
+  ownerOverrides: Record<string, string> | null,
+  adjustments: readonly OrderLineAdjustment[],
+): Record<string, string> | null {
+  const trip = adjustments.filter(
+    (adjustment) => adjustment.ownerShare != null && FEE_CATALOGUE.some((fee) => fee.column === adjustment.line),
+  );
+  if (trip.length === 0) return ownerOverrides;
+  const merged: Record<string, string> = { ...(ownerOverrides ?? {}) };
+  for (const adjustment of trip) {
+    merged[adjustment.line] = adjustment.ownerShare ? LedgerShareTarget.OWNER : LedgerShareTarget.MANAGER;
+  }
+  return merged;
 }

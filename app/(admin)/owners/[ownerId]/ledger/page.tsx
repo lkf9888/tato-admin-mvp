@@ -10,8 +10,10 @@ import {
 } from "@/lib/owner-ledger-recurring";
 import { prisma } from "@/lib/prisma";
 import {
+  applyLineAmounts,
   getManagerRetentionByFee,
   retentionBasisFor,
+  withTripShareOverrides,
   parseFeeShareOverrides,
   resolveWorkspaceLedgerPolicy,
 } from "@/lib/ledger-policy";
@@ -103,17 +105,32 @@ export default async function OwnerLedgerPage({ params }: { params: Params }) {
     { gross: number; withheld: Array<{ column: string; amount: number }>; net: number }
   > = {};
 
+  // Each trip's own corrections (amounts typed over the CSV's, lines
+  // ticked in or out of the owner's share), the same ones the ledger
+  // rows were written with, so the breakdown adds up to the row.
+  const adjustmentRows = await prisma.orderLedgerAdjustment.findMany({
+    where: {
+      orderId: {
+        in: ledgerItems.flatMap((item) => (item.kind === "OWNER_NET_EARNING" && item.orderId ? [item.orderId] : [])),
+      },
+    },
+    select: { orderId: true, line: true, amount: true, ownerShare: true },
+  });
+
   for (const item of ledgerItems) {
     if (item.kind !== "OWNER_NET_EARNING" || !item.order) continue;
-    const gross = getNetEarningFromFinancials(
+    const adjustments = adjustmentRows.filter((row) => row.orderId === item.orderId);
+    const corrected = applyLineAmounts(item.order.sourceMetadata, adjustments);
+    const reported = getNetEarningFromFinancials(
       parseImportedOrderMetadata(item.order.sourceMetadata)?.financials,
       item.order.totalPrice,
     );
-    if (gross == null) continue;
+    if (reported == null) continue;
+    const gross = Math.round((reported + corrected.delta) * 100) / 100;
     const retention = getManagerRetentionByFee(
-      item.order.sourceMetadata,
+      corrected.sourceMetadata,
       policy,
-      overrides,
+      withTripShareOverrides(overrides, adjustments),
       retentionBasisFor(owner.retentionBasis, item.order.vehicle?.turoPlanPercent, item.order.sourceMetadata),
     );
     if (retention.lines.length === 0) continue;

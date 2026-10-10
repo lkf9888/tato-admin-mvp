@@ -54,6 +54,7 @@ export const activityLabelsBase = {
     service_record_updated: "修改了維修記錄",
     service_record_deleted: "刪除了維修記錄",
     owner_retention_basis_applied: "統一了所有車主的費用扣除口徑",
+    order_ledger_adjusted: "修改了訂單的會計明細",
     import_csv: "已匯入 CSV",
     share_link_created: "已建立共享連結",
     share_link_revoked: "已作廢共享連結",

@@ -156,6 +156,13 @@ export const orderDetailMessages = {
       ledgerOther: "其他 Turo 調整",
       ledgerOtherHint: "上面列出的各項和 Turo 報告的收入之間的差額。",
       ledgerOtherFees: "其他費用",
+      ledgerOwnerNet: "車主分成淨收入",
+      ledgerOwnerNetHint: (rate: string) => `勾選的金額，減去 ${rate} 佣金和洗車費：這一單記到車主對帳單上的金額。`,
+      ledgerShareColumn: "車主",
+      ledgerShareToggle: "計入車主分成",
+      ledgerAdjusted: (original: string) => `手動改過，CSV 原值 ${original}`,
+      ledgerReset: "恢復 CSV 金額",
+      ledgerSaveFailed: "這項修改沒能儲存，請重試。",
       feeLabels: {
         "Trip price": "租金",
         "Boost price": "Boost 加價",

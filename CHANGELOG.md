@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.61.0 - 2026-10-10
+
+### Every amount on a trip's statement edits in place, and ticks say what counts toward the owner's share
+
+- A pencil left of each amount changes it. A CSV line typed over is kept
+  in a new table, `OrderLedgerAdjustment`, not on the order: the Turo CSV
+  is re-imported daily and rewrites the order's amounts, and these must
+  survive it. The trip's earnings become Turo's figure plus the
+  corrections' difference (Turo's `Total earnings` is the sum of the
+  columns). A changed amount is underlined, with the CSV's on hover, and
+  can go back to it. The sign is the line's, so a discount typed as 3.31
+  stays a deduction.
+- On a trip whose car has an owner, a tick right of each amount says
+  whether that line counts toward the owner's share. The default is the
+  owner's own fee rules; a tick changed on the trip applies to that trip
+  only and is stored only where it differs, so a later rule change still
+  reaches every trip nobody ticked. Unticking the cleaning fee leaves it
+  off the owner on that trip; unticking a trip with no CSV row keeps all
+  of it with the company. Rent can be unticked too.
+- Below the net income, "Owner's share": the ticked amounts less
+  commission and the cleaning fee, which is what the trip puts on the
+  owner's statement. It comes from `planOrderOwnerShare`, split out of
+  `syncOrderOwnerLedger` -- the sync now writes what that function plans
+  -- so the panel cannot show a figure the statement would not. Saving a
+  change on a trip already shared resyncs its ledger rows; the owner
+  ledger's breakdown applies the same corrections.
+- Kept fees are now read over every CSV column, Trip price included; the
+  owner-level rules never reach it, so only a trip's own tick moves it.
+  Resyncing every shared trip on the local data reproduced all existing
+  ledger rows exactly.
+- The dashboard's monthly figures still use Turo's reported earnings.
+
 ## v1.60.1 - 2026-10-10
 
 ### A trip's statement takes the cleaning fee off, under "Other charges", with one total

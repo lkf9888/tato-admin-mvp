@@ -148,7 +148,7 @@ export const guides: Guide[] = [
           "View Turo receipt and View on Turo open the trip on Turo.",
           "Sync to owner share puts the trip in the owner's ledger; the bar turns green.",
           "The pencil beside a field edits it; save or press Enter, Esc cancels. Times and places sit in the trip card at the top, with one line when pickup and return are the same place.",
-          "Accounting reads top to bottom: money in (rent, boost and so on) and money taken off (discounts, sales tax and so on), line for line with Turo's receipt, with anything left unexplained as Other Turo adjustments; then Other charges, the ones that do not come from Turo, such as the cleaning fee, which its pencil edits. The net income at the bottom has them all taken off.",
+          "Accounting reads top to bottom: money in (rent, boost and so on) and money taken off (discounts, sales tax and so on), line for line with Turo's receipt, then Other charges that do not come from Turo (such as the cleaning fee), and the net income at the bottom. The pencil left of each amount changes it (a changed amount is underlined; hover for the CSV's). When the car has an owner, the tick on the right says whether that line counts toward the owner's share, for this trip only. The owner's share below is what this trip puts on the owner's statement.",
           "Empty fields wait behind Add, such as deposit, payment method and contract number.",
           "At the bottom, duplicate the trip or delete it (deleted trips go to the Trash and can be restored).",
         ],

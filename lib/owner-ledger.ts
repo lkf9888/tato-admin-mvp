@@ -6,11 +6,16 @@ import {
 } from "@prisma/client";
 
 import {
+  applyLineAmounts,
+  CLEANING_LINE,
   getManagerRetentionByFee,
   retentionBasisFor,
   parseFeeShareOverrides,
   resolveWorkspaceLedgerPolicy,
+  TRIP_AMOUNT_LINE,
+  withTripShareOverrides,
   type LedgerShareCategory,
+  type OrderLineAdjustment,
 } from "@/lib/ledger-policy";
 import { prisma } from "@/lib/prisma";
 import { resolveCleaningFee, resolveCommission } from "@/lib/owner-commission";
@@ -49,29 +54,74 @@ export async function removeOrderAutoOwnerLedger(orderId: string, tx?: Tx) {
   });
 }
 
-export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
+type DesiredRow = {
+  kind: OwnerLedgerKind;
+  amount: number;
+  occurredAt: Date;
+  note: string | null;
+};
+
+/** What one trip comes to for its owner, and the ledger rows that say so. */
+export type OrderOwnerShare = {
+  ownerId: string;
+  /** The trip's earnings with its own corrections applied. */
+  netEarning: number | null;
+  /** What stays with the company out of those earnings. */
+  retained: number;
+  /** Earnings less what the company keeps: the owner's revenue. */
+  ownerRevenue: number;
+  commission: number;
+  commissionRate: number;
+  /** The trip's cleaning fee, unless the trip leaves it off the owner. */
+  cleaningFee: number;
+  /** What the owner ends up with from this trip: revenue, less
+   *  commission, less the cleaning fee. */
+  ownerNet: number;
+  rows: DesiredRow[];
+};
+
+async function loadAdjustments(db: Tx, orderId: string): Promise<OrderLineAdjustment[]> {
+  const rows = await db.orderLedgerAdjustment.findMany({
+    where: { orderId },
+    select: { line: true, amount: true, ownerShare: true },
+  });
+  return rows;
+}
+
+/**
+ * The owner's side of one trip, worked out but not written: the rows
+ * syncOrderOwnerLedger writes, and the totals the order panel shows as
+ * "owner's share". One function for both, so the panel can never show a
+ * figure the statement would not.
+ *
+ * Null when the trip has no owner or is not a live trip. Unlike the
+ * sync, it does not care whether the trip has been shared with the owner
+ * yet -- the panel previews what sharing it would post.
+ */
+export async function planOrderOwnerShare(orderId: string, tx?: Tx): Promise<OrderOwnerShare | null> {
   const db = tx ?? prisma;
   const order = await db.order.findUnique({
     where: { id: orderId },
     include: { vehicle: true, workspace: true },
   });
-  if (!order) return;
-
-  if (
-    order.isArchived ||
-    order.status === OrderStatus.cancelled ||
-    !order.vehicle.ownerId
-  ) {
-    await removeOrderAutoOwnerLedger(orderId, db);
-    return;
+  if (!order || order.isArchived || order.status === OrderStatus.cancelled || !order.vehicle.ownerId) {
+    return null;
   }
+  const ownerId = order.vehicle.ownerId;
 
-  if (!order.ownerLedgerSyncedAt) {
-    await removeOrderAutoOwnerLedger(orderId, db);
-    return;
-  }
+  // The trip's own corrections: amounts typed over the CSV's, and lines
+  // ticked in or out of the owner's share on this trip only.
+  const adjustments = await loadAdjustments(db, orderId);
+  const corrected = applyLineAmounts(order.sourceMetadata, adjustments);
+  const reported = getOrderNetEarning(order.sourceMetadata, order.totalPrice);
+  const netEarning = reported == null ? null : roundLedgerAmount(reported + corrected.delta);
+  const tripAmountExcluded = adjustments.some(
+    (adjustment) => adjustment.line === TRIP_AMOUNT_LINE && adjustment.ownerShare === false,
+  );
+  const cleaningExcluded = adjustments.some(
+    (adjustment) => adjustment.line === CLEANING_LINE && adjustment.ownerShare === false,
+  );
 
-  const netEarning = getOrderNetEarning(order.sourceMetadata, order.totalPrice);
   // Priced as of the day the trip started, so revising the fee today
   // does not rewrite what last month's trips were charged.
   const cleaningFeeRules = await db.vehicleCleaningFeeRule.findMany({
@@ -79,17 +129,14 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
     orderBy: { effectiveFrom: "desc" },
     select: { id: true, amount: true, effectiveFrom: true },
   });
-  const cleaningFee = roundLedgerAmount(
-    resolveCleaningFee(cleaningFeeRules, order.pickupDatetime, order.vehicle.cleaningFee).amount,
-  );
+  const cleaningFee = cleaningExcluded
+    ? 0
+    : roundLedgerAmount(
+        resolveCleaningFee(cleaningFeeRules, order.pickupDatetime, order.vehicle.cleaningFee).amount,
+      );
   const shouldChargeCleaningFee =
     cleaningFee > 0 &&
     (order.status === OrderStatus.completed || order.returnDatetime.getTime() <= Date.now());
-
-  if ((netEarning == null || Math.abs(netEarning) < 0.005) && !shouldChargeCleaningFee) {
-    await removeOrderAutoOwnerLedger(orderId, db);
-    return;
-  }
 
   // Owner revenue-split policy. Turo's `Total earnings` bundles trip
   // revenue together with reimbursements (gas, tolls, charging,
@@ -97,31 +144,32 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
   // Whoever fronted the cost or performed the work is entitled to the
   // corresponding slice — configured per workspace, defaulting to the
   // owner so behaviour is unchanged until an operator opts in.
-  //
-  // The retained amount becomes an explicit deduction line on the
-  // statement rather than being netted out of the revenue figure, so
-  // the owner can see exactly what was withheld and why.
   const policy = resolveWorkspaceLedgerPolicy(order.workspace);
-  // Per fee now, not per category. An owner with no exceptions
-  // resolves every fee through the same category policy as before, so
-  // their totals are unchanged; an owner with exceptions gets them.
+  // Per fee, not per category: the owner's exceptions, then this trip's.
   const owner = await db.owner.findUnique({
-    where: { id: order.vehicle.ownerId },
+    where: { id: ownerId },
     select: { feeShareOverrides: true, retentionBasis: true },
   });
   const retention = getManagerRetentionByFee(
-    order.sourceMetadata,
+    corrected.sourceMetadata,
     policy,
-    parseFeeShareOverrides(owner?.feeShareOverrides),
+    withTripShareOverrides(parseFeeShareOverrides(owner?.feeShareOverrides), adjustments),
+    // The plan is read from Turo's own figures, not the corrected ones.
     retentionBasisFor(owner?.retentionBasis, order.vehicle.turoPlanPercent, order.sourceMetadata),
   );
-  const retainedAmount = roundLedgerAmount(Math.min(retention.total, Math.max(0, netEarning ?? 0)));
+  // A trip with no CSV row is one amount; left out of the owner's share,
+  // all of it stays with the company.
+  const retainedAmount = roundLedgerAmount(
+    tripAmountExcluded
+      ? Math.max(0, netEarning ?? 0)
+      : Math.min(retention.total, Math.max(0, netEarning ?? 0)),
+  );
 
   // Terms as of the day the trip started, not as of today. A rate
   // renegotiated in March must not reprice a trip that ran in January
   // and was already settled at the old one.
   const commissionRules = await db.ownerCommissionRule.findMany({
-    where: { ownerId: order.vehicle.ownerId },
+    where: { ownerId },
     orderBy: { effectiveFrom: "desc" },
     select: { id: true, rate: true, settlement: true, effectiveFrom: true },
   });
@@ -142,27 +190,27 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
     ? `${order.vehicle.plateNumber} · ${order.vehicle.nickname}`
     : order.vehicle.nickname;
 
-  const desired: Array<{
-    kind: OwnerLedgerKind;
-    amount: number;
-    occurredAt: Date;
-    note: string | null;
-  }> = [];
-
   // Net of what the operator withheld, rather than gross with a
-  // deduction beside it.
-  //
-  // The retained charges are service fees and reimbursements billed to
-  // the guest that were never the owner's to begin with -- they are
-  // not something taken off the owner, they are money that is not part
-  // of the owner's revenue. Showing the gross and then subtracting
-  // them made the statement read as though the operator had clawed
-  // something back, and invited exactly that question.
-  //
-  // The arithmetic is not lost: the admin ledger expands this line
-  // into its components. The owner's copy shows the figure they are
-  // actually settled on.
+  // deduction beside it: the retained charges were never the owner's
+  // revenue to begin with. The admin ledger expands this line into its
+  // components; the owner's copy shows the figure they are settled on.
   const ownerRevenue = +((netEarning ?? 0) - retainedAmount).toFixed(2);
+  const summary = {
+    ownerId,
+    netEarning,
+    retained: retainedAmount,
+    ownerRevenue,
+    commission,
+    commissionRate,
+    cleaningFee,
+    ownerNet: roundLedgerAmount(ownerRevenue - commission - cleaningFee),
+  };
+
+  if ((netEarning == null || Math.abs(netEarning) < 0.005) && !shouldChargeCleaningFee) {
+    return { ...summary, rows: [] };
+  }
+
+  const desired: DesiredRow[] = [];
 
   if (netEarning != null && Math.abs(ownerRevenue) >= 0.005) {
     desired.push({
@@ -174,9 +222,8 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
   }
 
   // No separate "Retained by TATO" line any more -- it is folded into
-  // the revenue above. Kept out of AUTO_KINDS below would have been
-  // wrong; it stays there so a resync deletes the ones already
-  // written.
+  // the revenue above. It stays in AUTO_KINDS so a resync deletes the
+  // ones already written.
 
   // When the guest paid the owner directly, we never held this money,
   // so crediting it and stopping there would say we owe it. The
@@ -201,10 +248,8 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
       kind: OwnerLedgerKind.MANAGER_COMMISSION,
       amount: -commission,
       occurredAt: order.pickupDatetime,
-      // The operator's own name, not the product's. An owner reading
-      // "TATO commission" on their statement has no idea who TATO is
-      // -- their agreement is with SpeedX, and a line item naming a
-      // third party is a line item they will ask about.
+      // The operator's own name, not the product's: the owner's
+      // agreement is with SpeedX, not with a third party called TATO.
       note: `${operatorName} commission ${(commissionRate * 100).toFixed(
         Number.isInteger(commissionRate * 100) ? 0 : 1,
       )}% · ${order.renterName}`,
@@ -219,6 +264,24 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
       note: `Cleaning fee after return · ${order.renterName} · ${vehicleLabel}`,
     });
   }
+
+  return { ...summary, rows: desired };
+}
+
+export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
+  const db = tx ?? prisma;
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, workspaceId: true, vehicleId: true, ownerLedgerSyncedAt: true },
+  });
+  if (!order) return;
+
+  const plan = await planOrderOwnerShare(orderId, db);
+  if (!plan || !order.ownerLedgerSyncedAt || plan.rows.length === 0) {
+    await removeOrderAutoOwnerLedger(orderId, db);
+    return;
+  }
+  const desired = plan.rows;
 
   const existingRows = await db.ownerLedgerItem.findMany({
     where: {
@@ -245,7 +308,7 @@ export async function syncOrderOwnerLedger(orderId: string, tx?: Tx) {
     }
     const data = {
       workspaceId: order.workspaceId,
-      ownerId: order.vehicle.ownerId,
+      ownerId: plan.ownerId,
       vehicleId: order.vehicleId,
       orderId: order.id,
       kind: row.kind,

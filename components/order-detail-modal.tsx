@@ -329,57 +329,90 @@ type LedgerLine = {
   /** Signed; null when there is no amount yet. */
   value: number | null;
   placeholder?: string;
-  /** The order field this line edits, when it edits one. */
-  field?: "totalPrice" | "cleaningFee";
+  /** Typed over the CSV's amount on this trip; the CSV's is in `original`. */
+  adjusted?: boolean;
+  /** How the line edits, when it does. */
+  edit?: RowEdit;
+  /** The owner-share tick, on a trip whose car has an owner. */
+  share?: { checked: boolean; busy: boolean; onToggle: () => void };
 };
 
-type RowChrome = {
-  canEdit: boolean;
+type RowEdit = {
   editing: boolean;
   saving: boolean;
   justSaved: boolean;
+  draft: string;
+  setDraft: (value: string) => void;
   onEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
-  onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  /** Back to the CSV's amount, for a line typed over. */
+  onReset?: () => void;
 };
 
-/** One line of the statement: a label and a signed amount, editable in
- *  place when it stands for an order field. The controls sit before the
- *  amount so every amount lines up on the right. */
+type RowCopy = { edit: string; save: string; cancel: string; ledgerShareToggle: string; ledgerReset: string };
+
+/**
+ * One line of the statement: a pencil, the label, the signed amount,
+ * and -- on a trip with an owner -- the tick that says whether the line
+ * counts toward the owner's share. The pencil sits left of the amount
+ * and the tick right of it, so the amounts line up in one column.
+ */
 function LedgerRow({
   line,
   locale,
-  chrome,
-  draftValue,
-  onDraftChange,
   copy,
+  showShareColumn,
   children,
 }: {
   line: LedgerLine;
   locale: Locale;
-  chrome: RowChrome | null;
-  draftValue: string;
-  onDraftChange: (value: string) => void;
-  copy: { edit: string; save: string; cancel: string };
+  copy: RowCopy;
+  /** Keep the tick's column even on a line without a tick. */
+  showShareColumn: boolean;
   children?: React.ReactNode;
 }) {
-  const editing = Boolean(chrome?.editing);
+  const edit = line.edit;
   const negative = (line.value ?? 0) < 0;
   return (
     <li>
-      <div className="flex min-w-0 items-center justify-between gap-3 text-[13px] leading-6" onKeyDown={chrome?.onKeyDown}>
-        <span className="min-w-0 truncate text-[color:var(--ink-mid)]" title={line.original}>
+      <div
+        className="flex min-w-0 items-center justify-between gap-2 text-[13px] leading-6"
+        onKeyDown={(event) => {
+          if (!edit?.editing) return;
+          if (event.key === "Escape") {
+            event.preventDefault();
+            edit.onCancel();
+          } else if (event.key === "Enter") {
+            event.preventDefault();
+            edit.onSave();
+          }
+        }}
+      >
+        <span
+          className={cn("min-w-0 truncate", line.share && !line.share.checked ? "text-[color:var(--ink-soft)]" : "text-[color:var(--ink-mid)]")}
+          title={line.original}
+        >
           {line.label}
         </span>
         <span className="flex shrink-0 items-center gap-1">
-          {chrome?.canEdit ? (
-            editing ? (
+          {edit ? (
+            edit.editing ? (
               <>
+                {edit.onReset ? (
+                  <button
+                    type="button"
+                    onClick={edit.onReset}
+                    disabled={edit.saving}
+                    className="tap-compact rounded px-1 text-[11px] text-[var(--accent)] underline-offset-2 hover:underline disabled:opacity-40"
+                  >
+                    {copy.ledgerReset}
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  onClick={chrome.onSave}
-                  disabled={chrome.saving}
+                  onClick={edit.onSave}
+                  disabled={edit.saving}
                   title={copy.save}
                   aria-label={copy.save}
                   className="tap-compact flex h-6 w-6 items-center justify-center rounded text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-40"
@@ -388,8 +421,8 @@ function LedgerRow({
                 </button>
                 <button
                   type="button"
-                  onClick={chrome.onCancel}
-                  disabled={chrome.saving}
+                  onClick={edit.onCancel}
+                  disabled={edit.saving}
                   title={copy.cancel}
                   aria-label={copy.cancel}
                   className="tap-compact flex h-6 w-6 items-center justify-center rounded text-[color:var(--ink-soft)] transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
@@ -400,39 +433,66 @@ function LedgerRow({
             ) : (
               <button
                 type="button"
-                onClick={chrome.onEdit}
-                disabled={chrome.saving}
+                onClick={edit.onEdit}
+                disabled={edit.saving}
                 title={copy.edit}
-                aria-label={copy.edit}
+                aria-label={`${copy.edit} ${line.label}`}
                 className={cn(
                   "tap-compact flex h-6 w-6 items-center justify-center rounded transition hover:bg-[var(--surface-muted)] disabled:opacity-40",
-                  chrome.justSaved ? "text-emerald-600" : "text-[color:var(--ink-soft)] hover:text-[var(--ink)]",
+                  edit.justSaved ? "text-emerald-600" : "text-[color:var(--ink-soft)] hover:text-[var(--ink)]",
                 )}
               >
-                {chrome.justSaved ? <Check className="h-3 w-3" aria-hidden /> : <Pencil className="h-3 w-3" aria-hidden />}
+                {edit.justSaved ? <Check className="h-3 w-3" aria-hidden /> : <Pencil className="h-3 w-3" aria-hidden />}
               </button>
             )
-          ) : null}
-          {editing ? (
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={draftValue}
-              onChange={(event) => onDraftChange(event.target.value)}
-              onBlur={(event) => onDraftChange(formatCurrencyInputText(event.target.value))}
-              autoFocus
-              aria-label={line.label}
-              className="h-7 w-28 rounded-md border border-[var(--accent)] bg-white px-2 text-right text-[13px] tabular-nums text-[color:var(--ink)] outline-none"
-            />
-          ) : line.value != null ? (
-            <span className={cn("tabular-nums", negative ? "text-rose-600" : "text-[color:var(--ink)]")}>
-              {negative ? "−" : "+"}
-              {formatCurrency(Math.abs(line.value), locale)}
-            </span>
           ) : (
-            <span className="text-[12px] text-[color:var(--ink-soft)]">{line.placeholder ?? "—"}</span>
+            <span aria-hidden className="h-6 w-6" />
           )}
+          <span className="text-right" style={{ minWidth: "7.75rem" }}>
+            {edit?.editing ? (
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={edit.draft}
+                onChange={(event) => edit.setDraft(event.target.value)}
+                onBlur={(event) => edit.setDraft(formatCurrencyInputText(event.target.value))}
+                autoFocus
+                aria-label={line.label}
+                className="h-7 w-28 rounded-md border border-[var(--accent)] bg-white px-2 text-right text-[13px] tabular-nums text-[color:var(--ink)] outline-none"
+              />
+            ) : line.value != null ? (
+              <span
+                className={cn(
+                  "tabular-nums",
+                  negative ? "text-rose-600" : "text-[color:var(--ink)]",
+                  line.adjusted && "underline decoration-dotted decoration-[var(--accent)] underline-offset-4",
+                  line.share && !line.share.checked && "opacity-55",
+                )}
+                title={line.adjusted ? line.original : undefined}
+              >
+                {negative ? "−" : "+"}
+                {formatCurrency(Math.abs(line.value), locale)}
+              </span>
+            ) : (
+              <span className="text-[12px] text-[color:var(--ink-soft)]">{line.placeholder ?? "—"}</span>
+            )}
+          </span>
+          {showShareColumn ? (
+            line.share ? (
+              <input
+                type="checkbox"
+                checked={line.share.checked}
+                disabled={line.share.busy}
+                onChange={line.share.onToggle}
+                title={copy.ledgerShareToggle}
+                aria-label={`${copy.ledgerShareToggle}: ${line.label}`}
+                className="tap-compact ml-1.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--accent)] disabled:opacity-50"
+              />
+            ) : (
+              <span aria-hidden className="ml-1.5 h-4 w-4 shrink-0" />
+            )
+          ) : null}
         </span>
       </div>
       {children}
@@ -495,6 +555,30 @@ function LocationInput({
     </span>
   );
 }
+
+/** GET /api/orders/[orderId]/ledger: the trip's statement with its own
+ *  corrections, and what it comes to for the owner. */
+type LedgerData = {
+  owner: { id: string; name: string } | null;
+  tripNet: number | null;
+  lines: Array<{
+    line: string;
+    amount: number;
+    original: number;
+    adjusted: boolean;
+    ownerShare: boolean;
+    ownerShareDefault: boolean;
+  }>;
+  amountLine: { ownerShare: boolean; ownerShareDefault: boolean };
+  cleaning: { amount: number; ownerShare: boolean; ownerShareDefault: boolean };
+  ownerShare: {
+    ownerNet: number;
+    ownerRevenue: number;
+    commission: number;
+    commissionRate: number;
+    cleaningFee: number;
+  } | null;
+};
 
 export function OrderDetailModal({
   order,
@@ -609,59 +693,6 @@ export function OrderDetailModal({
     notes: Boolean(currentOrder.notes?.trim()),
   };
   const showField = (field: FieldKey) => filled[field] !== false || editingField === field;
-  // The trip's charges as a statement: each CSV column with its real
-  // sign. A debit column (a discount) is stored positive and subtracts;
-  // a credit column keeps the export's own sign, which is how Sales tax
-  // -- withheld by Turo, stored negative -- lands among the deductions.
-  // Whatever the listed lines do not explain of the reported earnings
-  // becomes one more line, so the Turo part always adds up to them.
-  //
-  // Without a CSV row there is nothing to list, and the trip's own
-  // amount is the one income line -- an offline order's price, or a Turo
-  // trip's earnings typed in by hand -- and it edits in place there.
-  //
-  // Below the deductions, "other charges" are the ones that do not come
-  // from Turo at all; today that is the cleaning fee this trip is charged
-  // (the fee in force when it started). They come off the net too.
-  const ledger = (() => {
-    const lines: LedgerLine[] = (currentOrder.feeLines ?? []).map((line) => ({
-      key: line.column,
-      label: t.feeLabels[line.column] ?? line.column,
-      original: line.column,
-      value: line.sign === "debit" ? -Math.abs(line.amount) : line.amount,
-    }));
-    if (lines.length > 0 && currentOrder.totalPrice != null) {
-      const listed = lines.reduce((sum, line) => sum + (line.value ?? 0), 0);
-      const gap = Math.round((currentOrder.totalPrice - listed) * 100) / 100;
-      if (Math.abs(gap) >= 0.01) {
-        lines.push({ key: "__other", label: t.ledgerOther, original: t.ledgerOtherHint, value: gap });
-      }
-    }
-    if (lines.length === 0) {
-      lines.push({
-        key: "__amount",
-        label: currentOrder.source === "turo" ? t.earnings : t.totalPrice,
-        value: currentOrder.totalPrice ?? null,
-        placeholder: currentOrder.source === "turo" ? t.earningsPending : "—",
-        field: "totalPrice",
-      });
-    }
-    const cleaning = currentOrder.cleaningFeeOnTrip ?? currentOrder.cleaningFee ?? 0;
-    const other: LedgerLine[] =
-      cleaning > 0 || editingField === "cleaningFee"
-        ? [{ key: "__cleaning", label: t.cleaningFee, value: cleaning > 0 ? -cleaning : null, placeholder: "—", field: "cleaningFee" }]
-        : [];
-    // No net while the trip's own amount is unknown: the cleaning fee
-    // alone would read as a loss.
-    const tripKnown = lines.every((line) => line.value != null);
-    const known = [...lines, ...other].filter((line) => line.value != null);
-    return {
-      income: lines.filter((line) => line.value == null || line.value > 0),
-      deductions: lines.filter((line) => line.value != null && line.value < 0),
-      other,
-      net: tripKnown && known.length > 0 ? Math.round(known.reduce((sum, line) => sum + (line.value ?? 0), 0) * 100) / 100 : null,
-    };
-  })();
   const addChips: Array<[FieldKey, string]> = [
     ...(pickupLocation === "" && returnLocation === "" && editingField !== "locations"
       ? ([["locations", t.sameLocation]] as Array<[FieldKey, string]>)
@@ -838,6 +869,178 @@ export function OrderDetailModal({
     cancelTitle: t.cancel,
   });
 
+  // The trip's statement and its own corrections come from the server
+  // (the same function writes the owner's ledger), loaded with the panel
+  // and again whenever the order changes under it. Until it lands -- and
+  // on the read-only share view, which has no session to ask with -- the
+  // lines are drawn from the order the panel was opened with.
+  const [ledgerData, setLedgerData] = useState<LedgerData | null>(null);
+  const [lineEditing, setLineEditing] = useState<string | null>(null);
+  const [lineDraft, setLineDraft] = useState("");
+  const [lineBusy, setLineBusy] = useState<string | null>(null);
+  const [lineSaved, setLineSaved] = useState<string | null>(null);
+  useEffect(() => {
+    if (readOnly || !currentOrder.id) return;
+    let cancelled = false;
+    fetch(`/api/orders/${currentOrder.id}/ledger`, { headers: { Accept: "application/json" } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: LedgerData | null) => {
+        if (!cancelled && data) setLedgerData(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [currentOrder, readOnly]);
+
+  const saveLine = async (line: string, body: { amount?: number | null; ownerShare?: boolean }) => {
+    if (lineBusy) return;
+    setLineBusy(line);
+    setError(null);
+    try {
+      const response = await fetch(`/api/orders/${currentOrder.id}/ledger`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ line, ...body }),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      setLedgerData((await response.json()) as LedgerData);
+      setLineEditing(null);
+      if (body.amount !== undefined) {
+        setLineSaved(line);
+        window.setTimeout(() => setLineSaved((current) => (current === line ? null : current)), 1800);
+      }
+    } catch {
+      setError(t.ledgerSaveFailed);
+    } finally {
+      setLineBusy(null);
+    }
+  };
+
+  // The trip's charges as a statement: each CSV column with its real
+  // sign. A debit column (a discount) is stored positive and subtracts;
+  // a credit column keeps the export's own sign, which is how Sales tax
+  // -- withheld by Turo, stored negative -- lands among the deductions.
+  // Whatever the listed lines do not explain of the earnings becomes one
+  // more line, so the Turo part always adds up to them.
+  //
+  // Without a CSV row the trip's own amount is the one income line -- an
+  // offline order's price, or a Turo trip's earnings typed in by hand.
+  // Below the deductions, "other charges" are the ones that do not come
+  // from Turo at all: the cleaning fee this trip is charged. They come
+  // off the net too.
+  //
+  // On a trip whose car has an owner, every line carries a tick: ticked
+  // counts toward the owner's share, the default being the owner's own
+  // fee rules; unticking leaves it out for this trip only.
+  const ledger = (() => {
+    const hasOwner = Boolean(ledgerData?.owner);
+    const formatOriginal = (value: number) => `${value < 0 ? "−" : ""}${formatCurrency(Math.abs(value), locale)}`;
+    const shareFor = (line: string, checked: boolean | undefined) =>
+      hasOwner && checked !== undefined && !readOnly
+        ? { checked, busy: lineBusy === line, onToggle: () => void saveLine(line, { ownerShare: !checked }) }
+        : undefined;
+    const csvEdit = (line: string, value: number, adjusted: boolean): RowEdit | undefined =>
+      readOnly || !ledgerData
+        ? undefined
+        : {
+            editing: lineEditing === line,
+            saving: lineBusy === line,
+            justSaved: lineSaved === line,
+            draft: lineDraft,
+            setDraft: setLineDraft,
+            onEdit: () => {
+              if (editingField) cancelField();
+              setLineEditing(line);
+              setLineDraft(Math.abs(value).toFixed(2));
+            },
+            onSave: () => {
+              const amount = Number(lineDraft);
+              if (!Number.isFinite(amount) || amount < 0) return;
+              void saveLine(line, { amount });
+            },
+            onCancel: () => setLineEditing(null),
+            onReset: adjusted ? () => void saveLine(line, { amount: null }) : undefined,
+          };
+    const fieldEdit = (field: "totalPrice" | "cleaningFee"): RowEdit | undefined => {
+      if (readOnly) return undefined;
+      const chrome = fieldChrome(field);
+      return {
+        editing: chrome.editing,
+        saving: chrome.saving,
+        justSaved: chrome.justSaved,
+        draft: field === "cleaningFee" ? draft.cleaningFee : draft.totalPrice,
+        setDraft: (value) => updateDraft(field === "cleaningFee" ? { cleaningFee: value } : { totalPrice: value }),
+        onEdit: () => {
+          setLineEditing(null);
+          chrome.onEdit();
+        },
+        onSave: chrome.onSave,
+        onCancel: chrome.onCancel,
+      };
+    };
+
+    const lines: LedgerLine[] = ledgerData
+      ? ledgerData.lines.map((line) => ({
+          key: line.line,
+          label: t.feeLabels[line.line] ?? line.line,
+          original: line.adjusted ? t.ledgerAdjusted(formatOriginal(line.original)) : line.line,
+          value: line.amount,
+          adjusted: line.adjusted,
+          edit: csvEdit(line.line, line.amount, line.adjusted),
+          share: shareFor(line.line, line.ownerShare),
+        }))
+      : (currentOrder.feeLines ?? []).map((line) => ({
+          key: line.column,
+          label: t.feeLabels[line.column] ?? line.column,
+          original: line.column,
+          value: line.sign === "debit" ? -Math.abs(line.amount) : line.amount,
+        }));
+    const tripNet = ledgerData ? ledgerData.tripNet : currentOrder.totalPrice ?? null;
+    if (lines.length > 0 && tripNet != null) {
+      const listed = lines.reduce((sum, line) => sum + (line.value ?? 0), 0);
+      const gap = Math.round((tripNet - listed) * 100) / 100;
+      if (Math.abs(gap) >= 0.01) {
+        lines.push({ key: "__other", label: t.ledgerOther, original: t.ledgerOtherHint, value: gap });
+      }
+    }
+    if (lines.length === 0) {
+      lines.push({
+        key: "__amount",
+        label: currentOrder.source === "turo" ? t.earnings : t.totalPrice,
+        value: currentOrder.totalPrice ?? null,
+        placeholder: currentOrder.source === "turo" ? t.earningsPending : "—",
+        edit: fieldEdit("totalPrice"),
+        share: shareFor("__amount", ledgerData?.amountLine.ownerShare),
+      });
+    }
+    const cleaning = ledgerData?.cleaning.amount ?? currentOrder.cleaningFeeOnTrip ?? currentOrder.cleaningFee ?? 0;
+    const other: LedgerLine[] =
+      cleaning > 0 || editingField === "cleaningFee"
+        ? [
+            {
+              key: "__cleaning",
+              label: t.cleaningFee,
+              value: cleaning > 0 ? -cleaning : null,
+              placeholder: "—",
+              edit: fieldEdit("cleaningFee"),
+              share: shareFor("__cleaning", ledgerData?.cleaning.ownerShare),
+            },
+          ]
+        : [];
+    // No net while the trip's own amount is unknown: the cleaning fee
+    // alone would read as a loss.
+    const tripKnown = lines.every((line) => line.value != null);
+    const known = [...lines, ...other].filter((line) => line.value != null);
+    return {
+      hasOwner,
+      income: lines.filter((line) => line.value == null || line.value > 0),
+      deductions: lines.filter((line) => line.value != null && line.value < 0),
+      other,
+      net: tripKnown && known.length > 0 ? Math.round(known.reduce((sum, line) => sum + (line.value ?? 0), 0) * 100) / 100 : null,
+      ownerShare: ledgerData?.ownerShare ?? null,
+    };
+  })();
   const syncOwnerShare = async () => {
     if (readOnly || isSaving || isSyncingOwner) return;
     if (!selectedOwnerId) {
@@ -1471,15 +1674,25 @@ export function OrderDetailModal({
 
           {/* Accounting, read top to bottom like a statement: what came
               in, what was taken off, the charges that are not Turo's, and
-              what is left. No subtotals per group: two more totals beside
-              the net read as rival answers to "what did this trip make".
-              Each editable amount edits on its own line. Deposit, payment
-              method and contract number are not money in or out, so they
-              stay boxes below, and only take one once they hold something. */}
+              what is left -- then, on a trip with an owner, what the trip
+              comes to for the owner, kept apart from the net so the two
+              are never mistaken for each other. No subtotals per group:
+              more totals beside the net read as rival answers to "what did
+              this trip make". Each amount edits on its own line, and the
+              ticks on the right say which lines count toward the owner's
+              share. Deposit, payment method and contract number are not
+              money in or out, so they stay boxes below. */}
           <div className="mt-2.5 rounded-lg border border-[rgba(17,19,24,0.1)] bg-[var(--surface-muted)]/50 p-2 sm:p-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
-              {t.accounting}
-            </p>
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
+                {t.accounting}
+              </p>
+              {ledger.hasOwner ? (
+                <span className="pr-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--ink-soft)]">
+                  {t.ledgerShareColumn}
+                </span>
+              ) : null}
+            </div>
             <div className="mt-1.5 overflow-hidden rounded-md border border-[rgba(17,19,24,0.1)] bg-[var(--surface)]">
               {(
                 [
@@ -1493,18 +1706,8 @@ export function OrderDetailModal({
                     <h4 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ink-soft)]">{title}</h4>
                     <ul className="mt-1 space-y-0.5">
                       {lines.map((line) => (
-                        <LedgerRow
-                          key={line.key}
-                          line={line}
-                          locale={locale}
-                          chrome={line.field ? fieldChrome(line.field) : null}
-                          draftValue={line.field === "cleaningFee" ? draft.cleaningFee : draft.totalPrice}
-                          onDraftChange={(value) =>
-                            updateDraft(line.field === "cleaningFee" ? { cleaningFee: value } : { totalPrice: value })
-                          }
-                          copy={t}
-                        >
-                          {line.field === "cleaningFee" && editingField === "cleaningFee" ? (
+                        <LedgerRow key={line.key} line={line} locale={locale} copy={t} showShareColumn={ledger.hasOwner}>
+                          {line.key === "__cleaning" && editingField === "cleaningFee" ? (
                             <div className="mt-1 grid gap-1 rounded-md bg-[var(--surface-muted)] px-2 py-1.5">
                               <label className="flex min-w-0 items-center gap-2">
                                 <span className="shrink-0 text-[10px] uppercase tracking-[0.13em] text-[color:var(--ink-soft)]">
@@ -1528,15 +1731,39 @@ export function OrderDetailModal({
               )}
               <div className="-mt-px flex min-w-0 items-center justify-between gap-3 border-t-2 border-[var(--line-strong)] px-3 py-2.5">
                 <span className="text-[13px] font-semibold text-[color:var(--ink)]">{t.ledgerNet}</span>
-                {ledger.net != null ? (
-                  <span className={cn("text-[19px] font-semibold tabular-nums", ledger.net < 0 ? "text-rose-600" : "text-[color:var(--ink)]")}>
-                    {ledger.net < 0 ? "−" : ""}
-                    {formatCurrency(Math.abs(ledger.net), locale)}
-                  </span>
-                ) : (
-                  <span className="text-[13px] text-[color:var(--ink-soft)]">—</span>
-                )}
+                <span className="flex items-center">
+                  {ledger.net != null ? (
+                    <span className={cn("text-[19px] font-semibold tabular-nums", ledger.net < 0 ? "text-rose-600" : "text-[color:var(--ink)]")}>
+                      {ledger.net < 0 ? "−" : ""}
+                      {formatCurrency(Math.abs(ledger.net), locale)}
+                    </span>
+                  ) : (
+                    <span className="text-[13px] text-[color:var(--ink-soft)]">—</span>
+                  )}
+                  {ledger.hasOwner ? <span aria-hidden className="ml-1.5 h-4 w-4" /> : null}
+                </span>
               </div>
+              {ledger.ownerShare ? (
+                <div className="flex min-w-0 items-start justify-between gap-3 border-t border-dashed border-[var(--line)] bg-emerald-50/60 px-3 py-2">
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-semibold text-emerald-800">{t.ledgerOwnerNet}</span>
+                    <span className="block text-[11px] leading-4 text-[color:var(--ink-soft)]">
+                      {t.ledgerOwnerNetHint(
+                        `${(ledger.ownerShare.commissionRate * 100).toFixed(
+                          Number.isInteger(ledger.ownerShare.commissionRate * 100) ? 0 : 1,
+                        )}%`,
+                      )}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center">
+                    <span className="text-[17px] font-semibold tabular-nums text-emerald-800">
+                      {ledger.ownerShare.ownerNet < 0 ? "−" : ""}
+                      {formatCurrency(Math.abs(ledger.ownerShare.ownerNet), locale)}
+                    </span>
+                    <span aria-hidden className="ml-1.5 h-4 w-4" />
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             {showField("depositAmount") || showField("paymentMethod") || showField("contractNumber") ? (

@@ -3,7 +3,7 @@ import "server-only";
 import bcrypt from "bcryptjs";
 import { randomInt } from "crypto";
 
-import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email";
+import { sendEmailChangeCode, sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email";
 import type { Locale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 
@@ -14,7 +14,10 @@ const MAX_ATTEMPTS = 5;
 // purpose, to keep abusers from spamming SMTP.
 const RESEND_COOLDOWN_MS = 30 * 1000;
 
-export type VerificationPurpose = "registration" | "password_reset";
+/** An email change is bound to the account asking for it: the purpose
+ *  carries the user's id, so a code issued to one account cannot finish
+ *  another account's change to the same address. */
+export type VerificationPurpose = "registration" | "password_reset" | `email_change:${string}`;
 
 function generateCode(): string {
   // 6 random digits, zero-padded so leading zeros are preserved.
@@ -249,6 +252,51 @@ export async function verifyPasswordResetCode(input: {
   code: string;
 }): Promise<VerifyCodeResult> {
   return verifyCodeForPurpose({ ...input, purpose: "password_reset" });
+}
+
+/**
+ * A code to the new address before a login email changes. The caller
+ * has already checked the current password and that the address is free.
+ */
+export async function issueEmailChangeCode(input: {
+  userId: string;
+  email: string;
+  locale: Locale;
+}): Promise<IssueCodeResult> {
+  const email = normalizeEmailAddress(input.email);
+  if (!email || !email.includes("@")) {
+    return { ok: false, reason: "invalid_email" };
+  }
+  const purpose: VerificationPurpose = `email_change:${input.userId}`;
+
+  const recent = await prisma.emailVerification.findFirst({
+    where: { email, purpose, consumedAt: null },
+    orderBy: { createdAt: "desc" },
+  });
+  if (recent && Date.now() - recent.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+    return { ok: false, reason: "throttled" };
+  }
+
+  const code = generateCode();
+  await prisma.emailVerification.create({
+    data: {
+      email,
+      codeHash: await bcrypt.hash(code, 10),
+      purpose,
+      expiresAt: new Date(Date.now() + CODE_TTL_MS),
+    },
+  });
+
+  const sendResult = await sendEmailChangeCode({ to: email, code, locale: input.locale });
+  return { ok: true, sent: sendResult.ok, reason: sendResult.reason };
+}
+
+export async function verifyEmailChangeCode(input: {
+  userId: string;
+  email: string;
+  code: string;
+}): Promise<VerifyCodeResult> {
+  return verifyCodeForPurpose({ email: input.email, code: input.code, purpose: `email_change:${input.userId}` });
 }
 
 /**

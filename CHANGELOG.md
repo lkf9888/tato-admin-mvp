@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.63.0 - 2026-10-10
+
+### Settings regroup around what people come for; changing the login email takes a code sent to the new address
+
+- The activity log and the trash left the sidebar for a Records card in
+  settings: they are opened when something has gone wrong, not daily.
+  Their URLs are unchanged; while on them the sidebar marks Settings,
+  and each has a way back.
+- Language and appearance are two small buttons at the foot of the
+  sidebar beside Contact, and at the foot of More on a phone, each
+  opening a short menu. The settings cards for them are gone, as are the
+  "other account-controlled settings" list and the Turo reader entry.
+  (The reader's own page, /agent, belongs to the sync session.)
+- Login email and password share one Sign-in and security card. A new
+  email now changes in two steps: the current password and the new
+  address send a 6-digit code there, and only that code changes it. The
+  code is bound to the account that asked (purpose
+  `email_change:<userId>`), lasts 10 minutes, and takes 5 tries.
+  Locally, with no mail service, the code is printed to the server log.
+- iPhone home screen and the Android app are one Install the app card.
+  The three iPhone steps each have a drawing of the screen they happen
+  on, the thing to tap ringed in blue; the drawings are markup, so they
+  follow the interface language.
+- The Android shell (APK 1.63.0, code 74, same signing key) hands an
+  APK link to the phone's default browser instead of downloading it in
+  the app. Not a plain VIEW intent: the app claims tatocar.co links, so
+  it would get the URL back; it asks which browser opens other sites and
+  addresses that one. Tried on an emulator: the app passed the APK URL to
+  Chrome. Shells already installed keep downloading in-app until updated.
+- The workspace's revenue-split defaults moved from settings to the
+  owner page, under that owner's fee sharing, as "Default revenue split"
+  (account owner only). Saving returns to that owner's page.
+- Help: the activity log and trash guides are sections of Account
+  Settings now; the owner guide covers the default split.
+
 ## v1.62.0 - 2026-10-10
 
 ### A trip's statement takes charges added by hand and its own commission, and every total counts the corrections

@@ -9,6 +9,8 @@ import { LedgerShareTarget } from "@prisma/client";
 
 import { canManageTeam } from "@/lib/access";
 import { normalizeEmail, requireCurrentAdminContext } from "@/lib/auth";
+import { issueEmailChangeCode, verifyEmailChangeCode } from "@/lib/email-verification";
+import { getI18n } from "@/lib/i18n-server";
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { getStripeClient, getStripeSecretKey } from "@/lib/stripe";
@@ -82,47 +84,90 @@ const emailSchema = z.object({
   currentPassword: z.string().min(1),
 });
 
-export async function updateAccountEmailAction(formData: FormData) {
-  const parsed = emailSchema.safeParse({
-    email: formData.get("email"),
-    currentPassword: formData.get("currentPassword"),
-  });
+export type EmailChangeResult =
+  | { ok: true; email?: string }
+  | {
+      ok: false;
+      error:
+        | "invalid"
+        | "bad_password"
+        | "email_in_use"
+        | "same_email"
+        | "throttled"
+        | "send_failed"
+        | "no_pending_code"
+        | "expired"
+        | "invalid_code"
+        | "too_many_attempts";
+    };
 
-  if (!parsed.success) {
-    finish("invalid");
-  }
+/**
+ * Step one of changing the login email: check the current password and
+ * that the new address is free, then send a code to the new address.
+ * The email changes only in step two, with that code -- so a typo, or
+ * an address the owner cannot read, never becomes the way in.
+ */
+export async function sendEmailChangeCodeAction(input: {
+  email: string;
+  currentPassword: string;
+}): Promise<EmailChangeResult> {
+  const parsed = emailSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid" };
+
+  const { user } = await requireCurrentAdminContext();
+  const email = normalizeEmail(parsed.data.email);
+  if (email === normalizeEmail(user.email)) return { ok: false, error: "same_email" };
+
+  const passwordOk = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
+  if (!passwordOk) return { ok: false, error: "bad_password" };
+
+  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (existing && existing.id !== user.id) return { ok: false, error: "email_in_use" };
+
+  const { locale } = await getI18n();
+  const issued = await issueEmailChangeCode({ userId: user.id, email, locale });
+  if (!issued.ok) return { ok: false, error: issued.reason === "throttled" ? "throttled" : "invalid" };
+  // Locally, with no mail service, the code is printed to the server log
+  // (lib/email.ts) so the change can still be tried end to end.
+  const devLogged = issued.reason === "smtp_not_configured" && process.env.NODE_ENV !== "production";
+  if (!issued.sent && !devLogged) return { ok: false, error: "send_failed" };
+  return { ok: true };
+}
+
+const emailCodeSchema = z.object({
+  email: z.string().trim().email().max(160),
+  code: z.string().trim().regex(/^\d{6}$/),
+});
+
+/** Step two: the code from the new address, and the email changes. */
+export async function confirmEmailChangeAction(input: { email: string; code: string }): Promise<EmailChangeResult> {
+  const parsed = emailCodeSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid_code" };
 
   const { user, workspace } = await requireCurrentAdminContext();
   const email = normalizeEmail(parsed.data.email);
 
-  const passwordOk = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
-  if (!passwordOk) {
-    finish("bad_password");
-  }
+  const verified = await verifyEmailChangeCode({ userId: user.id, email, code: parsed.data.code });
+  if (!verified.ok) return { ok: false, error: verified.reason };
 
-  const existing = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true },
-  });
-  if (existing && existing.id !== user.id) {
-    finish("email_in_use");
-  }
+  // Checked again: the address may have been taken while the code was
+  // on its way.
+  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (existing && existing.id !== user.id) return { ok: false, error: "email_in_use" };
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { email },
-  });
+  await prisma.user.update({ where: { id: user.id }, data: { email } });
 
   await logActivity({
     workspaceId: workspace.id,
-    actor: user.email,
+    actor: email,
     action: "account_email_updated",
     entityType: "User",
     entityId: user.id,
     metadata: { previousEmail: user.email, email },
   });
 
-  finish("email_saved");
+  revalidatePath("/account-settings");
+  return { ok: true, email };
 }
 
 const passwordSchema = z.object({
@@ -351,5 +396,11 @@ export async function updateLedgerPolicyAction(formData: FormData) {
     },
   });
 
+  // Saved from an owner's page, where the rules now live: back there.
+  const returnTo = String(formData.get("returnTo") ?? "");
+  if (/^\/owners\/[A-Za-z0-9_-]+$/.test(returnTo)) {
+    revalidatePath(returnTo);
+    redirect(`${returnTo}?saved=ledger_policy`);
+  }
   finish("ledger_policy_saved");
 }

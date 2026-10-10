@@ -20,18 +20,18 @@
  */
 export const ANDROID_RELEASE = {
   /** Matches the web app's version at the time the shell was built. */
-  version: "0.73.0",
+  version: "1.63.0",
   /** Android's own monotonic counter. Must only ever increase, or a
    *  device will refuse the upgrade. */
-  versionCode: 73,
-  builtAt: "2026-09-15",
+  versionCode: 74,
+  builtAt: "2026-10-10",
   fileName: "tato.apk",
   /** Stable on purpose: "the latest APK" should always be the same
    *  URL, so a link written down once keeps working. */
   path: "/tato.apk",
-  sizeBytes: 2575093,
+  sizeBytes: 2579189,
   /** So a download can be checked against what was built here. */
-  sha256: "b0b25fb59e6573b9e19b0bb4314bd940ad8af48c060aaec8c0bd23af8b670020",
+  sha256: "29f65ea7d3ea2331dfc3044635696c2848646d0801956457a4fca091eee84435",
 } as const;
 
 export function formatBytes(bytes: number) {

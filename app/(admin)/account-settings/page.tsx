@@ -1,24 +1,20 @@
+import { ChevronRight, History, Trash2 } from "lucide-react";
 import Link from "next/link";
 
-import { LanguageSwitcher } from "@/components/language-switcher";
-
+import { AccountLoginSecurity } from "@/components/account-login-security";
+import { AppInstallGuide } from "@/components/app-install-guide";
 import {
-  updateAccountEmailAction,
-  updateAccountPasswordAction,
   updateAccountProfileAction,
-  updateLedgerPolicyAction,
   updateStripePayoutBindingAction,
 } from "@/lib/account-settings-actions";
 import { ANDROID_RELEASE, formatBytes } from "@/lib/android-release";
-import { IosInstallGuide } from "@/components/ios-install-guide";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 import { TeamSettings } from "@/components/team-settings";
-import { ASSIGNABLE_SECTIONS, canManageTeam, parsePageAccess, parseVehicleScope } from "@/lib/access";
+import { ASSIGNABLE_SECTIONS, canManageTeam, canOpenPath, parsePageAccess, parseVehicleScope } from "@/lib/access";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { listTeam } from "@/lib/team";
 import { getMessages } from "@/lib/i18n";
-import { getI18n, getLocalePreference } from "@/lib/i18n-server";
+import { getI18n } from "@/lib/i18n-server";
 import {
   getWorkspaceConnectSnapshot,
   isStripeConnectConfigured,
@@ -32,13 +28,11 @@ export default async function AccountSettingsPage({
 }: {
   searchParams: Promise<{ account?: string }>;
 }) {
-  const [{ locale, messages }, { user, workspace }, params, localePreference] =
-    await Promise.all([
-      getI18n(),
-      requireCurrentAdminContext(),
-      searchParams,
-      getLocalePreference(),
-    ]);
+  const [{ locale, messages }, { user, workspace }, params] = await Promise.all([
+    getI18n(),
+    requireCurrentAdminContext(),
+    searchParams,
+  ]);
 
   const t = messages.accountSettingsPage;
   const isOwner = canManageTeam(user);
@@ -76,6 +70,10 @@ export default async function AccountSettingsPage({
   const connectStatus = summarizeConnectStatus(connectSnapshot);
   const isStripeConfigured = isStripeConnectConfigured();
   const notice = getAccountSettingsNotice(params.account, t);
+  const records = [
+    { href: "/activity", title: messages.shell.nav.activity, copy: t.activityCopy, Icon: History },
+    { href: "/trash", title: messages.shell.nav.trash, copy: t.trashCopy, Icon: Trash2 },
+  ].filter((record) => canOpenPath(user, record.href));
 
   const statusLabel =
     connectStatus === "active"
@@ -147,91 +145,7 @@ export default async function AccountSettingsPage({
           </form>
         </SettingsCard>
 
-        <SettingsCard title={t.loginTitle} copy={t.loginCopy}>
-          <form action={updateAccountEmailAction} className="grid gap-3 sm:grid-cols-2">
-            <label className="block min-w-0">
-              <span className="mb-1 block text-[11px] font-semibold text-[var(--ink-soft)]">
-                {t.emailLabel}
-              </span>
-              <input
-                name="email"
-                type="email"
-                defaultValue={user.email}
-                required
-                maxLength={160}
-                autoComplete="email"
-                className="input"
-              />
-            </label>
-            <label className="block min-w-0">
-              <span className="mb-1 block text-[11px] font-semibold text-[var(--ink-soft)]">
-                {t.currentPasswordLabel}
-              </span>
-              <input
-                name="currentPassword"
-                type="password"
-                required
-                autoComplete="current-password"
-                className="input"
-              />
-            </label>
-            <div className="sm:col-span-2">
-              <button className="btn-primary" type="submit">
-                {t.saveEmail}
-              </button>
-            </div>
-          </form>
-        </SettingsCard>
-
-        <SettingsCard title={t.passwordTitle} copy={t.passwordCopy}>
-          <form action={updateAccountPasswordAction} className="grid gap-3 sm:grid-cols-3">
-            <label className="block min-w-0">
-              <span className="mb-1 block text-[11px] font-semibold text-[var(--ink-soft)]">
-                {t.currentPasswordLabel}
-              </span>
-              <input
-                name="currentPassword"
-                type="password"
-                required
-                autoComplete="current-password"
-                className="input"
-              />
-            </label>
-            <label className="block min-w-0">
-              <span className="mb-1 block text-[11px] font-semibold text-[var(--ink-soft)]">
-                {t.newPasswordLabel}
-              </span>
-              <input
-                name="newPassword"
-                type="password"
-                minLength={8}
-                maxLength={128}
-                required
-                autoComplete="new-password"
-                className="input"
-              />
-            </label>
-            <label className="block min-w-0">
-              <span className="mb-1 block text-[11px] font-semibold text-[var(--ink-soft)]">
-                {t.confirmPasswordLabel}
-              </span>
-              <input
-                name="confirmPassword"
-                type="password"
-                minLength={8}
-                maxLength={128}
-                required
-                autoComplete="new-password"
-                className="input"
-              />
-            </label>
-            <div className="sm:col-span-3">
-              <button className="btn-primary" type="submit">
-                {t.savePassword}
-              </button>
-            </div>
-          </form>
-        </SettingsCard>
+        <AccountLoginSecurity currentEmail={user.email} locale={locale} />
 
         {isOwner ? (
         <SettingsCard title={t.stripeTitle} copy={t.stripeCopy}>
@@ -296,113 +210,9 @@ export default async function AccountSettingsPage({
         ) : null}
       </div>
 
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-3 sm:px-4">
-        <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--ink-soft)]">
-          {t.optionalTitle}
-        </p>
-        <p className="mt-1.5 text-[12px] leading-5 text-[var(--ink-soft)]">{t.optionalCopy}</p>
-        <ul className="mt-3 grid gap-2 text-[12px] text-[var(--ink)] md:grid-cols-2">
-          {t.optionalItems.map((item) => (
-            <li key={item} className="rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2">
-              {item}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* The reader used to be its own nav entry, which put a
-          set-it-once task permanently in the same list as the pages
-          used every day -- and on a phone, where the nav is a fixed
-          bottom bar with room for a handful of destinations, that is
-          an expensive slot. It lives here now, next to the other
-          things configured once and then forgotten. The route is
-          unchanged, so an existing bookmark of /agent still works. */}
-      {/* Moved out of the sidebar, where three buttons and a paragraph
-          of explanation held the bottom-left corner permanently for a
-          setting most people change once. */}
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
-        <LanguageSwitcher
-          locale={locale}
-          preference={localePreference}
-          label={messages.shell.languageLabel}
-          hint={messages.shell.languageHint}
-          autoLabel={messages.shell.languageAutoLabel}
-        />
-      </section>
-
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-          {t.turoReaderTitle}
-        </p>
-        <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
-          {t.turoReaderCopy}
-        </p>
-        <Link href="/agent" className="btn-secondary mt-3 inline-flex">
-          {t.turoReaderLink}
-        </Link>
-      </section>
-
-      {/* Its own section, though it links to the same page as the
-          reader above. They share a credentials page because both are
-          agent tokens, and they are otherwise unrelated -- nobody
-          looking for an HTTP API would think to open something called
-          "Turo reader", which is exactly how it went missing. */}
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-          {t.apiAccessTitle}
-        </p>
-        <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
-          {t.apiAccessCopy}
-        </p>
-        <Link href="/agent#api" className="btn-secondary mt-3 inline-flex">
-          {t.apiAccessLink}
-        </Link>
-      </section>
-
-      <ThemeSwitcher labels={t.theme} />
-
-      <div id="install" className="scroll-mt-20">
-        <IosInstallGuide t={t.iosInstall} />
-      </div>
-
-      {/* The APK. A plain anchor with `download`, not a Link: this
-          points at a file in `public/`, and Next's client router would
-          try to treat it as a route. */}
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-          {t.androidTitle}
-        </p>
-        <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
-          {t.androidCopy}
-        </p>
-        {ANDROID_RELEASE.sizeBytes > 0 ? (
-          <>
-            <a
-              href={ANDROID_RELEASE.path}
-              download={ANDROID_RELEASE.fileName}
-              className="btn-secondary mt-3 inline-flex"
-            >
-              {t.androidDownload}
-            </a>
-            <p className="mt-2 text-[11px] leading-4 text-[var(--ink-soft)] tabular-nums">
-              {t.androidMeta(
-                ANDROID_RELEASE.version,
-                formatBytes(ANDROID_RELEASE.sizeBytes),
-                ANDROID_RELEASE.builtAt,
-              )}
-            </p>
-            <p className="mt-1.5 max-w-3xl text-[11px] leading-4 text-[var(--ink-soft)]">
-              {t.androidSideload}
-            </p>
-          </>
-        ) : (
-          <p className="mt-3 text-[12px] text-[var(--ink-soft)]">{t.androidUnbuilt}</p>
-        )}
-      </section>
-
       {team ? (
         <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">{t.team.title}</p>
+          <h2 className="text-[1rem] font-semibold text-[var(--ink)]">{t.team.title}</h2>
           <p className="mb-3 mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">{t.team.copy}</p>
           <TeamSettings
             locale={locale}
@@ -432,67 +242,52 @@ export default async function AccountSettingsPage({
         </section>
       ) : null}
 
-      {isOwner ? (
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-          {t.ledgerTitle}
-        </p>
-        <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">
-          {t.ledgerCopy}
-        </p>
 
-        <form action={updateLedgerPolicyAction} className="mt-3 space-y-2">
-          {(
-            [
-              {
-                name: "reimbursementShare",
-                value: workspace.reimbursementShare,
-                title: t.ledgerReimbursementTitle,
-                copy: t.ledgerReimbursementCopy,
-              },
-              {
-                name: "serviceShare",
-                value: workspace.serviceShare,
-                title: t.ledgerServiceTitle,
-                copy: t.ledgerServiceCopy,
-              },
-              {
-                name: "penaltyShare",
-                value: workspace.penaltyShare,
-                title: t.ledgerPenaltyTitle,
-                copy: t.ledgerPenaltyCopy,
-              },
-            ] as const
-          ).map((row) => (
-            <div
-              key={row.name}
-              className="flex flex-col gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-            >
-              <div className="min-w-0">
-                <p className="text-[13px] font-semibold text-[var(--ink)]">{row.title}</p>
-                <p className="mt-0.5 text-[11.5px] leading-5 text-[var(--ink-soft)]">{row.copy}</p>
-              </div>
-              <select
-                name={row.name}
-                defaultValue={row.value}
-                className="h-9 shrink-0 rounded-md border border-[var(--line)] bg-white px-3 text-[12px] font-medium text-[var(--ink)] outline-none sm:w-48"
-              >
-                <option value="OWNER">{t.ledgerOwner}</option>
-                <option value="MANAGER">{t.ledgerManager}</option>
-              </select>
-            </div>
-          ))}
-
-          <p className="rounded-md border border-[var(--line)] bg-[var(--accent-soft)] px-3 py-2 text-[11.5px] leading-5 text-[var(--ink)]">
-            {t.ledgerResyncNotice}
-          </p>
-
-          <button className="h-9 rounded-full bg-[var(--ink)] px-4 text-[12px] font-semibold text-white transition hover:bg-[#2a2f3a]">
-            {t.ledgerSave}
-          </button>
-        </form>
-      </section>
+      {/* The activity log and the trash: looked at when something has
+          gone wrong, not every day, so they left the sidebar for here. */}
+      {records.length > 0 ? (
+        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
+          <h2 className="text-[1rem] font-semibold text-[var(--ink)]">{t.recordsTitle}</h2>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {records.map((record) => (
+              <li key={record.href}>
+                <Link
+                  href={record.href}
+                  className="tap-press flex items-center gap-3 rounded-md border border-[var(--line)] bg-[var(--surface-muted)] px-3 py-2.5 transition hover:border-[var(--ink-soft)]"
+                >
+                  <record.Icon className="h-5 w-5 shrink-0 text-[var(--ink-soft)]" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-semibold text-[var(--ink)]">{record.title}</span>
+                    <span className="block text-[11.5px] leading-5 text-[var(--ink-soft)]">{record.copy}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-soft)]" aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
+
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">
+        <h2 className="text-[1rem] font-semibold text-[var(--ink)]">{t.apiAccessTitle}</h2>
+        <p className="mt-1.5 max-w-3xl text-[12px] leading-5 text-[var(--ink-soft)]">{t.apiAccessCopy}</p>
+        <Link href="/agent#api" className="btn-secondary mt-3 inline-flex">
+          {t.apiAccessLink}
+        </Link>
+      </section>
+
+      <AppInstallGuide
+        locale={locale}
+        android={
+          ANDROID_RELEASE.sizeBytes > 0
+            ? {
+                path: ANDROID_RELEASE.path,
+                fileName: ANDROID_RELEASE.fileName,
+                meta: t.androidMeta(ANDROID_RELEASE.version, formatBytes(ANDROID_RELEASE.sizeBytes), ANDROID_RELEASE.builtAt),
+              }
+            : null
+        }
+      />
     </div>
   );
 }
@@ -538,7 +333,6 @@ function getAccountSettingsNotice(status: string | undefined, t: AccountSettings
   if (!status) return null;
   const successMap: Record<string, string> = {
     profile_saved: t.saved.profile,
-    email_saved: t.saved.email,
     password_saved: t.saved.password,
     stripe_saved: t.saved.stripe,
     stripe_cleared: t.saved.stripeCleared,

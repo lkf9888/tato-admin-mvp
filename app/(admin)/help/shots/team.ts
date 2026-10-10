@@ -161,7 +161,7 @@ export const accountShots: Shot[] = [
     path: "/account-settings",
     marks: [
       { step: 1, target: { role: "button", name: { zh: "保存资料", en: "Save profile" } } },
-      { step: 2, target: { role: "button", name: { zh: "更新邮箱", en: "Update email" } } },
+      { step: 2, target: { role: "button", name: { zh: "更改邮箱", en: "Change email" }, exact: true } },
       { step: 3, target: { role: "button", name: { zh: "更新密码", en: "Update password" } } },
     ],
   },
@@ -172,19 +172,18 @@ export const accountShots: Shot[] = [
     setup: [{ scrollTo: { css: 'main h2:text-is("团队成员"), main h2:text-is("Team"), main p:text-is("团队成员"), main p:text-is("Team")' } }],
     marks: [
       { step: 1, target: { role: "button", name: { zh: "+ 添加成员", en: "+ Add a member" } } },
-      { step: 2, target: { role: "button", name: { zh: "保存分账规则", en: "Save revenue split" } } },
     ],
   },
   {
     id: "settings-app",
     path: "/account-settings",
     viewportHeight: 1300,
-    setup: [{ scrollTo: { role: "button", name: { zh: "繁中", en: "繁中" } } }],
+    setup: [{ scrollTo: { css: 'main a[href="/activity"]' } }, { wait: 400 }],
     marks: [
-      { step: 1, target: { role: "button", name: { zh: "中文", en: "中文" }, exact: true } },
-      { step: 2, target: { role: "link", name: { zh: "去设置读取器", en: "Set up the reader" } } },
-      { step: 3, target: { role: "link", name: { zh: "签发 API 令牌", en: "Get an API token" } } },
-      { step: 4, target: { css: 'main button:text-is("深色"), main button:text-is("Dark")' } },
+      { step: 1, target: { css: 'main a[href="/activity"]' } },
+      { step: 2, target: { role: "link", name: { zh: "签发 API 令牌", en: "Get an API token" } } },
+      { step: 3, target: { css: "#install ol" } },
+      { step: 4, target: { role: "link", name: { zh: "下载 APK", en: "Download APK" } } },
     ],
   },
   {
@@ -192,8 +191,7 @@ export const accountShots: Shot[] = [
     path: "/agent",
     marks: [
       { step: 1, target: { role: "button", name: "签发新令牌" } },
-      { step: 2, target: { role: "link", name: "读取 Turo 会话" } },
-      { step: 3, target: { role: "button", name: "签发只读令牌" } },
+      { step: 2, target: { role: "button", name: "签发只读令牌" } },
     ],
   },
 ];

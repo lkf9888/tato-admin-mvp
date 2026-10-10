@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { OwnerEditor } from "@/app/(admin)/owners/[ownerId]/owner-editor";
-import { requireCurrentWorkspace } from "@/lib/auth";
+import { OwnerLedgerDefaults } from "@/components/owner-ledger-defaults";
+import { canManageTeam } from "@/lib/access";
+import { requireCurrentAdminContext } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getOwnerCommissionRules, pickCommissionRule } from "@/lib/owner-commission";
@@ -19,6 +21,7 @@ import {
 import { loadOrderAdjustments } from "@/lib/owner-ledger";
 
 type Params = Promise<{ ownerId: string }>;
+type SearchParams = Promise<{ saved?: string }>;
 
 function vehicleLabel(vehicle: {
   plateNumber: string;
@@ -30,9 +33,9 @@ function vehicleLabel(vehicle: {
   return `${vehicle.plateNumber} · ${vehicle.nickname || `${vehicle.brand} ${vehicle.model} ${vehicle.year}`}`;
 }
 
-export default async function OwnerEditPage({ params }: { params: Params }) {
-  const workspace = await requireCurrentWorkspace();
-  const [{ ownerId }, { locale }] = await Promise.all([params, getI18n()]);
+export default async function OwnerEditPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
+  const { user, workspace } = await requireCurrentAdminContext();
+  const [{ ownerId }, { locale, messages }, query] = await Promise.all([params, getI18n(), searchParams]);
 
   const owner = await prisma.owner.findFirst({
     where: { id: ownerId, workspaceId: workspace.id },
@@ -156,6 +159,21 @@ export default async function OwnerEditPage({ params }: { params: Params }) {
       payoutTotal={payoutTotal}
       feeOrderCount={ownerOrders.length}
       feeTripCorrections={tripCorrections}
+      ledgerDefaults={
+        // Workspace-wide, so only the account's owner changes it.
+        canManageTeam(user) ? (
+          <OwnerLedgerDefaults
+            ownerId={owner.id}
+            values={{
+              reimbursementShare: workspace.reimbursementShare,
+              serviceShare: workspace.serviceShare,
+              penaltyShare: workspace.penaltyShare,
+            }}
+            saved={query.saved === "ledger_policy"}
+            t={messages.accountSettingsPage}
+          />
+        ) : null
+      }
       assignedVehicleIds={owner.vehicles.map((vehicle) => vehicle.id)}
       allVehicles={allVehicles.map((vehicle) => ({
         id: vehicle.id,

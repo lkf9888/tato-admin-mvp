@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
  * height plus the safe-area inset, applied in the AppShell `<main>`.
  */
 
-type SidebarItem = { href: string; label: string; icon?: NavIconName };
+type SidebarItem = { href: string; label: string; icon?: NavIconName; also?: string[] };
 type SidebarGroup = { label: string; items: SidebarItem[] };
 
 /** How far the sheet must be pulled down, in px, to close on release. */
@@ -275,7 +275,9 @@ export function BottomTabBar({
                       one screen of a phone instead of a long list. */}
                   <ul className="grid grid-cols-2 gap-1.5">
                     {group.items.map((item) => {
-                      const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                      const active = [item.href, ...(item.also ?? [])].some(
+                        (href) => pathname === href || pathname.startsWith(`${href}/`),
+                      );
                       const Icon = item.icon ? NAV_ICONS[item.icon] : null;
                       return (
                         <li key={item.href}>

@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-type NavItem = { href: string; label: string; icon: NavIconName };
+type NavItem = { href: string; label: string; icon: NavIconName; also?: string[] };
 type NavGroup = { label: string; items: NavItem[] };
 
 function isActivePath(pathname: string, href: string) {
@@ -26,7 +26,7 @@ export function SidebarNav({ groups }: { groups: NavGroup[] }) {
           </div>
           <div className="space-y-1">
             {group.items.map((item) => {
-              const active = isActivePath(pathname, item.href);
+              const active = [item.href, ...(item.also ?? [])].some((href) => isActivePath(pathname, href));
               const Icon = NAV_ICONS[item.icon];
               return (
                 <Link

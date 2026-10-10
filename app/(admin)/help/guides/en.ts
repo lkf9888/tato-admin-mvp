@@ -407,6 +407,14 @@ export const guides: Guide[] = [
         ],
       },
       {
+        heading: "Owner page: default revenue split",
+        shot: "owners-defaults",
+        steps: [
+          "Reimbursed costs, service income, and fines and damages each go to the owner or to you. This is the default for every owner; anything set in fee sharing above wins for that owner.",
+          "Save revenue split. Existing statements are not rewritten until you resync that owner.",
+        ],
+      },
+      {
         heading: "Owner page: share link and cars",
         shot: "owners-share",
         steps: [
@@ -672,32 +680,6 @@ export const guides: Guide[] = [
     tips: ["Files are uploaded on a trip or a car; e-signed contracts appear here too."],
   },
   {
-    key: "activity",
-    title: "Activity log",
-    summary: "Who changed what and when: every change to trips, cars, owners, notes and prices is recorded.",
-    sections: [
-      {
-        heading: "Look something up",
-        shot: "activity-main",
-        steps: ["Filters narrows by person, kind or date.", "Each entry says what was done, by whom and when; open Metadata for the details of the change."],
-      },
-    ],
-    tips: ["When numbers do not add up, start here: who changed a trip's amount, when it was synced to the owner."],
-  },
-  {
-    key: "trash",
-    title: "Trash",
-    summary: "Deleted trips wait here and can be put back on the calendar.",
-    sections: [
-      {
-        heading: "Restore trips",
-        shot: "trash-main",
-        steps: ["Restore on a trip puts it back on the calendar and in Orders.", "For several, tick them (or Select all) and press Restore on the bar at the bottom."],
-      },
-    ],
-    tips: ["A deleted trip keeps its photos and files; they are all there after a restore."],
-  },
-  {
     key: "billing",
     title: "Buy Quota",
     summary: "Vehicle slots: the first five cars are free, and each one after that is paid monthly.",
@@ -758,40 +740,57 @@ export const guides: Guide[] = [
   {
     key: "account-settings",
     title: "Account Settings",
-    summary: "Company profile, login email and password, team members, language, appearance, the Turo reader and API tokens, and TATO on your phone.",
+    summary: "Company profile, sign-in and security, team members, the activity log and trash, API tokens, and TATO on your phone.",
     sections: [
       {
-        heading: "Company profile and login",
+        heading: "Company profile, sign-in and security",
         shot: "settings-profile",
-        steps: ["Change the company name and login display name; Save profile.", "Change the login email after your current password; Update email.", "Change the password (8 characters or more); Update password."],
+        steps: [
+          "Change the company name and login display name; Save profile.",
+          "To change the login email, press Change email, enter the new address and your current password, and Send code; then type the 6-digit code that arrives at the new address and press Change email. The code lasts 10 minutes.",
+          "To change the password, enter the current one and the new one twice (8 characters or more); Update password.",
+        ],
       },
       {
         heading: "Team members",
         shot: "settings-team",
         steps: [
           "The account owner presses + Add a member to invite partners or staff, each with their own login; choose which pages each can open, limit them to some cars, or make them view-only.",
-          "The owner split rules send three kinds of money, reimbursed costs, service income, and fines and damages, to the owner or to you; Save revenue split. Existing statements are not rewritten until you resync that owner.",
         ],
       },
       {
-        heading: "Language, appearance and tools",
+        heading: "Records, API tokens and the app",
         shot: "settings-app",
         steps: [
-          "Language: Auto, EN, 中文 or 繁中.",
-          "Set up the reader configures the Turo reader, which reads your Turo data for you.",
-          "Get an API token connects AI tools to TATO.",
-          "Appearance: light, dark or match the phone. Below are the steps to add TATO to an iPhone home screen, and an APK to install on Android.",
+          "Activity log shows who changed what and when; Trash puts deleted trips back.",
+          "Get an API token connects AI agents and scripts to TATO.",
+          "iPhone: follow the three pictured steps to add TATO to the home screen from Safari.",
+          "Android: Download APK and install it. Pressed inside the Android app, it opens the phone's browser to download.",
         ],
       },
       {
-        heading: "Turo reader and API tokens",
+        heading: "API tokens",
         shot: "settings-agent",
         steps: [
           "First 「签发新令牌」 (issue a token). It is shown once; if lost, issue another and revoke the old one.",
-          "Drag 「读取 Turo 会话」 (read Turo conversations) to the bookmarks bar, or 「复制代码」 to paste it as a new bookmark. Click it on any Turo page to send the latest 25 conversations to TATO.",
-          "API is for AI agents and scripts: 「签发只读令牌」 (read-only) reads trips, amounts, owner terms and ledgers; 「签发读写令牌」 (read-write) can also import Turo trips and write Turo conversations.",
+          "「签发只读令牌」 (read-only) reads trips, amounts, owner terms and ledgers; 「签发读写令牌」 (read-write) can also import Turo trips and write Turo conversations.",
         ],
       },
+      {
+        heading: "Activity log",
+        shot: "activity-main",
+        steps: ["Filters narrows by person, kind or date.", "Each entry says what was done, by whom and when; open Metadata for the details of the change."],
+      },
+      {
+        heading: "Trash",
+        shot: "trash-main",
+        steps: ["Restore on a trip puts it back on the calendar and in Orders.", "For several, tick them (or Select all) and press Restore on the bar at the bottom."],
+      },
+    ],
+    tips: [
+      "Language and appearance (light, dark, match device) are the two small buttons beside Contact at the very bottom of the sidebar; on a phone, at the bottom of More.",
+      "When numbers do not add up, start with the activity log: who changed a trip's amount, when it was synced to the owner.",
+      "A deleted trip keeps its photos and files; they are all there after a restore.",
     ],
   },
 ];

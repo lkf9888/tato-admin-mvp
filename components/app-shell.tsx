@@ -1,6 +1,7 @@
 import { logoutAction } from "@/app/actions";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { ContactButton } from "@/components/contact-button";
+import { DisplayPreferences } from "@/components/display-preferences";
 import { MobileNav } from "@/components/mobile-nav";
 import { NavBadgeProvider } from "@/components/nav-badges";
 import { ActivityIndicator } from "@/components/activity-indicator";
@@ -49,7 +50,8 @@ export function AppShell({
   // operator switches between the two all day, so this matches it:
   // a chat bubble for messages, a car for vehicles, a bar chart for
   // the money pages.
-  type NavItem = { href: string; label: string; icon: NavIconName };
+  // `also`: pages without their own entry that light this one up.
+  type NavItem = { href: string; label: string; icon: NavIconName; also?: string[] };
   type NavGroup = { label: string; items: NavItem[] };
 
   const navGroups: NavGroup[] = [
@@ -92,8 +94,6 @@ export function AppShell({
         { href: "/inspections", label: messages.shell.nav.inspections, icon: "photos" },
         { href: "/photos", label: messages.shell.nav.photos, icon: "photos" },
         { href: "/documents", label: messages.shell.nav.documents, icon: "documents" },
-        { href: "/activity", label: messages.shell.nav.activity, icon: "activity" },
-        { href: "/trash", label: messages.shell.nav.trash, icon: "activity" },
       ],
     },
     {
@@ -102,7 +102,9 @@ export function AppShell({
         { href: "/billing", label: messages.shell.nav.billing, icon: "billing" },
         { href: "/payouts", label: messages.shell.nav.payouts, icon: "payouts" },
         { href: "/invoices", label: messages.shell.nav.invoices, icon: "invoices" },
-        { href: "/account-settings", label: messages.shell.nav.accountSettings, icon: "accountSettings" },
+        // The activity log and the trash are opened from settings: looked
+        // at when something has gone wrong, not every day.
+        { href: "/account-settings", label: messages.shell.nav.accountSettings, icon: "accountSettings", also: ["/activity", "/trash"] },
         // Last, where people look for it: under the settings.
         { href: "/help", label: messages.shell.nav.help, icon: "help" },
       ],
@@ -127,13 +129,23 @@ export function AppShell({
   // need to live somewhere on mobile too. They get tucked into the
   // footer of the More sheet so the desktop sidebar's full surface is
   // reachable from a phone.
-  // The language switcher used to sit here, permanently occupying the
-  // bottom of the sidebar with three buttons and a paragraph of
-  // explanation -- for a setting most people change once, if ever. It
-  // lives in account settings now, with the rest of the once-and-done
-  // configuration.
+  // Language and appearance: two small buttons beside "Contact" at the
+  // foot of the sidebar, and at the foot of the More sheet on a phone.
+  const displayPreferences = (
+    <DisplayPreferences
+      locale={locale}
+      preference={localePreference}
+      labels={{
+        language: messages.shell.languageLabel,
+        auto: messages.shell.languageAutoLabel,
+        theme: messages.shell.theme,
+      }}
+    />
+  );
+
   const moreFooter = (
     <div className="space-y-3">
+      <div className="flex justify-center">{displayPreferences}</div>
       <form action={logoutAction}>
         <button className="tap-press w-full rounded-md border border-[var(--line)] bg-white/72 px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.16)] hover:bg-white hover:text-[var(--ink)]">
           {messages.shell.signOut}
@@ -176,6 +188,9 @@ export function AppShell({
         <div className="pt-2 text-[10px] text-[var(--ink-soft)]">
           {APP_VERSION_LABEL}
         </div>
+        {/* Level with the floating "Contact" button, which sits at the
+            bottom-left corner of the screen over this footer. */}
+        <div className="absolute bottom-3 right-3">{displayPreferences}</div>
       </div>
     </>
   );

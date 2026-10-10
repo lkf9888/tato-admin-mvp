@@ -138,6 +138,7 @@ export function OwnerEditor({
   payoutTotal,
   feeOrderCount,
   feeTripCorrections,
+  ledgerDefaults,
   locale,
 }: {
   owner: Owner;
@@ -151,6 +152,8 @@ export function OwnerEditor({
   payoutTotal: number;
   feeOrderCount: number;
   feeTripCorrections: TripCorrections;
+  /** The workspace's default split, under this owner's exceptions. */
+  ledgerDefaults?: React.ReactNode;
   locale: Locale;
 }) {
   const labels = copy(locale);
@@ -362,6 +365,8 @@ export function OwnerEditor({
         orderCount={feeOrderCount}
         tripCorrections={feeTripCorrections}
       />
+
+      {ledgerDefaults}
 
       <section className="card space-y-3 p-6">
         <h2 className="text-lg font-semibold">{labels.sections.share}</h2>

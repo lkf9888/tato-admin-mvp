@@ -11,8 +11,8 @@ android {
         // cannot work around.
         minSdkVersion 23
         targetSdkVersion 36
-        versionCode 73
-        versionName "0.73.0"
+        versionCode 74
+        versionName "1.63.0"
         resValue "string", "app_name", "TATO"
         resValue "string", "start_url", "https://tatocar.co/dashboard"
         resValue "string", "app_host", "tatocar.co"

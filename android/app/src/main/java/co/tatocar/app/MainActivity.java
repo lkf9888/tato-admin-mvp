@@ -174,6 +174,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
+                if (isApk(url.toString(), null)) return openInBrowser(url);
                 if (isAppHost(url)) return false;
                 // Anything not on the site -- a guest's phone number, a
                 // maps link, Turo itself -- belongs to whatever app
@@ -238,6 +239,14 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onDownloadStart(String url, String userAgent, String contentDisposition,
                                         String mimeType, long contentLength) {
+                // An APK -- this app's own update -- goes to the phone's
+                // browser: it downloads there like any APK from the web,
+                // and installing from the browser is the permission
+                // people already gave the first time.
+                if (isApk(url, mimeType)) {
+                    openInBrowser(Uri.parse(url));
+                    return;
+                }
                 downloadFile(url, userAgent, contentDisposition, mimeType);
             }
         });
@@ -389,10 +398,50 @@ public class MainActivity extends AppCompatActivity {
 
     // ---- External links ---------------------------------------------
 
+    private static boolean isApk(String url, String mimeType) {
+        if ("application/vnd.android.package-archive".equals(mimeType)) return true;
+        String path = Uri.parse(url).getPath();
+        return path != null && path.toLowerCase(java.util.Locale.ROOT).endsWith(".apk");
+    }
+
+    /**
+     * A tatocar.co URL in the phone's own browser. Not a plain VIEW
+     * intent: this app claims tatocar.co links (the autoVerify filter in
+     * the manifest), so Android would hand the URL straight back here.
+     * The default browser is whatever answers a link to some other site.
+     */
+    private boolean openInBrowser(Uri url) {
+        Intent intent = new Intent(Intent.ACTION_VIEW, url);
+        intent.addCategory(Intent.CATEGORY_BROWSABLE);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        android.content.pm.ResolveInfo browser = getPackageManager().resolveActivity(
+                new Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")),
+                PackageManager.MATCH_DEFAULT_ONLY);
+        String pkg = browser != null && browser.activityInfo != null ? browser.activityInfo.packageName : null;
+        if (pkg != null && !"android".equals(pkg) && !pkg.equals(getPackageName())) {
+            intent.setPackage(pkg);
+        } else {
+            // No default chosen yet: let the person pick, without this app.
+            java.util.List<android.content.pm.ResolveInfo> browsers = getPackageManager().queryIntentActivities(
+                    new Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")), 0);
+            for (android.content.pm.ResolveInfo info : browsers) {
+                if (!info.activityInfo.packageName.equals(getPackageName())) {
+                    intent.setPackage(info.activityInfo.packageName);
+                    break;
+                }
+            }
+        }
+        return openExternally(intent);
+    }
+
     private boolean openExternally(Uri url) {
+        Intent intent = new Intent(Intent.ACTION_VIEW, url);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        return openExternally(intent);
+    }
+
+    private boolean openExternally(Intent intent) {
         try {
-            Intent intent = new Intent(Intent.ACTION_VIEW, url);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
             return true;
         } catch (ActivityNotFoundException e) {

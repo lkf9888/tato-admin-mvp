@@ -188,6 +188,17 @@ export const fleetShots: Shot[] = [
     ],
   },
   {
+    id: "owners-defaults",
+    path: OWNER,
+    viewportHeight: 1100,
+    setup: [{ scrollTo: { css: "#ledger-defaults" } }],
+    clip: { element: { css: "#ledger-defaults" }, pad: 10 },
+    marks: [
+      { step: 1, target: { css: "#ledger-defaults select", nth: 0 } },
+      { step: 2, target: { role: "button", name: { zh: "保存分账规则", en: "Save revenue split" } } },
+    ],
+  },
+  {
     id: "owners-share",
     path: OWNER,
     setup: [{ scrollTo: { role: "button", name: { zh: "创建共享链接", en: "Create share link" } } }, { wait: 300 }],

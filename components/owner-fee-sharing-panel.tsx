@@ -42,7 +42,7 @@ function copy(locale: Locale) {
         intro:
           "Turo 的每笔行程收入里,除了租金还可能包含三十种额外收费或折扣。这里逐项决定哪些和这位车主分账、哪些由公司留下。不共享的项目会作为一条明确的扣款出现在对账单上,并写明是哪一项 —— 账要能对得上。",
         defaultNote:
-          "没有单独设置的项目跟随工作区的默认规则(在「账户设置 → 车主分账规则」里)。所以这里只需要标出这位车主的例外。",
+          "没有单独设置的项目跟随下方的「默认分账规则」,它对所有车主生效。所以这里只需要标出这位车主的例外。",
         shared: "分给车主",
         withheld: "公司留下",
         overrideTag: "例外",
@@ -95,7 +95,7 @@ function copy(locale: Locale) {
         intro:
           "A Turo trip's earnings bundle thirty possible charges and discounts on top of the rent. This decides, one by one, which of them this owner participates in and which the company keeps. Anything withheld appears on the statement as an explicit deduction naming the charge — the arithmetic has to be checkable.",
         defaultNote:
-          "Anything not set here follows the workspace default (Account settings → Owner revenue split), so this page only needs to record this owner's exceptions.",
+          "Anything not set here follows the default split below, which applies to every owner, so this page only needs to record this owner's exceptions.",
         shared: "Owner's",
         withheld: "Company keeps",
         overrideTag: "exception",

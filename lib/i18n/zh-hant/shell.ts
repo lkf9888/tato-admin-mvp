@@ -62,8 +62,8 @@ export const shellMessages = {
       workspaceKicker: "運營工作台",
       workspaceBadge: "Turo 管理後台 MVP · SQLite + Prisma + 手動 CSV 同步",
       languageLabel: "語言",
-      languageHint: "選擇“自動”時會跟隨瀏覽器語言，也可以手動固定為英文或中文。",
-      languageAutoLabel: "自動",
+      languageAutoLabel: "跟隨瀏覽器",
+      theme: { title: "外觀", light: "淺色", dark: "深色", system: "跟隨裝置" },
       versionLabel: "版本號",
     },
   } as const;

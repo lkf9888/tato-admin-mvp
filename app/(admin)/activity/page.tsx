@@ -169,6 +169,10 @@ export default async function ActivityPage({
   return (
     <div className="space-y-4 lg:space-y-3.5">
       <h1 className="sr-only">{t.title}</h1>
+      {/* Opened from settings now, not the sidebar: the way back. */}
+      <Link href="/account-settings" className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]">
+        &lt; {messages.shell.nav.accountSettings}
+      </Link>
       {/* The count is the one line of the old header that said anything
           the filters below do not. */}
       <p className="text-[12px] text-[color:var(--ink-soft)]">{t.summary(totalCount)}</p>

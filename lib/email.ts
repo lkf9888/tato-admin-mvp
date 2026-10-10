@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Locale } from "@/lib/i18n";
+import { convertUiToTraditional } from "@/lib/zh-hant-convert";
 
 type ResendConfig = {
   apiKey: string;
@@ -261,6 +262,74 @@ function buildPasswordResetCopy(code: string, locale: Locale) {
       </div>
     `,
   };
+}
+
+/**
+ * The code that confirms a new login email. Sent to the new address, so
+ * changing the email proves the account can receive mail there before
+ * it becomes the way in.
+ */
+function buildEmailChangeCopy(code: string, locale: Locale) {
+  if (locale !== "en") {
+    const zh = {
+      subject: `TATO 更改登录邮箱验证码：${code}`,
+      heading: "更改登录邮箱",
+      intro: "你正在把 TATO 后台的登录邮箱改成这个地址。请在账户设置里输入下方 6 位验证码完成更改。",
+      valid: "验证码 10 分钟内有效。",
+      ignore: "如果不是你本人操作，请忽略这封邮件，登录邮箱不会改变。",
+    };
+    const t = locale === "zh-Hant"
+      ? (Object.fromEntries(Object.entries(zh).map(([key, value]) => [key, convertUiToTraditional(value)])) as typeof zh)
+      : zh;
+    return {
+      subject: t.subject,
+      text: [t.intro, ``, `${code}`, ``, t.valid, t.ignore, ``, `— TATO`].join("\n"),
+      html: codeEmailHtml(t.heading, t.intro, code, t.valid, t.ignore),
+    };
+  }
+  return {
+    subject: `Your TATO email change code: ${code}`,
+    text: [
+      `You're changing the login email of your TATO account to this address.`,
+      ``,
+      `Code: ${code}`,
+      ``,
+      `This code is valid for 10 minutes.`,
+      `If you didn't request this, ignore this email; the login email stays as it is.`,
+      ``,
+      `— TATO`,
+    ].join("\n"),
+    html: codeEmailHtml(
+      "Change your login email",
+      "You're changing the login email of your TATO account to this address. Enter the 6-digit code below in Account settings to finish.",
+      code,
+      "This code is valid for 10 minutes.",
+      "If you didn't request this, ignore this email; the login email stays as it is.",
+    ),
+  };
+}
+
+function codeEmailHtml(heading: string, intro: string, code: string, valid: string, ignore: string) {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #111318;">
+      <p style="font-size: 11px; letter-spacing: 0.34em; text-transform: uppercase; color: #6b6f78; margin: 0 0 8px;">TATO</p>
+      <h1 style="font-size: 24px; font-weight: 600; margin: 0 0 16px;">${heading}</h1>
+      <p style="font-size: 14px; line-height: 22px; color: #3a3d44; margin: 0 0 24px;">${intro}</p>
+      <div style="background: #f4f4f6; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+        <p style="font-family: 'SF Mono', Menlo, monospace; font-size: 32px; letter-spacing: 12px; font-weight: 600; margin: 0; color: #111318;">${code}</p>
+      </div>
+      <p style="font-size: 13px; line-height: 20px; color: #6b6f78; margin: 0 0 8px;">${valid}</p>
+      <p style="font-size: 13px; line-height: 20px; color: #6b6f78; margin: 0;">${ignore}</p>
+    </div>
+  `;
+}
+
+export async function sendEmailChangeCode(input: {
+  to: string;
+  code: string;
+  locale: Locale;
+}): Promise<{ ok: boolean; reason?: string }> {
+  return sendMail({ to: input.to, ...buildEmailChangeCopy(input.code, input.locale) });
 }
 
 export async function sendPasswordResetEmail(input: {

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { TrashList } from "@/components/trash-list";
 import { requireCurrentWorkspace } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
@@ -31,20 +33,26 @@ export default async function TrashPage() {
   });
 
   return (
-    <TrashList
-      locale={locale}
-      labels={messages.calendar.trashPage}
-      orders={orders.map((order) => ({
-        id: order.id,
-        renterName: order.renterName,
-        vehiclePlateNumber: order.vehicle.plateNumber,
-        vehicleName: order.vehicle.nickname,
-        pickupDatetime: order.pickupDatetime.toISOString(),
-        returnDatetime: order.returnDatetime.toISOString(),
-        deletedAt: order.updatedAt.toISOString(),
-        source: order.source,
-        totalPrice: getOrderNetEarning(order.sourceMetadata, order.totalPrice),
-      }))}
-    />
+    <div className="space-y-3">
+      {/* Opened from settings now, not the sidebar: the way back. */}
+      <Link href="/account-settings" className="text-sm text-[var(--ink-soft)] hover:text-[var(--ink)]">
+        &lt; {messages.shell.nav.accountSettings}
+      </Link>
+      <TrashList
+        locale={locale}
+        labels={messages.calendar.trashPage}
+        orders={orders.map((order) => ({
+          id: order.id,
+          renterName: order.renterName,
+          vehiclePlateNumber: order.vehicle.plateNumber,
+          vehicleName: order.vehicle.nickname,
+          pickupDatetime: order.pickupDatetime.toISOString(),
+          returnDatetime: order.returnDatetime.toISOString(),
+          deletedAt: order.updatedAt.toISOString(),
+          source: order.source,
+          totalPrice: getOrderNetEarning(order.sourceMetadata, order.totalPrice),
+        }))}
+      />
+    </div>
   );
 }

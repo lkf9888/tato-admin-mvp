@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.67.0 - 2026-10-11
+
+### On a phone, a guest conversation fills the screen and the list fits more
+
+Part of the phone redesign agreed from the demo canvas; the calendar, orders, schedule and the bars around every page are the operations session's half.
+
+- The list runs edge to edge with shorter rows (38px avatars, 14/13/11px type), so about nine conversations show instead of six. The "AI 消息模板" tab is hidden on a phone; a book button beside the search box leads there instead.
+- A new "今天交接" filter lists the conversations whose trip is picked up or returned today.
+- An open conversation covers the whole phone screen, bottom tabs included, as a chat app does; the page under it stops scrolling. Header and reply box stay put and only the messages scroll, on a desktop too, so the reply box is always at the bottom of the pane.
+- The header is one row. "Turo 回复" is a smaller outlined button, and a "⋯" menu holds the word-for-word / summary switch and "标记已处理", which used to take a row each.
+- The reply box is about 140px instead of 200: two-line box, quick templates as small chips, the four tools as icon and label on one line, a smaller "复制去 Turo".
+- Small controls opt out of the global 44px touch floor with `tap-compact` and keep a 40px hit area with `hit-area`.
+- `/messages?order=<order id>` opens that trip's conversation, for the calendar's order card.
+
 ## v1.66.0 - 2026-10-11
 
 ### Library entries can be limited to a pickup place

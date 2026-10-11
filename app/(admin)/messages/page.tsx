@@ -153,10 +153,14 @@ export default async function GuestMessagesPage() {
   return (
     <div className="space-y-2">
       <h1 className="sr-only">{messages.shell.nav.guestMessages}</h1>
-      <GuestMessagesTabs
-        active="messages"
-        labels={{ messages: messages.guestMessagesPage.tabMessages, library: messages.guestMessagesPage.tabLibrary }}
-      />
+      {/* On a phone the list's own book button leads to the library, so
+          the list starts at the top of the screen. */}
+      <div className="hidden lg:block">
+        <GuestMessagesTabs
+          active="messages"
+          labels={{ messages: messages.guestMessagesPage.tabMessages, library: messages.guestMessagesPage.tabLibrary }}
+        />
+      </div>
 
       <GuestMessagesView
         locale={locale}

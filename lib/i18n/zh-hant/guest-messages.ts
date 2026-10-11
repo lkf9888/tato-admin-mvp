@@ -9,6 +9,8 @@ export const guestMessagesMessages = {
       filterAll: "全部",
       filterOpen: "待回覆",
       filterScheduled: "定時",
+      filterToday: "今天交接",
+      threadMenu: "更多",
       scheduledIntro: "按規則現在該發的訊息，已經按每筆訂單填好。",
       scheduledRules: "規則",
       scheduledEmpty: "現在沒有要發的。清單裡放什麼由「規則」決定。",

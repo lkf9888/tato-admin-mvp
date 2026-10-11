@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { assistantMemoryPrompt } from "@/lib/assistant-memory";
 import { requireCurrentAdminContext } from "@/lib/auth";
-import { findSimilarPastReplies, getVehicleReplyKnowledge } from "@/lib/guest-reply-context";
+import { loadReplyContext, replyContextText, REPLY_RULES } from "@/lib/guest-reply-prompt";
 import { isKimiConfigured, kimiChat } from "@/lib/kimi";
-import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -36,18 +34,8 @@ const draftSchema = z.object({
 
 const SYSTEM_PROMPT = [
   "You draft replies for a Turo host answering a guest by message.",
-  "Write ONE short reply in plain, warm, everyday English — like a quick text between two people, not a formal letter.",
-  "Keep it to 1–3 short sentences. Answer only what the guest actually asked. No greeting, no sign-off, no restating their question.",
-  "Never invent details you were not given: pickup addresses, lockbox codes, prices, or times. If the guest asks for something not in the context, say you will confirm shortly.",
-  "The trip facts you are given are the only facts you have. Do not add to them.",
-  "You may be shown how this host answered similar questions before. Match their tone and what they usually say, but never copy a code, address, time or price from those answers -- only the trip facts and car notes are current.",
-  "Car notes are written by the host for guests; you may use them.",
-  "Output only the reply text — no preamble, no quotes, no explanation.",
-  // These models reason before answering and the reasoning dominates
-  // the wait: measured at 14.4s for a 70-character reply. The reply is
-  // one or two sentences read off facts that are already in the
-  // prompt, so there is nothing here worth deliberating about.
-  "Answer directly from the facts given. Do not deliberate, plan, or weigh options.",
+  "Write ONE short reply: 1-3 short sentences, answering only what the guest actually asked.",
+  REPLY_RULES,
 ].join("\n");
 
 /**
@@ -55,9 +43,8 @@ const SYSTEM_PROMPT = [
  *
  * Drafting only. Turo has no send API and TATO holds no guest contact
  * details, so there is nothing here that could send even if it wanted
- * to — the operator copies the text into Turo themselves. That is the
- * same boundary the assistant works under, and it is deliberate:
- * the model writes, a person sends.
+ * to -- the operator copies the text into Turo themselves. The model
+ * writes, a person sends.
  */
 export async function POST(request: Request) {
   let context;
@@ -87,140 +74,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 
-  const emails = await prisma.inboundEmail.findMany({
-    where: {
-      workspaceId: context.workspace.id,
-      id: { in: parsed.data.emailIds },
-    },
-    orderBy: { receivedAt: "desc" },
-    // Five, not eight. A guest's question is answered by the last
-    // exchange, not by the whole history, and every extra message is
-    // prompt the model reads before it starts.
-    take: 5,
-    select: { id: true, subject: true, bodyText: true, receivedAt: true, parsed: true, order: true },
+  const reply = await loadReplyContext({
+    workspaceId: context.workspace.id,
+    emailIds: parsed.data.emailIds,
+    guestName: parsed.data.guestName,
+    vehicleId: parsed.data.vehicleId ?? null,
+    emailId: parsed.data.emailId ?? null,
   });
-
-  if (emails.length === 0) {
+  if (!reply) {
     return NextResponse.json({ error: "THREAD_NOT_FOUND" }, { status: 404 });
   }
 
-  const order = emails.find((email) => email.order)?.order ?? null;
-  const vehicle = parsed.data.vehicleId
-    ? await prisma.vehicle.findFirst({
-        where: { id: parsed.data.vehicleId, workspaceId: context.workspace.id },
-        select: { brand: true, model: true, year: true },
-      })
-    : null;
-
-  // Oldest first so the model reads the conversation in the order it
-  // happened. Bodies are trimmed hard: Turo wraps each message in a
-  // long notification template, and the guest's actual words are near
-  // the top.
-  const target = parsed.data.emailId
-    ? emails.find((email) => email.id === parsed.data.emailId)
-    : null;
-
-  // The recorded conversation, when there is one, is the better
-  // transcript: it has both sides, including what we already said, so
-  // the draft does not repeat an answer given an hour ago.
-  const recorded = order?.externalOrderId
-    ? await prisma.turoConversationMessage.findMany({
-        where: { workspaceId: context.workspace.id, reservationId: order.externalOrderId },
-        orderBy: { sentAt: "desc" },
-        take: 8,
-        select: { direction: true, body: true, sentAt: true },
-      })
-    : [];
-
-  const emailTranscript = [...emails]
-    .reverse()
-    .map((email) => {
-      const summary = (() => {
-        if (!email.parsed) return null;
-        try {
-          return (JSON.parse(email.parsed) as { summary?: string }).summary ?? null;
-        } catch {
-          return null;
-        }
-      })();
-      return [
-        `[${email.receivedAt.toISOString().slice(0, 16).replace("T", " ")}]`,
-        summary ? `Summary: ${summary}` : "",
-        email.bodyText.slice(0, 400),
-      ]
-        .filter(Boolean)
-        .join("\n");
-    })
-    .join("\n---\n");
-
-  const transcript =
-    recorded.length > 0
-      ? [...recorded]
-          .reverse()
-          .map(
-            (message) =>
-              `[${message.sentAt.toISOString().slice(0, 16).replace("T", " ")}] ${message.direction === "outbound" ? "Host" : "Guest"}: ${message.body.slice(0, 400)}`,
-          )
-          .join("\n")
-      : emailTranscript;
-
-  const question = (target ?? emails[0]).bodyText;
-  const vehicleId = parsed.data.vehicleId ?? order?.vehicleId ?? null;
-  const [memory, carNotes, pastReplies] = await Promise.all([
-    assistantMemoryPrompt(context.workspace.id),
-    getVehicleReplyKnowledge(context.workspace.id, vehicleId),
-    findSimilarPastReplies({
-      workspaceId: context.workspace.id,
-      question: question.slice(0, 600),
-      vehicleId,
-      excludeReservationId: order?.externalOrderId ?? null,
-    }),
-  ]);
-
-  const facts = [
-    `Guest: ${parsed.data.guestName}`,
-    vehicle ? `Vehicle: ${vehicle.year} ${vehicle.brand} ${vehicle.model}` : "",
-    order
-      ? `Trip: ${order.pickupDatetime.toISOString().slice(0, 16).replace("T", " ")} → ${order.returnDatetime.toISOString().slice(0, 16).replace("T", " ")}`
-      : "No matching trip on file — do not state any dates.",
-    order?.pickupLocation ? `Pickup: ${order.pickupLocation}` : "",
-    parsed.data.instruction ? `The host wants you to convey: ${parsed.data.instruction}` : "",
-    carNotes ? `Car notes from the host:\n${carNotes}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const examples = pastReplies.length
-    ? `\n\nHow this host answered similar questions before (tone only; facts may be out of date):\n${pastReplies
-        .map((pair) => `Guest: ${pair.asked}\nHost: ${pair.answered}`)
-        .join("\n---\n")}`
-    : "";
-
-  const focus = target
-    ? `\n\nReply to this message specifically:\n${target.bodyText.slice(0, 600)}`
-    : "";
-
+  const steer = parsed.data.instruction ? `\n\nThe host wants you to convey: ${parsed.data.instruction}` : "";
   const result = await kimiChat({
     messages: [
-      { role: "system", content: memory ? `${SYSTEM_PROMPT}\n\n${memory}` : SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Trip facts:\n${facts}${examples}\n\nConversation:\n${transcript}${focus}`,
-      },
+      { role: "system", content: reply.memory ? `${SYSTEM_PROMPT}\n\n${reply.memory}` : SYSTEM_PROMPT },
+      { role: "user", content: `${replyContextText(reply)}${steer}` },
     ],
-    // 1200 was tried and was wrong. The budget bounds reasoning *and*
-    // output, and this model reasons past 1200 before writing a word --
-    // so the cap did not shorten the wait, it truncated the answer and
-    // returned nothing after the same 12 seconds. Latency here is the
-    // reasoning pass; the only levers that touch it are a shorter
-    // prompt (done: 5 messages at 400 chars, from 8 at 800) and a
-    // model that reasons less.
     maxTokens: 3000,
+    // A reply read off facts already in the prompt: nothing to deliberate.
+    thinking: false,
   });
 
   if (!result.ok) {
     return NextResponse.json({ error: "DRAFT_FAILED", reason: result.reason }, { status: 502 });
   }
 
-  return NextResponse.json({ draft: result.content });
+  return NextResponse.json({ draft: result.content, libraryUsed: reply.libraryUsed });
 }

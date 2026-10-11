@@ -125,3 +125,44 @@ export async function saveVehicleReplyKnowledge(input: { workspaceId: string; ve
   });
   return { ok: true as const };
 }
+
+/**
+ * Recent exchanges for the message library's suggestions: each guest
+ * message with the host's reply when there was one, newest first. The
+ * mail's guest messages fill in where nothing has been recorded -- they
+ * carry the question, never the answer.
+ */
+export async function recentGuestExchanges(workspaceId: string, limit = 120) {
+  const rows = await prisma.turoConversationMessage.findMany({
+    where: { workspaceId },
+    orderBy: { sentAt: "desc" },
+    take: PAIR_SCAN_LIMIT,
+    select: { reservationId: true, direction: true, body: true, sentAt: true },
+  });
+  const chronological = [...rows].sort(
+    (a, b) => a.reservationId.localeCompare(b.reservationId) || a.sentAt.getTime() - b.sentAt.getTime(),
+  );
+  const out: Array<{ guest: string; host: string | null; at: Date }> = [];
+  for (let i = 0; i < chronological.length; i += 1) {
+    const guest = chronological[i];
+    if (guest.direction !== "inbound") continue;
+    const next = chronological[i + 1];
+    const host =
+      next && next.direction === "outbound" && next.reservationId === guest.reservationId ? next.body : null;
+    out.push({ guest: guest.body.slice(0, PAIR_TEXT_CHARS), host: host?.slice(0, PAIR_TEXT_CHARS) ?? null, at: guest.sentAt });
+  }
+
+  if (out.length < 40) {
+    const mail = await prisma.inboundEmail.findMany({
+      where: { workspaceId, kind: "GUEST_MESSAGE", guestText: { not: null } },
+      orderBy: { receivedAt: "desc" },
+      take: 80,
+      select: { guestText: true, receivedAt: true },
+    });
+    for (const email of mail) {
+      if (email.guestText) out.push({ guest: email.guestText.slice(0, PAIR_TEXT_CHARS), host: null, at: email.receivedAt });
+    }
+  }
+
+  return out.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, limit);
+}

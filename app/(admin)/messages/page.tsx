@@ -1,8 +1,10 @@
+import { GuestMessagesTabs } from "@/components/guest-messages-tabs";
 import { GuestMessagesView } from "@/components/guest-messages-view";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { loadGuestThreads } from "@/lib/guest-thread-state";
 import { getI18n } from "@/lib/i18n-server";
 import { isKimiConfigured } from "@/lib/kimi";
+import { loadKnowledge } from "@/lib/message-knowledge-server";
 import { prisma } from "@/lib/prisma";
 import { classifyTuroSubject } from "@/lib/turo-subjects";
 import { matchVehiclesForEmail } from "@/lib/turo-message-match";
@@ -67,10 +69,13 @@ export default async function GuestMessagesPage() {
   const vehicleLabel = (vehicle: (typeof fleet)[number]) =>
     `${vehicle.plateNumber} · ${vehicle.nickname || `${vehicle.brand} ${vehicle.model} ${vehicle.year}`}`;
 
+  // Rules are guidance for the AI, never words for a guest, so the
+  // scheduled-message rules cannot pick one.
   const messageTemplates = await prisma.messageTemplate.findMany({
-    where: { workspaceId: workspace.id },
+    where: { workspaceId: workspace.id, kind: { not: "rule" } },
     orderBy: { createdAt: "desc" },
   });
+  const library = await loadKnowledge(workspace.id);
   const fleetById = new Map(fleet.map((vehicle) => [vehicle.id, vehicle]));
 
   function explainUnmatched(subject: string): UnmatchedReason | null {
@@ -146,8 +151,12 @@ export default async function GuestMessagesPage() {
     : [];
 
   return (
-    <div>
+    <div className="space-y-2">
       <h1 className="sr-only">{messages.shell.nav.guestMessages}</h1>
+      <GuestMessagesTabs
+        active="messages"
+        labels={{ messages: messages.guestMessagesPage.tabMessages, library: messages.guestMessagesPage.tabLibrary }}
+      />
 
       <GuestMessagesView
         locale={locale}
@@ -162,6 +171,8 @@ export default async function GuestMessagesPage() {
             vehicleLabel: vehicle ? vehicleLabel(vehicle) : null,
           };
         })}
+        library={library}
+        vehicleLabels={Object.fromEntries(fleet.map((vehicle) => [vehicle.id, vehicleLabel(vehicle)]))}
         templateVehicleOptions={fleet.map((vehicle) => ({
           id: vehicle.id,
           label: vehicleLabel(vehicle),

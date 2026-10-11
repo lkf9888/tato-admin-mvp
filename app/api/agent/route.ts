@@ -109,8 +109,15 @@ export async function GET(request: Request) {
       {
         path: "/api/agent/message-templates",
         method: "GET",
-        summary: "Saved canned replies, general or locked to one vehicle.",
-        query: { vehicleId: "templates for one car plus the general ones" },
+        summary:
+          "The AI message library: saved replies (kind=reply), facts (fact) and internal rules (rule), each with the cars and trip stages it applies to. Read `usage` before using an entry.",
+        query: {
+          vehicleId: "entries usable for one car: its own plus the fleet's",
+          reservationId:
+            "one conversation: the entries TATO's own AI would be given, in its order, placeholders filled from the trip (pickup code withheld), with `promptBlock`",
+          stage: "before_pickup | during | after_return -- with vehicleId, the same without a trip",
+          q: "the guest's message, to order entries by relevance",
+        },
       },
     ],
     ...(writeEndpoints.length > 0 ? { writeEndpoints } : {}),

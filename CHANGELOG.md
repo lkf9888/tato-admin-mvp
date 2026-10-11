@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.65.0 - 2026-10-11
+
+### Replies are written as HostHub writes them, and the AI reads one message library
+
+**The reply box.** One composer per conversation, as in HostHub: 模板 / 起草 / 改写 / 翻译 under the text, and 复制并去 Turo 发送, which copies the text and opens that trip's Turo conversation (TATO cannot send a Turo message). Draft writes a reply to the guest's latest message, and anything already typed steers it. Rewrite turns the host's shorthand (Chinese is fine) into a message. Translate puts what is typed into the guest's language. Up to four templates that fit the conversation (its car, its trip stage, not yet sent) sit above the box. Replies now follow the guest's language instead of always being English. The AI never sees the pickup code: the operator's browser fills `{{pickup_code}}` into whatever it writes, and placeholders still unfilled are named under the box.
+
+**The AI message library (AI消息模板 tab, /messages/ai-templates).** A single library holds saved replies, facts and internal rules. Drafting, rewriting, the assistant and outside agents all read it. It extends `MessageTemplate`, so existing templates carry over, with new nullable or defaulted columns: `kind` (reply | fact | rule), `triggers` (how guests ask), `vehicleIds`, `stages` (before_pickup | during | after_return), `validUntil` and `aiEnabled`. The rules for what the AI may read are in `lib/message-knowledge.ts`, shared by the page and the server:
+- Entries limited to some cars never reach another car's conversation, nor one whose car is unknown.
+- Stage-limited entries need a trip at that stage.
+- Expired or disabled entries are withheld.
+- Rules are labelled as never to be repeated to a guest.
+- Placeholders are filled from the trip, and what cannot be filled is marked as unknown.
+
+Guests write English and entries are mostly Chinese, so retrieval does not depend on keyword overlap. Everything that applies is sent with its scope spelled out, and ranking only trims a library past the budget. The page shows exactly that text for any car and stage ("AI 会读到什么"). "从历史回复整理" proposes entries from past exchanges, taking answers only from the host's own replies. `GET /api/agent/message-templates` returns the structured fields and, given `reservationId` (or `vehicleId` and `stage`), the entries TATO's own AI would be given, filled from the trip, plus `promptBlock` and usage rules.
+
+**Fixes.**
+- Templates rendered on the server (the scheduled queue) printed times in UTC. They now use Vancouver time.
+- Rewriting the draft route onto the shared context (`lib/guest-reply-prompt.ts`) also gave it the library.
+
 ## v1.64.1 - 2026-10-11
 
 ### The summary backlog shrinks instead of redoing the newest twelve

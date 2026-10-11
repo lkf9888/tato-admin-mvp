@@ -1686,12 +1686,30 @@ model TuroConversationMessage {
 /// conversation, and a value narrows it to the one car it actually
 /// describes, for content that would be wrong on any other -- a gate
 /// code, a parking spot, a specific model's quirks.
+/// A saved reply and an entry in the AI's knowledge of this business:
+/// the operator inserts it into a reply, and the AI (drafting, the
+/// assistant, an outside agent) reads it when answering a guest.
 model MessageTemplate {
   workspaceId String?
   id          String     @id @default(cuid())
+  /// Legacy single-car scope, still read when `vehicleIds` is null.
   vehicleId   String?
   label       String
   content     String
+  /// "reply": a whole message that can be sent as is. "fact": an answer
+  /// the AI phrases itself. "rule": guidance for the AI, never told to
+  /// the guest.
+  kind        String     @default("reply")
+  /// How guests ask for this, one phrasing per line.
+  triggers    String?
+  /// JSON array of vehicle ids. Null is the whole fleet.
+  vehicleIds  String?
+  /// JSON array of trip stages (before_pickup, during, after_return).
+  /// Null is any time.
+  stages      String?
+  /// After this the entry is kept but no longer given to the AI.
+  validUntil  DateTime?
+  aiEnabled   Boolean    @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

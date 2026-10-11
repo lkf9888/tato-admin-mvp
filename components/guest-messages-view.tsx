@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, ChevronDown, ChevronLeft, ExternalLink, LayoutTemplate, Search } from "lucide-react";
+import { Bell, ChevronDown, ChevronLeft, ExternalLink, Languages, LayoutTemplate, PenLine, Search, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -9,12 +9,15 @@ import { GuestMessageAlertPanel } from "@/components/guest-message-alert-panel";
 import { MessageRulesPanel } from "@/components/message-rules-panel";
 import {
   MessageTemplatePanel,
+  suggestTemplates,
   type MessageTemplateContext,
   type MessageTemplateRow,
   type MessageTemplateVehicleOption,
 } from "@/components/message-template-panel";
 import { InlineSpinner, TypingDots } from "@/components/turo-task-progress";
 import { getMessages, type Locale } from "@/lib/i18n";
+import { tripStageAt, type KnowledgeEntry } from "@/lib/message-knowledge";
+import { renderTemplate } from "@/lib/message-placeholders";
 import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
 type ThreadMessage = {
@@ -253,6 +256,8 @@ export function GuestMessagesView({
   conversations,
   messageTemplates,
   templateVehicleOptions,
+  library,
+  vehicleLabels,
 }: {
   locale: Locale;
   canDraft: boolean;
@@ -262,8 +267,12 @@ export function GuestMessagesView({
    *  agent), keyed by reservation. A thread without one falls back to
    *  the email-derived view: what the guest said, none of our replies. */
   conversations: Record<string, ConversationMessage[]>;
+  /** For the scheduled-message rules, which pick a template by name. */
   messageTemplates: MessageTemplateRow[];
   templateVehicleOptions: MessageTemplateVehicleOption[];
+  /** The AI message library, for the composer's template picker. */
+  library: KnowledgeEntry[];
+  vehicleLabels: Record<string, string>;
 }) {
   const messages = getMessages(locale);
   const t = messages.guestMessagesPage;
@@ -356,13 +365,13 @@ export function GuestMessagesView({
   }, [threads, normalizedSearch, filter]);
   const [acknowledging, setAcknowledging] = useState(false);
 
-  // Per-message drafts, keyed by message id: switching threads must not
-  // hand one guest the reply written for another.
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [draftingId, setDraftingId] = useState<string | null>(null);
-  const [draftStartedAt, setDraftStartedAt] = useState(0);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [draftError, setDraftError] = useState<string | null>(null);
+  // The reply being written, per conversation: switching threads must
+  // not hand one guest the words meant for another.
+  const [composerTexts, setComposerTexts] = useState<Record<string, string>>({});
+  const [aiBusy, setAiBusy] = useState<null | "draft" | "rewrite" | "translate">(null);
+  const [aiStartedAt, setAiStartedAt] = useState(0);
+  const [composeError, setComposeError] = useState<string | null>(null);
+  const [composeNote, setComposeNote] = useState<string | null>(null);
 
   const [zh, setZh] = useState<Record<string, string>>({});
   const [translating, setTranslating] = useState(false);
@@ -443,9 +452,9 @@ export function GuestMessagesView({
     }
     setSelectedKey(key);
     setTripOpen(false);
-    setDraftError(null);
+    setComposeError(null);
+    setComposeNote(null);
     setTranslateError(null);
-    setCopiedId(null);
   }
 
   function backToList() {
@@ -503,45 +512,101 @@ export function GuestMessagesView({
     }
   }
 
-  async function draftFor(message: ThreadMessage) {
-    if (!selected || draftingId) return;
-    setDraftingId(message.id);
-    setDraftStartedAt(Date.now());
-    setDraftError(null);
+  /** The composer's text for the open conversation. */
+  function setComposer(text: string) {
+    if (!selected) return;
+    const key = selected.key;
+    setComposerTexts((current) => ({ ...current, [key]: text }));
+  }
+
+  /**
+   * Whatever the AI wrote, with this trip's placeholders filled in. The
+   * pickup code reaches the text here, in the operator's browser: the
+   * AI never sees it, and keeps {{pickup_code}} where it belongs.
+   */
+  function fillIn(text: string) {
+    return templateContext ? renderTemplate(text, templateContext.values).text : text;
+  }
+
+  /** Draft, rewrite or translate, through the one AI path. */
+  async function runAi(mode: "draft" | "rewrite" | "translate") {
+    if (!selected || aiBusy) return;
+    const text = (composerTexts[selected.key] ?? "").trim();
+    if (mode !== "draft" && !text) return;
+    setAiBusy(mode);
+    setAiStartedAt(Date.now());
+    setComposeError(null);
+    setComposeNote(null);
     try {
-      const response = await fetch("/api/messages/draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          emailIds: selected.messages.map((m) => m.id),
-          guestName: selected.guestName,
-          vehicleId: selected.vehicleId,
-          emailId: message.id,
-        }),
-      });
+      const response =
+        mode === "draft"
+          ? await fetch("/api/messages/draft", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                emailIds: selected.messages.map((m) => m.id),
+                guestName: selected.guestName,
+                vehicleId: selected.vehicleId,
+                emailId: selected.messages[0]?.id ?? null,
+                // What the operator already typed steers the draft.
+                instruction: text ? text.slice(0, 500) : null,
+              }),
+            })
+          : await fetch("/api/messages/compose", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                mode,
+                text,
+                emailIds: selected.messages.map((m) => m.id),
+                guestName: selected.guestName,
+                vehicleId: selected.vehicleId,
+              }),
+            });
       const data = (await response.json().catch(() => ({}))) as {
         draft?: string;
+        text?: string;
+        libraryUsed?: unknown[];
         error?: string;
         reason?: string;
       };
-      if (!response.ok || !data.draft) {
-        setDraftError(
-          `${t.draftFailed}${data.reason ? ` (${data.reason})` : data.error ? ` (${data.error})` : ""}`,
-        );
+      const result = data.draft ?? data.text;
+      if (!response.ok || !result) {
+        setComposeError(`${t.composeFailed}${data.reason ? ` (${data.reason})` : data.error ? ` (${data.error})` : ""}`);
         return;
       }
-      setDrafts((current) => ({ ...current, [message.id]: data.draft as string }));
-      requestAnimationFrame(() => threadEnd.current?.scrollIntoView({ block: "end", behavior: "smooth" }));
+      setComposer(fillIn(result));
+      const used = data.libraryUsed?.length ?? 0;
+      if (used > 0) setComposeNote(t.libraryUsedNote(used));
     } catch {
-      setDraftError(t.draftFailed);
+      setComposeError(t.composeFailed);
     } finally {
-      setDraftingId(null);
+      setAiBusy(null);
     }
   }
 
-  async function copy(id: string, text: string) {
-    await navigator.clipboard.writeText(text).catch(() => null);
-    setCopiedId(id);
+  function insertTemplate(text: string) {
+    const current = selected ? (composerTexts[selected.key] ?? "").trim() : "";
+    setComposer(current ? `${current}\n\n${text}` : text);
+  }
+
+  /**
+   * TATO cannot send a Turo message, so "send" is: copy, and open the
+   * conversation on Turo to paste it. Both run inside the click, before
+   * any await, because both need the gesture -- a window opened after a
+   * promise is a popup the browser blocks.
+   */
+  function copyAndOpen() {
+    if (!selected) return;
+    const text = (composerTexts[selected.key] ?? "").trim();
+    if (!text) return;
+    void navigator.clipboard.writeText(text).catch(() => null);
+    if (turoUrl) {
+      window.open(turoUrl, "_blank", "noopener");
+      setComposeNote(t.copiedOpening);
+    } else {
+      setComposeNote(t.copiedNoLink);
+    }
   }
 
   async function markHandled() {
@@ -567,6 +632,8 @@ export function GuestMessagesView({
     ? {
         title: [selected.guestName, selected.vehiclePlate ?? selected.vehicleLabel].filter(Boolean).join(" · "),
         vehicleId: selected.vehicleId,
+        stage: tripStageAt(order ? { pickup: order.pickupDatetime, return: order.returnDatetime } : null),
+        question: selected.messages[0]?.guestText ?? selected.messages[0]?.summary ?? "",
         values: {
           guest: order?.renterName ?? selected.guestName,
           car: order?.vehicleName ?? selected.vehicleLabel,
@@ -587,13 +654,16 @@ export function GuestMessagesView({
   const templatesPanel = (
     <>
       {templatesOpen ? (
-        <MessageTemplatePanel
-          locale={locale}
-          templates={messageTemplates}
-          vehicleOptions={templateVehicleOptions}
-          onClose={() => setTemplatesOpen(false)}
-          context={templateContext}
-        />
+        templateContext ? (
+          <MessageTemplatePanel
+            locale={locale}
+            entries={library}
+            vehicleLabels={vehicleLabels}
+            context={templateContext}
+            onInsert={insertTemplate}
+            onClose={() => setTemplatesOpen(false)}
+          />
+        ) : null
       ) : null}
       {alertsOpen ? <GuestMessageAlertPanel locale={locale} onClose={() => setAlertsOpen(false)} /> : null}
       {rulesOpen ? (
@@ -621,17 +691,14 @@ export function GuestMessagesView({
 
   // The reply is written to the newest message: that is the one waiting.
   const latestEmail = selected?.messages[0] ?? null;
-  const draft = latestEmail ? drafts[latestEmail.id] : undefined;
+  const composerText = selected ? (composerTexts[selected.key] ?? "") : "";
   const stage = tripStage(order, t);
-  const hasComposer = Boolean(
-    selected &&
-      (draft !== undefined ||
-        draftError ||
-        (latestEmail && canDraft) ||
-        selected.openCount > 0 ||
-        !turoUrl ||
-        messageTemplates.length > 0),
-  );
+  // Every conversation can be answered, so the composer is always there.
+  const hasComposer = Boolean(selected);
+  // A few templates that fit this conversation, one tap away; the rest
+  // behind the Templates button.
+  const quickTemplates = templateContext ? suggestTemplates(library, templateContext).filter((item) => !item.sent).slice(0, 4) : [];
+  const unfilled = composerText && templateContext ? renderTemplate(composerText, templateContext.values).missing : [];
 
   // One stream, oldest first. The recorded conversation when there is
   // one -- it has both sides -- and the guest's emailed messages when
@@ -703,7 +770,7 @@ export function GuestMessagesView({
 
   return (
     <>
-      <div className="lg:grid lg:h-[calc(100dvh-2rem)] lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-3">
+      <div className="lg:grid lg:h-[calc(100dvh-4.75rem)] lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-3">
         {/* ── The list ─────────────────────────────────────────── */}
         <section
           aria-label={messages.shell.nav.guestMessages}
@@ -728,17 +795,6 @@ export function GuestMessagesView({
                   className="h-10 w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] pl-9 pr-3 text-[14px] outline-none focus:border-[var(--line-strong)] lg:h-9 lg:text-[13px]"
                 />
               </label>
-              {/* Canned replies live behind their own sheet: reached for
-                  now and then, not read continuously. */}
-              <button
-                type="button"
-                onClick={() => setTemplatesOpen(true)}
-                title={t.templatesButton}
-                aria-label={t.templatesButton}
-                className="tap-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] lg:h-9 lg:w-9"
-              >
-                <LayoutTemplate className="h-4 w-4" aria-hidden />
-              </button>
               <button
                 type="button"
                 onClick={() => setAlertsOpen(true)}
@@ -1052,90 +1108,91 @@ export function GuestMessagesView({
                 here, rather than drawn as an empty bar. */}
             {hasComposer ? (
             <div className="mt-auto grid gap-2 border-t border-[var(--line)] bg-[var(--surface)] px-3 py-3">
-              {draft !== undefined && latestEmail ? (
-                <div className="flex justify-end">
-                  <div className="w-[88%] rounded-2xl rounded-br-md bg-[var(--brand)] px-3.5 py-2">
-                    <p className="text-[10.5px] font-semibold text-white/75">{t.draftTitle}</p>
-                    <textarea
-                      value={draft}
-                      onChange={(event) =>
-                        setDrafts((current) => ({ ...current, [latestEmail.id]: event.target.value }))
-                      }
-                      rows={4}
-                      aria-label={t.draftTitle}
-                      className="mt-1 w-full resize-y bg-transparent text-[14px] leading-[1.45] text-white outline-none"
-                    />
-                  </div>
+              {quickTemplates.length > 0 ? (
+                <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
+                  {quickTemplates.map(({ entry }) => (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      title={entry.content}
+                      disabled={aiBusy !== null}
+                      onClick={() => insertTemplate(renderTemplate(entry.content, templateContext?.values ?? null).text)}
+                      className="tap-press shrink-0 rounded-full border border-[var(--line-strong)] px-3 py-1 text-[12px] text-[var(--ink-mid)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] disabled:opacity-40"
+                    >
+                      {entry.label}
+                    </button>
+                  ))}
                 </div>
               ) : null}
-              {/* Where the draft will appear, while the model writes it:
-                  a reply can take twenty seconds, and a button that only
-                  says "drafting" for that long reads as stuck. */}
-              {latestEmail && draftingId === latestEmail.id && draft === undefined ? (
-                <div className="flex justify-end">
-                  <div className="rounded-2xl rounded-br-md bg-[var(--brand)] px-3.5 py-2.5 text-white">
-                    <TypingDots startedAt={draftStartedAt} locale={locale === "en" ? "en" : "zh"} />
-                  </div>
-                </div>
-              ) : null}
-              {draftError ? <p className="text-[12px] text-rose-600">{draftError}</p> : null}
 
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Here as well as above the list: on a phone the list is
-                    hidden while a conversation is open, and this is
-                    where a template is wanted -- filled for this guest. */}
-                {messageTemplates.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setTemplatesOpen(true)}
-                    className="tap-press flex h-9 items-center gap-1.5 rounded-full border border-[var(--line)] px-3.5 text-[13px] font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)]"
-                  >
-                    <LayoutTemplate className="h-4 w-4" aria-hidden />
-                    {t.templatesShort}
-                  </button>
+              {/* One box, four tools and the copy button beneath it, as
+                  HostHub has it: nothing crowds the text on a phone. */}
+              <div className="flex flex-col rounded-2xl border border-[var(--line-strong)] bg-[var(--surface)] focus-within:border-[var(--brand)]">
+                {aiBusy === "draft" || aiBusy === "rewrite" ? (
+                  <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-[13px] text-[var(--ink-soft)]">
+                    {t.composing}
+                    <TypingDots startedAt={aiStartedAt} locale={locale === "en" ? "en" : "zh"} />
+                  </div>
                 ) : null}
-                {draft !== undefined && latestEmail ? (
+                <textarea
+                  value={composerText}
+                  onChange={(event) => setComposer(event.target.value)}
+                  rows={3}
+                  placeholder={t.composerPlaceholder}
+                  aria-label={t.composerPlaceholder}
+                  hidden={aiBusy === "draft" || aiBusy === "rewrite"}
+                  className="max-h-48 min-h-[4.5rem] w-full resize-y bg-transparent px-3 pt-2.5 text-[14px] leading-[1.45] text-[var(--ink)] outline-none placeholder:text-[var(--ink-soft)]"
+                />
+                <div className="flex items-center gap-1 px-1.5 pb-1.5 pt-1">
+                  <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+                    <ComposerTool label={t.toolTemplates} title={t.toolTemplates} onClick={() => setTemplatesOpen(true)} disabled={aiBusy !== null}>
+                      <LayoutTemplate className="h-4 w-4" aria-hidden />
+                    </ComposerTool>
+                    {canDraft ? (
+                      <>
+                        <ComposerTool label={t.toolDraft} title={t.toolDraftHint} onClick={() => void runAi("draft")} disabled={aiBusy !== null || !latestEmail} busy={aiBusy === "draft"}>
+                          <Sparkles className="h-4 w-4" aria-hidden />
+                        </ComposerTool>
+                        <ComposerTool label={t.toolRewrite} title={t.toolRewriteHint} onClick={() => void runAi("rewrite")} disabled={aiBusy !== null || !composerText.trim()} busy={aiBusy === "rewrite"}>
+                          <PenLine className="h-4 w-4" aria-hidden />
+                        </ComposerTool>
+                        <ComposerTool label={t.toolTranslate} title={t.toolTranslateHint} onClick={() => void runAi("translate")} disabled={aiBusy !== null || !composerText.trim()} busy={aiBusy === "translate"}>
+                          <Languages className="h-4 w-4" aria-hidden />
+                        </ComposerTool>
+                      </>
+                    ) : null}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => copy(latestEmail.id, draft)}
-                    className="tap-press h-9 rounded-full bg-[var(--ink)] px-4 text-[13px] font-bold text-white transition hover:opacity-90"
+                    onClick={copyAndOpen}
+                    disabled={!composerText.trim() || aiBusy !== null}
+                    title={turoUrl ? t.replyOnTuroHint : t.noTuroLink}
+                    className="tap-press flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[var(--brand)] px-3.5 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-40"
                   >
-                    {copiedId === latestEmail.id ? t.draftCopied : t.draftCopyButton}
+                    {turoUrl ? t.copyAndOpen : t.copyOnly}
+                    {turoUrl ? <ExternalLink className="h-3.5 w-3.5" aria-hidden /> : null}
                   </button>
-                ) : latestEmail && canDraft ? (
-                  <button
-                    type="button"
-                    onClick={() => draftFor(latestEmail)}
-                    disabled={draftingId !== null}
-                    className="tap-press inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--ink)] px-4 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
-                  >
-                    {draftingId ? <InlineSpinner /> : null}
-                    {draftingId ? t.draftingOne : t.draftOne}
-                  </button>
-                ) : null}
-                {draft !== undefined && latestEmail && canDraft ? (
-                  <button
-                    type="button"
-                    onClick={() => draftFor(latestEmail)}
-                    disabled={draftingId !== null}
-                    className="tap-press inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--line)] px-3.5 text-[13px] font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] disabled:opacity-50"
-                  >
-                    {draftingId ? <InlineSpinner /> : null}
-                    {draftingId ? t.draftingOne : t.draftAgain}
-                  </button>
-                ) : null}
-                {selected.openCount > 0 ? (
+                </div>
+              </div>
+
+              {unfilled.length > 0 ? (
+                <p className="text-[11.5px] text-[var(--warn-fg)]">{t.missingPlaceholders(unfilled.map((key) => `{{${key}}}`).join("、"))}</p>
+              ) : null}
+              {composeError ? <p className="text-[12px] text-[var(--bad-fg)]">{composeError}</p> : null}
+              {composeNote ? <p className="text-[11.5px] text-[var(--ink-soft)]">{composeNote}</p> : null}
+
+              {selected.openCount > 0 ? (
+                <div className="flex justify-end">
                   <button
                     type="button"
                     onClick={markHandled}
                     disabled={acknowledging}
-                    className="tap-press ml-auto h-9 rounded-full border border-[var(--line)] px-3.5 text-[13px] font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] disabled:opacity-50"
+                    className="tap-press h-8 rounded-full border border-[var(--line)] px-3 text-[12px] font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] disabled:opacity-50"
                   >
                     {acknowledging ? t.markingHandled : t.markHandled}
                   </button>
-                ) : null}
-              </div>
-              {!turoUrl ? <p className="text-[11.5px] text-[var(--ink-soft)]">{t.noTuroLink}</p> : null}
+                </div>
+              ) : null}
             </div>
             ) : null}
             <div ref={threadEnd} />
@@ -1327,5 +1384,36 @@ function ScheduledQueue({
         </ul>
       )}
     </div>
+  );
+}
+
+/** One of the composer's tools: an icon over a short label, as HostHub's. */
+function ComposerTool({
+  label,
+  title,
+  onClick,
+  disabled,
+  busy,
+  children,
+}: {
+  label: string;
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className="tap-press flex min-w-[3.25rem] shrink-0 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1 text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)] disabled:opacity-40"
+    >
+      {busy ? <InlineSpinner /> : children}
+      <span className="text-[10.5px] font-semibold leading-none">{label}</span>
+    </button>
   );
 }

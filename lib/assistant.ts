@@ -1,4 +1,6 @@
 import { assistantMemoryPrompt } from "@/lib/assistant-memory";
+import { libraryDigest } from "@/lib/message-knowledge";
+import { loadKnowledge, loadVehicleLabels } from "@/lib/message-knowledge-server";
 import "server-only";
 
 import { InboundEmailKind, OrderStatus } from "@prisma/client";
@@ -277,7 +279,7 @@ export async function buildAssistantSnapshot(workspaceId: string): Promise<Assis
   };
 }
 
-function buildSystemPrompt(snapshot: AssistantSnapshot, operatorName: string, memory: string) {
+function buildSystemPrompt(snapshot: AssistantSnapshot, operatorName: string, memory: string, library: string | null) {
   return `You are the operations assistant for TATO, a Turo fleet management platform. You are helping ${operatorName}, who runs the fleet.
 
 You will be given a factual snapshot of the fleet below. Follow these rules without exception:
@@ -289,7 +291,7 @@ You will be given a factual snapshot of the fleet below. Follow these rules with
 5. Money is in Canadian dollars. Times are in the fleet's local timezone, already formatted in the snapshot.
 6. Reply in the same language the operator writes in.
 
-${memory ? `\n${memory}\n` : ""}
+${memory ? `\n${memory}\n` : ""}${library ? `\n${library}\n` : ""}
 === FLEET SNAPSHOT (generated ${formatDate(snapshot.generatedAt)}) ===
 ${snapshot.text}
 === END SNAPSHOT ===`;
@@ -313,13 +315,16 @@ export async function askAssistant(input: {
   question: string;
   history: Array<{ role: "USER" | "ASSISTANT"; content: string }>;
 }): Promise<AssistantReply> {
-  const [snapshot, memory] = await Promise.all([
+  const [snapshot, memory, entries, vehicles] = await Promise.all([
     buildAssistantSnapshot(input.workspaceId),
     assistantMemoryPrompt(input.workspaceId),
+    loadKnowledge(input.workspaceId),
+    loadVehicleLabels(input.workspaceId),
   ]);
+  const library = libraryDigest(entries, Object.fromEntries(vehicles.map((vehicle) => [vehicle.id, vehicle.label])));
 
   const messages: KimiMessage[] = [
-    { role: "system", content: buildSystemPrompt(snapshot, input.operatorName, memory) },
+    { role: "system", content: buildSystemPrompt(snapshot, input.operatorName, memory, library) },
     ...input.history.slice(-MAX_HISTORY_MESSAGES).map((entry) => ({
       role: entry.role === "USER" ? ("user" as const) : ("assistant" as const),
       content: entry.content,

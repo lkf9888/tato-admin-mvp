@@ -51,15 +51,26 @@ export type PlaceholderContext = {
 const TOKEN = /\{\{\s*([a-z_]+)\s*\}\}/g;
 const CJK = /[㐀-鿿]/;
 
+/**
+ * Trips happen in Vancouver, and that is the clock a guest reads. Fixed
+ * rather than the runtime's own zone: the server renders templates too
+ * (the scheduled queue, the AI's knowledge), and it runs in UTC -- a
+ * 10:00 pickup read 17:00 there.
+ */
+const TRIP_TIME_ZONE = "America/Vancouver";
+
 function formatWhen(value: string | Date, chinese: boolean) {
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return null;
   if (chinese) {
-    const weekday = date.toLocaleDateString("zh-CN", { weekday: "short" });
-    const time = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-    return `${date.getMonth() + 1}月${date.getDate()}日 ${weekday} ${time}`;
+    const part = (options: Intl.DateTimeFormatOptions) =>
+      new Intl.DateTimeFormat("zh-CN", { timeZone: TRIP_TIME_ZONE, ...options }).format(date);
+    const [month, day] = part({ month: "numeric", day: "numeric" }).match(/\d+/g) ?? [];
+    const time = part({ hour: "2-digit", minute: "2-digit", hour12: false });
+    return `${month}月${day}日 ${part({ weekday: "short" })} ${time}`;
   }
   return date.toLocaleString("en-US", {
+    timeZone: TRIP_TIME_ZONE,
     weekday: "short",
     month: "short",
     day: "numeric",

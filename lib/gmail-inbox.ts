@@ -772,6 +772,13 @@ async function enrichPendingEmails(
             kind: email.kind === InboundEmailKind.OTHER ? extracted.kind : email.kind,
             parsed: JSON.stringify(extracted),
             parsedAt: new Date(),
+            // The column is what marks a row done (see the query above),
+            // so it has to be written here too. It was not: every run
+            // re-extracted the same newest twelve, the backlog never
+            // shrank, and older messages never got a summary. English
+            // when the model gave no Chinese, so a row cannot stay
+            // "pending" forever.
+            summaryZh: (extracted.summaryZh || extracted.summary || email.subject || "").slice(0, 600) || null,
             orderId,
           },
         });

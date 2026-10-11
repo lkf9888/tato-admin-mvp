@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.64.1 - 2026-10-11
+
+### The summary backlog shrinks instead of redoing the newest twelve
+
+Enrichment picks rows with no `parsedAt` or no `summaryZh` column, but on success it wrote the Chinese summary only inside the `parsed` JSON, never into the column. Every run therefore re-extracted the same newest twelve messages, the backlog stayed at 400, and older messages never got a summary, with an AI call spent every fifteen minutes on work already done. This went unseen while extraction was failing outright. A successful extraction now writes the column too, falling back to the English summary so that no row stays pending forever.
+
 ## v1.64.0 - 2026-10-11
 
 ### The AI runs on OpenRouter, configured as HostHub is

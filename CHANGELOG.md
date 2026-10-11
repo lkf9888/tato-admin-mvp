@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.65.1 - 2026-10-11
+
+### The help manual covers replying to guests and the AI message templates
+
+- Follows the Messages redesign in v1.65.0. The Messages guide grows
+  from one section to four: finding what needs a reply; replying (the
+  box, Templates, Draft, Rewrite, Translate, and Copy & open Turo);
+  the AI message templates page (new entry, suggestions from past
+  replies, limiting an entry to cars, stages and dates, and the "what
+  the AI reads" preview); and the new-entry form (the three kinds, how
+  guests ask, placeholders, the pickup code never reaching the AI).
+- The old picture's third mark pointed at a link the redesign removed;
+  all four pictures are new, taken from local demo data. The library
+  pictures need a few demo entries in the local database, and the AI
+  tools only show when an AI key is set, so they were taken with a
+  placeholder key and no AI call.
+
 ## v1.65.0 - 2026-10-11
 
 ### Replies are written as HostHub writes them, and the AI reads one message library

@@ -38,12 +38,51 @@ export const operationsShots: Shot[] = [
   {
     id: "messages-main",
     path: "/messages",
+    setup: [{ click: { text: "Amarpreet S.", nth: 0 } }, { wait: 1200 }],
     marks: [
       { step: 1, target: { role: "button", name: { zh: "待回复", en: "Needs reply" } } },
       { step: 2, target: { text: "Amarpreet S.", nth: 0 } },
-      { step: 3, target: { css: 'main a:has-text("Turo")', nth: 0 } },
+      { step: 3, target: { role: "link", name: { zh: "Turo 回复", en: "Turo" }, exact: true } },
       { step: 4, target: { role: "button", name: { zh: "逐字翻译", en: "Translation" } } },
       { step: 5, target: { role: "button", name: { zh: "标记已处理", en: "Mark handled" } } },
+    ],
+  },
+  {
+    id: "messages-reply",
+    path: "/messages",
+    setup: [
+      { click: { text: "Amarpreet S.", nth: 0 } },
+      { wait: 1200 },
+      { fill: { css: "main textarea" }, value: "Hi Amarpreet! Let me check when the car comes back from the trip before yours, and I'll confirm the earlier pickup within the hour." },
+      { wait: 300 },
+    ],
+    marks: [
+      { step: 1, target: { css: "main textarea" } },
+      { step: 2, target: { role: "button", name: { zh: "模板", en: "Templates" }, exact: true } },
+      { step: 3, target: { css: 'main button:has(span:text-is("起草")), main button:has(span:text-is("Draft"))' } },
+      { step: 4, target: { role: "button", name: { zh: "复制并去 Turo 发送", en: "Copy & open Turo" } } },
+    ],
+  },
+  {
+    id: "messages-library",
+    path: "/messages/ai-templates",
+    marks: [
+      { step: 1, target: { role: "button", name: { zh: "新建", en: "New entry" }, exact: true } },
+      { step: 2, target: { role: "button", name: { zh: "从历史回复整理", en: "Suggest from past replies" } } },
+      { step: 3, target: { css: 'main span.rounded-full:text-is("全部车辆"), main span.rounded-full:text-is("All cars")', nth: 0 } },
+      { step: 4, target: { text: { zh: "AI 会读到什么", en: "What the AI reads" } } },
+    ],
+  },
+  {
+    id: "messages-library-new",
+    path: "/messages/ai-templates",
+    setup: [{ click: { role: "button", name: { zh: "新建", en: "New entry" }, exact: true } }, { wait: 800 }],
+    clip: { dialog: true },
+    marks: [
+      { step: 1, target: { css: '[role="dialog"] button', nth: 1 } },
+      { step: 2, target: { css: '[role="dialog"] textarea', nth: 0 } },
+      { step: 3, target: { css: '[role="dialog"] button:has-text("+ ")', nth: 1 } },
+      { step: 4, target: { role: "button", name: { zh: "保存", en: "Save" }, exact: true } },
     ],
   },
   {

@@ -66,23 +66,54 @@ export const guides: Guide[] = [
   {
     key: "messages",
     title: "Messages",
-    summary: "Every Turo guest message, grouped by conversation, with a translation beside it.",
+    summary: "Every Turo guest message, grouped by conversation, with a translation beside it; write the reply here (AI can draft, rewrite and translate) and copy it to Turo.",
     sections: [
       {
-        heading: "Find what needs a reply and clear it",
+        heading: "Find what needs a reply",
         shot: "messages-main",
         steps: [
           "Needs reply shows only conversations still waiting; Scheduled holds the ones you set to send later.",
           "Pick a conversation on the left to read all of it on the right, each message with its translation.",
-          "Turo opens the conversation on Turo, where you reply to the guest.",
+          "Turo, top right, opens the conversation on Turo.",
           "Switch between Translation and Summary; a long thread reads faster as a summary.",
           "When it is handled, press Mark handled and it leaves Needs reply.",
+        ],
+      },
+      {
+        heading: "Reply to the guest",
+        shot: "messages-reply",
+        steps: [
+          "Write the reply in the box, or just the gist (Chinese is fine) and press Rewrite: AI turns it into a full message in the guest's language.",
+          "Templates inserts a reply template from AI message templates, with placeholders such as the guest's name, the car and the pickup place filled in from the trip.",
+          "Draft has AI answer the guest's latest message using only what is in AI message templates; what is not there, it says it will check. Translate puts what you wrote into the guest's language.",
+          "Copy & open Turo copies the reply and opens this trip's conversation on Turo; paste it there and send.",
+        ],
+      },
+      {
+        heading: "AI message templates",
+        shot: "messages-library",
+        steps: [
+          "Open it from the tab at the top of Messages. It is everything the AI may say to guests: drafting and rewriting in the reply box, the assistant and outside AI agents all read this one library. New entry adds one.",
+          "Suggest from past replies has AI read past conversations and collect what guests often ask with the answers you gave; add the ones you want.",
+          "An entry can be limited to some cars and to a stage of the trip (before pickup, during, after return), and can expire; once expired or switched off from AI, the AI stops using it.",
+          "What the AI reads, on the right: pick a car and a trip stage and type a guest message to see exactly which entries the AI would be given.",
+        ],
+      },
+      {
+        heading: "New entry",
+        shot: "messages-library-new",
+        steps: [
+          "First say what it is: a Reply template is a whole message to send as is; a Fact is one answer the AI tells guests in its own words; an Internal rule is how you want something handled, which the AI follows but never tells the guest.",
+          "Fill in the title and How guests ask, in the guest's own words, one way of asking per line; that is how the AI knows when this entry applies.",
+          "In the content, the buttons below insert placeholders (guest name, car, pickup place, pickup code and so on), filled from the trip when used; the pickup code is never given to the AI.",
+          "Choose the cars, the stage and an expiry date if any, then Save.",
         ],
       },
     ],
     tips: [
       "The line at the top of a conversation is the trip's dates and amount; Trip on the right opens it.",
-      "Car not identified means the email's make and model fit several cars, or none. TATO never guesses; set the car on the trip yourself.",
+      "Car not identified means the email's make and model fit several cars, or none. TATO never guesses; set the car on the trip yourself. Such a conversation also gets no car-specific template entries.",
+      "Limit an entry to some cars only when it is true of those cars alone; leave the rest as All cars.",
     ],
   },
   {

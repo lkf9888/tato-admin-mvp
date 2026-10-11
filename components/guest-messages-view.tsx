@@ -16,7 +16,7 @@ import {
 } from "@/components/message-template-panel";
 import { InlineSpinner, TypingDots } from "@/components/turo-task-progress";
 import { getMessages, type Locale } from "@/lib/i18n";
-import { tripStageAt, type KnowledgeEntry } from "@/lib/message-knowledge";
+import { tripLocationText, tripStageAt, type KnowledgeEntry } from "@/lib/message-knowledge";
 import { renderTemplate } from "@/lib/message-placeholders";
 import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
@@ -633,6 +633,7 @@ export function GuestMessagesView({
         title: [selected.guestName, selected.vehiclePlate ?? selected.vehicleLabel].filter(Boolean).join(" · "),
         vehicleId: selected.vehicleId,
         stage: tripStageAt(order ? { pickup: order.pickupDatetime, return: order.returnDatetime } : null),
+        location: tripLocationText(order),
         question: selected.messages[0]?.guestText ?? selected.messages[0]?.summary ?? "",
         values: {
           guest: order?.renterName ?? selected.guestName,

@@ -41,6 +41,7 @@ const saveSchema = z.object({
   triggers: z.array(z.string().max(KNOWLEDGE_LIMITS.triggerLength * 2)).max(KNOWLEDGE_LIMITS.triggers * 2).default([]),
   vehicleIds: z.array(z.string().min(1)).max(200).nullish(),
   stages: z.array(z.enum(TRIP_STAGES)).nullish(),
+  locations: z.array(z.string().max(KNOWLEDGE_LIMITS.locationLength * 2)).max(KNOWLEDGE_LIMITS.locations * 2).nullish(),
   validUntil: z.string().trim().min(1).nullish(),
   aiEnabled: z.boolean().default(true),
 });
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
     id: parsed.data.id ?? null,
     vehicleIds: parsed.data.vehicleIds ?? null,
     stages: parsed.data.stages ?? null,
+    locations: parsed.data.locations ?? null,
     validUntil: parsed.data.validUntil ?? null,
   });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });

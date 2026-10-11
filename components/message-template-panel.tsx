@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 
 import { getMessages, type Locale } from "@/lib/i18n";
-import { isExpired, matchScore, type KnowledgeEntry, type TripStage } from "@/lib/message-knowledge";
+import { isExpired, locationMatches, matchScore, type KnowledgeEntry, type TripStage } from "@/lib/message-knowledge";
 import { renderTemplate, templateAlreadySent, type PlaceholderContext } from "@/lib/message-placeholders";
 import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
@@ -25,6 +25,8 @@ export type MessageTemplateContext = {
   title: string;
   vehicleId: string | null;
   stage: TripStage | null;
+  /** The trip's pickup and return addresses (see tripLocationText). */
+  location: string | null;
   /** Fills placeholders, pickup code included: this is the operator's
    *  own browser, not the AI. */
   values: PlaceholderContext;
@@ -37,7 +39,8 @@ export type MessageTemplateContext = {
 
 /**
  * The templates that fit a conversation, for the composer: this car's
- * and the fleet's, for this moment of the trip, best match first and
+ * and the fleet's, for this moment of the trip and this pickup place --
+ * the same tests the AI's library applies -- best match first and
  * already-sent last. Rules are not offered -- they are guidance for the
  * AI, never words for a guest.
  */
@@ -46,7 +49,8 @@ export function suggestTemplates(entries: KnowledgeEntry[], context: MessageTemp
     entry.kind !== "rule" &&
     !isExpired(entry) &&
     (!entry.vehicleIds || (context.vehicleId !== null && entry.vehicleIds.includes(context.vehicleId))) &&
-    (!entry.stages || (context.stage !== null && entry.stages.includes(context.stage)));
+    (!entry.stages || (context.stage !== null && entry.stages.includes(context.stage))) &&
+    (!entry.locations || locationMatches(entry.locations, context.location));
   return entries
     .filter(fits)
     .map((entry) => ({

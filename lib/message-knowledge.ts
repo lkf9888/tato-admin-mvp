@@ -13,6 +13,9 @@
  *   entries, never a car's own.
  * - A procedure for the wrong moment. Entries can be limited to a trip
  *   stage; a conversation with no trip gets none of those.
+ * - A place for the wrong pickup. Entries can be limited to addresses
+ *   (YVR's parkade is P3); a trip whose address does not contain one of
+ *   the entry's words, or has no address, gets none of those.
  * - Guidance quoted to a guest. Rules are labelled as such, and the
  *   prompt says they are never repeated.
  * - Stale facts. An entry past its date is kept for the operator but
@@ -47,6 +50,9 @@ export type KnowledgeEntry = {
   vehicleIds: string[] | null;
   /** Null: any time. */
   stages: TripStage[] | null;
+  /** Words the pickup or return address must contain, any one. Null:
+   *  anywhere. */
+  locations: string[] | null;
   validUntil: string | null;
   aiEnabled: boolean;
   updatedAt: string;
@@ -61,6 +67,7 @@ type StoredRow = {
   vehicleId: string | null;
   vehicleIds: string | null;
   stages: string | null;
+  locations?: string | null;
   validUntil: Date | string | null;
   aiEnabled: boolean;
   updatedAt: Date | string;
@@ -99,6 +106,7 @@ export function toKnowledgeEntry(row: StoredRow): KnowledgeEntry {
       .filter(Boolean),
     vehicleIds,
     stages: stages && stages.length > 0 ? stages : null,
+    locations: parseList(row.locations ?? null),
     validUntil: iso(row.validUntil),
     aiEnabled: row.aiEnabled,
     updatedAt: iso(row.updatedAt) ?? new Date(0).toISOString(),
@@ -127,8 +135,23 @@ export type KnowledgeScope = {
   /** The conversation's car, when known. */
   vehicleId: string | null;
   stage: TripStage | null;
+  /** The trip's pickup and return addresses, as one string. */
+  location?: string | null;
   now?: Date;
 };
+
+/** The addresses an entry's location words are matched against. */
+export function tripLocationText(trip: { pickupLocation?: string | null; returnLocation?: string | null } | null) {
+  const text = [trip?.pickupLocation, trip?.returnLocation].filter(Boolean).join(" | ");
+  return text || null;
+}
+
+/** Whether an address contains any of the words, ignoring case. */
+export function locationMatches(words: string[], location: string | null | undefined) {
+  if (!location) return false;
+  const haystack = location.toLowerCase();
+  return words.some((word) => word.trim() && haystack.includes(word.trim().toLowerCase()));
+}
 
 /**
  * Whether the AI may use this entry in this conversation. Strict on
@@ -139,6 +162,7 @@ export function appliesTo(entry: KnowledgeEntry, scope: KnowledgeScope) {
   if (!entry.aiEnabled || isExpired(entry, scope.now)) return false;
   if (entry.vehicleIds && !(scope.vehicleId && entry.vehicleIds.includes(scope.vehicleId))) return false;
   if (entry.stages && !(scope.stage && entry.stages.includes(scope.stage))) return false;
+  if (entry.locations && !locationMatches(entry.locations, scope.location)) return false;
   return true;
 }
 
@@ -248,6 +272,7 @@ export function buildKnowledgeBlock(input: {
       `[K${used.length + 1}] ${KIND_TAG[entry.kind]}: ${entry.label}`,
       `applies to: ${entry.vehicleIds ? `this car only (${thisCar ?? "this car"})` : "all cars"}`,
       `when: ${entry.stages ? entry.stages.map((stage) => STAGE_TAG[stage]).join(", ") : "any time"}`,
+      entry.locations ? `where: only when pickup/return is at ${entry.locations.join(" / ")} (this trip's is)` : "",
       entry.triggers.length > 0 ? `guests ask: ${entry.triggers.join(" / ")}` : "",
     ]
       .filter(Boolean)
@@ -294,7 +319,8 @@ export function libraryDigest(
       ? `only ${entry.vehicleIds.map((id) => vehicleLabels[id] ?? "a car no longer in the fleet").join(", ")}`
       : "all cars";
     const when = entry.stages ? entry.stages.map((stage) => STAGE_TAG[stage]).join(", ") : "any time";
-    const piece = `- ${KIND_TAG[entry.kind]}: ${entry.label} [${cars}; ${when}]${
+    const where = entry.locations ? `; only for pickup/return at ${entry.locations.join(" / ")}` : "";
+    const piece = `- ${KIND_TAG[entry.kind]}: ${entry.label} [${cars}; ${when}${where}]${
       entry.triggers.length ? ` (guests ask: ${entry.triggers.join(" / ")})` : ""
     }\n  """${entry.content.trim().slice(0, 400)}"""`;
     if (length + piece.length > budget) break;
@@ -302,7 +328,7 @@ export function libraryDigest(
     length += piece.length;
   }
   return [
-    "THE HOST'S MESSAGE LIBRARY (saved replies, facts and internal rules). When you draft anything for a guest, take facts only from here and the snapshot; use only entries whose cars include that guest's car and whose timing fits; never quote an INTERNAL RULE to a guest; leave {{placeholders}} as written.",
+    "THE HOST'S MESSAGE LIBRARY (saved replies, facts and internal rules). When you draft anything for a guest, take facts only from here and the snapshot; use only entries whose cars include that guest's car and whose timing and pickup place fit; never quote an INTERNAL RULE to a guest; leave {{placeholders}} as written.",
     ...parts,
   ].join("\n");
 }

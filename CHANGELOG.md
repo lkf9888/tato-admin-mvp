@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.66.0 - 2026-10-11
+
+### Library entries can be limited to a pickup place
+
+Some answers depend on where the trip starts rather than on the car: every pickup at YVR is in parkade P3, and keys wait at the office only for self-pickup there. `MessageTemplate.locations` (new, nullable) holds words the trip's pickup or return address must contain, any one and case-insensitive, such as "YVR" and "Grant McConachie". Entries are scoped the same way as by car and stage: a trip at another address, or with no address yet, never gets the entry.
+
+The rule is applied in one place, `appliesTo` in `lib/message-knowledge.ts`. It drives the AI's library section, the composer's quick template chips (which used to offer "YVR 机场取车：停 P3" on non-airport trips) and the outside agent endpoint (`location` comes from the booking, or from a `location` parameter alongside `stage`). The library editor has a field for it, cards show it, and the "AI 会读到什么" preview takes a pickup address.
+
 ## v1.65.1 - 2026-10-11
 
 ### The help manual covers replying to guests and the AI message templates

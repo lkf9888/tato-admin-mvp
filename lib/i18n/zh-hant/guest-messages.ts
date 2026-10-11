@@ -157,6 +157,12 @@ export const guestMessagesMessages = {
       fieldCarsHint: "只有這條確實只對某幾台車成立時才選車。認不出車的會話，永遠拿不到指定車輛的條目。",
       carSearch: "搜車牌或車型",
       fieldStages: "適用時段",
+      fieldLocations: "適用取車地點（選填）",
+      fieldLocationsHint:
+        "填訂單取車或還車地址裡會出現的詞，每行一個，例如 YVR、Grant McConachie。任意一個對上就算。地址不符、或者訂單還沒有地址時，這條不會用。",
+      anyLocation: "任何地點",
+      atLocation: (words: string) => `地點：${words}`,
+      previewLocation: "取車地址（選填）",
       fieldValidUntil: "有效期至（選填）",
       fieldValidUntilHint: "季節性的事實用這個，例如雪地胎只到 3 月。過期後條目還在，但 AI 不再使用。",
       fieldAi: "給 AI 使用",

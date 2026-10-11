@@ -27,6 +27,8 @@ type Draft = {
   content: string;
   vehicleIds: string[];
   stages: TripStage[];
+  /** One word per line. */
+  locations: string;
   validUntil: string;
   aiEnabled: boolean;
 };
@@ -39,6 +41,7 @@ const EMPTY_DRAFT: Draft = {
   content: "",
   vehicleIds: [],
   stages: [],
+  locations: "",
   validUntil: "",
   aiEnabled: true,
 };
@@ -58,6 +61,7 @@ function toDraft(entry: KnowledgeEntry, copyOf = false): Draft {
     content: entry.content,
     vehicleIds: entry.vehicleIds ?? [],
     stages: entry.stages ?? [],
+    locations: (entry.locations ?? []).join("\n"),
     validUntil: entry.validUntil ? entry.validUntil.slice(0, 10) : "",
     aiEnabled: entry.aiEnabled,
   };
@@ -130,6 +134,7 @@ export function MessageLibraryView({
           triggers: draft.triggers.split(/\r?\n/),
           vehicleIds: draft.vehicleIds.length > 0 ? draft.vehicleIds : null,
           stages: draft.stages.length > 0 ? draft.stages : null,
+          locations: draft.locations.split(/\r?\n/).map((word) => word.trim()).filter(Boolean),
           validUntil: draft.validUntil ? `${draft.validUntil}T23:59:59` : null,
           aiEnabled: draft.aiEnabled,
         }),
@@ -171,6 +176,7 @@ export function MessageLibraryView({
         triggers: entry.triggers,
         vehicleIds: entry.vehicleIds,
         stages: entry.stages,
+        locations: entry.locations,
         validUntil: entry.validUntil,
         aiEnabled: !entry.aiEnabled,
       }),
@@ -348,6 +354,7 @@ export function MessageLibraryView({
                 <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px]">
                   <Chip>{entry.vehicleIds ? entry.vehicleIds.map((id) => vehicleLabel[id]?.split(" · ")[0] ?? "?").join("、") : t.allCars}</Chip>
                   <Chip>{entry.stages ? entry.stages.map((stage) => t.stages[stage]).join("、") : t.stages.any}</Chip>
+                  {entry.locations ? <Chip>{t.atLocation(entry.locations.join(" / "))}</Chip> : null}
                   {entry.validUntil ? <Chip tone={expired ? "bad" : undefined}>{expired ? t.expired : t.validUntil(dateLabel(entry.validUntil))}</Chip> : null}
                   <button
                     type="button"
@@ -441,18 +448,19 @@ function AiPreview({
   const [vehicleId, setVehicleId] = useState<string>(vehicles[0]?.id ?? "");
   const [stage, setStage] = useState<TripStage | "">("before_pickup");
   const [question, setQuestion] = useState("");
+  const [location, setLocation] = useState("");
   const [open, setOpen] = useState(false);
 
   const block = useMemo(
     () =>
       buildKnowledgeBlock({
         entries,
-        scope: { vehicleId: vehicleId || null, stage: stage || null },
+        scope: { vehicleId: vehicleId || null, stage: stage || null, location: location.trim() || null },
         question,
         context: null,
         vehicleLabels: vehicleLabel,
       }),
-    [entries, vehicleId, stage, question, vehicleLabel],
+    [entries, vehicleId, stage, question, location, vehicleLabel],
   );
   const usable = entries.filter((entry) => entry.aiEnabled && !isExpired(entry)).length;
 
@@ -490,6 +498,15 @@ function AiPreview({
               </option>
             ))}
           </select>
+        </label>
+        <label className="grid gap-1 text-[11.5px] font-semibold text-[var(--ink-mid)]">
+          {t.previewLocation}
+          <input
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+            placeholder="3211 Grant McConachie Way, Richmond"
+            className="h-9 rounded-md border border-[var(--line)] bg-[var(--surface)] px-2 text-[13px] font-normal text-[var(--ink)]"
+          />
         </label>
         <label className="grid gap-1 text-[11.5px] font-semibold text-[var(--ink-mid)]">
           {t.previewQuestion}
@@ -729,6 +746,18 @@ function EntryEditor({
               })}
             </div>
           </div>
+
+          <label className={label}>
+            {t.fieldLocations}
+            <textarea
+              value={draft.locations}
+              onChange={(event) => set({ locations: event.target.value })}
+              rows={2}
+              placeholder={"YVR\nGrant McConachie"}
+              className={field}
+            />
+            <span className={hint}>{t.fieldLocationsHint}</span>
+          </label>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className={label}>

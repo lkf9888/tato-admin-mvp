@@ -116,6 +116,7 @@ export async function GET(request: Request) {
           reservationId:
             "one conversation: the entries TATO's own AI would be given, in its order, placeholders filled from the trip (pickup code withheld), with `promptBlock`",
           stage: "before_pickup | during | after_return -- with vehicleId, the same without a trip",
+          location: "the pickup address, with stage -- matched against entries limited to a place",
           q: "the guest's message, to order entries by relevance",
         },
       },

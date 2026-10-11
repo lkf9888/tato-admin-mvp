@@ -1707,6 +1707,9 @@ model MessageTemplate {
   /// JSON array of trip stages (before_pickup, during, after_return).
   /// Null is any time.
   stages      String?
+  /// JSON array of words a trip's pickup or return address must contain
+  /// (any one), e.g. ["YVR", "Grant McConachie"]. Null is anywhere.
+  locations   String?
   /// After this the entry is kept but no longer given to the AI.
   validUntil  DateTime?
   aiEnabled   Boolean    @default(true)

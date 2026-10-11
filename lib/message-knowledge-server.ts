@@ -4,6 +4,7 @@ import {
   buildKnowledgeBlock,
   KNOWLEDGE_KINDS,
   toKnowledgeEntry,
+  tripLocationText,
   TRIP_STAGES,
   tripStageAt,
   type KnowledgeKind,
@@ -22,6 +23,8 @@ export const KNOWLEDGE_LIMITS = {
   content: 4000,
   triggers: 20,
   triggerLength: 200,
+  locations: 10,
+  locationLength: 60,
   entries: 500,
 } as const;
 
@@ -34,6 +37,7 @@ const SELECT = {
   vehicleId: true,
   vehicleIds: true,
   stages: true,
+  locations: true,
   validUntil: true,
   aiEnabled: true,
   updatedAt: true,
@@ -72,6 +76,7 @@ export type KnowledgeInput = {
   triggers: string[];
   vehicleIds: string[] | null;
   stages: TripStage[] | null;
+  locations: string[] | null;
   validUntil: string | null;
   aiEnabled: boolean;
 };
@@ -86,6 +91,9 @@ export async function saveKnowledge(workspaceId: string, input: KnowledgeInput) 
   const triggers = [...new Set(input.triggers.map((line) => line.trim().slice(0, KNOWLEDGE_LIMITS.triggerLength)).filter(Boolean))]
     .slice(0, KNOWLEDGE_LIMITS.triggers);
   const stages = (input.stages ?? []).filter((stage) => (TRIP_STAGES as readonly string[]).includes(stage));
+  const locations = [
+    ...new Set((input.locations ?? []).map((word) => word.trim().slice(0, KNOWLEDGE_LIMITS.locationLength)).filter(Boolean)),
+  ].slice(0, KNOWLEDGE_LIMITS.locations);
 
   // Only this workspace's cars: an id from elsewhere would scope an
   // entry to a car nobody here can see, which reads as "no car".
@@ -112,6 +120,7 @@ export async function saveKnowledge(workspaceId: string, input: KnowledgeInput) 
     // the old template picker and the outside agent's filter.
     vehicleId: vehicleIds.length === 1 ? vehicleIds[0] : null,
     stages: stages.length > 0 && stages.length < TRIP_STAGES.length ? JSON.stringify(stages) : null,
+    locations: locations.length > 0 ? JSON.stringify(locations) : null,
     validUntil,
     aiEnabled: input.aiEnabled,
   };
@@ -172,6 +181,7 @@ export async function knowledgeForConversation(input: {
     scope: {
       vehicleId: input.vehicleId,
       stage: tripStageAt(trip ? { pickup: trip.pickupDatetime, return: trip.returnDatetime } : null, input.now),
+      location: tripLocationText(trip),
       now: input.now,
     },
     question: input.question,

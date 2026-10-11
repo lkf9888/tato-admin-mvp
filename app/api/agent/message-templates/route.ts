@@ -8,6 +8,7 @@ import {
   isExpired,
   rankForConversation,
   toKnowledgeEntry,
+  tripLocationText,
   TRIP_STAGES,
   tripStageAt,
   type KnowledgeEntry,
@@ -27,6 +28,7 @@ const USAGE = [
   "kind=rule: how the host wants something handled. Follow it; never quote or reveal it to a guest.",
   "vehicles=null means every car. Otherwise the entry is true of those cars only: never use it for another car, and never when the conversation's car is unknown.",
   "stages=null means any time; otherwise only at those trip stages (before_pickup, during, after_return), and never when there is no trip.",
+  "locations=null means anywhere; otherwise only when the trip's pickup or return address contains one of those words (case-insensitive), and never when the address is unknown.",
   "Entries past validUntil, or with aiEnabled=false, must not be used.",
   "A {{placeholder}} left in content is a fact unknown for that trip. Never guess it. The pickup code is always withheld here; leave {{pickup_code}} for the host.",
   "Facts not in the library or the trip: say you will check. Do not fill gaps from general knowledge.",
@@ -46,6 +48,8 @@ function shape(entry: KnowledgeEntry, vehicles: Map<string, { id: string; label:
       : null,
     /** Null: any time. */
     stages: entry.stages,
+    /** Null: anywhere. Otherwise words the pickup/return address must contain. */
+    locations: entry.locations,
     validUntil: entry.validUntil,
     aiEnabled: entry.aiEnabled,
     expired: isExpired(entry),
@@ -77,6 +81,7 @@ export async function GET(request: Request) {
   const reservationId = url.searchParams.get("reservationId")?.trim() || null;
   const stageParam = url.searchParams.get("stage")?.trim() || null;
   const vehicleIdParam = url.searchParams.get("vehicleId")?.trim() || null;
+  const locationParam = url.searchParams.get("location")?.trim().slice(0, 300) || null;
   const question = url.searchParams.get("q")?.slice(0, 600) ?? "";
 
   if (reservationId || stageParam) {
@@ -100,7 +105,7 @@ export async function GET(request: Request) {
     const stage = order
       ? tripStageAt({ pickup: order.pickupDatetime, return: order.returnDatetime })
       : (stageParam as TripStage);
-    const scope = { vehicleId, stage };
+    const scope = { vehicleId, stage, location: order ? tripLocationText(order) : locationParam };
     const context = order
       ? {
           guest: order.renterName,
@@ -127,6 +132,7 @@ export async function GET(request: Request) {
         reservationId,
         vehicle: vehicleId ? { id: vehicleId, label: vehicles.get(vehicleId)?.label ?? null } : null,
         stage,
+        location: scope.location,
       },
       data: ranked.map(({ entry }) => ({
         ...shape(entry, vehicles),

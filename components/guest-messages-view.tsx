@@ -413,7 +413,13 @@ export function GuestMessagesView({
     if (!selected || !canDraft) return;
     if (translatedKeys.has(selected.key)) return;
     const missing =
-      selected.messages.some((message) => !zh[message.id] && !message.summaryZh && message.summary) ||
+      // The guest's own words are what gets translated (the summary is
+      // only the fallback for mail with none), so they alone are reason
+      // enough. Asking for a summary as well left every message
+      // untranslated whenever extraction had not run.
+      selected.messages.some(
+        (message) => !zh[message.id] && !message.summaryZh && (message.guestText || message.summary),
+      ) ||
       conversationFor(selected).some((message) => !message.bodyZh && !zh[message.id]);
     if (!missing) return;
     void translateThread(selected);

@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.63.3 - 2026-10-11
+
+### Guest messages translate and summarise again
+
+- **Summaries.** Email extraction ran on `kimi-k2.5`, which the Kimi account can no longer call ("Not found the model kimi-k2.5 or Permission denied"). Every enrichment run failed all 12 of its messages, and 400 guest messages were left without a summary or a Chinese summary, so the 摘要 view was empty. Extraction now defaults to `kimi-k2.6`, the chat model the assistant and translation already use. If the extraction model is unavailable again (retired, or a stale `KIMI_EXTRACTION_MODEL`), `kimiExtractJson` retries once on the chat model. The backlog fills newest first, 12 messages per enrichment run.
+- **Word-for-word translation.** The messages page asked for a translation only when a message had a summary, although what it translates is the guest's own text. With extraction failing, no conversation was ever sent for translation. The guest's text alone now triggers it.
+
 ## v1.63.2 - 2026-10-10
 
 ### The /agent page is called API tokens, and the help manual describes it as it now is

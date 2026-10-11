@@ -21,8 +21,12 @@ const DEFAULT_BASE_URL = "https://api.moonshot.ai/v1";
 /** Conversational assistant. Balanced cost/quality. */
 const DEFAULT_CHAT_MODEL = "kimi-k2.6";
 
-/** Bulk classification of inbound email. Cheapest tier that can do it. */
-const DEFAULT_EXTRACTION_MODEL = "kimi-k2.5";
+/** Bulk classification of inbound email. Was `kimi-k2.5`, the cheaper
+ *  tier, until the account lost it (2026-10: "Not found the model
+ *  kimi-k2.5 or Permission denied") and every extraction failed -- 400
+ *  guest messages without a summary or a Chinese reading. The chat
+ *  model is the one model this account is known to be able to call. */
+const DEFAULT_EXTRACTION_MODEL = "kimi-k2.6";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
@@ -194,6 +198,11 @@ export async function kimiChat(input: {
   }
 }
 
+/** Moonshot's wording when a model is retired or not on the account. */
+function isUnavailableModel(reason: string) {
+  return /not found the model|permission denied|model[_ ]not[_ ]found/i.test(reason);
+}
+
 export type KimiJsonResult<T> = { ok: true; data: T } | { ok: false; reason: string };
 
 /**
@@ -214,16 +223,28 @@ export async function kimiExtractJson<T>(input: {
   maxTokens?: number;
   timeoutMs?: number;
 }): Promise<KimiJsonResult<T>> {
-  const result = await kimiChat({
-    messages: [
-      { role: "system", content: input.system },
-      { role: "user", content: input.user },
-    ],
-    model: input.model ?? getExtractionModel(),
-    maxTokens: input.maxTokens ?? 2048,
-    timeoutMs: input.timeoutMs,
-    jsonMode: true,
-  });
+  const call = (model: string) =>
+    kimiChat({
+      messages: [
+        { role: "system", content: input.system },
+        { role: "user", content: input.user },
+      ],
+      model,
+      maxTokens: input.maxTokens ?? 2048,
+      timeoutMs: input.timeoutMs,
+      jsonMode: true,
+    });
+
+  const model = input.model ?? getExtractionModel();
+  let result = await call(model);
+  // A model the account cannot reach -- retired, or never granted, or a
+  // stale KIMI_EXTRACTION_MODEL left in the environment -- fails every
+  // call the same way. Fall back to the chat model, which the assistant
+  // and translation prove works, rather than leave the inbox untouched
+  // until someone reads the workflow log.
+  if (!result.ok && isUnavailableModel(result.reason) && model !== getChatModel()) {
+    result = await call(getChatModel());
+  }
 
   if (!result.ok) return { ok: false, reason: result.reason };
 

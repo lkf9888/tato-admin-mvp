@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.64.0 - 2026-10-11
+
+### The AI runs on OpenRouter, configured as HostHub is
+
+TATO's AI calls go to OpenRouter when `OPENAI_API_KEY` is set. They default to DeepSeek V4.1 Flash with reasoning off, served only by DeepInfra or Together, no fallback to other hosts, and `data_collection: deny`, since guest messages carry names and dates. That covers translation, summaries, reply drafts, the assistant, order-note parsing and site ad copy. The settings are HostHub's, so both deployments read the same: `OPENAI_BASE_URL`, `OPENAI_MODEL`, `OPENAI_REASONING`, `OPENROUTER_PROVIDERS`, each optional with those defaults.
+
+HostHub compared the two on twelve real tasks. DeepSeek V4.1 Flash came out equal or better than Kimi at about a thirteenth of the cost, and answered in about a second. On today's OpenRouter prices it is $0.14 / $0.42 per million tokens against Kimi k2.6's $0.65 / $3.41.
+
+Without `OPENAI_API_KEY` the Moonshot settings work as before. When a reply wraps its JSON in a sentence, which DeepSeek does now and then with reasoning off, `kimiExtractJson` now takes the outermost object. `/api/assistant/diagnose` reports the provider and gives OpenRouter-specific hints.
+
 ## v1.63.4 - 2026-10-11
 
 ### Translation and summaries skip Kimi's reasoning pass

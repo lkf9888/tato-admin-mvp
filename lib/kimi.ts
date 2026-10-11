@@ -16,6 +16,42 @@ import "server-only";
  * doesn't require a deploy.
  */
 
+/**
+ * Two providers, one wire format.
+ *
+ * OpenRouter is the default (2026-10, following HostHub): DeepSeek V4.1
+ * Flash with reasoning off came out equal or better than Kimi on
+ * HostHub's twelve real tasks at about a thirteenth of the cost, and
+ * answers in a second. It is configured exactly as HostHub is, so the
+ * two deployments read the same:
+ *
+ *   OPENAI_API_KEY        the OpenRouter key (the name is the wire
+ *                         format, not the vendor)
+ *   OPENAI_BASE_URL       default https://openrouter.ai/api/v1
+ *   OPENAI_MODEL          default deepseek/deepseek-v4.1-flash
+ *   OPENAI_REASONING      off | minimal | low | medium | high; default off
+ *   OPENROUTER_PROVIDERS  hosts allowed to serve it, in order, no
+ *                         fallback; default deepinfra,together
+ *
+ * Guest messages carry names and travel dates, so a router request
+ * always asks for hosts that neither keep nor train on the data, and
+ * only the named ones.
+ *
+ * Without OPENAI_API_KEY, the Moonshot (Kimi) settings below still work
+ * unchanged.
+ */
+type Provider = "router" | "kimi";
+
+function activeProvider(): Provider | null {
+  if (process.env.OPENAI_API_KEY?.trim()) return "router";
+  if (process.env.KIMI_API_KEY?.trim() || process.env.MOONSHOT_API_KEY?.trim()) return "kimi";
+  return null;
+}
+
+const DEFAULT_ROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const DEFAULT_ROUTER_MODEL = "deepseek/deepseek-v4.1-flash";
+const DEFAULT_ROUTER_PROVIDERS = ["deepinfra", "together"];
+
 const DEFAULT_BASE_URL = "https://api.moonshot.ai/v1";
 
 /** Conversational assistant. Balanced cost/quality. */
@@ -47,24 +83,58 @@ export type KimiUsage = {
   totalTokens: number;
 };
 
+/** The active provider's key: OpenRouter's when set, else Kimi's. */
 export function getKimiApiKey() {
+  if (activeProvider() === "router") return process.env.OPENAI_API_KEY?.trim() ?? "";
   return process.env.KIMI_API_KEY?.trim() || process.env.MOONSHOT_API_KEY?.trim() || "";
+}
+
+/** Which provider answers, for diagnostics. */
+export function getAiProvider() {
+  return activeProvider();
 }
 
 export function isKimiConfigured() {
   return getKimiApiKey().length > 0;
 }
 
-function getBaseUrl() {
-  return (process.env.KIMI_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, "");
+export function getBaseUrl() {
+  const base =
+    activeProvider() === "router"
+      ? process.env.OPENAI_BASE_URL?.trim() || DEFAULT_ROUTER_BASE_URL
+      : process.env.KIMI_BASE_URL?.trim() || DEFAULT_BASE_URL;
+  return base.replace(/\/+$/, "");
 }
 
 export function getChatModel() {
+  if (activeProvider() === "router") return process.env.OPENAI_MODEL?.trim() || DEFAULT_ROUTER_MODEL;
   return process.env.KIMI_CHAT_MODEL?.trim() || DEFAULT_CHAT_MODEL;
 }
 
 export function getExtractionModel() {
+  // One model on the router: the flash tier is already the cheap one.
+  if (activeProvider() === "router") return getChatModel();
   return process.env.KIMI_EXTRACTION_MODEL?.trim() || DEFAULT_EXTRACTION_MODEL;
+}
+
+/**
+ * The router's extra request fields: reasoning, and which hosts may
+ * serve the model. `thinking: false` from a caller always turns
+ * reasoning off; otherwise OPENAI_REASONING decides, off by default --
+ * TATO's tasks are a reply, a translation, a parsed note.
+ */
+function routerFields(thinking: boolean | undefined): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
+  const setting = process.env.OPENAI_REASONING?.trim().toLowerCase() || "off";
+  if (thinking === false || setting === "off") fields.reasoning = { enabled: false };
+  else if (["minimal", "low", "medium", "high"].includes(setting)) fields.reasoning = { effort: setting };
+  const configured = (process.env.OPENROUTER_PROVIDERS ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  const order = configured.length > 0 ? configured : DEFAULT_ROUTER_PROVIDERS;
+  fields.provider = { order, allow_fallbacks: false, data_collection: "deny" };
+  return fields;
 }
 
 type ChatCompletionResponse = {
@@ -112,13 +182,14 @@ export async function kimiChat(input: {
   thinking?: boolean;
 }): Promise<KimiResult> {
   const model = input.model ?? getChatModel();
+  if (activeProvider() === "router") return kimiChatOnce({ ...input, model }, "router");
   if (input.thinking === false && /^kimi-k2\.[56]\b/.test(model)) {
-    const fast = await kimiChatOnce({ ...input, model }, false);
+    const fast = await kimiChatOnce({ ...input, model }, "kimi-fast");
     if (fast.ok || fast.status !== 400) return fast;
     // eslint-disable-next-line no-console
     console.error(`[kimi] thinking:disabled refused by ${model}, retrying with reasoning :: ${fast.reason}`);
   }
-  return kimiChatOnce({ ...input, model }, true);
+  return kimiChatOnce({ ...input, model }, "kimi");
 }
 
 async function kimiChatOnce(
@@ -129,8 +200,11 @@ async function kimiChatOnce(
     maxTokens?: number;
     timeoutMs?: number;
     jsonMode?: boolean;
+    thinking?: boolean;
   },
-  reasoning: boolean,
+  /** kimi: as before; kimi-fast: Moonshot with thinking off; router:
+   *  OpenRouter, with its own reasoning and host fields. */
+  mode: "kimi" | "kimi-fast" | "router",
 ): Promise<KimiResult> {
   const apiKey = getKimiApiKey();
   if (!apiKey) {
@@ -161,7 +235,14 @@ async function kimiChatOnce(
         //
         // With reasoning off the platform fixes a different value, so
         // the field is left out and the server picks it.
-        ...(reasoning ? { temperature: input.temperature ?? 1 } : { thinking: { type: "disabled" } }),
+        ...(mode === "kimi"
+          ? { temperature: input.temperature ?? 1 }
+          : mode === "kimi-fast"
+            ? { thinking: { type: "disabled" } }
+            : {
+                ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+                ...routerFields(input.thinking),
+              }),
         max_tokens: input.maxTokens ?? 2048,
         ...(input.jsonMode ? { response_format: { type: "json_object" } } : {}),
       }),
@@ -179,7 +260,7 @@ async function kimiChatOnce(
         // Non-JSON error body; keep the raw excerpt.
       }
       // eslint-disable-next-line no-console
-      console.error(`[kimi] request failed :: status=${response.status} :: ${message}`);
+      console.error(`[ai] request failed :: status=${response.status} :: ${message}`);
       return { ok: false, reason: message || `http_${response.status}`, status: response.status };
     }
 
@@ -201,7 +282,7 @@ async function kimiChatOnce(
           ? `empty_response (truncated: finish_reason=length, max_tokens=${input.maxTokens ?? 2048}${reasoned ? ", model emitted reasoning tokens" : ""} — raise maxTokens)`
           : `empty_response (finish_reason=${finish}${reasoned ? ", reasoning only" : ""})`;
       // eslint-disable-next-line no-console
-      console.error(`[kimi] ${detail}`);
+      console.error(`[ai] ${detail}`);
       return { ok: false, reason: detail };
     }
 
@@ -294,6 +375,17 @@ export async function kimiExtractJson<T>(input: {
         return { ok: true, data: JSON.parse(fenced[1]) as T };
       } catch {
         return { ok: false, reason: "malformed_json_in_fence" };
+      }
+    }
+    // DeepSeek with reasoning off sometimes writes a sentence around the
+    // object (HostHub saw the same). Take the outermost braces.
+    const start = result.content.indexOf("{");
+    const end = result.content.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return { ok: true, data: JSON.parse(result.content.slice(start, end + 1)) as T };
+      } catch {
+        // fall through
       }
     }
     return { ok: false, reason: "malformed_json" };

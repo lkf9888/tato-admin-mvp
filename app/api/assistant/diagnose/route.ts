@@ -7,7 +7,7 @@ import { gmailIdleStatus } from "@/lib/gmail-idle";
 import { prisma } from "@/lib/prisma";
 import { resolveTuroSyncWorkspace } from "@/lib/turo-sync";
 import { getGmailConfig, isGmailInboxConfigured } from "@/lib/gmail-inbox";
-import { getChatModel, getExtractionModel, getKimiApiKey, kimiChat } from "@/lib/kimi";
+import { getAiProvider, getBaseUrl, getChatModel, getExtractionModel, getKimiApiKey, kimiChat } from "@/lib/kimi";
 import { APP_VERSION } from "@/lib/version";
 
 export const runtime = "nodejs";
@@ -44,10 +44,8 @@ export async function GET() {
   }
 
   const apiKey = getKimiApiKey();
-  const baseUrl = (process.env.KIMI_BASE_URL?.trim() || "https://api.moonshot.ai/v1").replace(
-    /\/+$/,
-    "",
-  );
+  const provider = getAiProvider();
+  const baseUrl = getBaseUrl();
   const gmail = getGmailConfig();
 
   // Inbox attribution — the match rate the guest-messages page runs on.
@@ -141,13 +139,17 @@ export async function GET() {
     workspaces,
     inbox,
     kimi: {
+      // "router" is OpenRouter (OPENAI_*), "kimi" is Moonshot direct.
+      provider,
       apiKey: describeSecret(apiKey),
       baseUrl,
       chatModel: getChatModel(),
       extractionModel: getExtractionModel(),
       // Which env var name actually supplied the key, so a typo in one
       // of the two accepted names is visible.
-      keySource: process.env.KIMI_API_KEY?.trim()
+      keySource: process.env.OPENAI_API_KEY?.trim()
+        ? "OPENAI_API_KEY"
+        : process.env.KIMI_API_KEY?.trim()
         ? "KIMI_API_KEY"
         : process.env.MOONSHOT_API_KEY?.trim()
           ? "MOONSHOT_API_KEY"
@@ -193,7 +195,15 @@ export async function GET() {
           // The two failures that actually happen, with the fix, since
           // the upstream message alone rarely makes them obvious.
           hint:
-            test.status === 401
+            provider === "router"
+              ? test.status === 401
+                ? "OpenRouter rejected the key. OPENAI_API_KEY must be an OpenRouter key (sk-or-...)."
+                : test.status === 402
+                  ? "OpenRouter account is out of credit."
+                  : test.status === 404
+                    ? `No allowed host serves "${getChatModel()}". Check OPENAI_MODEL and OPENROUTER_PROVIDERS (only hosts that do not keep data are allowed).`
+                    : null
+              : test.status === 401
               ? "Key rejected. Moonshot runs two independent regions and keys are not shared between them: platform.moonshot.cn keys only work against https://api.moonshot.cn/v1, and platform.moonshot.ai keys only against https://api.moonshot.ai/v1. Set KIMI_BASE_URL to match where the key was issued."
               : test.status === 404
                 ? `Model "${getChatModel()}" was not found. The kimi-k2 series was discontinued 2026-05-25; current models are kimi-k3, kimi-k2.6 and kimi-k2.5. Override with KIMI_CHAT_MODEL.`

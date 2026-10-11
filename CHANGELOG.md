@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.63.4 - 2026-10-11
+
+### Translation and summaries skip Kimi's reasoning pass
+
+After v1.63.3 a long guest message still failed to translate with `timeout_60s`, and about one summary in six hit its 90s timeout. `kimi-k2.6` reasons before it answers by default, and translating a line or filling a JSON shape needs none of that. `kimiChat` takes `thinking: false`, sent as `thinking: {type: "disabled"}` only to the k2.5/k2.6 models that accept it, with temperature left to the server. If a model refuses with a 400, the call is retried once with reasoning on, as before. Translation and email extraction use it; assistant chat and reply drafts keep reasoning.
+
+`kimi-k2.5`, which extraction used until v1.63.3, was retired from the Kimi platform on 2026-08-31.
+
 ## v1.63.3 - 2026-10-11
 
 ### Guest messages translate and summarise again

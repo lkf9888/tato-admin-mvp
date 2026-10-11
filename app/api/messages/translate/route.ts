@@ -178,6 +178,9 @@ export async function POST(request: Request) {
       },
     ],
     maxTokens: 3000,
+    // Translation needs no reasoning pass, and with one a long thread
+    // ran past the 60s timeout.
+    thinking: false,
   });
 
   if (!result.ok) {

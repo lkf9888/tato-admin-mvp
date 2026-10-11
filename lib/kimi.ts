@@ -101,7 +101,37 @@ export async function kimiChat(input: {
   timeoutMs?: number;
   /** Ask the model for a JSON object. Used by the email extractor. */
   jsonMode?: boolean;
+  /**
+   * False to skip the reasoning pass, for work that needs none --
+   * translating a line, filling a JSON shape. The k2.5/k2.6 models
+   * think by default, and on a long guest message that alone ran
+   * translation past its 60s timeout. Sent only to models that accept
+   * `thinking` (k3 and the code models reject it); if a model refuses,
+   * the call is retried once with reasoning on, as before.
+   */
+  thinking?: boolean;
 }): Promise<KimiResult> {
+  const model = input.model ?? getChatModel();
+  if (input.thinking === false && /^kimi-k2\.[56]\b/.test(model)) {
+    const fast = await kimiChatOnce({ ...input, model }, false);
+    if (fast.ok || fast.status !== 400) return fast;
+    // eslint-disable-next-line no-console
+    console.error(`[kimi] thinking:disabled refused by ${model}, retrying with reasoning :: ${fast.reason}`);
+  }
+  return kimiChatOnce({ ...input, model }, true);
+}
+
+async function kimiChatOnce(
+  input: {
+    messages: KimiMessage[];
+    model: string;
+    temperature?: number;
+    maxTokens?: number;
+    timeoutMs?: number;
+    jsonMode?: boolean;
+  },
+  reasoning: boolean,
+): Promise<KimiResult> {
   const apiKey = getKimiApiKey();
   if (!apiKey) {
     return { ok: false, reason: "kimi_not_configured" };
@@ -119,7 +149,7 @@ export async function kimiChat(input: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: input.model ?? getChatModel(),
+        model: input.model,
         messages: input.messages,
         // The current Kimi models accept exactly one temperature:
         // `invalid temperature: only 1 is allowed for this model`
@@ -128,7 +158,10 @@ export async function kimiChat(input: {
         // omitting relies on the server defaulting to 1, which is
         // probable but unverified, and this call path is the one that
         // was already failing. A caller that knows better can override.
-        temperature: input.temperature ?? 1,
+        //
+        // With reasoning off the platform fixes a different value, so
+        // the field is left out and the server picks it.
+        ...(reasoning ? { temperature: input.temperature ?? 1 } : { thinking: { type: "disabled" } }),
         max_tokens: input.maxTokens ?? 2048,
         ...(input.jsonMode ? { response_format: { type: "json_object" } } : {}),
       }),
@@ -233,6 +266,9 @@ export async function kimiExtractJson<T>(input: {
       maxTokens: input.maxTokens ?? 2048,
       timeoutMs: input.timeoutMs,
       jsonMode: true,
+      // Classification into a fixed shape: nothing to reason about,
+      // and the reasoning pass is what made each call take 30-90s.
+      thinking: false,
     });
 
   const model = input.model ?? getExtractionModel();

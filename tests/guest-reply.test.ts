@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { prisma } from '../lib/prisma';
 import { loadReplyContext, replyContextText } from '../lib/guest-reply-prompt';
 import { buildKnowledgeBlock, type KnowledgeEntry } from '../lib/message-knowledge';
+import { loadGuestThreads } from '../lib/guest-thread-state';
 
 const at = (minute: number) => new Date(Date.UTC(2026, 9, 12, 20, minute));
 const order = { id: 'trip', externalOrderId: 'reservation', vehicleId: 'tesla', renterName: 'Guest', pickupDatetime: at(-100), returnDatetime: at(100), pickupLocation: 'YVR', returnLocation: 'Office', vehicle: { brand: 'Tesla', model: 'Model Y', year: 2020, plateNumber: 'TEST' } };
@@ -122,4 +123,24 @@ test('access codes in the current transcript stay placeholders in the model prom
     const c=await loadReplyContext({workspaceId:'test',emailIds:['last'],guestName:'Guest',vehicleId:'tesla'});
     assert(c);const prompt=replyContextText(c);assert(!prompt.includes('9997'));assert.match(prompt,/\{\{pickup_code\}\}/);
   });
+});
+
+test('the inbox loads host replies through the matched order even when mail has no parsed reservation',async()=>{
+  const restores=[
+    replace(prisma.inboundEmail,'findMany',async()=>[{
+      ...email('last','How do I get the keys?',1),guestName:'Guest',vehicleId:'tesla',
+      vehicle:order.vehicle,orderId:order.id,acknowledgedAt:null,subject:'Guest message',parsed:null,
+    }]),
+    replace(prisma.order,'findMany',async()=>[{id:order.id,externalOrderId:order.externalOrderId}]),
+    replace(prisma.turoConversationMessage,'findMany',async(args:any)=>
+      args.where.reservationId.in.includes(order.externalOrderId)
+        ? [{id:'host',reservationId:order.externalOrderId,direction:'outbound',body:'Use the confirmed key pickup instructions.',sentAt:at(2)}]
+        : []),
+  ];
+  try {
+    const result=await loadGuestThreads('test');
+    assert.deepEqual(result.reservationIds,['reservation']);
+    assert.equal(result.scraped.length,1);
+    assert(result.answeredKeys.has(result.threads[0].key));
+  } finally {restores.forEach(restore=>restore());}
 });

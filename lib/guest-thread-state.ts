@@ -52,20 +52,21 @@ export async function loadGuestThreads(workspaceId: string) {
   // these exist only where the reader or an agent has recorded the
   // conversation. Keyed by reservation, which is how Turo threads a
   // conversation and how the order already joins.
-  const reservationIds = [
-    ...new Set(
-      emails
-        .map((email) => {
-          if (!email.parsed) return null;
-          try {
-            return (JSON.parse(email.parsed) as { reservationId?: string }).reservationId ?? null;
-          } catch {
-            return null;
-          }
-        })
-        .filter((id): id is string => !!id),
-    ),
-  ];
+  // Use the same matched order as the draft loader. Notification mail
+  // often has no parsed reservation id even after its order was matched.
+  const orderIds = [...new Set(emails.map(email => email.orderId).filter((id): id is string => !!id))];
+  const orderReservations = orderIds.length
+    ? await prisma.order.findMany({
+        where: { id: { in: orderIds }, workspaceId },
+        select: { id: true, externalOrderId: true },
+      })
+    : [];
+  const reservationByOrderId = new Map(
+    orderReservations
+      .filter(order => order.externalOrderId)
+      .map(order => [order.id, order.externalOrderId as string]),
+  );
+  const reservationIds = [...new Set(reservationByOrderId.values())];
 
   const scraped = reservationIds.length
     ? await prisma.turoConversationMessage.findMany({
@@ -129,19 +130,6 @@ export async function loadGuestThreads(workspaceId: string) {
         needsAction: extracted?.needsAction === true,
       };
     }),
-  );
-
-  const orderIds = threads.map((thread) => thread.orderId).filter((id): id is string => !!id);
-  const orderReservations = orderIds.length
-    ? await prisma.order.findMany({
-        where: { id: { in: orderIds }, workspaceId },
-        select: { id: true, externalOrderId: true },
-      })
-    : [];
-  const reservationByOrderId = new Map(
-    orderReservations
-      .filter((order) => order.externalOrderId)
-      .map((order) => [order.id, order.externalOrderId as string]),
   );
 
   // Threads whose last inbound message predates our last reply are

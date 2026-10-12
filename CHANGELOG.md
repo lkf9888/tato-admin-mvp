@@ -1,10 +1,15 @@
 # Changelog
 
+## v1.71.3 — Show the same conversation the draft reads
+
+- Load recorded host replies through matched orders, including notifications with no parsed reservation id. Inbox context and answered status now use the same reservation as guest drafts.
+- Add a regression for the real missing-host-reply case.
+
 ## v1.71.2 — Keep other trips out of guest drafts
 
-- Remove other-trip reply examples from guest prompts: a tone-only label did not prevent addresses and access codes being copied into an unrelated trip.
+- Remove other-trip reply examples from guest prompts: a tone-only label is insufficient isolation for addresses and access codes.
 - Redact labelled access codes from current-trip prompt text into the existing host-filled placeholder.
-- Add regressions for both observed sources of historical-code leakage.
+- Add regressions for cross-trip context isolation and current-trip code redaction.
 
 ## v1.71.1 — Guest reply context and directional locations
 

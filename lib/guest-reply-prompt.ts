@@ -2,7 +2,7 @@ import "server-only";
 
 import { cleanGuestMessage as clean, mergeGuestConversation } from "@/lib/guest-conversation";
 import { assistantMemoryPrompt } from "@/lib/assistant-memory";
-import { findSimilarPastReplies, getVehicleReplyKnowledge } from "@/lib/guest-reply-context";
+import { getVehicleReplyKnowledge } from "@/lib/guest-reply-context";
 import { knowledgeForConversation } from "@/lib/message-knowledge-server";
 import { prisma } from "@/lib/prisma";
 
@@ -17,7 +17,7 @@ export const REPLY_RULES = [
   "Write in the language the guest writes in (look at their latest message). If you cannot tell, write English.",
   "Plain, warm, everyday wording -- like a quick text between two people, not a formal letter. No greeting, no sign-off, no restating their question.",
   "Never invent details: pickup addresses, codes, prices, times, policies. If something is not in the trip facts or the host's library, say you will check and get back to them.",
-  "You may be shown how this host answered similar questions before. Match their tone and what they usually say, but never copy a code, address, time or price from those answers -- only the trip facts, car notes and library are current.",
+  "The latest relevant host reply in this same conversation may confirm facts for this trip only. Never generalize it to another trip, and never reuse a historical access code. Keep {{pickup_code}} for the host to fill.",
   "Read the latest guest message together with the preceding guest messages. Resolve words such as it, there and again from that exchange, not from an unrelated template or older topic. If the referent is unclear, ask what they mean.",
   "A confirmed option is not an exclusive policy: if the host said a guest can pay a parking ticket online, say that option without claiming tickets never go through Turo. Do not add always, never, must, or cannot unless the evidence explicitly supports it.",
   "Pickup and return are separate. Use only the confirmed address and instructions for the direction asked about; never borrow the other direction when an address is missing. A requested change is not confirmed until the trip is updated.",
@@ -88,15 +88,9 @@ export async function loadReplyContext(input: {
   const questionContext = [...guestEmails.slice(0, 3)].reverse()
     .map((email) => clean(email.guestText ?? email.bodyText).slice(0, 600)).join("\n");
 
-  const [memory, carNotes, pastReplies, library] = await Promise.all([
+  const [memory, carNotes, library] = await Promise.all([
     assistantMemoryPrompt(input.workspaceId),
     getVehicleReplyKnowledge(input.workspaceId, vehicleId),
-    findSimilarPastReplies({
-      workspaceId: input.workspaceId,
-      question: questionContext,
-      vehicleId,
-      excludeReservationId: order?.externalOrderId ?? null,
-    }),
     knowledgeForConversation({
       workspaceId: input.workspaceId,
       vehicleId,
@@ -119,18 +113,11 @@ export async function loadReplyContext(input: {
     .filter(Boolean)
     .join("\n");
 
-  const examples = pastReplies.length
-    ? `How this host answered similar questions before (tone only; facts may be out of date):\n${pastReplies
-        .map((pair) => `Guest: ${pair.asked}\nHost: ${pair.answered}`)
-        .join("\n---\n")}`
-    : "";
-
   return {
     memory,
     facts,
     library: library.text,
     libraryUsed: library.used,
-    examples,
     transcript,
     lastGuestText,
     /** Shown on its own when one message was picked to answer. */
@@ -143,10 +130,12 @@ export function replyContextText(context: NonNullable<Awaited<ReturnType<typeof 
   return [
     `Trip facts:\n${context.facts}`,
     context.library ?? "",
-    context.examples,
     `Conversation:\n${context.transcript}`,
     context.focus ? `Reply to this message specifically:\n${context.focus}` : "",
   ]
     .filter(Boolean)
-    .join("\n\n");
+    .join("\n\n")
+    // Current-trip imports can carry access codes too. Only the browser may
+    // fill a code from the matched order; never teach it to the model.
+    .replace(/((?:\bpin|\b(?:lockbox|key|access|door|pickup|pick-up|security)\s*code|密码)\s*(?:(?:is|为|是)\s*)?[:：]?\s*)(?=[a-z0-9]*\d)[a-z0-9]{3,12}\b/gi, "$1{{pickup_code}}");
 }

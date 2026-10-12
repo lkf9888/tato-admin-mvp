@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.71.2 — Keep other trips out of guest drafts
+
+- Remove other-trip reply examples from guest prompts: a tone-only label did not prevent addresses and access codes being copied into an unrelated trip.
+- Redact labelled access codes from current-trip prompt text into the existing host-filled placeholder.
+- Add regressions for both observed sources of historical-code leakage.
+
 ## v1.71.1 — Guest reply context and directional locations
 
 - Merge recorded host replies with incoming guest messages in both the inbox and AI prompts; preserve the selected question and its preceding context.

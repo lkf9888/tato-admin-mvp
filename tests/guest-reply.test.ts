@@ -99,3 +99,27 @@ test('vehicle restrictions and expiration still exclude ineligible knowledge',()
   const block=(vehicleId:string|null)=>buildKnowledgeBlock({entries:[scoped,expired],scope:{vehicleId,stage:'during',pickupLocation:'Office',returnLocation:'YVR'},question:'USB',context:null,vehicleLabels:{}}).used.map(x=>x.id);
   assert.deepEqual(block('tesla'),[]);assert.deepEqual(block(null),[]);assert.deepEqual(block('lexus'),['lexus']);
 });
+
+test('another trip’s address and access code never enter the guest draft prompt as tone examples',async()=>{
+  const emails=[email('last','How do I get the keys?',1)];
+  await withRows(emails,[],async()=>{
+    const restore=replace(prisma.turoConversationMessage,'findMany',async(args:any)=>typeof args.where.reservationId==='string' ? [] : [
+      {reservationId:'other-trip',direction:'inbound',body:'How do I get the keys?'},
+      {reservationId:'other-trip',direction:'outbound',body:'The key is at Example Street. PIN 9998.'},
+    ]);
+    const restoreOrders=replace(prisma.order,'findMany',async()=>[{externalOrderId:'other-trip',vehicleId:'other-car'}]);
+    try {
+      const c=await loadReplyContext({workspaceId:'test',emailIds:['last'],guestName:'Guest',vehicleId:'tesla'});
+      assert(c);const prompt=replyContextText(c);
+      assert(!prompt.includes('Example Street'));assert(!prompt.includes('9998'));
+    } finally {restore();restoreOrders();}
+  });
+});
+
+test('access codes in the current transcript stay placeholders in the model prompt',async()=>{
+  const emails=[email('last','How do I get the key?',1)];
+  await withRows(emails,[{direction:'outbound',body:'The key is in the lockbox. PIN is : 9997',sentAt:at(0)}],async()=>{
+    const c=await loadReplyContext({workspaceId:'test',emailIds:['last'],guestName:'Guest',vehicleId:'tesla'});
+    assert(c);const prompt=replyContextText(c);assert(!prompt.includes('9997'));assert.match(prompt,/\{\{pickup_code\}\}/);
+  });
+});

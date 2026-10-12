@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.70.0 - 2026-10-12
+
+### An API token can be allowed to edit the AI message library
+
+- A new token scope, `templates:write`, for agents that keep the AI
+  message library up to date. On the API tokens page it is its own tick,
+  off by default and in no preset -- "允许修改 AI 消息模板" -- because
+  what is in the library is what TATO's AI, and every agent reading it,
+  says to guests. Ticked, it is added to whichever token is issued, and
+  the token's name says so.
+- `GET /api/agent` lists the two library write endpoints (POST to add or
+  replace an entry, DELETE to remove one) to a token holding the scope,
+  with their body, returns and errors, and its notes say such a token
+  deletes nothing but library entries. The endpoints themselves ship
+  with the sync session's next release.
+- Agent CORS allows DELETE, so a browser-side agent's delete is not
+  stopped at the preflight.
+
 ## v1.69.0 - 2026-10-11
 
 ### On a phone, the library and alert settings sit in the top bar

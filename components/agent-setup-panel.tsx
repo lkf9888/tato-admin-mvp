@@ -40,6 +40,12 @@ const WRITE_ENDPOINTS: Array<[string, string]> = [
   ["POST /api/agent/messages", "写入 Turo 会话，包括你发给客人的回复——邮件里只有客人那一半。只记录，不会发出任何消息"],
 ];
 
+/** What the separate "edit the message library" tick adds. */
+const TEMPLATE_ENDPOINTS: Array<[string, string]> = [
+  ["POST /api/agent/message-templates", "新增消息库条目；带 id 就是整条替换。和网页同一套校验"],
+  ["DELETE /api/agent/message-templates", "删除一条；用到它的定时消息规则会停止发送"],
+];
+
 export function AgentSetupPanel({
   appUrl,
   tokens,
@@ -54,6 +60,9 @@ export function AgentSetupPanel({
   const [revoking, setRevoking] = useState<string | null>(null);
   const [busyRead, setBusyRead] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
+  // Its own tick, off by default and never part of a preset: editing
+  // the library changes what the AI says to guests.
+  const [allowTemplates, setAllowTemplates] = useState(false);
 
   /** Read-only by default; `write` adds `orders:write` for an agent
    *  that imports trips. Two separate tokens rather than one upgraded
@@ -66,11 +75,13 @@ export function AgentSetupPanel({
       const response = await fetch("/api/agent/tokens", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          write
-            ? { name: "读写 API", scopes: ["read", "orders:write", "messages:write"] }
-            : { name: "只读 API", scopes: ["read"] },
-        ),
+        body: JSON.stringify({
+          name: `${write ? "读写 API" : "只读 API"}${allowTemplates ? " · 可改消息库" : ""}`,
+          scopes: [
+            ...(write ? ["read", "orders:write", "messages:write"] : ["read"]),
+            ...(allowTemplates ? ["templates:write"] : []),
+          ],
+        }),
       });
       const data = (await response.json()) as { token?: string };
       if (data.token) {
@@ -141,6 +152,21 @@ export function AgentSetupPanel({
             </code>
           </div>
         ) : (
+          <>
+          <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-md border border-[var(--line)] p-2.5">
+            <input
+              type="checkbox"
+              checked={allowTemplates}
+              onChange={(event) => setAllowTemplates(event.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand)]"
+            />
+            <span className="min-w-0">
+              <span className="block text-[12.5px] font-bold text-[var(--ink)]">允许修改 AI 消息模板</span>
+              <span className="block text-[11.5px] leading-4 text-[var(--ink-soft)]">
+                新增、修改、删除消息库条目；每次修改记在操作记录里。改了库，AI 回客人的内容就跟着变，所以单独勾选。
+              </span>
+            </span>
+          </label>
           <div className="tap-row mt-2 flex flex-wrap gap-2">
             <button
               type="button"
@@ -159,6 +185,7 @@ export function AgentSetupPanel({
               签发读写令牌
             </button>
           </div>
+          </>
         )}
 
         {tokens.length > 0 ? (
@@ -223,6 +250,15 @@ export function AgentSetupPanel({
           <p className="t-eyebrow mt-3 text-[var(--ink-soft)]">读写令牌还能写</p>
           <ul className="mt-1.5 space-y-1">
             {WRITE_ENDPOINTS.map(([path, description]) => (
+              <li key={path} className="text-[11.5px] leading-5">
+                <code className="text-[var(--ink)]">{path}</code>
+                <span className="text-[var(--ink-soft)]"> — {description}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="t-eyebrow mt-3 text-[var(--ink-soft)]">勾了「允许修改 AI 消息模板」还能</p>
+          <ul className="mt-1.5 space-y-1">
+            {TEMPLATE_ENDPOINTS.map(([path, description]) => (
               <li key={path} className="text-[11.5px] leading-5">
                 <code className="text-[var(--ink)]">{path}</code>
                 <span className="text-[var(--ink-soft)]"> — {description}</span>

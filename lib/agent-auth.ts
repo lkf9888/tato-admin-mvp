@@ -28,7 +28,11 @@ import { prisma } from "@/lib/prisma";
  * only read is one that cannot be turned into a wrong number by a
  * confused model or a prompt injection carried in a guest's message.
  */
-export const AGENT_SCOPES = ["read", "messages:write", "orders:write"] as const;
+//
+// `templates:write` edits the AI message library -- what TATO's own AI
+// and every agent reading the library say to guests -- so it is never
+// part of a preset: a token gets it only when someone ticks it.
+export const AGENT_SCOPES = ["read", "messages:write", "orders:write", "templates:write"] as const;
 export type AgentScope = (typeof AGENT_SCOPES)[number];
 
 function hashToken(token: string) {

@@ -25,6 +25,7 @@ export async function GET(request: Request) {
 
   const canWriteOrders = agent.scopes.includes("orders:write");
   const canWriteMessages = agent.scopes.includes("messages:write");
+  const canWriteTemplates = agent.scopes.includes("templates:write");
   // Listed only to a token that can call them: a read-only agent shown
   // write endpoints would try them, get 401, and conclude the token is
   // broken.
@@ -123,13 +124,16 @@ export async function GET(request: Request) {
     ],
     ...(writeEndpoints.length > 0 ? { writeEndpoints } : {}),
     notes: [
-      canWriteOrders || canWriteMessages
+      canWriteOrders || canWriteMessages || canWriteTemplates
         ? `This token can ${[
             canWriteOrders ? "import Turo trips (orders:write)" : null,
             canWriteMessages ? "record Turo conversation messages, host replies included (messages:write)" : null,
+            canWriteTemplates ? "edit the AI message library -- add, replace and delete entries (templates:write)" : null,
           ]
             .filter(Boolean)
-            .join(" and ")}. It cannot change a price, a commission rule or a ledger line directly, and cannot delete anything.`
+            .join(", ")}. It cannot change a price, a commission rule or a ledger line directly${
+            canWriteTemplates ? ", and deletes nothing but library entries" : ", and cannot delete anything"
+          }.`
         : "This token is read-only. Nothing reachable from it can change an order, a price, or a ledger line.",
       "TATO cannot send a Turo message: there is no write access to that channel. Recording a message here does not send it; replies are still sent in Turo by a person.",
       "Guest phone numbers are returned unmasked, because an automation that contacts guests needs them. Treat this token as carrying customer PII.",
@@ -228,6 +232,41 @@ const WRITE_ENDPOINTS: Array<{ scope: AgentScope } & Record<string, unknown>> = 
       "Send the whole visible conversation each time; there is no need to work out which messages are new.",
       "Returns { created, updated }. GET /api/agent/threads then shows these under each thread's conversation.",
     ],
+  },
+  {
+    scope: "templates:write",
+    path: "/api/agent/message-templates",
+    method: "POST",
+    summary:
+      "Add an entry to the AI message library, or replace one. Without an id it is a new entry; with an id the entry is replaced as a whole (send every field you want kept). Same checks as the library page. Every change is recorded in the activity log under this token's name.",
+    body: {
+      id: "optional. The entry to replace, from GET /api/agent/message-templates",
+      label: "string, required. A short title for people, e.g. Pickup instructions",
+      content: "string, required. The text; placeholders such as {{pickup_location}} are filled from the trip when used",
+      kind: "reply | fact | rule. reply: a whole message to send as is. fact: an answer the AI phrases itself. rule: guidance the AI follows and never tells the guest",
+      triggers: "optional string[]. How guests ask, in their own words, one phrasing each",
+      vehicleIds: "optional string[] | null. The cars it is true of; null or omitted for the whole fleet",
+      stages: "optional (before_pickup | during | after_return)[] | null. When it applies; null for any time",
+      locations: "optional string[] | null. Pickup places it is limited to; null for anywhere",
+      validUntil: "optional ISO date | null. After it the entry is kept but no longer given to the AI",
+      aiEnabled: "optional boolean, default true. false keeps it as a saved reply the AI never reads",
+    },
+    returns: "{ entry }",
+    errors:
+      "400 { error: LABEL_REQUIRED | CONTENT_REQUIRED | BAD_KIND | VEHICLE_NOT_FOUND | BAD_DATE | NOT_FOUND | LIBRARY_FULL | VALIDATION_ERROR }",
+    notes: [
+      "What is written here changes what the AI says to guests from the next reply on. Prefer adding a fact or a rule over rewriting a reply someone wrote by hand.",
+    ],
+  },
+  {
+    scope: "templates:write",
+    path: "/api/agent/message-templates",
+    method: "DELETE",
+    summary:
+      "Delete an entry from the AI message library. Scheduled-message rules that use it stop sending. Recorded in the activity log.",
+    body: { id: "string, required" },
+    returns: "{ ok: true }",
+    errors: '404 { error: "NOT_FOUND" }',
   },
 ];
 

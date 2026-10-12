@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.69.0 - 2026-10-11
+
+### On a phone, the library and alert settings sit in the top bar
+
+The Messages page puts its two icon buttons -- the AI message templates (its tab is hidden on a phone) and the alert settings -- in the phone's top bar through `MobilePageHeader` from v1.68.0, instead of beside the search box. The search box gets the whole row. The desktop keeps the bell beside the search box and the tabs above the list.
+
 ## v1.68.0 - 2026-10-11
 
 ### On a phone, the calendar, orders and schedule are built for a phone

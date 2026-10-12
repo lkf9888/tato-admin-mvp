@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { GuestMessageAlertPanel } from "@/components/guest-message-alert-panel";
+import { MobileIconButton, MobilePageHeader } from "@/components/mobile-chrome";
 import { MessageRulesPanel } from "@/components/message-rules-panel";
 import {
   MessageTemplatePanel,
@@ -822,6 +823,20 @@ export function GuestMessagesView({
 
   return (
     <>
+      {/* On a phone the library (its tab is hidden there) and the alert
+          settings sit in the top bar, so the search box gets the row. */}
+      <MobilePageHeader
+        actions={
+          <>
+            <MobileIconButton label={t.tabLibrary} href="/messages/ai-templates">
+              <BookText className="h-[19px] w-[19px]" aria-hidden />
+            </MobileIconButton>
+            <MobileIconButton label={t.alertsButton} onClick={() => setAlertsOpen(true)}>
+              <Bell className="h-[19px] w-[19px]" aria-hidden />
+            </MobileIconButton>
+          </>
+        }
+      />
       <div className="lg:grid lg:h-[calc(100dvh-4.75rem)] lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-3">
         {/* ── The list ─────────────────────────────────────────── */}
         <section
@@ -852,20 +867,10 @@ export function GuestMessagesView({
                 onClick={() => setAlertsOpen(true)}
                 title={t.alertsButton}
                 aria-label={t.alertsButton}
-                className="tap-press tap-compact hit-area flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)]"
+                className="tap-press hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] lg:flex"
               >
                 <Bell className="h-4 w-4" aria-hidden />
               </button>
-              {/* The library's tab is hidden on a phone to give the list
-                  the room; this is the way there instead. */}
-              <Link
-                href="/messages/ai-templates"
-                title={t.tabLibrary}
-                aria-label={t.tabLibrary}
-                className="tap-press tap-compact hit-area flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] lg:hidden"
-              >
-                <BookText className="h-4 w-4" aria-hidden />
-              </Link>
             </div>
 
             <div className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 [scrollbar-width:none] lg:mx-0 lg:px-0" role="tablist">

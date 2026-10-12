@@ -153,8 +153,8 @@ export default async function GuestMessagesPage() {
   return (
     <div className="space-y-2">
       <h1 className="sr-only">{messages.shell.nav.guestMessages}</h1>
-      {/* On a phone the list's own book button leads to the library, so
-          the list starts at the top of the screen. */}
+      {/* On a phone the library is a button in the top bar, so the list
+          starts at the top of the screen. */}
       <div className="hidden lg:block">
         <GuestMessagesTabs
           active="messages"

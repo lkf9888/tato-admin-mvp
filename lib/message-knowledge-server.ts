@@ -141,10 +141,12 @@ export async function saveKnowledge(workspaceId: string, input: KnowledgeInput) 
   return { ok: true as const, entry: toKnowledgeEntry(row) };
 }
 
+/** Whether there was such an entry to delete. */
 export async function deleteKnowledge(workspaceId: string, id: string) {
   // Scheduled-message rules point at templates; a rule whose template
   // is gone simply stops producing messages (see listDueMessages).
-  await prisma.messageTemplate.deleteMany({ where: { workspaceId, id } });
+  const { count } = await prisma.messageTemplate.deleteMany({ where: { workspaceId, id } });
+  return count > 0;
 }
 
 type TripForKnowledge = {

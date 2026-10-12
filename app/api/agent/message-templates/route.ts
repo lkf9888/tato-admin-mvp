@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 
 import { authenticateAgent } from "@/lib/agent-auth";
 import { corsPreflight, withCors } from "@/lib/agent-cors";
@@ -6,6 +7,7 @@ import { cursorArgs, iso, paginate, parseLimit } from "@/lib/agent-read";
 import {
   buildKnowledgeBlock,
   isExpired,
+  KNOWLEDGE_KINDS,
   rankForConversation,
   toKnowledgeEntry,
   tripLocationText,
@@ -14,8 +16,15 @@ import {
   type KnowledgeEntry,
   type TripStage,
 } from "@/lib/message-knowledge";
-import { loadKnowledge, loadVehicleLabels } from "@/lib/message-knowledge-server";
+import {
+  deleteKnowledge,
+  KNOWLEDGE_LIMITS,
+  loadKnowledge,
+  loadVehicleLabels,
+  saveKnowledge,
+} from "@/lib/message-knowledge-server";
 import { renderTemplate } from "@/lib/message-placeholders";
+import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -171,6 +180,101 @@ export async function GET(request: Request) {
     nextCursor,
     usage: USAGE,
   });
+}
+
+const saveSchema = z.object({
+  id: z.string().trim().min(1).nullish(),
+  label: z.string().max(KNOWLEDGE_LIMITS.label * 2),
+  content: z.string().max(KNOWLEDGE_LIMITS.content * 2),
+  kind: z.enum(KNOWLEDGE_KINDS),
+  triggers: z.array(z.string().max(KNOWLEDGE_LIMITS.triggerLength * 2)).max(KNOWLEDGE_LIMITS.triggers * 2).default([]),
+  vehicleIds: z.array(z.string().min(1)).max(200).nullish(),
+  stages: z.array(z.enum(TRIP_STAGES)).nullish(),
+  locations: z.array(z.string().max(KNOWLEDGE_LIMITS.locationLength * 2)).max(KNOWLEDGE_LIMITS.locations * 2).nullish(),
+  validUntil: z.string().trim().min(1).nullish(),
+  aiEnabled: z.boolean().default(true),
+});
+
+/** Who changed the library, as the activity log names it. */
+const actorFor = (agent: { name: string }) => `agent:${agent.name}`;
+
+/**
+ * Add an entry, or replace one (`id`). The same checks as the library
+ * page: this workspace's cars only, the three kinds, the size limits.
+ *
+ * A whole entry, not a patch: an agent that edits sends back what it
+ * read, so a field it left out is not silently kept from before.
+ *
+ * Its own scope, apart from orders and messages: what this changes is
+ * what TATO's AI tells guests, so a token gets it only on purpose.
+ * Every change is logged with the token's name.
+ */
+export async function POST(request: Request) {
+  const agent = await authenticateAgent(request, "templates:write");
+  if (!agent) return withCors({ error: "UNAUTHORIZED" }, { status: 401 });
+
+  const parsed = saveSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return withCors({ error: "VALIDATION_ERROR", issues: parsed.error.issues.slice(0, 5) }, { status: 400 });
+  }
+  const before = parsed.data.id
+    ? await prisma.messageTemplate.findFirst({
+        where: { id: parsed.data.id, workspaceId: agent.workspaceId },
+        select: { label: true, content: true },
+      })
+    : null;
+
+  const result = await saveKnowledge(agent.workspaceId, {
+    ...parsed.data,
+    id: parsed.data.id ?? null,
+    vehicleIds: parsed.data.vehicleIds ?? null,
+    stages: parsed.data.stages ?? null,
+    locations: parsed.data.locations ?? null,
+    validUntil: parsed.data.validUntil ?? null,
+  });
+  if (!result.ok) {
+    return withCors({ error: result.error }, { status: result.error === "NOT_FOUND" ? 404 : 400 });
+  }
+
+  await logActivity({
+    workspaceId: agent.workspaceId,
+    actor: actorFor(agent),
+    action: parsed.data.id ? "message_template_updated" : "message_template_created",
+    entityType: "MessageTemplate",
+    entityId: result.entry.id,
+    // The previous wording, so a bad edit can be put back by hand.
+    metadata: { label: result.entry.label, before },
+  }).catch(() => null);
+
+  const vehicles = new Map((await loadVehicleLabels(agent.workspaceId)).map((vehicle) => [vehicle.id, vehicle]));
+  return withCors({ entry: shape(result.entry, vehicles), usage: USAGE });
+}
+
+export async function DELETE(request: Request) {
+  const agent = await authenticateAgent(request, "templates:write");
+  if (!agent) return withCors({ error: "UNAUTHORIZED" }, { status: 401 });
+
+  const parsed = z.object({ id: z.string().trim().min(1) }).safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return withCors({ error: "VALIDATION_ERROR" }, { status: 400 });
+
+  const before = await prisma.messageTemplate.findFirst({
+    where: { id: parsed.data.id, workspaceId: agent.workspaceId },
+    select: { label: true, content: true, kind: true },
+  });
+  if (!before || !(await deleteKnowledge(agent.workspaceId, parsed.data.id))) {
+    return withCors({ error: "NOT_FOUND" }, { status: 404 });
+  }
+
+  await logActivity({
+    workspaceId: agent.workspaceId,
+    actor: actorFor(agent),
+    action: "message_template_deleted",
+    entityType: "MessageTemplate",
+    entityId: parsed.data.id,
+    metadata: { label: before.label, before },
+  }).catch(() => null);
+
+  return withCors({ ok: true });
 }
 
 export function OPTIONS() {

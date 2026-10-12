@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.71.0 - 2026-10-12
+
+### An outside agent can add, change and delete AI message library entries
+
+`/api/agent/message-templates` gains POST and DELETE, behind the `templates:write` scope added in v1.70.0. POST without `id` adds an entry, with `id` replaces it whole -- a field left out is cleared, not kept, since an agent that edits sends back what it read. Both go through `saveKnowledge` / `deleteKnowledge`, so the checks are the library page's: this workspace's cars only, the three kinds, the size limits, 500 entries. Errors are the same codes (`LABEL_REQUIRED`, `VEHICLE_NOT_FOUND`, `NOT_FOUND` as 404, ...).
+
+Every change is written to the activity log as `message_template_created` / `_updated` / `_deleted` with the actor `agent:<token name>` and the previous label and wording, so a bad edit can be traced to its token and put back by hand. `deleteKnowledge` now says whether there was an entry to delete.
+
 ## v1.70.0 - 2026-10-12
 
 ### An API token can be allowed to edit the AI message library

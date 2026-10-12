@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 
 import { getMessages, type Locale } from "@/lib/i18n";
-import { isExpired, locationMatches, matchScore, type KnowledgeEntry, type TripStage } from "@/lib/message-knowledge";
+import { isExpired, entryLocationMatches, matchScore, type KnowledgeEntry, type TripStage } from "@/lib/message-knowledge";
 import { renderTemplate, templateAlreadySent, type PlaceholderContext } from "@/lib/message-placeholders";
 import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
@@ -25,8 +25,8 @@ export type MessageTemplateContext = {
   title: string;
   vehicleId: string | null;
   stage: TripStage | null;
-  /** The trip's pickup and return addresses (see tripLocationText). */
-  location: string | null;
+  pickupLocation: string | null;
+  returnLocation: string | null;
   /** Fills placeholders, pickup code included: this is the operator's
    *  own browser, not the AI. */
   values: PlaceholderContext;
@@ -50,7 +50,7 @@ export function suggestTemplates(entries: KnowledgeEntry[], context: MessageTemp
     !isExpired(entry) &&
     (!entry.vehicleIds || (context.vehicleId !== null && entry.vehicleIds.includes(context.vehicleId))) &&
     (!entry.stages || (context.stage !== null && entry.stages.includes(context.stage))) &&
-    (!entry.locations || locationMatches(entry.locations, context.location));
+    entryLocationMatches(entry, context);
   return entries
     .filter(fits)
     .map((entry) => ({

@@ -1710,6 +1710,8 @@ model MessageTemplate {
   /// JSON array of words a trip's pickup or return address must contain
   /// (any one), e.g. ["YVR", "Grant McConachie"]. Null is anywhere.
   locations   String?
+  /// pickup / return / either; null means legacy, requiring both addresses to match.
+  locationRole String?
   /// After this the entry is kept but no longer given to the AI.
   validUntil  DateTime?
   aiEnabled   Boolean    @default(true)

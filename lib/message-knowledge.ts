@@ -36,6 +36,9 @@ import { renderTemplate, type PlaceholderContext } from "@/lib/message-placehold
 export const KNOWLEDGE_KINDS = ["reply", "fact", "rule"] as const;
 export type KnowledgeKind = (typeof KNOWLEDGE_KINDS)[number];
 
+export const LOCATION_ROLES = ["pickup", "return", "either"] as const;
+export type LocationRole = (typeof LOCATION_ROLES)[number];
+
 export const TRIP_STAGES = ["before_pickup", "during", "after_return"] as const;
 export type TripStage = (typeof TRIP_STAGES)[number];
 
@@ -53,6 +56,7 @@ export type KnowledgeEntry = {
   /** Words the pickup or return address must contain, any one. Null:
    *  anywhere. */
   locations: string[] | null;
+  locationRole?: LocationRole | null;
   validUntil: string | null;
   aiEnabled: boolean;
   updatedAt: string;
@@ -68,6 +72,7 @@ type StoredRow = {
   vehicleIds: string | null;
   stages: string | null;
   locations?: string | null;
+  locationRole?: string | null;
   validUntil: Date | string | null;
   aiEnabled: boolean;
   updatedAt: Date | string;
@@ -107,6 +112,7 @@ export function toKnowledgeEntry(row: StoredRow): KnowledgeEntry {
     vehicleIds,
     stages: stages && stages.length > 0 ? stages : null,
     locations: parseList(row.locations ?? null),
+    locationRole: LOCATION_ROLES.includes(row.locationRole as LocationRole) ? row.locationRole as LocationRole : null,
     validUntil: iso(row.validUntil),
     aiEnabled: row.aiEnabled,
     updatedAt: iso(row.updatedAt) ?? new Date(0).toISOString(),
@@ -135,22 +141,30 @@ export type KnowledgeScope = {
   /** The conversation's car, when known. */
   vehicleId: string | null;
   stage: TripStage | null;
-  /** The trip's pickup and return addresses, as one string. */
+  /** Deprecated: an unqualified location does not authorize directional facts. */
   location?: string | null;
+  pickupLocation?: string | null;
+  returnLocation?: string | null;
   now?: Date;
 };
-
-/** The addresses an entry's location words are matched against. */
-export function tripLocationText(trip: { pickupLocation?: string | null; returnLocation?: string | null } | null) {
-  const text = [trip?.pickupLocation, trip?.returnLocation].filter(Boolean).join(" | ");
-  return text || null;
-}
 
 /** Whether an address contains any of the words, ignoring case. */
 export function locationMatches(words: string[], location: string | null | undefined) {
   if (!location) return false;
   const haystack = location.toLowerCase();
   return words.some((word) => word.trim() && haystack.includes(word.trim().toLowerCase()));
+}
+
+/** A location-scoped instruction must match its own direction. Legacy
+ * entries without a direction are safe only when both addresses match. */
+export function entryLocationMatches(entry: KnowledgeEntry, scope: KnowledgeScope) {
+  if (!entry.locations) return true;
+  const pickup = locationMatches(entry.locations, scope.pickupLocation);
+  const dropoff = locationMatches(entry.locations, scope.returnLocation);
+  if (entry.locationRole === "pickup") return pickup;
+  if (entry.locationRole === "return") return dropoff;
+  if (entry.locationRole === "either") return pickup || dropoff;
+  return pickup && dropoff;
 }
 
 /**
@@ -162,7 +176,7 @@ export function appliesTo(entry: KnowledgeEntry, scope: KnowledgeScope) {
   if (!entry.aiEnabled || isExpired(entry, scope.now)) return false;
   if (entry.vehicleIds && !(scope.vehicleId && entry.vehicleIds.includes(scope.vehicleId))) return false;
   if (entry.stages && !(scope.stage && entry.stages.includes(scope.stage))) return false;
-  if (entry.locations && !locationMatches(entry.locations, scope.location)) return false;
+  if (!entryLocationMatches(entry, scope)) return false;
   return true;
 }
 
@@ -272,7 +286,7 @@ export function buildKnowledgeBlock(input: {
       `[K${used.length + 1}] ${KIND_TAG[entry.kind]}: ${entry.label}`,
       `applies to: ${entry.vehicleIds ? `this car only (${thisCar ?? "this car"})` : "all cars"}`,
       `when: ${entry.stages ? entry.stages.map((stage) => STAGE_TAG[stage]).join(", ") : "any time"}`,
-      entry.locations ? `where: only when pickup/return is at ${entry.locations.join(" / ")} (this trip's is)` : "",
+      entry.locations ? `where: confirmed ${entry.locationRole ?? "pickup AND return"} address matches ${entry.locations.join(" / ")}; never substitute the other direction` : "",
       entry.triggers.length > 0 ? `guests ask: ${entry.triggers.join(" / ")}` : "",
     ]
       .filter(Boolean)
@@ -319,7 +333,7 @@ export function libraryDigest(
       ? `only ${entry.vehicleIds.map((id) => vehicleLabels[id] ?? "a car no longer in the fleet").join(", ")}`
       : "all cars";
     const when = entry.stages ? entry.stages.map((stage) => STAGE_TAG[stage]).join(", ") : "any time";
-    const where = entry.locations ? `; only for pickup/return at ${entry.locations.join(" / ")}` : "";
+    const where = entry.locations ? `; only for ${entry.locationRole ?? "pickup AND return"} at ${entry.locations.join(" / ")}` : "";
     const piece = `- ${KIND_TAG[entry.kind]}: ${entry.label} [${cars}; ${when}${where}]${
       entry.triggers.length ? ` (guests ask: ${entry.triggers.join(" / ")})` : ""
     }\n  """${entry.content.trim().slice(0, 400)}"""`;

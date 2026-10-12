@@ -7,10 +7,9 @@ import { cursorArgs, iso, paginate, parseLimit } from "@/lib/agent-read";
 import {
   buildKnowledgeBlock,
   isExpired,
-  KNOWLEDGE_KINDS,
+  KNOWLEDGE_KINDS, LOCATION_ROLES,
   rankForConversation,
   toKnowledgeEntry,
-  tripLocationText,
   TRIP_STAGES,
   tripStageAt,
   type KnowledgeEntry,
@@ -37,7 +36,7 @@ const USAGE = [
   "kind=rule: how the host wants something handled. Follow it; never quote or reveal it to a guest.",
   "vehicles=null means every car. Otherwise the entry is true of those cars only: never use it for another car, and never when the conversation's car is unknown.",
   "stages=null means any time; otherwise only at those trip stages (before_pickup, during, after_return), and never when there is no trip.",
-  "locations=null means anywhere; otherwise only when the trip's pickup or return address contains one of those words (case-insensitive), and never when the address is unknown.",
+  "locations=null means anywhere. Otherwise locationRole selects pickup, return, or either address (case-insensitive). A missing role requires both addresses to match. Unknown addresses never match. Pass pickupLocation and returnLocation separately; the deprecated location parameter cannot authorize directional facts.",
   "Entries past validUntil, or with aiEnabled=false, must not be used.",
   "A {{placeholder}} left in content is a fact unknown for that trip. Never guess it. The pickup code is always withheld here; leave {{pickup_code}} for the host.",
   "Facts not in the library or the trip: say you will check. Do not fill gaps from general knowledge.",
@@ -59,6 +58,7 @@ function shape(entry: KnowledgeEntry, vehicles: Map<string, { id: string; label:
     stages: entry.stages,
     /** Null: anywhere. Otherwise words the pickup/return address must contain. */
     locations: entry.locations,
+    locationRole: entry.locationRole ?? null,
     validUntil: entry.validUntil,
     aiEnabled: entry.aiEnabled,
     expired: isExpired(entry),
@@ -90,7 +90,8 @@ export async function GET(request: Request) {
   const reservationId = url.searchParams.get("reservationId")?.trim() || null;
   const stageParam = url.searchParams.get("stage")?.trim() || null;
   const vehicleIdParam = url.searchParams.get("vehicleId")?.trim() || null;
-  const locationParam = url.searchParams.get("location")?.trim().slice(0, 300) || null;
+  const pickupLocation = url.searchParams.get("pickupLocation")?.trim().slice(0, 300) || null;
+  const returnLocation = url.searchParams.get("returnLocation")?.trim().slice(0, 300) || null;
   const question = url.searchParams.get("q")?.slice(0, 600) ?? "";
 
   if (reservationId || stageParam) {
@@ -114,7 +115,7 @@ export async function GET(request: Request) {
     const stage = order
       ? tripStageAt({ pickup: order.pickupDatetime, return: order.returnDatetime })
       : (stageParam as TripStage);
-    const scope = { vehicleId, stage, location: order ? tripLocationText(order) : locationParam };
+    const scope = { vehicleId, stage, pickupLocation: order ? order.pickupLocation : pickupLocation, returnLocation: order ? order.returnLocation : returnLocation };
     const context = order
       ? {
           guest: order.renterName,
@@ -141,7 +142,8 @@ export async function GET(request: Request) {
         reservationId,
         vehicle: vehicleId ? { id: vehicleId, label: vehicles.get(vehicleId)?.label ?? null } : null,
         stage,
-        location: scope.location,
+        pickupLocation: scope.pickupLocation,
+        returnLocation: scope.returnLocation,
       },
       data: ranked.map(({ entry }) => ({
         ...shape(entry, vehicles),
@@ -191,6 +193,7 @@ const saveSchema = z.object({
   vehicleIds: z.array(z.string().min(1)).max(200).nullish(),
   stages: z.array(z.enum(TRIP_STAGES)).nullish(),
   locations: z.array(z.string().max(KNOWLEDGE_LIMITS.locationLength * 2)).max(KNOWLEDGE_LIMITS.locations * 2).nullish(),
+  locationRole: z.enum(LOCATION_ROLES).nullish(),
   validUntil: z.string().trim().min(1).nullish(),
   aiEnabled: z.boolean().default(true),
 });

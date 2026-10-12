@@ -30,7 +30,8 @@ import {
 } from "@/components/message-template-panel";
 import { InlineSpinner, TypingDots } from "@/components/turo-task-progress";
 import { getMessages, type Locale } from "@/lib/i18n";
-import { tripLocationText, tripStageAt, type KnowledgeEntry } from "@/lib/message-knowledge";
+import { mergeGuestConversation } from "@/lib/guest-conversation";
+import { tripStageAt, type KnowledgeEntry } from "@/lib/message-knowledge";
 import { renderTemplate } from "@/lib/message-placeholders";
 import { SEARCH_FIELD_PROPS } from "@/lib/search-field-props";
 
@@ -685,7 +686,8 @@ export function GuestMessagesView({
         title: [selected.guestName, selected.vehiclePlate ?? selected.vehicleLabel].filter(Boolean).join(" · "),
         vehicleId: selected.vehicleId,
         stage: tripStageAt(order ? { pickup: order.pickupDatetime, return: order.returnDatetime } : null),
-        location: tripLocationText(order),
+        pickupLocation: order?.pickupLocation ?? null,
+        returnLocation: order?.returnLocation ?? null,
         question: selected.messages[0]?.guestText ?? selected.messages[0]?.summary ?? "",
         values: {
           guest: order?.renterName ?? selected.guestName,
@@ -753,34 +755,31 @@ export function GuestMessagesView({
   const quickTemplates = templateContext ? suggestTemplates(library, templateContext).filter((item) => !item.sent).slice(0, 4) : [];
   const unfilled = composerText && templateContext ? renderTemplate(composerText, templateContext.values).missing : [];
 
-  // One stream, oldest first. The recorded conversation when there is
-  // one -- it has both sides -- and the guest's emailed messages when
-  // there is not.
-  const stream: {
+  // Reader imports and guest notifications complement each other.
+  type StreamMessage = {
     id: string;
     at: string;
     outbound: boolean;
     body: string;
     chinese: string | null;
     open: boolean;
-  }[] = selected
-    ? conversation.length > 0
-      ? conversation.map((message) => ({
+  };
+  const stream: StreamMessage[] = selected
+    ? mergeGuestConversation<StreamMessage>(conversation.map((message) => ({
           id: message.id,
           at: message.sentAt,
           outbound: message.direction === "outbound",
           body: message.body,
           chinese: message.bodyZh ?? zh[message.id] ?? null,
           open: false,
-        }))
-      : [...selected.messages].reverse().map((message) => ({
+        })), selected.messages.map((message) => ({
           id: message.id,
           at: message.receivedAt,
           outbound: false,
           body: message.guestText ?? message.summary ?? message.subject ?? "",
           chinese: chinese(message),
           open: !message.acknowledgedAt,
-        }))
+        })), (recorded, email) => ({ ...recorded, open: email.open, chinese: recorded.chinese ?? email.chinese }))
     : [];
 
   const tripDetails: { label: string; value: ReactNode }[] = order

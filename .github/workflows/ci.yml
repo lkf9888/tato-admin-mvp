@@ -35,6 +35,8 @@ jobs:
         run: npm run check:zh-hant
       - name: Help manual covers every sidebar page
         run: npm run check:help
+      - name: Guest reply regressions
+        run: npm test
       - name: Type check
         run: npx tsc --noEmit
       - name: Production build

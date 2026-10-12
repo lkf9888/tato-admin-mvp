@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.71.1 — Guest reply context and directional locations
+
+- Merge recorded host replies with incoming guest messages in both the inbox and AI prompts; preserve the selected question and its preceding context.
+- Match template locations against explicit pickup or return addresses, with separate preview inputs and conservative handling of legacy scopes.
+- Keep the matched trip vehicle authoritative and avoid turning confirmed options into unsupported exclusive policies.
+- Add regression tests for missing context, mixed locations, deduplication and vehicle scope.
+
 ## v1.71.0 - 2026-10-12
 
 ### An outside agent can add, change and delete AI message library entries

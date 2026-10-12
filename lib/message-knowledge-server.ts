@@ -4,10 +4,10 @@ import {
   buildKnowledgeBlock,
   KNOWLEDGE_KINDS,
   toKnowledgeEntry,
-  tripLocationText,
   TRIP_STAGES,
   tripStageAt,
   type KnowledgeKind,
+  type LocationRole,
   type TripStage,
 } from "@/lib/message-knowledge";
 import { prisma } from "@/lib/prisma";
@@ -38,6 +38,7 @@ const SELECT = {
   vehicleIds: true,
   stages: true,
   locations: true,
+  locationRole: true,
   validUntil: true,
   aiEnabled: true,
   updatedAt: true,
@@ -77,6 +78,7 @@ export type KnowledgeInput = {
   vehicleIds: string[] | null;
   stages: TripStage[] | null;
   locations: string[] | null;
+  locationRole?: LocationRole | null;
   validUntil: string | null;
   aiEnabled: boolean;
 };
@@ -121,6 +123,7 @@ export async function saveKnowledge(workspaceId: string, input: KnowledgeInput) 
     vehicleId: vehicleIds.length === 1 ? vehicleIds[0] : null,
     stages: stages.length > 0 && stages.length < TRIP_STAGES.length ? JSON.stringify(stages) : null,
     locations: locations.length > 0 ? JSON.stringify(locations) : null,
+    locationRole: input.locationRole ?? null,
     validUntil,
     aiEnabled: input.aiEnabled,
   };
@@ -183,7 +186,8 @@ export async function knowledgeForConversation(input: {
     scope: {
       vehicleId: input.vehicleId,
       stage: tripStageAt(trip ? { pickup: trip.pickupDatetime, return: trip.returnDatetime } : null, input.now),
-      location: tripLocationText(trip),
+      pickupLocation: trip?.pickupLocation ?? null,
+      returnLocation: trip?.returnLocation ?? null,
       now: input.now,
     },
     question: input.question,

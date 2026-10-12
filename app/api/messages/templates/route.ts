@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
-import { KNOWLEDGE_KINDS, TRIP_STAGES } from "@/lib/message-knowledge";
+import { KNOWLEDGE_KINDS, LOCATION_ROLES, TRIP_STAGES } from "@/lib/message-knowledge";
 import {
   deleteKnowledge,
   KNOWLEDGE_LIMITS,
@@ -42,6 +42,7 @@ const saveSchema = z.object({
   vehicleIds: z.array(z.string().min(1)).max(200).nullish(),
   stages: z.array(z.enum(TRIP_STAGES)).nullish(),
   locations: z.array(z.string().max(KNOWLEDGE_LIMITS.locationLength * 2)).max(KNOWLEDGE_LIMITS.locations * 2).nullish(),
+  locationRole: z.enum(LOCATION_ROLES).nullish(),
   validUntil: z.string().trim().min(1).nullish(),
   aiEnabled: z.boolean().default(true),
 });

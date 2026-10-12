@@ -9,6 +9,8 @@ import {
   buildKnowledgeBlock,
   isExpired,
   KNOWLEDGE_KINDS,
+  LOCATION_ROLES,
+  type LocationRole,
   TRIP_STAGES,
   type KnowledgeEntry,
   type KnowledgeKind,
@@ -29,6 +31,7 @@ type Draft = {
   stages: TripStage[];
   /** One word per line. */
   locations: string;
+  locationRole: LocationRole | null;
   validUntil: string;
   aiEnabled: boolean;
 };
@@ -42,6 +45,7 @@ const EMPTY_DRAFT: Draft = {
   vehicleIds: [],
   stages: [],
   locations: "",
+  locationRole: "pickup",
   validUntil: "",
   aiEnabled: true,
 };
@@ -62,6 +66,7 @@ function toDraft(entry: KnowledgeEntry, copyOf = false): Draft {
     vehicleIds: entry.vehicleIds ?? [],
     stages: entry.stages ?? [],
     locations: (entry.locations ?? []).join("\n"),
+    locationRole: entry.locationRole ?? null,
     validUntil: entry.validUntil ? entry.validUntil.slice(0, 10) : "",
     aiEnabled: entry.aiEnabled,
   };
@@ -134,6 +139,7 @@ export function MessageLibraryView({
           triggers: draft.triggers.split(/\r?\n/),
           vehicleIds: draft.vehicleIds.length > 0 ? draft.vehicleIds : null,
           stages: draft.stages.length > 0 ? draft.stages : null,
+          locationRole: draft.locationRole,
           locations: draft.locations.split(/\r?\n/).map((word) => word.trim()).filter(Boolean),
           validUntil: draft.validUntil ? `${draft.validUntil}T23:59:59` : null,
           aiEnabled: draft.aiEnabled,
@@ -177,6 +183,7 @@ export function MessageLibraryView({
         vehicleIds: entry.vehicleIds,
         stages: entry.stages,
         locations: entry.locations,
+        locationRole: entry.locationRole ?? null,
         validUntil: entry.validUntil,
         aiEnabled: !entry.aiEnabled,
       }),
@@ -354,7 +361,7 @@ export function MessageLibraryView({
                 <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px]">
                   <Chip>{entry.vehicleIds ? entry.vehicleIds.map((id) => vehicleLabel[id]?.split(" · ")[0] ?? "?").join("、") : t.allCars}</Chip>
                   <Chip>{entry.stages ? entry.stages.map((stage) => t.stages[stage]).join("、") : t.stages.any}</Chip>
-                  {entry.locations ? <Chip>{t.atLocation(entry.locations.join(" / "))}</Chip> : null}
+                  {entry.locations ? <Chip>{`${t.locationRoles[entry.locationRole ?? "unconfirmed"]} · ${t.atLocation(entry.locations.join(" / "))}`}</Chip> : null}
                   {entry.validUntil ? <Chip tone={expired ? "bad" : undefined}>{expired ? t.expired : t.validUntil(dateLabel(entry.validUntil))}</Chip> : null}
                   <button
                     type="button"
@@ -448,19 +455,20 @@ function AiPreview({
   const [vehicleId, setVehicleId] = useState<string>(vehicles[0]?.id ?? "");
   const [stage, setStage] = useState<TripStage | "">("before_pickup");
   const [question, setQuestion] = useState("");
-  const [location, setLocation] = useState("");
+  const [pickupLocation, setPickupLocation] = useState("");
+  const [returnLocation, setReturnLocation] = useState("");
   const [open, setOpen] = useState(false);
 
   const block = useMemo(
     () =>
       buildKnowledgeBlock({
         entries,
-        scope: { vehicleId: vehicleId || null, stage: stage || null, location: location.trim() || null },
+        scope: { vehicleId: vehicleId || null, stage: stage || null, pickupLocation: pickupLocation.trim() || null, returnLocation: returnLocation.trim() || null },
         question,
         context: null,
         vehicleLabels: vehicleLabel,
       }),
-    [entries, vehicleId, stage, question, location, vehicleLabel],
+    [entries, vehicleId, stage, question, pickupLocation, returnLocation, vehicleLabel],
   );
   const usable = entries.filter((entry) => entry.aiEnabled && !isExpired(entry)).length;
 
@@ -502,9 +510,17 @@ function AiPreview({
         <label className="grid gap-1 text-[11.5px] font-semibold text-[var(--ink-mid)]">
           {t.previewLocation}
           <input
-            value={location}
-            onChange={(event) => setLocation(event.target.value)}
+            value={pickupLocation}
+            onChange={(event) => setPickupLocation(event.target.value)}
             placeholder="3211 Grant McConachie Way, Richmond"
+            className="h-9 rounded-md border border-[var(--line)] bg-[var(--surface)] px-2 text-[13px] font-normal text-[var(--ink)]"
+          />
+        </label>
+        <label className="grid gap-1 text-[11.5px] font-semibold text-[var(--ink-mid)]">
+          {t.previewReturnLocation}
+          <input
+            value={returnLocation}
+            onChange={(event) => setReturnLocation(event.target.value)}
             className="h-9 rounded-md border border-[var(--line)] bg-[var(--surface)] px-2 text-[13px] font-normal text-[var(--ink)]"
           />
         </label>
@@ -747,6 +763,13 @@ function EntryEditor({
             </div>
           </div>
 
+          <label className={label}>
+            {t.fieldLocationRole}
+            <select value={draft.locationRole ?? ""} onChange={(event) => set({ locationRole: (event.target.value || null) as LocationRole | null })} className={field}>
+              <option value="">{t.locationRoles.unconfirmed}</option>
+              {LOCATION_ROLES.map(role => <option key={role} value={role}>{t.locationRoles[role]}</option>)}
+            </select>
+          </label>
           <label className={label}>
             {t.fieldLocations}
             <textarea

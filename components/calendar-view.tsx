@@ -1,9 +1,19 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Ticket, Wrench } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, Ticket, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { CalendarOrderSheet } from "@/components/calendar-order-sheet";
+import { CalendarViewToggle, useCalendarViewMode } from "@/components/mobile-calendar-switch";
+import {
+  type MobileAction,
+  MobileFab,
+  MobileIconButton,
+  MobileMoreMenu,
+  MobilePageHeader,
+  MobileSheet,
+} from "@/components/mobile-chrome";
 import { CalendarPricePanel } from "@/components/calendar-price-panel";
 import { type EditableOrder, OrderDetailModal } from "@/components/order-detail-modal";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -122,14 +132,16 @@ const DEFAULT_VEHICLE_COLUMN_WIDTH = 188;
 // A 188px sticky column eats half of a 375px phone, leaving barely two
 // day columns visible -- the timeline is technically present and
 // useless. Narrow it when the viewport is narrow; the row still shows
-// the nickname, just with less room around it.
-const COMPACT_VEHICLE_COLUMN_WIDTH = 88;
+// the nickname, just with less room around it. 62px holds a plate and,
+// under it, the model -- the badges that used to share the cell are a
+// desktop affordance.
+const COMPACT_VEHICLE_COLUMN_WIDTH = 62;
 const COMPACT_VIEWPORT_WIDTH = 640;
 // What a phone should be able to see at once without scrolling: this
 // week and the few days after it. Everything else about the compact
 // timeline -- the column width, the row height, the type -- falls out
-// of making seven columns fit.
-const COMPACT_VISIBLE_DAYS = 7;
+// of making eight columns fit: a week and the day after it.
+const COMPACT_VISIBLE_DAYS = 8;
 const COMPACT_MIN_DAY_COLUMN_WIDTH = 30;
 const DAY_COLUMN_WIDTHS = {
   week: 92,
@@ -164,11 +176,11 @@ const DEFAULT_CUSTOM_DAY_WIDTH = 52;
 const LANE_HEIGHT = 38;
 const BAR_HEIGHT = 34;
 // The same rows about a third shorter. Desktop heights on a phone made
-// four vehicles a full screen; at these, it is closer to nine, which
-// is the point of a timeline.
-const COMPACT_LANE_HEIGHT = 30;
-const COMPACT_BAR_HEIGHT = 27;
-const COMPACT_MIN_ROW_HEIGHT = 36;
+// four vehicles a full screen; at 40px rows with 22px bars that carry
+// the name only, it is sixteen, which is the point of a timeline.
+const COMPACT_LANE_HEIGHT = 26;
+const COMPACT_BAR_HEIGHT = 22;
+const COMPACT_MIN_ROW_HEIGHT = 40;
 const MIN_ROW_HEIGHT = 44;
 const DAY_IN_MS = CHUNK_DAY_IN_MS;
 const SCRUBBER_DAY_RANGE = 365;
@@ -293,7 +305,7 @@ function getTimelineBarClasses(
     // cell that happens to be clickable; at the floor's height four
     // vehicles fill a phone screen, which defeats the view. It stays a
     // comfortable target because it is wide.
-    compact ? "tap-compact px-1.5 text-[10px]" : "px-3.5 text-[13px]",
+    compact ? "tap-compact px-1.5 text-[11px] font-semibold" : "px-3.5 text-[13px]",
     // Conflict and cancellation are the two states that need to stay
     // findable regardless of anything else about the trip, so they
     // still win outright. Below that, green now means "this trip's
@@ -546,6 +558,26 @@ function formatWeekday(date: Date, locale: Locale, compact = false) {
 
 function formatTimelineDateLabel(date: Date) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+/** What the bar colours mean: the desktop's legend row and the phone's
+ *  legend sheet. */
+const BAR_LEGEND = [
+  ["unsynced", "h-2.5 w-4 rounded-sm bg-[#3456df]"],
+  ["synced", "h-2.5 w-4 rounded-sm bg-[#2f7f67]"],
+  ["conflict", "h-2.5 w-4 rounded-sm bg-[#e5484d]"],
+  ["service", "h-2.5 w-4 rounded-sm border border-amber-500 bg-amber-300"],
+  ["cancelled", "h-2 w-4 rounded-sm border border-dashed border-[rgba(17,19,24,0.35)] bg-[rgba(17,19,24,0.10)]"],
+  ["now", "h-3 w-[2px] bg-[var(--accent)]"],
+  ["turnaround", "h-2.5 w-2.5 rounded-full border border-amber-400 bg-amber-100"],
+] as const;
+
+/** "Tesla Model Y 2020" → "Model Y": what fits under a plate in 62px. */
+function shortModel(label: string) {
+  const words = label.trim().split(/\s+/);
+  if (words.length > 1 && /^\d{4}$/.test(words[words.length - 1])) words.pop();
+  if (words.length > 1) words.shift();
+  return words.join(" ");
 }
 
 function formatMonthTitle(date: Date, locale: Locale) {
@@ -858,6 +890,10 @@ export function CalendarView({
   const dayColumnWidthRef = useRef(DEFAULT_CUSTOM_DAY_WIDTH);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState<number | null>(null);
   const [orderPopover, setOrderPopover] = useState<OrderPopoverState | null>(null);
+  // A phone's first step on a tapped trip: the card from the bottom.
+  const [orderSheetOpen, setOrderSheetOpen] = useState(false);
+  const [mobileSheet, setMobileSheet] = useState<"search" | "filters" | "legend" | null>(null);
+  const calendarViewMode = useCalendarViewMode();
   const [isTuroSyncing, setIsTuroSyncing] = useState(false);
   const [turoSyncNotice, setTuroSyncNotice] = useState<TuroSyncNotice | null>(null);
 
@@ -1617,7 +1653,12 @@ export function CalendarView({
     : DEFAULT_VEHICLE_COLUMN_WIDTH;
   const laneHeight = compact ? COMPACT_LANE_HEIGHT : LANE_HEIGHT;
   const barHeight = compact ? COMPACT_BAR_HEIGHT : BAR_HEIGHT;
-  const barTopOffset = compact ? 4 : 6;
+  const barTopOffset = compact ? 9 : 6;
+  // Prices start hidden on a phone: in a 41px column they crowd the
+  // bars out. ⋯ turns them on.
+  useEffect(() => {
+    if (compact) setShowPrices(false);
+  }, [compact]);
   const minRowHeight = compact ? COMPACT_MIN_ROW_HEIGHT : MIN_ROW_HEIGHT;
   const fittedTimelineWidth = Math.max((timelineViewportWidth ?? 0) - vehicleColumnWidth, 0);
   // A phone divides the width it has by seven and takes that, rather
@@ -2406,8 +2447,178 @@ export function CalendarView({
     }
   };
 
+  // The three filters, drawn in the desktop's Filters menu and in the
+  // phone's filter sheet.
+  const filterControls = (
+    <>
+      <SearchableFilterDropdown
+        value={selectedVehicleId}
+        query={vehicleFilterQuery}
+        allLabel={calendarMessages.allVehicles}
+        searchPlaceholder={calendarMessages.searchVehiclesPlaceholder}
+        options={vehicleFilterOptions}
+        onValueChange={setSelectedVehicleId}
+        onQueryChange={setVehicleFilterQuery}
+      />
+      {!readOnly ? (
+        <SearchableFilterDropdown
+          value={selectedOwnerId}
+          query={ownerFilterQuery}
+          allLabel={calendarMessages.allOwners}
+          searchPlaceholder={calendarMessages.searchOwnersPlaceholder}
+          options={ownerFilterOptions}
+          onValueChange={setSelectedOwnerId}
+          onQueryChange={setOwnerFilterQuery}
+        />
+      ) : null}
+      <SearchableFilterDropdown
+        value={selectedSource}
+        query={sourceFilterQuery}
+        allLabel={calendarMessages.allSources}
+        searchPlaceholder={calendarMessages.searchSourcesPlaceholder}
+        options={sourceFilterOptions}
+        onValueChange={setSelectedSource}
+        onQueryChange={setSourceFilterQuery}
+      />
+    </>
+  );
+  const activeFilterCount = [selectedVehicleId, readOnly ? "all" : selectedOwnerId, selectedSource].filter(
+    (value) => value !== "all",
+  ).length;
+  const mobileText = calendarMessages.mobile;
+  // The phone's chrome belongs to whichever view is showing: the list
+  // draws its own.
+  const showMobileChrome = compact && calendarViewMode !== "list";
+  const mobileMoreActions: MobileAction[] = [
+    ...(pricing
+      ? [
+          { label: showPrices ? mobileText.pricesOff : mobileText.pricesOn, onClick: () => setShowPrices((on) => !on) },
+          ...(!readOnly
+            ? [{ label: messages.calendarPricePanel.openAction, onClick: () => setPricePanel({ vehicleIds: [], days: [] }) }]
+            : []),
+        ]
+      : []),
+    ...(!readOnly
+      ? [
+          { label: calendarMessages.turoSyncAction, onClick: () => void handleTuroSync(), disabled: isTuroSyncing },
+          { label: calendarMessages.refreshAction, onClick: handleRefresh, disabled: isRefreshing },
+        ]
+      : [{ label: calendarMessages.refreshAction, onClick: handleRefresh, disabled: isRefreshing }]),
+    ...(!readOnly && !limitedToVehicles
+      ? [
+          { label: bulkMode ? calendarMessages.bulkModeExit : calendarMessages.bulkModeEnter, onClick: toggleBulkMode },
+          { label: calendarMessages.feedAction, onClick: () => setIsFeedOpen(true) },
+        ]
+      : []),
+    ...(!readOnly
+      ? [
+          {
+            label: calendarMessages.downloadOrders,
+            onClick: () => setExportSignal((value) => value + 1),
+            disabled: vehicleOptions.length === 0,
+          },
+        ]
+      : []),
+    ...(!readOnly && !limitedToVehicles
+      ? [{ label: calendarMessages.addVehicleAction.replace(/^\+\s*/, ""), onClick: () => setIsAddVehicleOpen(true) }]
+      : []),
+    { label: mobileText.legend, onClick: () => setMobileSheet("legend") },
+  ];
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 max-sm:space-y-0">
+      {showMobileChrome ? (
+        <MobilePageHeader
+          title={
+            <span className="truncate text-[17px] font-semibold leading-tight text-[var(--ink)]">
+              {formatMonthTitle(normalizedFocusDate, locale)}
+            </span>
+          }
+          actions={
+            <>
+              <MobileIconButton
+                label={mobileText.search}
+                onClick={() => setMobileSheet("search")}
+                dot={Boolean(calendarSearchQuery.trim())}
+              >
+                <Search className="h-[19px] w-[19px]" aria-hidden />
+              </MobileIconButton>
+              <MobileIconButton
+                label={mobileText.filters}
+                onClick={() => setMobileSheet("filters")}
+                dot={activeFilterCount > 0}
+              >
+                <SlidersHorizontal className="h-[19px] w-[19px]" aria-hidden />
+              </MobileIconButton>
+              <MobileMoreMenu label={mobileText.more} cancelLabel={mobileText.cancel} actions={mobileMoreActions} />
+            </>
+          }
+        />
+      ) : null}
+      {showMobileChrome && !readOnly ? (
+        <MobileFab
+          label={mobileText.newMenu}
+          cancelLabel={mobileText.cancel}
+          actions={[
+            { label: calendarMessages.manualCreate, onClick: openCreateOrderDialog, disabled: vehicleOptions.length === 0 },
+            { label: calendarMessages.service.newAction, onClick: openServiceDialog, disabled: vehicleOptions.length === 0 },
+            ...(limitedToVehicles
+              ? []
+              : [{ label: calendarMessages.recurringAction, onClick: () => setIsRecurringOpen(true), disabled: vehicleOptions.length === 0 }]),
+          ]}
+        />
+      ) : null}
+      {compact ? (
+        <>
+          <MobileSheet
+            open={mobileSheet === "search"}
+            onClose={() => setMobileSheet(null)}
+            label={mobileText.search}
+            closeLabel={mobileText.done}
+          >
+            <label className="block pb-2 pr-10">
+              <span className="sr-only">{calendarMessages.timelineSearch}</span>
+              <input
+                type="search"
+                {...SEARCH_FIELD_PROPS}
+                autoFocus
+                value={calendarSearchQuery}
+                onChange={(event) => setCalendarSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") setMobileSheet(null);
+                }}
+                placeholder={calendarMessages.timelineSearchPlaceholder}
+                className="h-10 w-full rounded-[10px] bg-[var(--surface-muted)] px-3 text-[16px] text-[var(--ink)] outline-none"
+              />
+            </label>
+          </MobileSheet>
+          <MobileSheet
+            open={mobileSheet === "filters"}
+            onClose={() => setMobileSheet(null)}
+            label={mobileText.filters}
+            closeLabel={mobileText.done}
+          >
+            <h2 className="pb-2 text-[17px] font-semibold text-[var(--ink)]">{mobileText.filters}</h2>
+            <div className="grid gap-2 pb-2">{filterControls}</div>
+          </MobileSheet>
+          <MobileSheet
+            open={mobileSheet === "legend"}
+            onClose={() => setMobileSheet(null)}
+            label={mobileText.legend}
+            closeLabel={mobileText.done}
+          >
+            <h2 className="pb-2 text-[17px] font-semibold text-[var(--ink)]">{mobileText.legend}</h2>
+            <ul className="grid gap-2.5 pb-2 text-[14px] text-[var(--ink)]">
+              {BAR_LEGEND.map(([key, swatch]) => (
+                <li key={key} className="flex items-center gap-2.5">
+                  <span aria-hidden className={cn("inline-block shrink-0", swatch)} />
+                  {calendarMessages.barLegend[key]}
+                </li>
+              ))}
+            </ul>
+          </MobileSheet>
+        </>
+      ) : null}
       {/* v0.19.1 density pass: control bar was using p-4 + gap-4 + a
        * 2.2rem center title that ate ~250px of vertical space before
        * the timeline started rendering. Reframed as a single tight
@@ -2417,12 +2628,56 @@ export function CalendarView({
        * badges removed — the timeline itself is self-explanatory and
        * those badges were just decorative noise. */}
       {/* Not overflow-hidden: the toolbar's menus open below it. */}
-      <section className="relative z-20 rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-2.5 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+      <section className="relative z-20 rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] p-2.5 shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)] max-sm:-mx-2.5 max-sm:-mt-3 max-sm:rounded-none max-sm:border-x-0 max-sm:border-t-0 max-sm:bg-[var(--surface)] max-sm:px-2.5 max-sm:py-0 max-sm:shadow-none">
+        {/* A phone: one 40px row -- ‹ Today ›, the count, and the
+            calendar/list switch. Search and filters are the top bar's
+            icons, everything else is behind its ⋯, and new is the round
+            ＋. The desktop's two rows of menus are hidden there. */}
+        <div className="flex h-10 items-center justify-between gap-2 sm:hidden">
+          <div className="flex min-w-0 items-center gap-1">
+            <button
+              type="button"
+              aria-label={calendarMessages.panEarlier(pageStrideDays)}
+              onClick={() => panByDays(-pageStrideDays)}
+              className="tap-compact hit-area flex h-[30px] w-[30px] items-center justify-center rounded-lg text-[var(--ink)]"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToDate(nowDay)}
+              className="tap-compact hit-area h-7 shrink-0 whitespace-nowrap rounded-[7px] border border-[var(--line-strong)] bg-[var(--surface)] px-2.5 text-[12px] font-semibold text-[var(--ink)]"
+            >
+              {calendarMessages.today}
+            </button>
+            <button
+              type="button"
+              aria-label={calendarMessages.panLater(pageStrideDays)}
+              onClick={() => panByDays(pageStrideDays)}
+              className="tap-compact hit-area flex h-[30px] w-[30px] items-center justify-center rounded-lg text-[var(--ink)]"
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </button>
+            <span className="ml-1 truncate text-[12px] text-[var(--ink-soft)]">
+              {mobileText.rowSummary(sortedVehicles.length, visibleOrders.length)}
+            </span>
+          </div>
+          <CalendarViewToggle />
+        </div>
+        {bulkMode ? (
+          <button
+            type="button"
+            onClick={toggleBulkMode}
+            className="tap-compact mb-1.5 h-8 w-full rounded-md border border-[var(--accent)] text-[12px] font-semibold text-[var(--accent)] sm:hidden"
+          >
+            {calendarMessages.bulkModeExit}
+          </button>
+        ) : null}
         <div className="grid gap-2 2xl:grid-cols-[auto_minmax(42rem,1fr)] 2xl:items-center">
           {/* One row of grouped menus. It was eleven buttons in two
               rows, then a filter row; related actions share a menu now,
               and only the moves made every minute stay loose. */}
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 max-sm:hidden">
             <div className="inline-flex rounded-md border border-[var(--line)] bg-white p-0.5">
               <button
                 type="button"
@@ -2574,35 +2829,7 @@ export function CalendarView({
                     className="h-9 w-full rounded-md border border-[var(--line)] bg-white px-3 text-[12px] text-[var(--ink)] outline-none focus:border-[rgba(17,19,24,0.3)]"
                   />
                 </label>
-                <SearchableFilterDropdown
-                  value={selectedVehicleId}
-                  query={vehicleFilterQuery}
-                  allLabel={calendarMessages.allVehicles}
-                  searchPlaceholder={calendarMessages.searchVehiclesPlaceholder}
-                  options={vehicleFilterOptions}
-                  onValueChange={setSelectedVehicleId}
-                  onQueryChange={setVehicleFilterQuery}
-                />
-                {!readOnly ? (
-                  <SearchableFilterDropdown
-                    value={selectedOwnerId}
-                    query={ownerFilterQuery}
-                    allLabel={calendarMessages.allOwners}
-                    searchPlaceholder={calendarMessages.searchOwnersPlaceholder}
-                    options={ownerFilterOptions}
-                    onValueChange={setSelectedOwnerId}
-                    onQueryChange={setOwnerFilterQuery}
-                  />
-                ) : null}
-                <SearchableFilterDropdown
-                  value={selectedSource}
-                  query={sourceFilterQuery}
-                  allLabel={calendarMessages.allSources}
-                  searchPlaceholder={calendarMessages.searchSourcesPlaceholder}
-                  options={sourceFilterOptions}
-                  onValueChange={setSelectedSource}
-                  onQueryChange={setSourceFilterQuery}
-                />
+                {filterControls}
               </div>
             </ToolbarMenu>
 
@@ -2886,17 +3113,7 @@ export function CalendarView({
               {/* What the colours mean. Learnt once, but until then a
                   blue bar and a green one were two shades of "a trip". */}
               <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[color:var(--ink-soft)]">
-                {(
-                  [
-                    ["unsynced", "h-2.5 w-4 rounded-sm bg-[#3456df]"],
-                    ["synced", "h-2.5 w-4 rounded-sm bg-[#2f7f67]"],
-                    ["conflict", "h-2.5 w-4 rounded-sm bg-[#e5484d]"],
-                    ["service", "h-2.5 w-4 rounded-sm border border-amber-500 bg-amber-300"],
-                    ["cancelled", "h-2 w-4 rounded-sm border border-dashed border-[rgba(17,19,24,0.35)] bg-[rgba(17,19,24,0.10)]"],
-                    ["now", "h-3 w-[2px] bg-[var(--accent)]"],
-                    ["turnaround", "h-2.5 w-2.5 rounded-full border border-amber-400 bg-amber-100"],
-                  ] as const
-                ).map(([key, swatch]) => (
+                {BAR_LEGEND.map(([key, swatch]) => (
                   <li key={key} className="flex items-center gap-1.5 whitespace-nowrap">
                     <span aria-hidden className={cn("inline-block shrink-0", swatch)} />
                     {calendarMessages.barLegend[key]}
@@ -3150,7 +3367,7 @@ export function CalendarView({
 
       {/* `isolate` keeps the grid's sticky header (z-40/50) stacking
           inside this card, so the toolbar's menus open over it. */}
-      <section className="calendar-dense isolate overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
+      <section className="calendar-dense isolate overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.74)] p-2.5 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] max-sm:-mx-2.5 max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:p-0 max-sm:shadow-none">
         {sortedVehicles.length === 0 ? (
           <div className="rounded-lg bg-[rgba(255,255,255,0.72)] px-4 py-10 text-sm text-[color:var(--ink-soft)]">
             {calendarMessages.noVehicles}
@@ -3177,6 +3394,9 @@ export function CalendarView({
                away instead. */
             className={cn(
               "max-h-[76vh] cursor-grab touch-pan-y overflow-auto overscroll-x-contain rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.95)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]",
+              // A phone: the grid fills what is left between the bars,
+              // so the page itself does not scroll under it.
+              "max-sm:h-[calc(100dvh-160px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] max-sm:max-h-none max-sm:rounded-none max-sm:border-0",
               // The server cannot know the screen, so its markup is the
               // desktop layout. Hidden until measured, so a phone never
               // shows that frame before its own.
@@ -3251,19 +3471,19 @@ export function CalendarView({
                           the accent, so it is found without counting. */}
                       <p
                         className={cn(
-                          "truncate text-[11px] font-semibold uppercase tracking-[0.04em] max-lg:text-[9px] max-lg:tracking-normal",
+                          "truncate text-[11px] font-semibold uppercase tracking-[0.04em] max-lg:text-[10px] max-lg:font-normal max-lg:tracking-normal",
                           todayColumn ? "text-[var(--accent)]" : "text-[color:var(--ink-soft)]",
                         )}
                       >
-                        {todayColumn && !compact ? calendarMessages.today : formatWeekday(date, locale, compact)}
+                        {todayColumn ? calendarMessages.today : formatWeekday(date, locale, compact)}
                       </p>
                       <p
                         className={cn(
-                          "mt-0.5 whitespace-nowrap text-[14px] font-bold leading-tight tabular-nums max-lg:text-[11px]",
+                          "mt-0.5 whitespace-nowrap text-[14px] font-bold leading-tight tabular-nums max-lg:mt-0 max-lg:text-[13px] max-lg:font-semibold",
                           todayColumn ? "text-[var(--accent)]" : "text-[color:var(--ink)]",
                         )}
                       >
-                        {formatTimelineDateLabel(date)}
+                        {compact ? date.getDate() : formatTimelineDateLabel(date)}
                       </p>
                     </div>
                   );
@@ -3355,7 +3575,7 @@ export function CalendarView({
                   >
                     <div
                       className={cn(
-                        "sticky left-0 z-20 flex flex-col justify-center overflow-hidden border-r border-[color:var(--line)] px-3 py-1.5 backdrop-blur max-lg:px-2 max-lg:py-1",
+                        "sticky left-0 z-20 flex flex-col justify-center overflow-hidden border-r border-[color:var(--line)] px-3 py-1.5 backdrop-blur max-lg:px-2 max-lg:py-1 max-sm:pl-2.5 max-sm:pr-1",
                         // The detail the second line used to carry.
                         "cursor-default",
                         // Opaque, not 95%. The column stands still
@@ -3373,11 +3593,27 @@ export function CalendarView({
                         .filter(Boolean)
                         .join(" · ")}
                     >
-                      {/* On a phone the two badges drop under the plate
-                          rather than squeezing it to "DJ…". */}
+                      {/* A phone: the plate and, under it, the model, both
+                          one tap from the car's month. The badges and the
+                          edit link are a desktop's. */}
+                      {compact ? (
+                        <button
+                          type="button"
+                          onClick={() => setMonthCalendarFor(vehicle.id)}
+                          aria-label={`${vehicle.plateNumber || vehicle.label} \u2014 ${calendarMessages.monthViewAction}`}
+                          className={cn("tap-compact flex min-w-0 flex-col items-start text-left leading-[1.2]", vehicle.archived && "opacity-60")}
+                        >
+                          <span className="w-full truncate text-[11px] font-semibold tracking-[0.2px] text-[color:var(--ink)]">
+                            {highlightText(vehicle.plateNumber || vehicle.label, vehicleFilterQuery)}
+                          </span>
+                          <span className="w-full truncate text-[9.5px] text-[color:var(--ink-soft)]">
+                            {shortModel(vehicle.secondaryLabel || vehicle.label)}
+                          </span>
+                        </button>
+                      ) : (
                       <span
                         className={cn(
-                          "flex min-w-0 items-center gap-1 max-sm:flex-wrap max-sm:gap-y-0.5",
+                          "flex min-w-0 items-center gap-1",
                           vehicle.archived && "opacity-60",
                         )}
                       >
@@ -3438,6 +3674,7 @@ export function CalendarView({
                         </span>
                       ) : null}
                       </span>
+                      )}
                       {/* The plate is the column, on every size now.
                           Model and owner were a second line under it,
                           and in a grid whose job is "which car is free
@@ -3749,8 +3986,11 @@ export function CalendarView({
                         // Too narrow for anything readable: a bare block
                         // says "something is here"; tap and tooltip say
                         // what. Times need room for both corners.
-                        const showName = visibleBarWidth >= 32;
-                        const showTimes = visibleBarWidth >= (compact ? 64 : 84);
+                        // A phone shows the name alone, and under 44px only
+                        // its first letter: the card it opens has the rest.
+                        const showName = compact ? visibleBarWidth >= 14 : visibleBarWidth >= 32;
+                        const nameInitialOnly = compact && visibleBarWidth < 44;
+                        const showTimes = !compact && visibleBarWidth >= 84;
 
                         return (
                           <button
@@ -3772,7 +4012,10 @@ export function CalendarView({
                                 return;
                               }
                               setSelectedOrder(bar.order);
-                              setOrderPopover({ isOpen: true });
+                              // On a phone a card from the bottom first,
+                              // the full panel from its "Open order".
+                              if (compact) setOrderSheetOpen(true);
+                              else setOrderPopover({ isOpen: true });
                             }}
                             className={getTimelineBarClasses(
                               bar.order,
@@ -3820,7 +4063,9 @@ export function CalendarView({
                                 )}
                                 style={{ paddingLeft: labelInset, paddingRight: rightInset }}
                               >
-                                {highlightText(bar.order.renterName, calendarSearchQuery)}
+                                {nameInitialOnly
+                                  ? bar.order.renterName.trim().slice(0, 1)
+                                  : highlightText(bar.order.renterName, calendarSearchQuery)}
                               </span>
                             ) : null}
                           </button>
@@ -3846,6 +4091,19 @@ export function CalendarView({
           </div>
         )}
       </section>
+
+      {compact && selectedOrder && orderSheetOpen ? (
+        <CalendarOrderSheet
+          order={selectedOrder}
+          locale={locale}
+          readOnly={readOnly}
+          onClose={() => setOrderSheetOpen(false)}
+          onOpenOrder={() => {
+            setOrderSheetOpen(false);
+            setOrderPopover({ isOpen: true });
+          }}
+        />
+      ) : null}
 
       {selectedOrder && orderPopover ? (
         <OrderDetailModal

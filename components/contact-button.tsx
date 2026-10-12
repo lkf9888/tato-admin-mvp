@@ -27,6 +27,8 @@ import { APP_VERSION_LABEL } from "@/lib/version";
  */
 
 const ACCEPT_ATTRIBUTE = "image/*,video/*,application/pdf,text/plain";
+
+export const OPEN_CONTACT_EVENT = "tato:open-contact";
 const MAX_FILES = 5;
 const MAX_BYTES_PER_FILE = 10 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -72,6 +74,15 @@ export function ContactButton({
       document.body.style.overflow = original;
     };
   }, [open]);
+
+  // On a phone the floating trigger is gone (the top bar's right side
+  // belongs to each page's own buttons); "Contact" in the More sheet
+  // opens this through an event instead.
+  useEffect(() => {
+    const openFromElsewhere = () => setOpen(true);
+    window.addEventListener(OPEN_CONTACT_EVENT, openFromElsewhere);
+    return () => window.removeEventListener(OPEN_CONTACT_EVENT, openFromElsewhere);
+  }, []);
 
   // ESC closes the modal without losing the draft.
   useEffect(() => {
@@ -198,10 +209,10 @@ export function ContactButton({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={labels.trigger}
-        className="tap-press fixed right-3 top-[calc(env(safe-area-inset-top)+0.35rem)] z-30 inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2.5 text-[12px] font-medium text-[var(--ink)] shadow-[0_18px_38px_-20px_rgba(17,19,24,0.45)] hover:bg-white lg:bottom-3 lg:left-3 lg:right-auto lg:top-auto lg:z-50"
+        className="tap-press fixed bottom-3 left-3 z-50 hidden items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2.5 text-[12px] font-medium text-[var(--ink)] shadow-[0_18px_38px_-20px_rgba(17,19,24,0.45)] hover:bg-white lg:inline-flex"
       >
         <MessageSquare className="h-4 w-4" />
-        <span className="hidden sm:inline">{labels.trigger}</span>
+        <span>{labels.trigger}</span>
       </button>
 
       {open ? (

@@ -5,8 +5,8 @@ import { CountPill, NavBadge, useNavBadges } from "@/components/nav-badges";
 import { NAV_ICONS, type NavIconName } from "@/components/nav-icons";
 import {
   CalendarDays,
-  LayoutGrid,
   ListChecks,
+  MessageSquare,
   MoreHorizontal,
   UsersRound,
 } from "lucide-react";
@@ -45,6 +45,7 @@ export function BottomTabBar({
 }: {
   labels: {
     home: string;
+    messages: string;
     calendar: string;
     orders: string;
     schedule: string;
@@ -74,6 +75,14 @@ export function BottomTabBar({
   useEffect(() => {
     setMoreOpen(false);
   }, [pathname]);
+
+  // "Contact" in the sheet opens the contact form over it; close the
+  // sheet so the form is not left sitting on top of a menu.
+  useEffect(() => {
+    const close = () => setMoreOpen(false);
+    window.addEventListener("tato:open-contact", close);
+    return () => window.removeEventListener("tato:open-contact", close);
+  }, []);
 
   // Lock background scroll when the More sheet is open. Same pattern
   // as the existing MobileNav drawer.
@@ -124,17 +133,19 @@ export function BottomTabBar({
     /** Highlight rule: pathname starts with one of these prefixes. */
     matchPrefixes: string[];
   }> = [
-    {
-      href: "/dashboard",
-      label: labels.home,
-      Icon: LayoutGrid,
-      matchPrefixes: ["/dashboard"],
-    },
+    // The calendar first and messages second: what a phone is opened
+    // for. The dashboard is a desk page and lives behind More.
     {
       href: "/calendar",
       label: labels.calendar,
       Icon: CalendarDays,
       matchPrefixes: ["/calendar"],
+    },
+    {
+      href: "/messages",
+      label: labels.messages,
+      Icon: MessageSquare,
+      matchPrefixes: ["/messages"],
     },
     {
       href: "/orders",
@@ -187,17 +198,17 @@ export function BottomTabBar({
                 prefetch
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "tap-press flex flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-medium",
+                  "tap-press tap-compact flex h-[52px] flex-col items-center justify-center gap-0.5 px-1 text-[10px]",
                   active
-                    ? "text-[var(--ink)]"
-                    : "text-[var(--ink-soft)] hover:text-[var(--ink)]",
+                    ? "font-semibold text-[var(--ink)]"
+                    : "font-medium text-[var(--ink-soft)] hover:text-[var(--ink)]",
                 )}
               >
                 <span className="relative">
                   <tab.Icon
                     className={cn(
-                      "h-[22px] w-[22px]",
-                      active ? "stroke-[2.4]" : "stroke-[1.8]",
+                      "h-5 w-5",
+                      active ? "stroke-[2.2]" : "stroke-[1.8]",
                     )}
                   />
                   <NavBadge href={tab.href} className="absolute -right-2.5 -top-1.5" />
@@ -213,17 +224,17 @@ export function BottomTabBar({
             aria-haspopup="dialog"
             aria-expanded={moreOpen}
             className={cn(
-              "tap-press flex flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-medium",
+              "tap-press tap-compact flex h-[52px] flex-col items-center justify-center gap-0.5 px-1 text-[10px]",
               isMoreActive || moreOpen
-                ? "text-[var(--ink)]"
-                : "text-[var(--ink-soft)] hover:text-[var(--ink)]",
+                ? "font-semibold text-[var(--ink)]"
+                : "font-medium text-[var(--ink-soft)] hover:text-[var(--ink)]",
             )}
           >
             <span className="relative">
               <MoreHorizontal
                 className={cn(
-                  "h-[22px] w-[22px]",
-                  isMoreActive || moreOpen ? "stroke-[2.4]" : "stroke-[1.8]",
+                  "h-5 w-5",
+                  isMoreActive || moreOpen ? "stroke-[2.2]" : "stroke-[1.8]",
                 )}
               />
               <CountPill count={moreCount} className="absolute -right-2.5 -top-1.5" />

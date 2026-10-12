@@ -1,6 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+
+import { cn } from "@/lib/utils";
+
+type Mode = "list" | "timeline";
+const SwitchContext = createContext<{
+  mode: Mode;
+  choose: (mode: Mode) => void;
+  labels: { list: string; timeline: string };
+} | null>(null);
+
+/**
+ * 日历 | 列表, as a small segmented control. Each view draws it in its
+ * own top row -- the timeline beside ‹ Today ›, the list beside its day
+ * strip -- rather than the switch taking a row of its own above both.
+ */
+/** Which view the phone is showing; null outside the switch. */
+export function useCalendarViewMode(): Mode | null {
+  return useContext(SwitchContext)?.mode ?? null;
+}
+
+export function CalendarViewToggle({ className }: { className?: string }) {
+  const context = useContext(SwitchContext);
+  if (!context) return null;
+  return (
+    <div className={cn("flex shrink-0 rounded-lg bg-[var(--surface-muted)] p-0.5 lg:hidden", className)}>
+      {(["timeline", "list"] as const).map((value) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => context.choose(value)}
+          aria-pressed={context.mode === value}
+          className={cn(
+            "tap-compact hit-area flex h-[26px] items-center rounded-md px-3 text-[12px]",
+            context.mode === value
+              ? "bg-[var(--surface)] font-semibold text-[var(--ink)] shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+              : "text-[var(--ink-soft)]",
+          )}
+        >
+          {value === "list" ? context.labels.list : context.labels.timeline}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Calendar or list, on a phone; calendar only, on a desktop.
@@ -45,7 +89,7 @@ export function MobileCalendarSwitch({
   timelineLabel: string;
   className?: string;
 }) {
-  const [mode, setMode] = useState<"list" | "timeline">("timeline");
+  const [mode, setMode] = useState<Mode>("timeline");
 
   useEffect(() => {
     try {
@@ -66,26 +110,8 @@ export function MobileCalendarSwitch({
   }
 
   return (
+    <SwitchContext.Provider value={{ mode, choose, labels: { list: listLabel, timeline: timelineLabel } }}>
     <div className={className}>
-      {/* The switch itself is a phone affordance. A desktop has room
-          for the timeline and shows it unconditionally. */}
-      <div className="tap-row mb-2 flex items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface)] p-0.5 lg:hidden">
-        {(["timeline", "list"] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => choose(value)}
-            className={`tap-press flex-1 rounded-[5px] px-3 py-1.5 text-[12px] font-bold transition ${
-              mode === value
-                ? "bg-[var(--ink)] text-white"
-                : "text-[var(--ink-mid)] hover:bg-[var(--surface-muted)]"
-            }`}
-          >
-            {value === "list" ? listLabel : timelineLabel}
-          </button>
-        ))}
-      </div>
-
       <div className={mode === "list" ? "lg:hidden" : "hidden"}>{list}</div>
 
       {/* Bare on purpose: the timeline already owns an `overflow-auto`
@@ -95,5 +121,6 @@ export function MobileCalendarSwitch({
           away, which is the one thing it exists not to do. */}
       <div className={mode === "timeline" ? "lg:block" : "hidden lg:block"}>{timeline}</div>
     </div>
+    </SwitchContext.Provider>
   );
 }

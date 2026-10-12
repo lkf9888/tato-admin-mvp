@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   type EditableOrder,
@@ -9,8 +9,9 @@ import {
   type OrderEditorVehicleOption,
 } from "@/components/order-detail-modal";
 import { BulkActionBar, BulkActionButton } from "@/components/bulk-action-bar";
+import { ORDERS_SELECT_MODE_EVENT } from "@/components/orders-mobile-bar";
 import { StatusBadge } from "@/components/status-badge";
-import type { Locale } from "@/lib/i18n";
+import { getMessages, getStatusLabel, type Locale } from "@/lib/i18n";
 import { cn, formatCurrency, formatDateTime } from "@/lib/utils";
 
 function labels(locale: Locale) {
@@ -97,6 +98,16 @@ export function OrdersRowList({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // On a phone the boxes are hidden until ⋯ → Select orders asks for
+  // them; they are what makes a row 40px wider than it needs to be.
+  const [selectMode, setSelectMode] = useState(false);
+  useEffect(() => {
+    const enter = () => setSelectMode(true);
+    window.addEventListener(ORDERS_SELECT_MODE_EVENT, enter);
+    return () => window.removeEventListener(ORDERS_SELECT_MODE_EVENT, enter);
+  }, []);
+  const showBoxes = selectMode || selectedIds.size > 0;
+  const mobile = getMessages(locale).orders.mobile;
 
   function toggleSelected(id: string) {
     setSelectedIds((current) => {
@@ -191,8 +202,9 @@ export function OrdersRowList({
 
   return (
     <>
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.9)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)]">
-        <label className="flex cursor-pointer items-center gap-2 border-b border-[color:var(--line)] bg-[var(--surface-muted)]/60 px-2.5 py-1.5 text-[11.5px] text-[color:var(--ink-soft)] sm:px-3">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.9)] shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] max-sm:-mx-2.5 max-sm:rounded-none max-sm:border-x-0 max-sm:shadow-none">
+        <div className={cn("flex items-center border-b border-[color:var(--line)] bg-[var(--surface-muted)]/60", !showBoxes && "max-sm:hidden")}>
+        <label className="flex flex-1 cursor-pointer items-center gap-2 px-2.5 py-1.5 text-[11.5px] text-[color:var(--ink-soft)] sm:px-3">
           <input
             type="checkbox"
             className="h-4 w-4"
@@ -206,12 +218,25 @@ export function OrdersRowList({
           />
           {t.selectAll}
         </label>
+        {selectMode ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectMode(false);
+              setSelectedIds(new Set());
+            }}
+            className="tap-compact mr-2 h-8 rounded-md px-3 text-[12px] font-semibold text-[var(--brand)] sm:hidden"
+          >
+            {mobile.doneSelecting}
+          </button>
+        ) : null}
+        </div>
         <div className="divide-y divide-[color:var(--line)]">
           {rows.map((order) => {
             const payment = paymentInfo[order.id];
             return (
             <div key={order.id} className={cn("flex items-stretch", order.hasConflict ? "bg-rose-50/70" : "bg-white/60")}>
-              <label className="flex w-9 shrink-0 cursor-pointer items-start justify-center pt-4 sm:w-10">
+              <label className={cn("flex w-9 shrink-0 cursor-pointer items-start justify-center pt-4 sm:w-10", !showBoxes && "max-sm:hidden")}>
                 <input
                   type="checkbox"
                   className="h-4 w-4"
@@ -224,11 +249,13 @@ export function OrdersRowList({
               type="button"
               onClick={() => setSelectedOrder(order)}
               className={cn(
-                "grid min-w-0 flex-1 gap-2 py-3 pr-3 text-left transition hover:bg-white sm:pr-4 lg:grid-cols-[minmax(13rem,1.4fr)_minmax(11rem,1fr)_minmax(15rem,1.25fr)_minmax(8rem,0.72fr)] lg:items-center",
+                "min-w-0 flex-1 text-left transition hover:bg-white max-sm:px-3.5 max-sm:py-2.5 sm:grid sm:gap-2 sm:py-3 sm:pr-4 lg:grid-cols-[minmax(13rem,1.4fr)_minmax(11rem,1fr)_minmax(15rem,1.25fr)_minmax(8rem,0.72fr)] lg:items-center",
+                showBoxes && "max-sm:pl-0",
               )}
               aria-label={`${t.open}: ${order.vehicleName} ${order.renterName}`}
             >
-              <div className="min-w-0">
+              <MobileOrderRow order={order} locale={locale} labels={mobile} />
+              <div className="min-w-0 max-sm:hidden">
                 <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                   <p className="truncate font-serif text-[0.98rem] font-semibold text-[color:var(--ink)]">
                     {order.vehiclePlateNumber
@@ -242,7 +269,7 @@ export function OrdersRowList({
                 </p>
               </div>
 
-              <div className="min-w-0">
+              <div className="min-w-0 max-sm:hidden">
                 <p className="truncate text-[13px] font-semibold text-[color:var(--ink)]">
                   {order.renterName}
                 </p>
@@ -251,7 +278,7 @@ export function OrdersRowList({
                 </p>
               </div>
 
-              <div className="grid gap-1 text-[11px] text-[color:var(--ink-soft)] sm:grid-cols-2 lg:block">
+              <div className="grid gap-1 text-[11px] text-[color:var(--ink-soft)] max-sm:hidden sm:grid-cols-2 lg:block">
                 <p className="truncate">
                   <span className="font-semibold text-[color:var(--ink)]">{t.pickup}:</span>{" "}
                   {formatDateTime(order.pickupDatetime, locale)}
@@ -262,7 +289,7 @@ export function OrdersRowList({
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
+              <div className="flex flex-wrap items-center gap-1.5 max-sm:hidden lg:justify-end">
                 <StatusBadge value={order.source} locale={locale} />
                 <StatusBadge value={order.status} locale={locale} />
                 <span className="rounded-full bg-[var(--ink)] px-2.5 py-1 text-[11px] font-semibold text-white">
@@ -332,5 +359,81 @@ export function OrdersRowList({
         />
       ) : null}
     </>
+  );
+}
+
+const shortDate = (iso: string) => {
+  const date = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const sameLocalDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+/**
+ * One order on a phone, in three lines: the car and what the trip
+ * earned; the renter, where the trip stands and where it came from; the
+ * dates and how many days. Owner and phone are a tap away, in the order.
+ */
+function MobileOrderRow({
+  order,
+  locale,
+  labels,
+}: {
+  order: EditableOrder;
+  locale: Locale;
+  labels: ReturnType<typeof getMessages>["orders"]["mobile"];
+}) {
+  const now = new Date();
+  const pickup = new Date(order.pickupDatetime);
+  const ret = new Date(order.returnDatetime);
+  const days = Math.max(1, Math.ceil((ret.getTime() - pickup.getTime()) / 86_400_000));
+  const status =
+    order.status !== "cancelled" && sameLocalDay(pickup, now)
+      ? { label: labels.pickupToday, tone: "bg-[var(--brand-soft)] text-[var(--brand)]" }
+      : order.status !== "cancelled" && sameLocalDay(ret, now)
+        ? { label: labels.returnToday, tone: "bg-amber-100 text-amber-800" }
+        : {
+            label: getStatusLabel(order.status, locale),
+            tone:
+              order.status === "ongoing"
+                ? "bg-emerald-100 text-emerald-800"
+                : order.status === "cancelled"
+                  ? "bg-rose-100 text-rose-700"
+                  : "bg-[var(--surface-muted)] text-[var(--ink-mid)]",
+          };
+  const source =
+    order.source === "turo"
+      ? "bg-[var(--ink)] text-[var(--surface)]"
+      : order.source === "offline"
+        ? "bg-[var(--brand-soft)] text-[var(--brand)]"
+        : "bg-[var(--surface-muted)] text-[var(--ink-mid)]";
+  return (
+    <div className="min-w-0 sm:hidden">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-[13.5px] font-semibold text-[var(--ink)]">
+          {order.vehiclePlateNumber ? `${order.vehiclePlateNumber} · ${order.vehicleName}` : order.vehicleName}
+        </span>
+        <span className="shrink-0 text-[13.5px] font-semibold tabular-nums text-[var(--ink)]">
+          {order.totalPrice != null ? formatCurrency(order.totalPrice, locale) : "—"}
+        </span>
+      </div>
+      <div className="mt-[3px] flex min-w-0 items-center gap-1.5">
+        <span className="truncate text-[13px] text-[var(--ink-mid)]">{order.renterName}</span>
+        <span className={cn("shrink-0 rounded px-1.5 py-px text-[10.5px] font-semibold", status.tone)}>{status.label}</span>
+        <span className={cn("shrink-0 rounded px-1.5 py-px text-[10.5px] font-semibold", source)}>
+          {getStatusLabel(order.source, locale)}
+        </span>
+        {order.hasConflict ? (
+          <span className="shrink-0 rounded bg-rose-100 px-1.5 py-px text-[10.5px] font-semibold text-rose-700">
+            {getStatusLabel("conflict", locale)}
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-[3px] truncate text-[12px] tabular-nums text-[var(--ink-soft)]">
+        {shortDate(order.pickupDatetime)} → {shortDate(order.returnDatetime)} · {labels.days(days)}
+      </p>
+    </div>
   );
 }

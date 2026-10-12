@@ -1,15 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useContext, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
   Bell,
+  Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Circle,
   GripVertical,
   ImagePlus,
+  MoreHorizontal,
   Pencil,
   Plus,
   Trash2,
@@ -18,6 +22,14 @@ import {
   X,
 } from "lucide-react";
 
+import {
+  type MobileAction,
+  MobileActionSheet,
+  MobileIconButton,
+  MobileMoreMenu,
+  MobilePageHeader,
+  MobileSheet,
+} from "@/components/mobile-chrome";
 import type { Locale } from "@/lib/i18n";
 import { compressImageFiles } from "@/lib/client-image-compression";
 import { findSameDayPickups } from "@/lib/staff-same-day";
@@ -291,6 +303,32 @@ function getStaffScheduleCopy(locale: Locale) {
         none: "不关联",
         created: "已保存",
         failed: "保存失败，请稍后再试。",
+        mobile: {
+          more: "更多",
+          newTask: "新增任务",
+          overdue: "逾期",
+          unassigned: "待分配",
+          items: (n: number) => `${n} 项`,
+          assign: "分配",
+          assignTitle: "分配给谁？",
+          notifyAfter: "分配后通知员工（短信 / 小程序）",
+          confirmAssign: (name: string) => `分配给 ${name}`,
+          pickOne: "先选一位员工",
+          kindSend: "送",
+          kindReturn: "还",
+          kindTodo: "事",
+          dayCount: (n: number) => (n ? `这天 ${n} 项` : "这天没有任务"),
+          free: "前后空闲",
+          conflict: (time: string, what: string) => `${time} 在${what}，时间太近`,
+          nothing: "这天没有任务。",
+          overdueBy: (n: number) => `逾期 ${n} 天`,
+          markDone: "标记完成",
+          markOpen: "改回未完成",
+          taskActions: "子任务、编辑、删除",
+          addSubtask: "添加子任务",
+          subtaskPrompt: "子任务内容",
+          delete: "删除",
+        },
         complained: "客人投诉",
         markComplained: "客人投诉了这次工作",
         sameDayPickup: (time: string) => `当天 ${time} 再取车`,
@@ -416,6 +454,32 @@ function getStaffScheduleCopy(locale: Locale) {
         none: "None",
         created: "Saved",
         failed: "Could not save. Please try again.",
+        mobile: {
+          more: "More",
+          newTask: "New task",
+          overdue: "Overdue",
+          unassigned: "To assign",
+          items: (n: number) => `${n} ${n === 1 ? "task" : "tasks"}`,
+          assign: "Assign",
+          assignTitle: "Who takes it?",
+          notifyAfter: "Notify them once assigned (SMS / mini program)",
+          confirmAssign: (name: string) => `Assign to ${name}`,
+          pickOne: "Pick someone first",
+          kindSend: "Out",
+          kindReturn: "Back",
+          kindTodo: "Job",
+          dayCount: (n: number) => (n ? `${n} that day` : "Nothing that day"),
+          free: "Free around then",
+          conflict: (time: string, what: string) => `At ${what} at ${time}: too close`,
+          nothing: "Nothing scheduled this day.",
+          overdueBy: (n: number) => `${n} ${n === 1 ? "day" : "days"} overdue`,
+          markDone: "Mark done",
+          markOpen: "Mark not done",
+          taskActions: "Subtask, edit, delete",
+          addSubtask: "Add a subtask",
+          subtaskPrompt: "Subtask",
+          delete: "Delete",
+        },
         complained: "Guest complaint",
         markComplained: "A guest complained about this job",
         sameDayPickup: (time: string) => `Out again ${time}`,
@@ -451,6 +515,7 @@ export function StaffScheduleClient({
   initialNotificationTemplate: StaffTaskNotificationTemplate;
 }) {
   const c = getStaffScheduleCopy(locale);
+  const searchParams = useSearchParams();
   const [staff, setStaff] = useState(initialStaff);
   const [tasks, setTasks] = useState(initialTasks);
   const [notificationTemplate, setNotificationTemplate] = useState(() =>
@@ -614,14 +679,20 @@ export function StaffScheduleClient({
     upsertTask(normalizeTask(payload.task));
   }
 
-  async function persistTaskOrder(updates: Map<string, Partial<StaffTask>>, movedTaskId: string, staffId: string | null) {
+  async function persistTaskOrder(
+    updates: Map<string, Partial<StaffTask>>,
+    movedTaskId: string,
+    staffId: string | null,
+    notify = true,
+  ) {
     const responses = await Promise.all(
       Array.from(updates.entries()).map(([taskId, update]) => {
-        const body: Record<string, string | number> = { sortOrder: update.sortOrder ?? 0 };
+        const body: Record<string, string | number | boolean> = { sortOrder: update.sortOrder ?? 0 };
         if (taskId === movedTaskId) {
           body.staffId = staffId ?? "";
           body.staffLabel = "";
           body.parentTaskId = "";
+          if (!notify) body.notify = false;
         }
         return fetch(`/api/staff-schedule/tasks/${taskId}`, {
           method: "PATCH",
@@ -638,7 +709,12 @@ export function StaffScheduleClient({
     setNotice(c.created);
   }
 
-  async function moveTaskToPosition(taskId: string, staffId: string | null, targetTaskId: string | null = null) {
+  async function moveTaskToPosition(
+    taskId: string,
+    staffId: string | null,
+    targetTaskId: string | null = null,
+    notify = true,
+  ) {
     const movingTask = tasks.find((task) => task.id === taskId);
     if (!movingTask || movingTask.id === targetTaskId) return;
 
@@ -689,7 +765,7 @@ export function StaffScheduleClient({
         return update ? { ...task, ...update } : task;
       }),
     );
-    await persistTaskOrder(updates, taskId, targetStaffId);
+    await persistTaskOrder(updates, taskId, targetStaffId, notify);
   }
 
   function handleTaskDrop(staffId: string | null) {
@@ -700,7 +776,7 @@ export function StaffScheduleClient({
     setDragOverTaskId(null);
   }
 
-  async function createTaskFromOrderEvent(orderEvent: OrderEvent, staffId: string | null) {
+  async function createTaskFromOrderEvent(orderEvent: OrderEvent, staffId: string | null, notify = true) {
     const existingTask = rootActiveTasks.find(
       (task) =>
         task.orderId === orderEvent.orderId &&
@@ -710,7 +786,7 @@ export function StaffScheduleClient({
     );
 
     if (existingTask) {
-      await moveTaskToPosition(existingTask.id, staffId);
+      await moveTaskToPosition(existingTask.id, staffId, null, notify);
       setNotice(c.orderTaskExists);
       return;
     }
@@ -734,6 +810,7 @@ export function StaffScheduleClient({
         timeWindow: formatOrderEventTime(orderEvent.datetime, locale),
         category: orderEvent.category,
         sortOrder: targetSortOrder,
+        ...(notify ? {} : { notify: false }),
       }),
     });
     const payload = await response.json().catch(() => ({}));
@@ -904,8 +981,36 @@ export function StaffScheduleClient({
   return (
     <TaskFlagsContext.Provider value={{ sameDayPickups, toggleComplaint: (task) => void toggleComplaint(task) }}>
     <div className="staff-schedule-surface mx-auto max-w-7xl space-y-4">
-      <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-end">
-        <h1 className="sr-only">{c.title}</h1>
+      <h1 className="sr-only">{c.title}</h1>
+      <StaffScheduleMobile
+        c={c}
+        locale={locale}
+        staff={activeStaff}
+        tasks={tasks}
+        orderEvents={upcomingOrderEvents}
+        initialAssignTaskId={searchParams.get("assign")}
+        moreActions={[
+          { label: c.payouts, href: "/staff-schedule/payouts" },
+          { label: c.notificationTemplates, onClick: () => setNotificationTemplateOpen(true) },
+          { label: showArchivedStaff ? c.hideArchivedStaff : c.viewArchivedStaff, onClick: () => setShowArchivedStaff((open) => !open) },
+          { label: c.addStaff, onClick: () => setStaffModal("new") },
+        ]}
+        archivedPanel={
+          showArchivedStaff ? (
+            <ArchivedStaffPanel copy={c} locale={locale} members={archivedStaff} tasksByStaff={tasksByArchivedStaff} />
+          ) : null
+        }
+        onNewTask={() => setTaskModal({ kind: "new" })}
+        onEdit={setTaskModal}
+        onDelete={(task) => void deleteTask(task)}
+        onToggleDone={(task) => void quickStatus(task, task.status === "done" ? "todo" : "done")}
+        onAddSubtask={(task, title) => void createSubtask(task, title)}
+        onAssignTask={(taskId, staffId, notify) => void moveTaskToPosition(taskId, staffId, null, notify)}
+        onAssignEvent={(event, staffId, notify) => void createTaskFromOrderEvent(event, staffId, notify)}
+      />
+      {/* The desktop's board: drag jobs onto people. A phone has its own
+          view above; drag-and-drop does not work under a thumb. */}
+      <section className="flex flex-col gap-3 max-sm:hidden sm:flex-row sm:items-end sm:justify-end">
         <div className="flex flex-wrap gap-2">
           <Link href="/staff-schedule/payouts" className="btn-secondary min-h-11 px-4 py-2 text-sm">
             <Wallet className="h-4 w-4" />
@@ -925,7 +1030,7 @@ export function StaffScheduleClient({
         </div>
       </section>
 
-      <p className="text-xs text-[var(--ink-soft)]">{c.dragHint}</p>
+      <p className="text-xs text-[var(--ink-soft)] max-sm:hidden">{c.dragHint}</p>
 
       {notice ? (
         <div className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink-mid)]">
@@ -935,7 +1040,7 @@ export function StaffScheduleClient({
 
       <div
         className={cn(
-          "grid gap-3 xl:items-start",
+          "grid gap-3 max-sm:hidden xl:items-start",
           upcomingOrdersCollapsed
             ? "xl:grid-cols-[3.25rem_minmax(0,1fr)]"
             : "xl:grid-cols-[18rem_minmax(0,1fr)]",
@@ -3151,4 +3256,519 @@ function toLocalDateInput(value: string) {
   const date = new Date(value);
   const pad = (part: number) => String(part).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// ---- The schedule on a phone -----------------------------------------
+
+type ScheduleCopy = ReturnType<typeof getStaffScheduleCopy>;
+
+/** A task's day, as the desktop reads it: an order task by its handover,
+ *  anything else by its due date. */
+function mobileTaskDay(task: StaffTask) {
+  if (task.category === "order_pickup" && task.order) return new Date(task.order.pickupDatetime);
+  if (task.category === "order_return" && task.order) return new Date(task.order.returnDatetime);
+  return task.dueDatetime ? new Date(task.dueDatetime) : null;
+}
+
+/** Minutes after midnight the task happens at, when it says. */
+function mobileTaskMinutes(task: StaffTask) {
+  if (isOrderEventTask(task) && task.order) {
+    const at = mobileTaskDay(task)!;
+    return at.getHours() * 60 + at.getMinutes();
+  }
+  const match = task.timeWindow?.match(/(\d{1,2}):(\d{2})/);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+function mobileDayOffset(date: Date | null) {
+  if (!date) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.round((day.getTime() - today.getTime()) / 86400000);
+}
+
+const hhmmFromMinutes = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+type AssignTarget =
+  | { type: "task"; task: StaffTask }
+  | { type: "event"; event: OrderEvent };
+
+/**
+ * The staff schedule on a phone. Dragging, which the desktop is built
+ * on, does not work under a thumb, so here each unassigned job has an
+ * Assign button that opens the staff list -- each person with how much
+ * they have that day and a warning when another of their jobs is too
+ * close in time -- and each person's jobs are rows: a circle to tick
+ * one done, and ⋯ for the rest. A strip at the top moves between
+ * overdue, today and the days after.
+ */
+function StaffScheduleMobile({
+  c,
+  locale,
+  staff,
+  tasks,
+  orderEvents,
+  initialAssignTaskId,
+  moreActions,
+  archivedPanel,
+  onNewTask,
+  onEdit,
+  onDelete,
+  onToggleDone,
+  onAddSubtask,
+  onAssignTask,
+  onAssignEvent,
+}: {
+  c: ScheduleCopy;
+  locale: Locale;
+  staff: StaffMember[];
+  tasks: StaffTask[];
+  orderEvents: OrderEvent[];
+  initialAssignTaskId: string | null;
+  moreActions: MobileAction[];
+  archivedPanel: React.ReactNode;
+  onNewTask: () => void;
+  onEdit: (task: StaffTask) => void;
+  onDelete: (task: StaffTask) => void;
+  onToggleDone: (task: StaffTask) => void;
+  onAddSubtask: (task: StaffTask, title: string) => void;
+  onAssignTask: (taskId: string, staffId: string, notify: boolean) => void;
+  onAssignEvent: (event: OrderEvent, staffId: string, notify: boolean) => void;
+}) {
+  const m = c.mobile;
+  const [selected, setSelected] = useState<"overdue" | number>(0);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const [assign, setAssign] = useState<AssignTarget | null>(null);
+  const [assignee, setAssignee] = useState<string | null>(null);
+  const [notify, setNotify] = useState(true);
+  const [actionsFor, setActionsFor] = useState<StaffTask | null>(null);
+
+  // Arriving from the calendar's card (?assign=<task>): open that task.
+  useEffect(() => {
+    if (!initialAssignTaskId) return;
+    const task = tasks.find((item) => item.id === initialAssignTaskId);
+    if (!task) return;
+    const offset = mobileDayOffset(mobileTaskDay(task));
+    if (offset != null && offset >= 0 && offset < 5) setSelected(offset);
+    setAssign({ type: "task", task });
+    setAssignee(task.staffId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAssignTaskId]);
+
+  const roots = tasks.filter((task) => !task.parentTaskId && task.status !== "cancelled");
+  const open = roots.filter((task) => task.status !== "done");
+  const overdue = open.filter((task) => {
+    const offset = mobileDayOffset(mobileTaskDay(task));
+    return offset != null && offset < 0;
+  });
+  const onDay = (offset: number) =>
+    roots.filter((task) => mobileDayOffset(mobileTaskDay(task)) === offset);
+  const eventsOnDay = (offset: number) =>
+    orderEvents.filter((event) => mobileDayOffset(new Date(event.datetime)) === offset);
+
+  const dayTasks = selected === "overdue" ? overdue : onDay(selected);
+  const dayEvents = selected === "overdue" ? [] : eventsOnDay(selected);
+  const byTime = (a: StaffTask, b: StaffTask) =>
+    (mobileTaskMinutes(a) ?? 24 * 60) - (mobileTaskMinutes(b) ?? 24 * 60) || sortTasks(a, b);
+  const unassignedTasks = dayTasks.filter((task) => !task.staffId && task.status !== "done").sort(byTime);
+
+  const days = [0, 1, 2, 3, 4].map((offset) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    const label =
+      offset === 0
+        ? `${c.todayBadge} ${date.getMonth() + 1}/${date.getDate()}`
+        : offset === 1
+          ? c.tomorrowBadge
+          : new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { weekday: "short" }).format(date);
+    const count = onDay(offset).filter((task) => task.status !== "done").length + eventsOnDay(offset).length;
+    return { offset, label, count };
+  });
+
+  const kind = (category: string | null) =>
+    category === "order_pickup"
+      ? { label: m.kindSend, tone: "bg-[var(--brand-soft)] text-[var(--brand)]" }
+      : category === "order_return"
+        ? { label: m.kindReturn, tone: "bg-amber-100 text-amber-800" }
+        : { label: m.kindTodo, tone: "bg-[var(--surface-muted)] text-[var(--ink-mid)]" };
+  const shortTitle = (task: StaffTask) =>
+    getDisplayTaskTitle(task, c).replace(/^(送车|还车|取车|Pickup|Delivery|Return)\s*·\s*/i, "");
+  const timeText = (task: StaffTask) => {
+    const minutes = mobileTaskMinutes(task);
+    if (selected === "overdue") {
+      const day = mobileTaskDay(task);
+      return day ? `${day.getMonth() + 1}/${day.getDate()}${minutes != null ? ` ${hhmmFromMinutes(minutes)}` : ""}` : "";
+    }
+    return minutes != null ? hhmmFromMinutes(minutes) : task.timeWindow || "";
+  };
+
+  // What each person already has on the assignment's day, and the job
+  // of theirs nearest in time when it is within an hour and a half.
+  const assignDay =
+    assign?.type === "event"
+      ? new Date(assign.event.datetime)
+      : assign
+        ? mobileTaskDay(assign.task)
+        : null;
+  const assignMinutes =
+    assign?.type === "event"
+      ? new Date(assign.event.datetime).getHours() * 60 + new Date(assign.event.datetime).getMinutes()
+      : assign
+        ? mobileTaskMinutes(assign.task)
+        : null;
+  const assignOffset = mobileDayOffset(assignDay);
+  const staffNote = (member: StaffMember) => {
+    const theirs = open.filter(
+      (task) =>
+        task.staffId === member.id &&
+        (assign?.type !== "task" || task.id !== assign.task.id) &&
+        assignOffset != null &&
+        mobileDayOffset(mobileTaskDay(task)) === assignOffset,
+    );
+    const count = m.dayCount(theirs.length);
+    if (assignMinutes == null) return { text: count, warn: false };
+    const clash = theirs
+      .map((task) => ({ task, minutes: mobileTaskMinutes(task) }))
+      .filter((item): item is { task: StaffTask; minutes: number } => item.minutes != null)
+      .sort((a, b) => Math.abs(a.minutes - assignMinutes) - Math.abs(b.minutes - assignMinutes))[0];
+    if (clash && Math.abs(clash.minutes - assignMinutes) < 90) {
+      const where =
+        (clash.task.category === "order_return" ? c.returnCar : clash.task.category === "order_pickup" ? c.pickup : "") +
+        (clash.task.vehicle?.plateNumber ? ` ${clash.task.vehicle.plateNumber}` : "");
+      return { text: `${count} · ${m.conflict(hhmmFromMinutes(clash.minutes), where || shortTitle(clash.task))}`, warn: true };
+    }
+    return { text: theirs.length ? `${count} · ${m.free}` : count, warn: false };
+  };
+
+  const openAssign = (target: AssignTarget) => {
+    setAssign(target);
+    setAssignee(target.type === "task" ? target.task.staffId : null);
+    setNotify(true);
+  };
+  const confirmAssign = () => {
+    if (!assign || !assignee) return;
+    if (assign.type === "task") onAssignTask(assign.task.id, assignee, notify);
+    else onAssignEvent(assign.event, assignee, notify);
+    setAssign(null);
+  };
+
+  const rowBase = "flex min-h-[56px] items-center gap-2.5 border-b border-[var(--line)] bg-[var(--surface)] py-2 pl-3.5 pr-1.5";
+
+  const unassignedRow = (content: { key: string; kind: ReturnType<typeof kind>; title: string; sub: string; onAssign: () => void }) => (
+    <li key={content.key} className={rowBase}>
+      <span className={cn("shrink-0 rounded px-1.5 py-px text-[10.5px] font-bold", content.kind.tone)}>
+        {content.kind.label}
+      </span>
+      <span className="min-w-0 flex-1 leading-[1.3]">
+        <span className="block truncate text-[13px] font-semibold text-[var(--ink)]">{content.title}</span>
+        {content.sub ? <span className="block truncate text-[11.5px] text-[var(--ink-soft)]">{content.sub}</span> : null}
+      </span>
+      <button
+        type="button"
+        onClick={content.onAssign}
+        className="tap-compact hit-area mr-2 h-[30px] shrink-0 rounded-lg border border-[var(--brand)] px-3 text-[12px] font-semibold text-[var(--brand)]"
+      >
+        {m.assign}
+      </button>
+    </li>
+  );
+
+  const taskRow = (task: StaffTask) => {
+    const done = task.status === "done";
+    const k = kind(task.category);
+    const late = !done && (mobileDayOffset(mobileTaskDay(task)) ?? 0) < 0;
+    const sub = late
+      ? m.overdueBy(-(mobileDayOffset(mobileTaskDay(task)) ?? 0))
+      : [getTaskDetailsText(task), task.vehicle?.plateNumber].filter(Boolean).join(" · ");
+    return (
+      <li key={task.id} className={cn(rowBase, done && "opacity-50")}>
+        <button
+          type="button"
+          onClick={() => onToggleDone(task)}
+          aria-label={done ? m.markOpen : m.markDone}
+          aria-pressed={done}
+          className={cn(
+            "tap-compact hit-area flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-[1.6px]",
+            done ? "border-emerald-700 bg-emerald-700 text-white" : "border-[var(--line-strong)] bg-[var(--surface)]",
+          )}
+        >
+          {done ? <Check className="h-3 w-3" strokeWidth={3} aria-hidden /> : null}
+        </button>
+        <span className="min-w-0 flex-1 leading-[1.3]">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className={cn("shrink-0 rounded px-1.5 py-px text-[10.5px] font-bold", k.tone)}>{k.label}</span>
+            <span className={cn("truncate text-[13px] font-semibold text-[var(--ink)]", done && "line-through")}>
+              {[timeText(task), shortTitle(task)].filter(Boolean).join(" · ")}
+            </span>
+          </span>
+          {sub ? (
+            <span className={cn("mt-0.5 block truncate text-[11.5px]", late ? "text-[var(--bad-fg)]" : "text-[var(--ink-soft)]")}>
+              {sub}
+            </span>
+          ) : null}
+        </span>
+        <MobileIconButton label={m.taskActions} onClick={() => setActionsFor(task)} className="h-8 w-8 text-[var(--ink-soft)]">
+          <MoreHorizontal className="h-[17px] w-[17px]" aria-hidden />
+        </MobileIconButton>
+      </li>
+    );
+  };
+
+  const groupHeader = (key: string, avatar: React.ReactNode, name: string, note: string, isOpen: boolean) => (
+    <button
+      type="button"
+      onClick={() =>
+        setCollapsed((current) => {
+          const next = new Set(current);
+          if (next.has(key)) next.delete(key);
+          else next.add(key);
+          return next;
+        })
+      }
+      aria-expanded={isOpen}
+      className="tap-compact flex h-11 w-full items-center gap-2.5 border-b border-[var(--line)] bg-[var(--surface-muted)] px-3.5 text-left text-[13px]"
+    >
+      {avatar}
+      <b className="text-[var(--ink)]">{name}</b>
+      <span className="flex-1 text-[var(--ink-soft)]">· {note}</span>
+      <ChevronDown className={cn("h-4 w-4 text-[var(--ink-soft)] transition", isOpen && "rotate-180")} aria-hidden />
+    </button>
+  );
+
+  const unassignedCount = unassignedTasks.length + dayEvents.length;
+
+  return (
+    <div className="-mx-2.5 -mt-3 sm:hidden">
+      <MobilePageHeader
+        actions={
+          <>
+            <MobileIconButton label={m.newTask} onClick={onNewTask}>
+              <Plus className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </MobileIconButton>
+            <MobileMoreMenu label={m.more} cancelLabel={c.cancel} actions={moreActions} />
+          </>
+        }
+      />
+
+      <div className="flex gap-1.5 overflow-x-auto border-b border-[var(--line)] bg-[var(--surface)] px-3.5 pb-2.5 pt-1 [scrollbar-width:none]">
+        {overdue.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setSelected("overdue")}
+            aria-pressed={selected === "overdue"}
+            className={cn(
+              "tap-compact flex h-[46px] min-w-[52px] shrink-0 flex-col items-center justify-center rounded-[10px] border px-1.5 leading-[1.2]",
+              selected === "overdue"
+                ? "border-[var(--bad-fg)] bg-[var(--bad-fg)] text-white"
+                : "border-rose-200 bg-rose-50 text-[var(--bad-fg)]",
+            )}
+          >
+            <span className="text-[11px] font-semibold">{m.overdue}</span>
+            <span className="text-[14px] font-bold">{overdue.length}</span>
+          </button>
+        ) : null}
+        {days.map((day) => (
+          <button
+            key={day.offset}
+            type="button"
+            onClick={() => setSelected(day.offset)}
+            aria-pressed={selected === day.offset}
+            className={cn(
+              "tap-compact flex h-[46px] min-w-[52px] shrink-0 flex-col items-center justify-center rounded-[10px] border px-1.5 leading-[1.2]",
+              selected === day.offset
+                ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]"
+                : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]",
+            )}
+          >
+            <span className="whitespace-nowrap text-[11px] opacity-80">{day.label}</span>
+            <span className="text-[14px] font-bold">{day.count}</span>
+          </button>
+        ))}
+      </div>
+
+      {unassignedCount > 0 ? (
+        <section>
+          <div className="flex h-11 items-center gap-2 border-b border-[var(--line)] bg-[var(--surface-muted)] px-3.5 text-[13px]">
+            <b className="text-[var(--ink)]">{m.unassigned}</b>
+            <span className="text-[var(--ink-soft)]">· {m.items(unassignedCount)}</span>
+          </div>
+          <ul>
+            {dayEvents
+              .slice()
+              .sort((a, b) => a.datetime.localeCompare(b.datetime))
+              .map((event) =>
+                unassignedRow({
+                  key: event.id,
+                  kind: kind(event.category),
+                  title: `${formatOrderEventTime(event.datetime, locale)} · ${event.vehicleLabel} · ${event.renterName}`,
+                  sub: event.location ?? "",
+                  onAssign: () => openAssign({ type: "event", event }),
+                }),
+              )}
+            {unassignedTasks.map((task) =>
+              unassignedRow({
+                key: task.id,
+                kind: kind(task.category),
+                title: [timeText(task), shortTitle(task)].filter(Boolean).join(" · "),
+                sub: [getTaskDetailsText(task), task.vehicle?.plateNumber].filter(Boolean).join(" · "),
+                onAssign: () => openAssign({ type: "task", task }),
+              }),
+            )}
+          </ul>
+        </section>
+      ) : null}
+
+      {staff.map((member) => {
+        const theirs = dayTasks.filter((task) => task.staffId === member.id).sort(byTime);
+        const isOpen = theirs.length > 0 && !collapsed.has(member.id);
+        return (
+          <section key={member.id}>
+            {groupHeader(
+              member.id,
+              <span
+                className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white"
+                style={{ backgroundColor: member.color }}
+              >
+                {member.name.trim().slice(0, 1).toUpperCase()}
+              </span>,
+              member.name,
+              theirs.length ? m.items(theirs.length) : m.dayCount(0),
+              isOpen,
+            )}
+            {isOpen ? <ul>{theirs.map(taskRow)}</ul> : null}
+          </section>
+        );
+      })}
+
+      {dayTasks.length === 0 && dayEvents.length === 0 ? (
+        <p className="bg-[var(--surface)] px-3.5 py-6 text-center text-[13px] text-[var(--ink-soft)]">{m.nothing}</p>
+      ) : null}
+
+      {archivedPanel ? <div className="p-2.5">{archivedPanel}</div> : null}
+
+      <MobileActionSheet
+        open={actionsFor !== null}
+        onClose={() => setActionsFor(null)}
+        cancelLabel={c.cancel}
+        title={actionsFor ? shortTitle(actionsFor) : undefined}
+        actions={
+          actionsFor
+            ? [
+                {
+                  label: m.addSubtask,
+                  onClick: () => {
+                    const title = window.prompt(m.subtaskPrompt);
+                    if (title?.trim()) onAddSubtask(actionsFor, title);
+                  },
+                },
+                { label: c.edit, onClick: () => onEdit(actionsFor) },
+                { label: actionsFor.status === "done" ? m.markOpen : m.markDone, onClick: () => onToggleDone(actionsFor) },
+                { label: m.delete, danger: true, onClick: () => onDelete(actionsFor) },
+              ]
+            : []
+        }
+      />
+
+      <MobileSheet open={assign !== null} onClose={() => setAssign(null)} label={m.assignTitle} closeLabel={c.cancel}>
+        {assign ? (
+          <div className="pb-1">
+            <h2 className="text-[17px] font-bold text-[var(--ink)]">{m.assignTitle}</h2>
+            <div className="mt-2.5 flex items-center gap-2.5 rounded-[10px] bg-[var(--surface-muted)] px-3 py-2.5">
+              <span
+                className={cn(
+                  "shrink-0 rounded px-1.5 py-px text-[10.5px] font-bold",
+                  kind(assign.type === "event" ? assign.event.category : assign.task.category).tone,
+                )}
+              >
+                {kind(assign.type === "event" ? assign.event.category : assign.task.category).label}
+              </span>
+              <span className="min-w-0 leading-[1.35]">
+                <span className="block truncate text-[13px] font-semibold text-[var(--ink)]">
+                  {assign.type === "event"
+                    ? `${formatOrderEventTime(assign.event.datetime, locale)} · ${assign.event.vehicleLabel} · ${assign.event.renterName}`
+                    : [timeText(assign.task), shortTitle(assign.task)].filter(Boolean).join(" · ")}
+                </span>
+                <span className="block truncate text-[11.5px] text-[var(--ink-soft)]">
+                  {assign.type === "event" ? assign.event.location : getTaskDetailsText(assign.task)}
+                </span>
+              </span>
+            </div>
+            <ul className="mt-1.5" role="radiogroup" aria-label={m.assignTitle}>
+              {staff.map((member) => {
+                const note = staffNote(member);
+                const chosen = assignee === member.id;
+                return (
+                  <li key={member.id}>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={chosen}
+                      onClick={() => setAssignee(member.id)}
+                      className="tap-compact flex h-[54px] w-full items-center gap-3 border-b border-[var(--line)] px-1 text-left"
+                    >
+                      <span
+                        className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
+                        style={{ backgroundColor: member.color }}
+                      >
+                        {member.name.trim().slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="min-w-0 flex-1 leading-[1.3]">
+                        <span className="block text-[14px] font-semibold text-[var(--ink)]">{member.name}</span>
+                        <span
+                          className={cn(
+                            "block truncate text-[11.5px]",
+                            note.warn ? "text-amber-700" : "text-[var(--ink-soft)]",
+                          )}
+                        >
+                          {note.text}
+                        </span>
+                      </span>
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "h-5 w-5 shrink-0 rounded-full border-[1.6px] border-[var(--line-strong)]",
+                          chosen && "border-[6px] border-[var(--brand)]",
+                        )}
+                      />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <label className="mt-3 flex items-center justify-between gap-3 text-[13px] text-[var(--ink)]">
+              <span>{m.notifyAfter}</span>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={notify}
+                onChange={(event) => setNotify(event.target.checked)}
+                className="tap-compact h-[26px] w-[42px] shrink-0 cursor-pointer appearance-none rounded-full bg-[var(--line-strong)] transition before:block before:h-5 before:w-5 before:translate-x-[3px] before:translate-y-[3px] before:rounded-full before:bg-white before:transition checked:bg-[var(--brand)] checked:before:translate-x-[19px]"
+              />
+            </label>
+            <div className="mt-3.5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAssign(null)}
+                className="tap-compact h-[42px] flex-1 rounded-[10px] border border-[var(--line-strong)] text-[14px] font-semibold text-[var(--ink)]"
+              >
+                {c.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={confirmAssign}
+                disabled={!assignee}
+                className="tap-compact h-[42px] flex-[2] rounded-[10px] bg-[var(--brand)] text-[14px] font-semibold text-white disabled:opacity-40"
+              >
+                {assignee
+                  ? m.confirmAssign(staff.find((member) => member.id === assignee)?.name ?? "")
+                  : m.pickOne}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </MobileSheet>
+    </div>
+  );
 }

@@ -23,6 +23,8 @@ const taskSchema = z.object({
   priority: z.nativeEnum(StaffTaskPriority).optional(),
   category: z.string().trim().optional().or(z.literal("")),
   sortOrder: z.coerce.number().int().optional(),
+  /** false: create it assigned without messaging the person. */
+  notify: z.boolean().optional(),
 });
 
 function nullable(value?: string) {
@@ -152,7 +154,7 @@ export async function POST(request: NextRequest) {
     metadata: { title: task.title, staffId: task.staffId, vehicleId: task.vehicleId },
   });
 
-  if (task.staffId) {
+  if (task.staffId && parsed.notify !== false) {
     await notifyStaffTaskAssignment(task, new URL(request.url).origin);
   }
 

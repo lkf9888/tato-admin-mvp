@@ -1,6 +1,7 @@
 import { logoutAction } from "@/app/actions";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { ContactButton } from "@/components/contact-button";
+import { ContactLauncher } from "@/components/contact-launcher";
 import { DisplayPreferences } from "@/components/display-preferences";
 import { MobileNav } from "@/components/mobile-nav";
 import { NavBadgeProvider } from "@/components/nav-badges";
@@ -145,7 +146,10 @@ export function AppShell({
 
   const moreFooter = (
     <div className="space-y-3">
-      <div className="flex justify-center">{displayPreferences}</div>
+      <div className="flex items-center justify-center gap-1">
+        <ContactLauncher label={messages.contact.trigger} />
+        {displayPreferences}
+      </div>
       <form action={logoutAction}>
         <button className="tap-press w-full rounded-md border border-[var(--line)] bg-white/72 px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink-soft)] transition hover:border-[rgba(17,19,24,0.16)] hover:bg-white hover:text-[var(--ink)]">
           {messages.shell.signOut}
@@ -219,7 +223,7 @@ export function AppShell({
          * inner sections that NEED horizontal scroll (the metric
          * strip) keep doing it inside their own `overflow-x-auto`
          * container. */}
-        <main className="min-w-0 flex-1 px-2.5 pb-[calc(env(safe-area-inset-bottom)+82px)] pt-3 sm:px-3 lg:ml-56 lg:px-4 lg:pb-4 lg:pt-4">
+        <main className="min-w-0 flex-1 px-2.5 pb-[calc(env(safe-area-inset-bottom)+76px)] pt-3 sm:px-3 lg:ml-56 lg:px-4 lg:pb-4 lg:pt-4">
           {children}
         </main>
       </div>

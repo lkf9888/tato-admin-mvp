@@ -61,6 +61,7 @@ export const shellMessages = {
       // short so they fit a ~75px tab cell on a 375px-wide phone.
       bottomNav: {
         home: "Home",
+        messages: "Messages",
         calendar: "Calendar",
         orders: "Orders",
         schedule: "Schedule",
@@ -127,6 +128,7 @@ export const shellMessages = {
       },
       bottomNav: {
         home: "首页",
+        messages: "消息",
         calendar: "日历",
         orders: "订单",
         schedule: "排班",

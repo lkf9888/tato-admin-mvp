@@ -1,5 +1,52 @@
 # Changelog
 
+## v1.68.0 - 2026-10-11
+
+### On a phone, the calendar, orders and schedule are built for a phone
+
+From the mobile demo the user approved ("都可以，开始改吧"); the
+messages page went out separately in v1.67.0.
+
+- **Shell.** The top bar is 44px, the page's name at 17px with no brand
+  line, and on the right the page's own icon buttons. A page puts them
+  there with `<MobilePageHeader>` (components/mobile-chrome.tsx), backed
+  by a small store rather than portals: a portal held the bar it found
+  at mount, and a bar re-created by hydration lost the buttons. The tab
+  bar is 52px: Calendar, Messages (with its unread count), Orders,
+  Schedule, More; Home moved into More. On phones Contact is a row in
+  the More sheet, not a floating button over the bar. The same file has
+  the shared pieces: a 36px icon button with a 40px hit area
+  (`.hit-area`), the ⋯ action sheet, the round ＋ and the bottom card.
+- **Calendar.** Two rows of toolbar become one 40px row (‹ Today ›, the
+  count, Calendar | List); the month is the top bar's title; search and
+  filters are its icons; prices, sync, bulk, subscribe, export, add car
+  and the colour key are behind ⋯; new order and service record are ＋.
+  The vehicle column is 62px (plate and model), rows 40px, eight 41px
+  days, bars 22px with the name only. Prices start hidden on a phone.
+  Tapping a trip opens a card: guest, status, source, car, plate and
+  number, each handover's time, place and staff, the earnings
+  (`totalPrice`, already getOrderNetEarning), and Message
+  (/messages?order=), Assign pickup/return (opens the schedule's assign
+  card) and Open order. The list view is a week strip with handover
+  counts, the day's pickups and returns as 58px rows saying who is
+  assigned, and the trips running through the day folded into one row.
+  A new read-only /api/orders/[id]/handover gives the card its staff.
+- **Orders.** Four desktop cards above the first order become a search
+  field, a filter button and a row of filter chips; ＋ creates an
+  offline order and ⋯ exports or starts selecting (checkboxes are hidden
+  until then). Each order is three lines. Orders now sort by the next
+  handover by default -- trips under way or about to start first,
+  finished ones after -- on desktop too, with a toggle back to newest
+  pickup; sorting by pickup put bookings a year out on the first screen.
+- **Schedule.** Dragging does not work under a thumb, so each job to
+  assign has an Assign button opening the staff list, each person with
+  their count for that day and a warning when another of their jobs is
+  within 90 minutes, and a switch to notify them. The task API takes an
+  optional `notify: false` for that switch. A strip moves between
+  overdue, today and the next days; each person's jobs are rows with a
+  circle to tick done and ⋯ for subtask, edit and delete. The desktop
+  board is unchanged.
+
 ## v1.67.0 - 2026-10-11
 
 ### On a phone, a guest conversation fills the screen and the list fits more

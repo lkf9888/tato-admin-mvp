@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
+import { useMobileHeader } from "@/components/mobile-chrome";
 import { sectionForPath } from "@/lib/access";
 
 type NavItem = { href: string; label: string };
@@ -19,21 +20,28 @@ function currentItem(path: string, items: NavItem[]) {
 }
 
 /**
- * Mobile-only top bar for the admin shell. Navigation itself lives in
- * `BottomTabBar` (bottom tabs + More sheet); this bar says where you are:
- * the brand small, the current page's name under it, so a page reached
- * from the More sheet is not left unnamed until its own heading scrolls in.
+ * The phone's top bar: 44px under the status bar, the page's name at
+ * 17px on the left, and on the right whatever icon buttons the page puts
+ * there through <MobilePageHeader> (search, filters, ⋯, ＋). Navigation
+ * itself is the bottom tab bar's job. The brand line that used to sit
+ * above the name is gone: on a phone every pixel of height is a row of
+ * the calendar.
  */
 export function MobileNav({ brandTitle, items }: { brandTitle: string; items: NavItem[] }) {
   const pathname = usePathname() ?? "";
   const page = currentItem(pathname, items);
+  const header = useMobileHeader();
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--line)] bg-[var(--surface)]/95 px-4 pt-safe pb-2.5 backdrop-blur lg:hidden">
-      <div className="min-w-0">
-        <p className="text-[9px] uppercase tracking-[0.28em] text-[var(--ink-soft)]">{brandTitle}</p>
-        <p className="mt-0.5 truncate text-[15px] font-semibold leading-tight text-[var(--ink)]">
-          {page?.label ?? brandTitle}
-        </p>
+    <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--surface)]/95 pt-safe backdrop-blur lg:hidden">
+      <div className="flex h-11 items-center justify-between gap-2 pl-3.5 pr-1.5">
+        <div className="flex min-w-0 flex-1 items-center">
+          {header.title ?? (
+            <p className="truncate text-[17px] font-semibold leading-tight text-[var(--ink)]">
+              {page?.label ?? brandTitle}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5">{header.actions}</div>
       </div>
     </header>
   );

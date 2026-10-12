@@ -5,7 +5,7 @@ import { getRateSeasonality } from "@/lib/rental-estimate/rate-seasonality-serve
 import { resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
 import { dateToDateOnly } from "@/lib/direct-booking";
 import { MobileCalendarSwitch } from "@/components/mobile-calendar-switch";
-import { MobileScheduleList } from "@/components/mobile-schedule-list";
+import { CalendarAgendaList } from "@/components/calendar-agenda-list";
 import { userRole } from "@/lib/access";
 import { requireAccessContext } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
@@ -81,43 +81,38 @@ export default async function CalendarPage() {
     }),
   ]);
 
-  // The 1400-line CalendarView is built around a horizontal-scroll
-  // 2D timeline that requires both axes to be useful — perfect for a
-  // 1280px laptop, hostile on a 375px phone. Mobile gets a vertical,
-  // time-bucketed list instead (`MobileScheduleList`); desktop keeps
-  // the timeline. Both render the same data, so a host who pulls up
-  // the page on a phone sees the same source of truth as on the
-  // browser, just laid out for their thumb.
-  // The mobile list buckets into today / tomorrow / this week / later,
-  // and its own note says it assumes an active fleet rarely books more
-  // than ~30 days out. This fleet books six months out, so "later" was
-  // catching ~900 trips: a phone downloaded every one of them, then
-  // rendered a list nobody scrolls to the end of. Thirty days matches
-  // what the component was written for, and anything beyond it is a
-  // lookup that /orders answers better.
-  const scheduleHorizon = new Date();
-  scheduleHorizon.setDate(scheduleHorizon.getDate() + 30);
-
-  const scheduleOrders = orders
-    // Cancelled trips reach this page now (the grid draws them as a
-    // thin strip so a cancellation is visible rather than absent), but
-    // the phone's list is "what is happening", and a cancelled trip is
-    // not happening.
-    .filter(
-      (order) => order.status !== "cancelled" && order.pickupDatetime <= scheduleHorizon,
-    )
-    .map((order) => ({
-    id: order.id,
-    vehicleName: order.vehicle.nickname,
-    vehiclePlateNumber: order.vehicle.plateNumber,
-    renterName: order.renterName,
-    ownerName: order.vehicle.owner?.name ?? null,
-    pickupDatetime: order.pickupDatetime,
-    returnDatetime: order.returnDatetime,
-    status: order.status,
-    source: order.source,
-    hasConflict: order.hasConflict,
-    }));
+  // A phone shows the timeline or a list (CalendarAgendaList); a
+  // desktop always the timeline. The list covers one week -- the next
+  // seven days' handovers and the trips running through them -- which
+  // keeps it to a few dozen rows; anything further out is a lookup
+  // that /orders answers better.
+  // The phone's list: the next week's handovers and the trips running
+  // through it, each with who is assigned to its pickup and return.
+  const agendaStart = new Date();
+  agendaStart.setHours(0, 0, 0, 0);
+  const agendaEnd = new Date(agendaStart);
+  agendaEnd.setDate(agendaEnd.getDate() + 7);
+  const agendaRows = orders.filter(
+    (order) =>
+      order.status !== "cancelled" && order.pickupDatetime < agendaEnd && order.returnDatetime >= agendaStart,
+  );
+  const handoverTasks = await prisma.staffTask.findMany({
+    where: {
+      workspaceId: workspace.id,
+      orderId: { in: agendaRows.map((order) => order.id) },
+      category: { in: ["order_pickup", "order_return"] },
+      status: { not: "cancelled" },
+      parentTaskId: null,
+    },
+    select: { orderId: true, category: true, staff: { select: { name: true } } },
+  });
+  const staffFor = (orderId: string, category: string) =>
+    handoverTasks.find((task) => task.orderId === orderId && task.category === category)?.staff?.name ?? null;
+  const agendaOrders = agendaRows.map((order) => ({
+    order: toCalendarOrderPayload(order),
+    pickupStaff: staffFor(order.id, "order_pickup"),
+    returnStaff: staffFor(order.id, "order_return"),
+  }));
 
   // Built once, rendered in two places -- the phone's switch and the
   // desktop pane show the same component, and duplicating the props
@@ -211,10 +206,18 @@ export default async function CalendarPage() {
       listLabel={messages.calendar.mobile.viewList}
       timelineLabel={messages.calendar.mobile.viewTimeline}
       list={
-        <MobileScheduleList
-          orders={scheduleOrders}
+        <CalendarAgendaList
+          orders={agendaOrders}
           locale={locale}
-          labels={messages.calendar.mobile}
+          readOnly={viewOnly}
+          vehicleOptions={vehicles.map((vehicle) => ({
+            id: vehicle.id,
+            label: vehicle.nickname,
+            plateNumber: vehicle.plateNumber,
+            secondaryLabel: `${vehicle.brand} ${vehicle.model} ${vehicle.year}`,
+            ownerId: vehicle.ownerId,
+            ownerName: vehicle.owner?.name,
+          }))}
         />
       }
       timeline={calendarView}

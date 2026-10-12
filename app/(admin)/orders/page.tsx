@@ -4,6 +4,7 @@ import { deleteOrderAction, saveOfflineOrderAction, updateOrderStatusAction } fr
 import { DateTimeField } from "@/components/date-time-field";
 import { requireAccessContext } from "@/lib/auth";
 import { OfflineOrderCreateForm } from "@/components/offline-order-create-form";
+import { OrdersMobileBar } from "@/components/orders-mobile-bar";
 import { OrdersRowList } from "@/components/orders-row-list";
 import { SearchableSelect } from "@/components/searchable-select";
 import { StatusBadge } from "@/components/status-badge";
@@ -19,6 +20,7 @@ import {
   orderReceipts,
   ORDER_SOURCES,
   parseDateParam,
+  sortByNearestHandover,
   summarizeOrders,
 } from "@/lib/orders-list";
 import { prisma } from "@/lib/prisma";
@@ -50,6 +52,7 @@ type OrdersSearchParams = {
   vehicleId?: string;
   from?: string;
   to?: string;
+  sort?: string;
 };
 
 /**
@@ -64,6 +67,7 @@ function buildFilterQueryString(filters: {
   vehicleId?: string;
   from?: string;
   to?: string;
+  sort?: string;
 }) {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
@@ -72,6 +76,7 @@ function buildFilterQueryString(filters: {
   if (filters.vehicleId) params.set("vehicleId", filters.vehicleId);
   if (filters.from) params.set("from", filters.from);
   if (filters.to) params.set("to", filters.to);
+  if (filters.sort && filters.sort !== "recent") params.set("sort", filters.sort);
   return params.toString();
 }
 
@@ -151,9 +156,13 @@ export default async function OrdersPage({
   // in JS because (a) SQLite + Prisma doesn't ship case-insensitive
   // LIKE without a raw query and (b) the `normalizeText` helper does
   // diacritic stripping the DB can't replicate easily.
-  const searchedOrders = searchQuery
+  // Nearest handover first unless asked otherwise: newest pickup first
+  // put bookings a year out above everything happening this week.
+  const sortMode = params.sort === "pickup" ? "pickup" : "recent";
+  const matchedOrders = searchQuery
     ? allMatchingOrders.filter((order) => matchesOrderSearch(order, searchQuery, locale))
     : allMatchingOrders;
+  const searchedOrders = sortMode === "pickup" ? matchedOrders : sortByNearestHandover(matchedOrders);
 
   // Pagination math. Total comes from the post-search list (so the
   // user sees the count of what they actually asked for, not the
@@ -185,7 +194,31 @@ export default async function OrdersPage({
     vehicleId: vehicleFilter,
     from: fromFilterRaw,
     to: toFilterRaw,
+    sort: sortMode,
   });
+
+  // The phone's filter chips show how many trips are under way and how
+  // many are still to start, ignoring the status and source the chips
+  // themselves set. Not under a search: the search runs after the
+  // database, so a count from it would be the wrong number.
+  const chipCounts = searchQuery
+    ? null
+    : await prisma.order
+        .groupBy({
+          by: ["status"],
+          where: buildWhereClause(workspace.id, {
+            vehicleId: vehicleFilter || undefined,
+            from: fromDate,
+            to: toDate,
+            vehicleIds,
+          }),
+          _count: { _all: true },
+        })
+        .then((rows) => ({
+          ongoing: rows.find((row) => row.status === "ongoing")?._count._all ?? 0,
+          booked: rows.find((row) => row.status === "booked")?._count._all ?? 0,
+        }));
+  const mobileSummary = summarizeOrders(searchedOrders);
   const prevHref =
     currentPage > 1
       ? `/orders?${filterQs ? `${filterQs}&` : ""}page=${currentPage - 1}`
@@ -241,6 +274,35 @@ export default async function OrdersPage({
 
   return (
     <div className="space-y-2.5">
+      <OrdersMobileBar
+        locale={locale}
+        filters={{
+          q: searchQuery,
+          status: statusFilter,
+          source: sourceFilter,
+          vehicleId: vehicleFilter,
+          from: fromFilterRaw,
+          to: toFilterRaw,
+          sort: sortMode,
+        }}
+        counts={chipCounts}
+        summary={orderMessages.mobile.summary(mobileSummary.count, formatCurrency(mobileSummary.total, locale))}
+        vehicles={vehicleSelectOptions.map(({ value, label }) => ({ value, label }))}
+        statusOptions={statusSelectOptions}
+        sourceOptions={sourceSelectOptions}
+        exportHref={`/api/orders/export?${filterQs ? `${filterQs}&` : ""}locale=${locale}`}
+        createForm={
+          <OfflineOrderCreateForm
+            locale={locale}
+            vehicleOptions={vehicleSelectOptions}
+            statusOptions={statusSelectOptions}
+            defaultVehicleId={vehicles[0]?.id ?? ""}
+            inputClass={inputClass}
+            primaryButtonClass={primaryButtonClass}
+          />
+        }
+      />
+
       <PendingOrdersPanel
         locale={locale}
         rows={pendingOrders.map((row) => ({
@@ -302,7 +364,9 @@ export default async function OrdersPage({
        * gives us a free disclosure animation and a working
        * keyboard / a11y focus story without any client JS.
        */}
-      <details className="group overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)]">
+      {/* On a phone the bar above takes over: ＋ creates, the search and
+          chips filter, ⋯ exports. These desktop cards are hidden there. */}
+      <details className="group overflow-hidden rounded-lg border border-[color:var(--line)] bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(247,247,247,0.96))] shadow-[0_24px_60px_-42px_rgba(17,19,24,0.45)] max-sm:hidden">
         <summary className="tap-press flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 sm:px-4 sm:py-3.5">
           <div className="min-w-0">
             <p className="text-[9px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)] sm:text-[10px] sm:tracking-[0.24em]">
@@ -346,7 +410,7 @@ export default async function OrdersPage({
        * opens to a clean "search + results" view; users who want
        * to slice by status / vehicle / date open the panel.
        */}
-      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-3 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] sm:p-3.5">
+      <section className="overflow-hidden rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-3 shadow-[0_20px_50px_-40px_rgba(17,19,24,0.4)] max-sm:hidden sm:p-3.5">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-[10px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
@@ -477,7 +541,7 @@ export default async function OrdersPage({
         </form>
       </section>
 
-      <section className="flex flex-col gap-2 rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-3 sm:flex-row sm:items-start sm:justify-between">
+      <section className="flex flex-col gap-2 rounded-lg border border-[color:var(--line)] bg-[rgba(255,255,255,0.88)] p-3 max-sm:hidden sm:flex-row sm:items-start sm:justify-between">
         {listSummary ? (
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold text-[color:var(--ink)]">{orderMessages.listSummary.title}</p>
@@ -523,12 +587,28 @@ export default async function OrdersPage({
         ) : (
           <div className="hidden sm:block" />
         )}
-        <a
-          href={`/api/orders/export?${filterQs ? `${filterQs}&` : ""}locale=${locale}`}
-          className={subtleButtonClass}
-        >
-          {orderMessages.listSummary.exportExcel}
-        </a>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Link
+            href={`/orders?${buildFilterQueryString({
+              q: searchQuery,
+              status: statusFilter,
+              source: sourceFilter,
+              vehicleId: vehicleFilter,
+              from: fromFilterRaw,
+              to: toFilterRaw,
+              sort: sortMode === "pickup" ? "recent" : "pickup",
+            })}`}
+            className={subtleButtonClass}
+          >
+            {sortMode === "pickup" ? orderMessages.mobile.sortPickup : orderMessages.mobile.sortRecent} ⇅
+          </Link>
+          <a
+            href={`/api/orders/export?${filterQs ? `${filterQs}&` : ""}locale=${locale}`}
+            className={subtleButtonClass}
+          >
+            {orderMessages.listSummary.exportExcel}
+          </a>
+        </div>
       </section>
 
       <OrdersRowList

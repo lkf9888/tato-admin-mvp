@@ -32,6 +32,9 @@ const taskSchema = z.object({
   /** Pay for this one task; null falls back to the staff member's rate. */
   payRate: z.number().nonnegative().nullable().optional(),
   complained: z.boolean().optional(),
+  /** false: assign without messaging the person (the phone's
+   *  "notify them" switch, turned off). Omitted means notify. */
+  notify: z.boolean().optional(),
 });
 
 function nullable(value?: string | null) {
@@ -186,7 +189,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     "category",
   ].some((key) => key in parsed);
   const nextStatus = parsed.status ?? existing.status;
-  const shouldNotifyAssignment = Boolean(staffId && staffId !== existing.staffId);
+  const shouldNotifyAssignment = parsed.notify !== false && Boolean(staffId && staffId !== existing.staffId);
   const shouldNotifyExistingStaff = Boolean(
     staffId && staffId === existing.staffId && hasNotifiableTaskChange,
   );

@@ -231,6 +231,28 @@ export function orderReceipts(order: Pick<ListedOrder, "totalPrice" | "orderPaym
 }
 
 /** The totals over a whole filtered list, not just the page in view. */
+/**
+ * Orders by the next handover: trips under way or still to start first,
+ * soonest pickup or return at the top, then finished ones, most recent
+ * first. Sorting by pickup alone put bookings a year out on the first
+ * screen, above everything happening this week.
+ */
+export function sortByNearestHandover<T extends { pickupDatetime: Date; returnDatetime: Date }>(orders: T[], now = Date.now()) {
+  const key = (order: T) => {
+    const pickup = order.pickupDatetime.getTime();
+    const ret = order.returnDatetime.getTime();
+    if (pickup >= now) return { past: false, at: pickup };
+    if (ret >= now) return { past: false, at: ret };
+    return { past: true, at: ret };
+  };
+  return [...orders].sort((a, b) => {
+    const ka = key(a);
+    const kb = key(b);
+    if (ka.past !== kb.past) return ka.past ? 1 : -1;
+    return ka.past ? kb.at - ka.at : ka.at - kb.at;
+  });
+}
+
 export function summarizeOrders(orders: ListedOrder[]) {
   let total = 0;
   let received = 0;

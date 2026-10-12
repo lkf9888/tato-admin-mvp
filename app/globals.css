@@ -520,6 +520,20 @@ a[class*="rounded-2xl"],
   }
 }
 
+/* A control drawn small with a thumb-sized target: the visible box
+   stays 32-36px so a phone row stays tight, and this invisible margin
+   takes the hit area to at least 40px. For the phone's bars and rows. */
+/* Unlayered, so it outranks Tailwind's utilities: leave an element
+   that is already positioned (absolute, fixed, sticky) as it is. */
+.hit-area:not(.absolute):not(.fixed):not(.sticky) {
+  position: relative;
+}
+.hit-area::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+
 /* Text that has to stay readable without pinch-zoom. Body copy below
    12px is where reading turns into squinting, and the fix people
    reach for -- zooming -- breaks every sticky header on the page. */

@@ -1,5 +1,6 @@
 /**
- * iCalendar (RFC 5545) output for the fleet calendar.
+ * iCalendar (RFC 5545) output: the fleet calendar's feeds and each staff
+ * member's task feed.
  *
  * Written by hand rather than pulled in as a dependency: the whole
  * format we need is VEVENT with six properties, and the parts that
@@ -20,7 +21,17 @@ export type IcalEvent = {
   location?: string;
   cancelled?: boolean;
   updatedAt?: Date;
+  /** A day rather than a time: `start` and `end` are read for their UTC
+   *  calendar date (TATO stores date-only values at noon UTC, so that
+   *  date is the one that was picked), and `end` is the day after. */
+  allDay?: boolean;
+  url?: string;
 };
+
+/** `YYYYMMDD`, the form of an all-day DTSTART/DTEND. */
+function toIcalDate(date: Date) {
+  return date.toISOString().slice(0, 10).replace(/-/g, "");
+}
 
 /** `YYYYMMDDTHHMMSSZ`. Everything is emitted in UTC so no VTIMEZONE
  *  block is needed and no client has to guess. */
@@ -110,8 +121,17 @@ export function buildIcalendar({
       "BEGIN:VEVENT",
       property("UID", event.uid),
       property("DTSTAMP", toIcalUtc(event.updatedAt ?? now)),
-      property("DTSTART", toIcalUtc(event.start)),
-      property("DTEND", toIcalUtc(event.end)),
+      ...(event.allDay
+        ? [
+            property("DTSTART;VALUE=DATE", toIcalDate(event.start)),
+            // Exclusive: a one-day event ends on the next date, and an
+            // end on the same date is an empty event some clients drop.
+            property(
+              "DTEND;VALUE=DATE",
+              toIcalDate(new Date(Math.max(event.end.getTime(), event.start.getTime() + 24 * 60 * 60 * 1000))),
+            ),
+          ]
+        : [property("DTSTART", toIcalUtc(event.start)), property("DTEND", toIcalUtc(event.end))]),
       property("SUMMARY", escapeText(event.summary)),
     );
     if (event.description) {
@@ -119,6 +139,9 @@ export function buildIcalendar({
     }
     if (event.location) {
       lines.push(property("LOCATION", escapeText(event.location)));
+    }
+    if (event.url) {
+      lines.push(property("URL", event.url));
     }
     // A cancelled trip is published as cancelled rather than dropped,
     // so a client that already has it removes it instead of keeping a

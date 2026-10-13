@@ -243,6 +243,9 @@ function getStaffScheduleCopy(locale: Locale) {
         hideHistory: "折叠",
         historyCount: (count: number) => `${count} 条记录`,
         copyShareLink: "复制链接",
+        copyCalendarLink: "复制日历链接",
+        calendarLinkHint: "员工在谷歌日历里「通过网址添加」这个链接，就能看到分给自己的任务；谷歌大约每几个小时更新一次。员工也可以在自己的任务页点「加到我的日历」。",
+        calendarCopied: "日历订阅链接已复制。谷歌日历每几个小时更新一次，不适合当实时通知。",
         shareCopied: "员工任务链接已复制。",
         miniProgramCode: "小程序 Code",
         bindCode: "绑定码",
@@ -394,6 +397,9 @@ function getStaffScheduleCopy(locale: Locale) {
         hideHistory: "Collapse",
         historyCount: (count: number) => `${count} record${count === 1 ? "" : "s"}`,
         copyShareLink: "Copy link",
+        copyCalendarLink: "Copy calendar link",
+        calendarLinkHint: "Added in Google Calendar under \"From URL\", this shows the person the jobs assigned to them; Google refreshes it every few hours. They can also use \"Add to my calendar\" on their own task page.",
+        calendarCopied: "Calendar link copied. Google Calendar refreshes it every few hours, so it is not a live notification.",
         shareCopied: "Staff task link copied.",
         miniProgramCode: "Mini Program Code",
         bindCode: "Bind code",
@@ -878,17 +884,22 @@ export function StaffScheduleClient({
     return member.shareToken ? `/staff-share/${member.shareToken}` : "";
   }
 
-  async function copyStaffShareLink(member: StaffMember) {
+  /** The task page, or ("calendar") the person's task calendar to
+   *  subscribe to in Google Calendar and the like. */
+  async function copyStaffShareLink(member: StaffMember, which: "page" | "calendar" = "page") {
     const href = staffShareHref(member);
     if (!href) {
       setNotice(c.shareUnavailable);
       return;
     }
 
-    const url = `${window.location.origin}${href}`;
+    const url =
+      which === "calendar"
+        ? `${window.location.origin}/api/staff-share/${encodeURIComponent(member.shareToken ?? "")}/calendar`
+        : `${window.location.origin}${href}`;
     try {
       await navigator.clipboard.writeText(url);
-      setNotice(c.shareCopied);
+      setNotice(which === "calendar" ? c.calendarCopied : c.shareCopied);
     } catch {
       setNotice(c.copyFailed);
     }
@@ -1145,6 +1156,13 @@ export function StaffScheduleClient({
                     <>
                       <button className="btn-secondary min-h-7 px-2 py-1 text-[11px]" onClick={() => copyStaffShareLink(member)}>
                         {c.copyShareLink}
+                      </button>
+                      <button
+                        className="btn-secondary min-h-7 px-2 py-1 text-[11px]"
+                        title={c.calendarLinkHint}
+                        onClick={() => copyStaffShareLink(member, "calendar")}
+                      >
+                        {c.copyCalendarLink}
                       </button>
                     </>
                   ) : null}

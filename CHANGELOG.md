@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.72.0 - 2026-10-13
+
+### Each staff member can see their tasks in Google Calendar
+
+- A subscribable calendar per staff member at
+  /api/staff-share/<token>/calendar, authorised by the same token as
+  their task page, so revoking one revokes both. Their own task page has
+  "Add to my calendar": Add to Google Calendar opens Google's add screen
+  with the address filled in, and Copy subscription link is for Apple
+  Calendar and Outlook. On the schedule, "Copy calendar link" beside
+  each person's page link.
+- Pickups and returns sit at the trip's own time and place for an hour;
+  other tasks at the time their window names on their due date (in
+  Vancouver time), or all day when it names none. Done tasks stay,
+  ticked; cancelled and reassigned ones leave the calendar. The pickup
+  code is stripped: a calendar is copied to every device and kept.
+- Google refreshes a subscribed calendar every few hours, on its own
+  schedule, and both places say so: this shows the week, the texts and
+  the mini program still notify.
+- iCal output gains all-day events (DTEND the day after) and URL.
+
 ## v1.71.3 — Show the same conversation the draft reads
 
 - Load recorded host replies through matched orders, including notifications with no parsed reservation id. Inbox context and answered status now use the same reservation as guest drafts.

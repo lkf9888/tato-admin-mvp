@@ -72,6 +72,12 @@ function copy(locale: Locale) {
   return locale === "zh"
     ? {
         kicker: "我的任务",
+        calendarTitle: "加到我的日历",
+        calendarGoogle: "添加到谷歌日历",
+        calendarCopy: "复制订阅链接",
+        calendarCopied: "已复制",
+        calendarHint:
+          "苹果日历、Outlook：复制链接，在日历里选「添加订阅日历」粘贴。谷歌日历大约每几个小时才更新一次，刚分配或改过时间的任务可能晚几个小时出现，以这个页面和短信为准。取车密码不会写进日历。",
         tasksTab: "任务",
         incomeTab: "我的收入",
         subtitle: "只显示分配给你的任务",
@@ -123,6 +129,12 @@ function copy(locale: Locale) {
       }
     : {
         kicker: "My tasks",
+        calendarTitle: "Add to my calendar",
+        calendarGoogle: "Add to Google Calendar",
+        calendarCopy: "Copy subscription link",
+        calendarCopied: "Copied",
+        calendarHint:
+          "Apple Calendar or Outlook: copy the link and add it as a subscribed calendar. Google Calendar refreshes every few hours, so a job just assigned or moved can take hours to appear; this page and the texts are what count. Pickup codes are never put in the calendar.",
         tasksTab: "Tasks",
         incomeTab: "My income",
         subtitle: "Only tasks assigned to you are shown",
@@ -368,6 +380,7 @@ export function StaffShareClient({
               <p className="text-sm text-neutral-300">{staff.role || labels.subtitle}</p>
             </div>
           </div>
+          <CalendarSubscribe token={token} labels={labels} />
           {staff.miniProgramCode || staff.pinnedMessage ? (
             <div className="mt-3 overflow-hidden rounded-md border border-white/10 bg-white/10 text-sm text-neutral-100">
               <button
@@ -1204,4 +1217,64 @@ function getDisplayTaskTitle(task: StaffShareTask, labels: ReturnType<typeof cop
 
 function isPhotoFile(file: File) {
   return file.type.startsWith("image/") || /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
+}
+
+/**
+ * Adding these tasks to the person's own calendar app: a subscription
+ * to /api/staff-share/<token>/calendar. Google opens straight to its
+ * "add this calendar" screen from the link; other apps take the copied
+ * address. Said plainly that it lags: Google refreshes a subscribed
+ * calendar every few hours.
+ */
+function CalendarSubscribe({
+  token,
+  labels,
+}: {
+  token: string;
+  labels: { calendarTitle: string; calendarGoogle: string; calendarCopy: string; calendarCopied: string; calendarHint: string };
+}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [feed, setFeed] = useState("");
+  useEffect(() => {
+    setFeed(`${window.location.origin}/api/staff-share/${encodeURIComponent(token)}/calendar`);
+  }, [token]);
+  const webcal = feed.replace(/^https?:/, "webcal:");
+  return (
+    <div className="mt-3 overflow-hidden rounded-md border border-white/10 bg-white/10 text-sm text-neutral-100">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        <span className="font-semibold">{labels.calendarTitle}</span>
+        <span aria-hidden className="text-xs text-neutral-300">{open ? "−" : "+"}</span>
+      </button>
+      {open && feed ? (
+        <div className="space-y-2 border-t border-white/10 px-3 py-2.5">
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={`https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-9 items-center rounded-md bg-white px-3 text-xs font-semibold text-[var(--ink)]"
+            >
+              {labels.calendarGoogle}
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard?.writeText(feed).then(() => setCopied(true));
+              }}
+              className="inline-flex min-h-9 items-center rounded-md border border-white/25 px-3 text-xs font-semibold text-white"
+            >
+              {copied ? labels.calendarCopied : labels.calendarCopy}
+            </button>
+          </div>
+          <p className="text-xs leading-5 text-neutral-300">{labels.calendarHint}</p>
+        </div>
+      ) : null}
+    </div>
+  );
 }

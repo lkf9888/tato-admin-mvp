@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.77.0 - 2026-10-19
+
+### The AI answers "where is the car?" from the trip's recorded spot
+
+Follows v1.76.0, which records per trip where the car is handed over (`pickupSpot`, `returnSpot`, `handoverNote`). Pickup location, pickup process and return were together the largest share of guest questions in the message history (about 23%, 35% with time changes and late arrivals), and the library can only hold the general answer -- P3, the office -- not which stall this trip's car is in.
+
+- Drafts and rewrites get the three fields in their trip facts, with a rule to use them exactly, for their own direction, over a generic location entry; with none recorded the AI gives the confirmed address and says the exact spot will follow. The note never carries the code (the existing redaction still runs over the prompt).
+- Templates gain `{{pickup_spot}}`, `{{return_spot}}` and `{{handover_note}}`; the library editor lists them, and the knowledge block, the composer and the outside agent's endpoint fill them.
+- The guest-messages trip details show them when set.
+
 ## v1.76.0 - 2026-10-19
 
 ### Each trip records exactly where the car is handed over

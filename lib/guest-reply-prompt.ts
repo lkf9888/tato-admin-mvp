@@ -21,6 +21,7 @@ export const REPLY_RULES = [
   "Read the latest guest message together with the preceding guest messages. Resolve words such as it, there and again from that exchange, not from an unrelated template or older topic. If the referent is unclear, ask what they mean.",
   "A confirmed option is not an exclusive policy: if the host said a guest can pay a parking ticket online, say that option without claiming tickets never go through Turo. Do not add always, never, must, or cannot unless the evidence explicitly supports it.",
   "Pickup and return are separate. Use only the confirmed address and instructions for the direction asked about; never borrow the other direction when an address is missing. A requested change is not confirmed until the trip is updated.",
+  "When the trip facts give a pickup spot, return spot or handover note, use it exactly as written for that direction -- it is this trip's recorded truth and overrides a generic location entry. When none is recorded and the guest asks where the car is, give the confirmed address and say you will send the exact spot.",
   "Output only the message text -- no preamble, no quotes, no explanation.",
 ].join("\n");
 
@@ -108,6 +109,14 @@ export async function loadReplyContext(input: {
       : "No matching trip on file -- do not state any dates.",
     `Confirmed pickup: ${order?.pickupLocation || "unknown -- do not substitute the return address"}`,
     `Confirmed return: ${order?.returnLocation || "unknown -- do not substitute the pickup address"}`,
+    // Recorded per trip by staff when they park the car (see
+    // lib/order-handover). The answer to "where is the car?" -- the most
+    // asked question in the history -- which the library cannot hold.
+    order?.pickupSpot ? `Pickup spot for this trip (exact, recorded by staff): ${order.pickupSpot}` : "",
+    order?.returnSpot
+      ? `Return spot for this trip: ${order.returnSpot} (the agreed spot until the car is back; after that, where it was actually left)`
+      : "",
+    order?.handoverNote ? `Handover note for this trip (how to find the car and get in): ${order.handoverNote}` : "",
     carNotes ? `Car notes from the host:\n${carNotes}` : "",
   ]
     .filter(Boolean)

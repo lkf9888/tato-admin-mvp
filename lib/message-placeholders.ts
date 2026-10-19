@@ -15,6 +15,9 @@ export const PLACEHOLDER_KEYS = [
   "return",
   "pickup_location",
   "return_location",
+  "pickup_spot",
+  "return_spot",
+  "handover_note",
   "reservation",
   "pickup_code",
 ] as const;
@@ -30,6 +33,9 @@ export const PLACEHOLDER_LABELS: Record<PlaceholderKey, { zh: string; en: string
   return: { zh: "还车时间", en: "Return time" },
   pickup_location: { zh: "取车地点", en: "Pickup location" },
   return_location: { zh: "还车地点", en: "Return location" },
+  pickup_spot: { zh: "取车车位", en: "Pickup spot" },
+  return_spot: { zh: "还车车位", en: "Return spot" },
+  handover_note: { zh: "交接说明", en: "Handover note" },
   reservation: { zh: "预订号", en: "Reservation" },
   pickup_code: { zh: "取车密码", en: "Pickup code" },
 };
@@ -44,6 +50,12 @@ export type PlaceholderContext = {
   return?: string | Date | null;
   pickupLocation?: string | null;
   returnLocation?: string | null;
+  /** Where this trip's car is parked for pickup, as staff recorded it. */
+  pickupSpot?: string | null;
+  /** The agreed return spot, or where the car was left once it is back. */
+  returnSpot?: string | null;
+  /** How to get in: lockbox location, landmarks. Never the code. */
+  handoverNote?: string | null;
   reservation?: string | null;
   pickupCode?: string | null;
 };
@@ -98,6 +110,12 @@ function valueFor(key: PlaceholderKey, context: PlaceholderContext, chinese: boo
       return clean(context.pickupLocation);
     case "return_location":
       return clean(context.returnLocation);
+    case "pickup_spot":
+      return clean(context.pickupSpot);
+    case "return_spot":
+      return clean(context.returnSpot);
+    case "handover_note":
+      return clean(context.handoverNote);
     case "reservation":
       return clean(context.reservation);
     case "pickup_code":

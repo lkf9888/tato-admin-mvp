@@ -158,6 +158,9 @@ type TripForKnowledge = {
   returnDatetime: Date;
   pickupLocation: string | null;
   returnLocation: string | null;
+  pickupSpot?: string | null;
+  returnSpot?: string | null;
+  handoverNote?: string | null;
   externalOrderId: string | null;
   vehicle?: { plateNumber: string; brand: string; model: string; year: number } | null;
 } | null;
@@ -199,6 +202,9 @@ export async function knowledgeForConversation(input: {
       return: trip?.returnDatetime ?? null,
       pickupLocation: trip?.pickupLocation ?? null,
       returnLocation: trip?.returnLocation ?? null,
+      pickupSpot: trip?.pickupSpot ?? null,
+      returnSpot: trip?.returnSpot ?? null,
+      handoverNote: trip?.handoverNote ?? null,
       reservation: trip?.externalOrderId ?? null,
     },
     vehicleLabels: Object.fromEntries(vehicles.map((vehicle) => [vehicle.id, vehicle.label])),

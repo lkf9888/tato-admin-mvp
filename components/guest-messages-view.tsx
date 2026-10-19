@@ -93,6 +93,10 @@ type Order = {
   returnDatetime: string;
   pickupLocation: string | null;
   returnLocation: string | null;
+  /** Recorded by staff per trip: exact spot, and how to get in. */
+  pickupSpot?: string | null;
+  returnSpot?: string | null;
+  handoverNote?: string | null;
   status: string;
   netEarning: number | null;
   vehicleLabel: string | null;
@@ -800,6 +804,9 @@ export function GuestMessagesView({
           return: order?.returnDatetime ?? null,
           pickupLocation: order?.pickupLocation ?? null,
           returnLocation: order?.returnLocation ?? null,
+          pickupSpot: order?.pickupSpot ?? null,
+          returnSpot: order?.returnSpot ?? null,
+          handoverNote: order?.handoverNote ?? null,
           reservation: order?.externalOrderId ?? null,
           pickupCode: order?.pickupCode ?? null,
         },
@@ -905,7 +912,10 @@ export function GuestMessagesView({
         },
         { label: t.tripReservation, value: order.externalOrderId },
         { label: t.tripPickupAddress, value: order.pickupLocation },
+        ...(order.pickupSpot ? [{ label: t.tripPickupSpot, value: order.pickupSpot }] : []),
         { label: t.tripReturnAddress, value: order.returnLocation },
+        ...(order.returnSpot ? [{ label: t.tripReturnSpot, value: order.returnSpot }] : []),
+        ...(order.handoverNote ? [{ label: t.tripHandoverNote, value: order.handoverNote }] : []),
       ]
     : [];
 

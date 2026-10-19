@@ -125,6 +125,9 @@ export async function GET(request: Request) {
           return: order.returnDatetime,
           pickupLocation: order.pickupLocation,
           returnLocation: order.returnLocation,
+          pickupSpot: order.pickupSpot,
+          returnSpot: order.returnSpot,
+          handoverNote: order.handoverNote,
           reservation: order.externalOrderId,
         }
       : null;

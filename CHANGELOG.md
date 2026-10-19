@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.75.0 - 2026-10-19
+
+### What guests ask about, measured from the message history
+
+Step 0 of using the ~53,000 imported guest messages for AI replies: find out which questions come up and how many the AI message library can already answer, before building anything. `/api/messages/insights` (admin session only): POST `{"step":"classify"}` labels a fixed random sample of 3,000 substantive messages with one of 24 intents and a short Chinese "ask" (no names or numbers), 30 a call, four calls at a time, within one request's time -- call again until `remaining` is 0. POST `{"step":"coverage"}` then asks the model, for each intent over 1%, whether the library holds what is needed to answer it, and what is missing. GET returns the report: trivial share ("thanks", "ok", counted over the whole history without a model), each intent's share and estimated total, trip stage, top asks and coverage.
+
+A one-off analysis, so its state is a JSON file under the data directory rather than a table.
+
 ## v1.74.3 - 2026-10-19
 
 ### The history import looks past mail it cannot import or clear

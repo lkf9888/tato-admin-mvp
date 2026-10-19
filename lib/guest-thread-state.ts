@@ -10,16 +10,33 @@ import { prisma } from "@/lib/prisma";
  * number on the badge and the "needs reply" count on the page cannot
  * disagree: both come from here.
  */
-export async function loadGuestThreads(workspaceId: string) {
+/** Emails on the first screen: a quarter's worth of conversation is
+ *  plenty to work from, and the nav badge counts over the same set. */
+export const FIRST_PAGE_EMAILS = 400;
+
+/**
+ * One page of guest emails, newest first, grouped into conversations.
+ *
+ * `cursor` is the id of the last email of the page before, which keeps
+ * paging exact when two emails share a timestamp. The history import
+ * put ten years of messages in this table, so the page never loads it
+ * whole: each further page is another `take` emails, asked for when the
+ * operator scrolls to the end of the list. A conversation that spans a
+ * page boundary arrives in parts; the page joins them by thread key.
+ */
+export async function loadGuestThreads(
+  workspaceId: string,
+  options: { cursor?: string | null; take?: number } = {},
+) {
+  const take = options.take ?? FIRST_PAGE_EMAILS;
   const emails = await prisma.inboundEmail.findMany({
     where: {
       workspaceId,
       kind: { in: ["GUEST_MESSAGE", "SUPPORT"] },
     },
-    orderBy: { receivedAt: "desc" },
-    // A quarter's worth of conversation is plenty to work from, and
-    // bounds the page against a mailbox that only grows.
-    take: 400,
+    orderBy: [{ receivedAt: "desc" }, { id: "desc" }],
+    ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
+    take,
     select: {
       id: true,
       subject: true,
@@ -147,7 +164,8 @@ export async function loadGuestThreads(workspaceId: string) {
       .map((thread) => thread.key),
   );
 
-  return { threads, scraped, reservationIds, answeredKeys };
+  const nextCursor = emails.length === take ? (emails[emails.length - 1]?.id ?? null) : null;
+  return { threads, scraped, reservationIds, answeredKeys, nextCursor };
 }
 
 /** Conversations with a guest message nobody has answered or handled. */

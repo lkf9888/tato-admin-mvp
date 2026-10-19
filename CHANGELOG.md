@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.74.0 - 2026-10-19
+
+### Older guest conversations load a page at a time
+
+The history import is putting tens of thousands of old guest messages into `InboundEmail`, and the messages page only ever showed the newest 400 emails. A "加载更早的对话" button at the foot of the list now loads the next 200 emails' worth of conversations from `/api/messages/threads?cursor=<last email id>`; at the end it says so. Only on request, not on scroll, so a page nobody pages back through costs what it did before.
+
+- `loadGuestThreads` takes a cursor (`receivedAt desc, id desc`, exact when timestamps tie) and returns `nextCursor`. The first page is still 400 emails, the set the nav badge counts.
+- The page's data assembly (threads, matched trips, recorded Turo messages, why a thread has no trip) moved into `lib/guest-messages-data.ts`, so the page and the API return one shape.
+- The view joins pages by thread key: a conversation spanning a boundary becomes one, the newest page's copy wins and older pages only add messages. A refresh after "mark handled" keeps the replaced first page as an older one, so nothing already loaded drops out.
+- Search covers loaded conversations, and says so while older ones remain.
+
 ## v1.73.2 - 2026-10-19
 
 ### The history import takes a full batch per run

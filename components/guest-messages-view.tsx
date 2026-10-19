@@ -103,6 +103,77 @@ type Order = {
   pickupCode?: string | null;
 };
 
+/** One page of conversations, as the page renders and /api/messages/threads returns. */
+type Page = {
+  threads: Thread[];
+  orders: Order[];
+  /** Full conversations recorded off Turo (the browser reader or an
+   *  agent), keyed by reservation. A thread without one falls back to
+   *  the email-derived view: what the guest said, none of our replies. */
+  conversations: Record<string, ConversationMessage[]>;
+  /** Where the next page starts; null on the last one. */
+  nextCursor: string | null;
+};
+
+/**
+ * Pages joined into one list, newest page first.
+ *
+ * A conversation that spans a page boundary arrives in parts and is put
+ * back together by its key. The newest page's copy of a thread wins --
+ * it is the fresher read, and the one that knows which threads are
+ * already answered -- and older pages only add messages it does not
+ * have.
+ */
+function mergePages(pages: Page[]) {
+  const byKey = new Map<string, Thread>();
+  const orders = new Map<string, Order>();
+  const conversations: Record<string, ConversationMessage[]> = {};
+
+  for (const page of pages) {
+    for (const thread of page.threads) {
+      const have = byKey.get(thread.key);
+      if (!have) {
+        byKey.set(thread.key, thread);
+        continue;
+      }
+      const ids = new Set(have.messages.map((message) => message.id));
+      const extra = thread.messages.filter((message) => !ids.has(message.id));
+      if (extra.length === 0) continue;
+      const orderId = have.orderId ?? thread.orderId;
+      byKey.set(thread.key, {
+        ...have,
+        messages: [...have.messages, ...extra].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)),
+        openCount: have.openCount + extra.filter((message) => !message.acknowledgedAt).length,
+        vehicleLabel: have.vehicleLabel ?? thread.vehicleLabel,
+        vehiclePlate: have.vehiclePlate ?? thread.vehiclePlate,
+        avatarUrl: have.avatarUrl ?? thread.avatarUrl,
+        turoLink: have.turoLink ?? thread.turoLink,
+        orderId,
+        unmatchedReason: orderId ? null : have.unmatchedReason,
+      });
+    }
+    for (const order of page.orders) if (!orders.has(order.id)) orders.set(order.id, order);
+    for (const [reservationId, list] of Object.entries(page.conversations)) {
+      const have = conversations[reservationId];
+      if (!have) {
+        conversations[reservationId] = list;
+        continue;
+      }
+      const ids = new Set(have.map((message) => message.id));
+      conversations[reservationId] = [...have, ...list.filter((message) => !ids.has(message.id))].sort((a, b) =>
+        a.sentAt.localeCompare(b.sentAt),
+      );
+    }
+  }
+
+  // The order `groupIntoThreads` uses: anything open first, then newest.
+  const threads = [...byKey.values()].sort((a, b) => {
+    if ((a.openCount > 0) !== (b.openCount > 0)) return a.openCount > 0 ? -1 : 1;
+    return b.latestAt.localeCompare(a.latestAt);
+  });
+  return { threads, orders: [...orders.values()], conversations };
+}
+
 type Copy = ReturnType<typeof getMessages>["guestMessagesPage"];
 
 type DueMessage = {
@@ -266,9 +337,7 @@ const DESKTOP_QUERY = "(min-width: 1024px)";
 export function GuestMessagesView({
   locale,
   canDraft,
-  threads,
-  orders,
-  conversations,
+  firstPage,
   messageTemplates,
   templateVehicleOptions,
   library,
@@ -276,12 +345,8 @@ export function GuestMessagesView({
 }: {
   locale: Locale;
   canDraft: boolean;
-  threads: Thread[];
-  orders: Order[];
-  /** Full conversations recorded off Turo (the browser reader or an
-   *  agent), keyed by reservation. A thread without one falls back to
-   *  the email-derived view: what the guest said, none of our replies. */
-  conversations: Record<string, ConversationMessage[]>;
+  /** The newest conversations; older pages load on request. */
+  firstPage: Page;
   /** For the scheduled-message rules, which pick a template by name. */
   messageTemplates: MessageTemplateRow[];
   templateVehicleOptions: MessageTemplateVehicleOption[];
@@ -292,6 +357,44 @@ export function GuestMessagesView({
   const messages = getMessages(locale);
   const t = messages.guestMessagesPage;
   const router = useRouter();
+
+  // Older conversations, a page at a time, only when asked for: ten
+  // years of history loaded at once would make this page slow for
+  // everyone who opens it.
+  const [olderPages, setOlderPages] = useState<Page[]>([]);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderFailed, setOlderFailed] = useState(false);
+  // A refresh (after "mark handled") brings a new first page whose
+  // window has moved forward; the one it replaces is kept as an older
+  // page, or the messages that slid out of the window would vanish from
+  // a list that had already gone past them.
+  const previousFirst = useRef(firstPage);
+  useEffect(() => {
+    if (previousFirst.current === firstPage) return;
+    const replaced = previousFirst.current;
+    previousFirst.current = firstPage;
+    setOlderPages((pages) => (pages.length > 0 ? [replaced, ...pages] : pages));
+  }, [firstPage]);
+  const { threads, orders, conversations } = useMemo(
+    () => mergePages([firstPage, ...olderPages]),
+    [firstPage, olderPages],
+  );
+  const nextCursor = olderPages.length > 0 ? olderPages[olderPages.length - 1].nextCursor : firstPage.nextCursor;
+  async function loadOlder() {
+    if (!nextCursor || loadingOlder) return;
+    setLoadingOlder(true);
+    setOlderFailed(false);
+    try {
+      const response = await fetch(`/api/messages/threads?cursor=${encodeURIComponent(nextCursor)}`);
+      if (!response.ok) throw new Error(String(response.status));
+      const page = (await response.json()) as Page;
+      setOlderPages((pages) => [...pages, page]);
+    } catch {
+      setOlderFailed(true);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -992,6 +1095,30 @@ export function GuestMessagesView({
               })}
             </ul>
           )}
+
+          {/* Older conversations, a page at a time. A button rather than
+              loading on scroll: each page costs memory, so it is spent
+              only when someone means to go back that far. */}
+          {filter !== "scheduled" && (nextCursor || olderPages.length > 0) ? (
+            <div className="grid shrink-0 justify-items-center gap-1 border-t border-[var(--line)] px-3 py-2.5">
+              {nextCursor ? (
+                <button
+                  type="button"
+                  onClick={() => void loadOlder()}
+                  disabled={loadingOlder}
+                  className="tap-press tap-compact hit-area inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--line-strong)] px-3.5 text-[12px] font-semibold text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] disabled:opacity-60"
+                >
+                  {loadingOlder ? <InlineSpinner className="h-3 w-3" /> : null}
+                  {loadingOlder ? t.loadingOlder : olderFailed ? t.loadOlderFailed : t.loadOlder}
+                </button>
+              ) : (
+                <p className="text-[11.5px] text-[var(--ink-soft)]">{t.noOlder}</p>
+              )}
+              {normalizedSearch && nextCursor ? (
+                <p className="text-center text-[11px] text-[var(--ink-soft)]">{t.searchLoadedOnly}</p>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         {/* ── One conversation ─────────────────────────────────── */}

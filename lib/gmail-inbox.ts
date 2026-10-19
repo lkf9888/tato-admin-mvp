@@ -264,6 +264,11 @@ export type GmailSyncResult = {
   reclassified: number;
   /** Guest messages pushed to the operator's phone this run. */
   guestMessagesPushed?: number;
+  /** Filed guest-message emails moved to Gmail's Trash this run. */
+  trashed?: number;
+  /** History run: old guest messages still to import after this one.
+   *  Zero means the history is all in. */
+  historyRemaining?: number;
   /** What the booking mail did to orders on this run. */
   orders?: ApplyOutcome;
   /** Messages still waiting for a summary after this run's budget ran
@@ -381,6 +386,13 @@ export async function runGmailSync(input: {
    * anything already calling this keeps its behaviour.
    */
   mode?: "ingest" | "enrich" | "full";
+  /**
+   * Bring in old conversations: guest messages from the last ten years,
+   * up to 400 a run, newest first, filed as read. Each run clears what
+   * it filed from the inbox, so run it until it imports nothing. Other
+   * old Turo mail is not imported (see ingestMailbox).
+   */
+  history?: boolean;
 }): Promise<GmailSyncResult> {
   const mode = input.mode ?? "full";
   const config = getGmailConfig();
@@ -429,6 +441,7 @@ export async function runGmailSync(input: {
       workspaceId: input.workspaceId,
       lookbackDays: input.lookbackDays,
       maxMessages: input.maxMessages,
+      history: input.history,
       config,
       fleet,
       result,
@@ -480,10 +493,37 @@ export async function runGmailSync(input: {
   return result;
 }
 
+/**
+ * Whether a guest-message email leaves the mailbox once TATO has it.
+ *
+ * On by default: Turo sends one notification per guest message, the
+ * operator's inbox drowned in them, and everything TATO reads from one
+ * -- the text, the guest, the car, the link back to Turo -- is copied
+ * into its row at ingest. Nothing later goes back to Gmail for it.
+ * Moved to Gmail's Trash rather than deleted outright, so a mistake has
+ * Gmail's thirty days to be undone. Only guest messages: booking mail
+ * stays where it is. `GMAIL_TRASH_GUEST_MESSAGES=false` turns it off.
+ */
+function trashGuestMessagesEnabled() {
+  return process.env.GMAIL_TRASH_GUEST_MESSAGES?.trim().toLowerCase() !== "false";
+}
+
+/** How far back the history run reaches, and how much it takes a run. */
+const HISTORY_LOOKBACK_DAYS = 3650;
+const HISTORY_MAX_MESSAGES = 400;
+
+/** The mailbox Gmail calls Trash, whatever the account's language. */
+async function findTrashMailbox(client: ImapFlow) {
+  const boxes = await client.list();
+  return boxes.find((box) => box.specialUse === "\\Trash")?.path ?? null;
+}
+
 async function ingestMailbox(input: {
   workspaceId: string;
   lookbackDays?: number;
   maxMessages?: number;
+  /** The history run: see `runGmailSync`. */
+  history?: boolean;
   config: ReturnType<typeof getGmailConfig>;
   fleet: VehicleForMatch[];
   result: GmailSyncResult;
@@ -510,16 +550,29 @@ async function ingestMailbox(input: {
   const lock = await client.getMailboxLock(config.mailbox);
   try {
     const since = new Date();
-    since.setDate(since.getDate() - (input.lookbackDays ?? getLookbackDays()));
+    since.setDate(
+      since.getDate() - (input.history ? HISTORY_LOOKBACK_DAYS : (input.lookbackDays ?? getLookbackDays())),
+    );
 
-    const uids = await client.search({ since }, { uid: true });
+    // Turo's mail only. Searching every sender let the rest of the
+    // inbox use up the cap, which a long backfill window made worse:
+    // the newest N of all mail may hold few or no Turo messages. The
+    // sender check below still runs; this only narrows the search.
+    const senderTerms = config.allowedSenders.map((sender) => ({ from: sender }));
+    const query =
+      senderTerms.length === 1 ? { since, ...senderTerms[0] } : { since, or: senderTerms };
+    const uids = await client.search(query, { uid: true });
     if (!uids || uids.length === 0) {
       return result;
     }
 
     // Newest first, capped — a first run against a busy mailbox should
-    // not try to ingest years of history in one request.
-    const selected = uids.slice(-(input.maxMessages ?? getMaxMessages()));
+    // not try to ingest years of history in one request. The history
+    // run reads every envelope instead (small, and booking mail that
+    // stays in the inbox would otherwise fill the newest N forever)
+    // and caps only the whole messages it downloads, below.
+    const cap = input.maxMessages ?? (input.history ? HISTORY_MAX_MESSAGES : getMaxMessages());
+    const selected = input.history ? uids : uids.slice(-cap);
     result.scanned = selected.length;
 
     // Pre-load the ids we already have, so the common case -- a poll
@@ -531,32 +584,70 @@ async function ingestMailbox(input: {
     // past, dedupe starts missing and every miss becomes a unique
     // constraint violation on insert. Ids are short strings -- ten
     // thousand of them is a rounding error next to the message bodies
-    // this function is already holding.
+    // this function is already holding. The kind comes along to know
+    // which stored ones are guest messages to clear from the inbox.
     const existing = await prisma.inboundEmail.findMany({
       where: { workspaceId: input.workspaceId },
-      select: { messageId: true },
+      select: { messageId: true, kind: true },
     });
-    const seen = new Set(existing.map((row) => row.messageId));
+    const storedKind = new Map(existing.map((row) => [row.messageId, row.kind]));
 
-    for await (const message of client.fetch(
-      selected,
-      { uid: true, envelope: true, source: true },
-      { uid: true },
-    )) {
+    // Two passes: envelopes first, which are small, then whole messages
+    // only for what is new. Re-reading every stored message's source
+    // to learn it was a duplicate made the history run slow for nothing.
+    const fresh: number[] = [];
+    const toTrash: number[] = [];
+    for await (const message of client.fetch(selected, { uid: true, envelope: true }, { uid: true })) {
+      const messageId = message.envelope?.messageId?.trim();
+      if (!messageId) continue;
+      const kind = storedKind.get(messageId);
+      if (kind) {
+        result.skippedDuplicate += 1;
+        if (kind === InboundEmailKind.GUEST_MESSAGE) toTrash.push(message.uid);
+        continue;
+      }
+      const fromAddress = message.envelope?.from?.[0]?.address?.trim().toLowerCase() ?? "";
+      if (!senderAllowed(fromAddress, config.allowedSenders)) {
+        result.skippedSender += 1;
+        continue;
+      }
+      // The history run is for conversations. Old booking mail is left
+      // alone: turned into orders now, years-old changes and
+      // cancellations would be replayed onto trips the CSV already got
+      // right.
+      if (
+        input.history &&
+        classifyTuroSubject(message.envelope?.subject ?? "")?.kind !== InboundEmailKind.GUEST_MESSAGE
+      ) {
+        continue;
+      }
+      fresh.push(message.uid);
+    }
+
+    // Newest first within the cap; the next history run takes the next
+    // older batch, since what this one files is no longer new.
+    if (input.history) result.historyRemaining = Math.max(0, fresh.length - cap);
+    if (fresh.length > cap) fresh.splice(0, fresh.length - cap);
+
+    // Anything older than the normal window is history: filed as read,
+    // or a backfill would put a thousand long-finished conversations
+    // at the top of "needs reply".
+    const historyBefore = new Date();
+    historyBefore.setDate(historyBefore.getDate() - getLookbackDays());
+
+    for await (const message of fresh.length > 0
+      ? client.fetch(fresh, { uid: true, envelope: true, source: true }, { uid: true })
+      : []) {
       const envelope = message.envelope;
       const messageId = envelope?.messageId?.trim();
       if (!messageId) continue;
 
-      if (seen.has(messageId)) {
+      if (storedKind.has(messageId)) {
         result.skippedDuplicate += 1;
         continue;
       }
 
       const fromAddress = envelope?.from?.[0]?.address?.trim().toLowerCase() ?? "";
-      if (!senderAllowed(fromAddress, config.allowedSenders)) {
-        result.skippedSender += 1;
-        continue;
-      }
 
       // `source` is only present because we asked for it in the fetch
       // options, but the type is optional — skip rather than assert, so
@@ -603,19 +694,38 @@ async function ingestMailbox(input: {
             subject,
             receivedAt,
             bodyText,
+            avatarUrl,
             ...attribution,
+            acknowledgedAt:
+              attribution.kind === InboundEmailKind.GUEST_MESSAGE && receivedAt < historyBefore ? new Date() : null,
             parsedAt: null,
             parsed: null,
           },
         });
       } catch {
         result.skippedDuplicate += 1;
-        seen.add(messageId);
+        storedKind.set(messageId, attribution.kind);
         continue;
       }
 
-      seen.add(messageId);
+      storedKind.set(messageId, attribution.kind);
       result.imported += 1;
+      if (attribution.kind === InboundEmailKind.GUEST_MESSAGE) toTrash.push(message.uid);
+    }
+
+    // Only once the rows exist: a message moves out of the inbox after
+    // TATO has it, never before. A failure here leaves the mail where
+    // it was, and the next run tries again.
+    if (toTrash.length > 0 && trashGuestMessagesEnabled()) {
+      try {
+        const trash = await findTrashMailbox(client);
+        if (trash && trash !== config.mailbox) {
+          await client.messageMove(toTrash, trash, { uid: true });
+          result.trashed = toTrash.length;
+        }
+      } catch (error) {
+        console.error("[gmail-inbox] moving filed guest messages to Trash failed", error);
+      }
     }
   } finally {
     lock.release();
@@ -909,6 +1019,8 @@ export function summarizeGmailSyncResult(result: GmailSyncResult) {
     `parsed=${result.parsed}`,
     `parseFailed=${result.parseFailed}`,
     `reclassified=${result.reclassified}`,
+    result.trashed ? `trashed=${result.trashed}` : "",
+    result.historyRemaining != null ? `historyRemaining=${result.historyRemaining}` : "",
     `enrichRemaining=${result.enrichRemaining}`,
     result.enrichErrors.length > 0 ? `enrichErrors=${result.enrichErrors.join("|")}` : "",
   ]

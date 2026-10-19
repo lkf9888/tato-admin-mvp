@@ -15,6 +15,16 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+    # 手动跑时可选 history:把以前的客人消息分批导入(每次最多 400 封,
+    # 只要客人消息,按已读入库),导入后从收件箱移到垃圾箱。
+    # 一直跑到 imported=0 为止。
+    inputs:
+      mode:
+        description: "ingest(默认)或 history(导入历史客人消息)"
+        required: false
+        default: ingest
+        type: choice
+        options: [ingest, history]
 
 # 重叠的运行做不了有用的事:同步内部按 Message-ID 去重并且单飞,
 # 第二个只会重读第一个正在处理的东西。
@@ -29,7 +39,7 @@ jobs:
       - name: Trigger Turo inbox sync
         run: |
           code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
-            -X POST "https://tatocar.co/api/gmail-sync?mode=ingest" \
+            -X POST "https://tatocar.co/api/gmail-sync?mode=${{ inputs.mode || 'ingest' }}" \
             -H "x-tato-sync-secret: ${{ secrets.GMAIL_SYNC_SECRET }}")
           cat /tmp/out.json
           echo ""

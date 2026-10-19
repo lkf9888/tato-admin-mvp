@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.73.0 - 2026-10-19
+
+### Guest-message emails leave Gmail once TATO has them, and old conversations come in
+
+Turo emails a notification for every guest message, and the operator's inbox was buried in them. Everything TATO reads from one -- the text, guest, car, trip and the link back to Turo -- is copied into its `InboundEmail` row at ingest, and nothing later goes back to Gmail for it. So each sync now moves the guest-message emails it has filed (new, or stored on an earlier run) to Gmail's Trash, found by its special-use flag so the account's language does not matter. Only after the row exists; a failed move leaves the mail for the next run. Booking and other Turo mail stays put. Trash rather than deletion: Gmail keeps it thirty days. `GMAIL_TRASH_GUEST_MESSAGES=false` turns it off.
+
+`?mode=history` (and a `history` choice on the Gmail sync workflow's manual run) brings in old conversations: guest messages from the last ten years, 400 whole messages a run, newest first. It reads every Turo envelope (small) and downloads only guest messages it does not have, so booking mail left in the inbox cannot block it; the response's `historyRemaining` says how many are left. Old booking mail is not imported, so years-old changes cannot be replayed onto orders. Guest messages older than the normal seven-day window are filed as read, so history does not flood "needs reply".
+
+Along the way:
+- The IMAP search asks for Turo's senders only. Searching all mail let the rest of the inbox use up the per-run cap.
+- Stored messages are recognised from their envelope; their full source is no longer downloaded just to be skipped.
+- The guest's avatar, read from each email since it was added, is now actually stored.
+- The IDLE listener ignores the mailbox count dropping (mail moved to Trash) and wakes only for new mail.
+
 ## v1.72.0 - 2026-10-13
 
 ### Each staff member can see their tasks in Google Calendar

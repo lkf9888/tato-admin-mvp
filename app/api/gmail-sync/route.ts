@@ -98,15 +98,22 @@ export async function POST(request: Request) {
     // `?mode=ingest` reads the mailbox and stops; `?mode=enrich` runs
     // only the model passes. Unrecognised or absent means both, so the
     // scheduled job that has been calling this all along is unchanged.
+    //
+    // `?mode=history` brings in old conversations, a batch per call (see
+    // `runGmailSync`). Open to the scheduler's secret too, unlike
+    // `?days=`: it is bounded -- guest messages only, 400 a run, no
+    // model -- and is run by hand from the workflow until it is done.
     const requestedMode = new URL(request.url).searchParams.get("mode");
+    const history = requestedMode === "history";
     const mode =
-      requestedMode === "ingest" || requestedMode === "enrich" ? requestedMode : undefined;
+      requestedMode === "ingest" || requestedMode === "enrich" ? requestedMode : history ? "ingest" : undefined;
 
     const result = await runGmailSync({
       workspaceId: context.workspaceId,
       lookbackDays,
       maxMessages,
       mode,
+      history,
     });
 
     // Turning mail into bookings now happens inside `runGmailSync`,

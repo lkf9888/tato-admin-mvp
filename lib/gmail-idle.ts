@@ -144,7 +144,10 @@ export function startGmailIdle() {
         await ingestNow("reconnect");
 
         let settleTimer: NodeJS.Timeout | null = null;
-        client.on("exists", () => {
+        client.on("exists", (event: { count: number; prevCount: number }) => {
+          // The count also drops when the sync moves filed guest messages
+          // to Trash; only a rise is new mail.
+          if (event.count <= event.prevCount) return;
           status.lastEventAt = new Date().toISOString();
           if (settleTimer) clearTimeout(settleTimer);
           settleTimer = setTimeout(() => void ingestNow("new mail"), SETTLE_MS);

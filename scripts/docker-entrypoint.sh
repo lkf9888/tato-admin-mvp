@@ -78,10 +78,28 @@ if [ "$DB_PATH" != "$DATABASE_URL" ] && [ -f "$DB_PATH" ]; then
   #    disk, so we'd rather start the app without a fresh snapshot
   #    than refuse to come up at all. Log the skip so it's visible in
   #    Railway's deploy logs.
+  #
+  # 3. Never let the snapshot be what fills the volume (2026-10-19). The
+  #    database had grown, the volume was nearly full, and a `cp` that
+  #    ran out of space halfway left its partial file behind: the copy
+  #    "failed and was skipped", and SQLite was left with no room to
+  #    write -- "database or disk is full", the site down. So: prune to
+  #    two before copying (three in all after it, not four), copy only
+  #    with room for twice the database to spare -- the copy plus room
+  #    for the database's own journal to grow -- and delete a partial
+  #    copy if one is left anyway.
   mkdir -p /app/data/backups || true
-  ls -t /app/data/backups/*.db 2>/dev/null | tail -n +4 | xargs -r rm -f -- || true
-  if ! cp "$DB_PATH" "/app/data/backups/$(basename "$DB_PATH" .db)-predeploy-$(date +%Y%m%d%H%M%S).db"; then
-    echo "[entrypoint] Pre-deploy DB snapshot failed (volume full?). Skipping snapshot and continuing."
+  ls -t /app/data/backups/*.db 2>/dev/null | tail -n +3 | xargs -r rm -f -- || true
+  SNAPSHOT="/app/data/backups/$(basename "$DB_PATH" .db)-predeploy-$(date +%Y%m%d%H%M%S).db"
+  DB_KB=$(du -k "$DB_PATH" 2>/dev/null | cut -f1)
+  FREE_KB=$(df -Pk /app/data 2>/dev/null | awk 'NR==2 {print $4}')
+  if [ -n "$DB_KB" ] && [ -n "$FREE_KB" ] && [ "$FREE_KB" -gt $((DB_KB * 2)) ]; then
+    if ! cp "$DB_PATH" "$SNAPSHOT"; then
+      rm -f "$SNAPSHOT" || true
+      echo "[entrypoint] Pre-deploy DB snapshot failed. Removed the partial copy and continuing."
+    fi
+  else
+    echo "[entrypoint] Skipping the pre-deploy DB snapshot: ${FREE_KB:-?} KB free on /app/data for a ${DB_KB:-?} KB database. Free space or grow the volume."
   fi
 fi
 

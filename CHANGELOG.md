@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.74.1 - 2026-10-19
+
+### A deploy's database snapshot can no longer be what fills the volume
+
+On 2026-10-19 the Railway volume filled and the site was down for about
+nine hours (now 5 GB). The entrypoint's pre-deploy snapshot tolerated a
+failed `cp`, but left the half-written copy behind, using the last of
+the space SQLite needs to write.
+
+- Snapshots are pruned to two before the copy, so three in all after it
+  (it was three plus the new one).
+- A snapshot is taken only with more than twice the database's size free
+  on /app/data; otherwise the deploy says so in its log and starts
+  without one.
+- A copy that fails anyway is deleted rather than left on the volume.
+
 ## v1.74.0 - 2026-10-19
 
 ### Older guest conversations load a page at a time

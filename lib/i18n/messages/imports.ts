@@ -71,6 +71,16 @@ export const importsMessages = {
         turoAccountPlaceholder: "e.g. kevin",
         turoAccountMain: "Main account",
         turoAccountOther: "Another account…",
+        accountRename: "Rename",
+        accountLabelPlaceholder: "A name you'll recognise",
+        accountLabelSave: "Save",
+        accountLabelCancel: "Cancel",
+        accountLabelSaving: "Saving…",
+        accountLabelFailed: "Couldn't save. Try again",
+        accountLabelHint: (key: string) =>
+          key
+            ? `Only the name shown here changes. Imports and Turo mail still match on the account's Turo name "${key}".`
+            : "Only the name shown here changes. Imports and Turo mail still treat it as the main account.",
         importStep: "Import",
         importStepHint: "New cars are listed for you to confirm before any is created.",
         runImport: "Start import",
@@ -222,6 +232,16 @@ export const importsMessages = {
         turoAccountPlaceholder: "例如 kevin",
         turoAccountMain: "主账户",
         turoAccountOther: "其他账户…",
+        accountRename: "改名",
+        accountLabelPlaceholder: "起一个你认得出的名字",
+        accountLabelSave: "保存",
+        accountLabelCancel: "取消",
+        accountLabelSaving: "保存中…",
+        accountLabelFailed: "保存失败，请重试",
+        accountLabelHint: (key: string) =>
+          key
+            ? `只改这里显示的名字。导入和 Turo 邮件匹配仍按 Turo 上的账户名「${key}」。`
+            : "只改这里显示的名字。导入和 Turo 邮件匹配仍把它当作主账户。",
         importStep: "开始导入",
         importStepHint: "如果有车队里没有的车，会先列出来让你确认，再新建。",
         runImport: "开始导入",

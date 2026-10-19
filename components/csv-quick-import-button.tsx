@@ -101,7 +101,11 @@ export function CsvQuickImportButton({ locale }: { locale: Locale }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>({ kind: "idle" });
-  const [accounts, setAccounts] = useState<{ accounts: string[]; lastAccount: string | null } | null>(null);
+  const [accounts, setAccounts] = useState<{
+    accounts: string[];
+    lastAccount: string | null;
+    labels?: Record<string, string>;
+  } | null>(null);
 
   // Asked every time, like the imports page: reusing the last account
   // filed a co-hosted export under whichever account came before it.
@@ -175,7 +179,10 @@ export function CsvQuickImportButton({ locale }: { locale: Locale }) {
           </p>
           {accounts ? (
             <div className="flex flex-wrap gap-1.5">
-              {[{ value: "", label: t.mainAccount }, ...accounts.accounts.map((account) => ({ value: account, label: account }))].map(
+              {[
+                { value: "", label: accounts.labels?.[""] || t.mainAccount },
+                ...accounts.accounts.map((account) => ({ value: account, label: accounts.labels?.[account] || account })),
+              ].map(
                 (option) => (
                   <button
                     key={option.value || "(main)"}

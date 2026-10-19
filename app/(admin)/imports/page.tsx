@@ -8,6 +8,7 @@ import type { Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
+import { loadAccountLabels } from "@/lib/turo-account-labels";
 import {
   findUnconfirmedAssignments,
   findUnknownVehiclesFromImports,
@@ -48,9 +49,10 @@ export default async function ImportsPage({
     .map((row) => row.turoAccount)
     .filter((account): account is string => Boolean(account));
 
-  const [unconfirmed, unknownVehicles] = await Promise.all([
+  const [unconfirmed, unknownVehicles, accountLabels] = await Promise.all([
     findUnconfirmedAssignments(workspace.id, { limit: 25 }),
     findUnknownVehiclesFromImports(workspace.id),
+    loadAccountLabels(workspace.id),
   ]);
   const importMessages = messages.imports;
   const turoSyncMessages = getTuroSyncSettingsCopy(locale);
@@ -279,6 +281,7 @@ export default async function ImportsPage({
         }}
         billingState={params.billing ?? null}
         knownTuroAccounts={knownTuroAccounts}
+        accountLabels={accountLabels}
       />
 
       <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">

@@ -61,6 +61,7 @@ export function CsvImportPanel({
   billingSnapshot,
   billingState,
   knownTuroAccounts,
+  accountLabels: initialAccountLabels,
 }: {
   locale: Locale;
   billingSnapshot: BillingSnapshot;
@@ -70,6 +71,9 @@ export function CsvImportPanel({
    *  against, so anything else is a typo waiting to file a car under
    *  an account that does not exist. */
   knownTuroAccounts: string[];
+  /** Names the operator gave accounts, keyed like the accounts ("" =
+   *  main). Display only: the key is still what gets imported. */
+  accountLabels: Record<string, string>;
 }) {
   const router = useRouter();
   const messages = getMessages(locale);
@@ -90,6 +94,27 @@ export function CsvImportPanel({
   // Null until picked: asked every time rather than defaulted, because
   // the default is exactly the mistake.
   const [accountChoice, setAccountChoice] = useState<string | null>(null);
+  const [accountLabels, setAccountLabels] = useState(initialAccountLabels);
+  // The account being renamed and the name being typed; null when not renaming.
+  const [renaming, setRenaming] = useState<{ account: string; label: string } | null>(null);
+  const [renameState, setRenameState] = useState<"idle" | "saving" | "failed">("idle");
+  async function saveRename() {
+    if (!renaming || renameState === "saving") return;
+    setRenameState("saving");
+    try {
+      const response = await fetch("/api/imports/accounts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account: renaming.account, label: renaming.label }),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      setAccountLabels(((await response.json()) as { labels: Record<string, string> }).labels);
+      setRenaming(null);
+      setRenameState("idle");
+    } catch {
+      setRenameState("failed");
+    }
+  }
   const [customAccount, setCustomAccount] = useState("");
 
   const [stage, setStage] = useState<"idle" | "checking" | "confirm" | "importing">("idle");
@@ -332,8 +357,8 @@ export function CsvImportPanel({
   }
 
   const accountOptions = [
-    { value: "", label: panelMessages.turoAccountMain },
-    ...knownTuroAccounts.map((account) => ({ value: account, label: account })),
+    { value: "", label: accountLabels[""] || panelMessages.turoAccountMain },
+    ...knownTuroAccounts.map((account) => ({ value: account, label: accountLabels[account] || account })),
     { value: NEW_ACCOUNT, label: panelMessages.turoAccountOther },
   ];
 
@@ -517,6 +542,68 @@ export function CsvImportPanel({
                 );
               })}
             </div>
+            {/* A name over the account, not a new account: the key the cars
+                and Turo's mail carry stays as it is (lib/turo-account-labels). */}
+            {accountChoice !== null && accountChoice !== NEW_ACCOUNT ? (
+              renaming?.account === accountChoice ? (
+                <div className="mt-2 grid gap-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      autoFocus
+                      value={renaming.label}
+                      maxLength={40}
+                      disabled={renameState === "saving"}
+                      onChange={(event) => setRenaming({ account: accountChoice, label: event.target.value })}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void saveRename();
+                        if (event.key === "Escape") setRenaming(null);
+                      }}
+                      placeholder={panelMessages.accountLabelPlaceholder}
+                      className="w-full rounded-md border border-[color:var(--line-strong)] bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--brand)] sm:max-w-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void saveRename()}
+                      disabled={renameState === "saving"}
+                      className="tap-press min-h-9 rounded-md bg-[var(--ink)] px-3 text-[13px] font-semibold text-white disabled:opacity-60"
+                    >
+                      {renameState === "saving" ? panelMessages.accountLabelSaving : panelMessages.accountLabelSave}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRenaming(null);
+                        setRenameState("idle");
+                      }}
+                      className="tap-press min-h-9 rounded-md px-2 text-[13px] text-[color:var(--ink-soft)] hover:text-[color:var(--ink)]"
+                    >
+                      {panelMessages.accountLabelCancel}
+                    </button>
+                  </div>
+                  <p className="text-[11.5px] leading-5 text-[color:var(--ink-soft)]">
+                    {renameState === "failed" ? (
+                      <span className="text-[var(--bad-fg)]">{panelMessages.accountLabelFailed} · </span>
+                    ) : null}
+                    {panelMessages.accountLabelHint(accountChoice)}
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setRenameState("idle");
+                    setRenaming({ account: accountChoice, label: accountLabels[accountChoice] ?? "" });
+                  }}
+                  className="mt-2 text-[12px] font-semibold text-[var(--brand)] underline-offset-2 hover:underline disabled:opacity-50"
+                >
+                  {panelMessages.accountRename}
+                  {accountChoice && accountLabels[accountChoice] ? (
+                    <span className="ml-1 font-normal text-[color:var(--ink-soft)]">({accountChoice})</span>
+                  ) : null}
+                </button>
+              )
+            ) : null}
             {accountChoice === NEW_ACCOUNT ? (
               <input
                 autoFocus

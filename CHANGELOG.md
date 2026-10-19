@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.79.0 - 2026-10-19
+
+### A Turo account can be given a name to show
+
+On /imports, step 2 ("这份文件属于哪个 Turo 账户？") offers 改名 under the selected account, the main one included; the dashboard's quick import shows the same names. Only the displayed name changes. The account string on the cars (`Vehicle.turoAccount`) is Turo's own co-host wording -- mail arrives as "(kevin's vehicles) - ..." and matches on "kevin" -- so renaming it would stop every later email from that account finding its car. The names live in `TuroSyncConfig.accountLabels` (new, nullable, JSON of key → name, "" for the main account) and are set through PUT `/api/imports/accounts`; clearing a name shows the key again.
+
 ## v1.78.0 - 2026-10-19
 
 ### The dashboard shows yesterday's handovers in a column of their own

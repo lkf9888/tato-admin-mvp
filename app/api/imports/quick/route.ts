@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { loadAccountLabels } from "@/lib/turo-account-labels";
 import { importTuroCsvWithLastSettings, TuroSyncError } from "@/lib/turo-sync";
 
 export const runtime = "nodejs";
@@ -15,7 +16,7 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024;
  */
 export async function GET() {
   const { workspace } = await requireCurrentAdminContext();
-  const [vehicles, last] = await Promise.all([
+  const [vehicles, last, labels] = await Promise.all([
     prisma.vehicle.findMany({
       where: { workspaceId: workspace.id, turoAccount: { not: null } },
       distinct: ["turoAccount"],
@@ -27,8 +28,11 @@ export async function GET() {
       orderBy: { importedAt: "desc" },
       select: { turoAccount: true },
     }),
+    loadAccountLabels(workspace.id),
   ]);
   return NextResponse.json({
+    /** Names given to accounts, keyed like `accounts` ("" = main). */
+    labels,
     accounts: vehicles.map((row) => row.turoAccount).filter((account): account is string => Boolean(account)),
     // "" is the main account; null means nothing was imported yet.
     lastAccount: last ? (last.turoAccount ?? "") : null,

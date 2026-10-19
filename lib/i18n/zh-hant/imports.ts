@@ -63,6 +63,16 @@ export const importsMessages = {
         turoAccountPlaceholder: "例如 kevin",
         turoAccountMain: "主帳戶",
         turoAccountOther: "其他帳戶…",
+        accountRename: "改名",
+        accountLabelPlaceholder: "起一個你認得出的名字",
+        accountLabelSave: "儲存",
+        accountLabelCancel: "取消",
+        accountLabelSaving: "儲存中…",
+        accountLabelFailed: "儲存失敗，請重試",
+        accountLabelHint: (key: string) =>
+          key
+            ? `只改這裡顯示的名字。匯入和 Turo 郵件匹配仍按 Turo 上的帳戶名「${key}」。`
+            : "只改這裡顯示的名字。匯入和 Turo 郵件匹配仍把它當作主帳戶。",
         importStep: "開始匯入",
         importStepHint: "如果有車隊裡沒有的車，會先列出來讓你確認，再新建。",
         runImport: "開始匯入",

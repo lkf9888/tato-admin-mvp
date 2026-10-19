@@ -495,6 +495,10 @@ model TuroSyncConfig {
   csvMapping            String?
   createMissingVehicles Boolean   @default(true)
   archiveMissingOrders  Boolean   @default(false)
+  /// JSON object: Turo account key (as on Vehicle.turoAccount; "" for
+  /// the main account) -> the name the operator wants to see. Display
+  /// only: matching keeps the key, which is Turo's own co-host wording.
+  accountLabels         String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

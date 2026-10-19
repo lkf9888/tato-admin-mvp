@@ -4,6 +4,7 @@ import { InboundEmailKind } from "@prisma/client";
 import { ImapFlow } from "imapflow";
 import { simpleParser, type ParsedMail } from "mailparser";
 
+import { getDiskUsage } from "@/lib/disk";
 import { kimiExtractJson, isKimiConfigured,
   kimiChat,
   getExtractionModel,
@@ -269,6 +270,11 @@ export type GmailSyncResult = {
   /** History run: old guest messages still to import after this one.
    *  Zero means the history is all in. */
   historyRemaining?: number;
+  /** History run: how full the volume was when it started. */
+  diskUsedPercent?: number | null;
+  /** History run: set when it imported nothing because the volume is
+   *  too full to grow the database safely. */
+  historyPaused?: "disk";
   /** What the booking mail did to orders on this run. */
   orders?: ApplyOutcome;
   /** Messages still waiting for a summary after this run's budget ran
@@ -436,7 +442,22 @@ export async function runGmailSync(input: {
     },
   });
 
-  if (mode !== "enrich") {
+  // The history import grows the database by tens of megabytes a run,
+  // and a full volume took the site down for nine hours (2026-10-19):
+  // SQLite could not write and the next deploy failed its healthcheck.
+  // So each history run looks first and stands down well before full,
+  // leaving room for deploy snapshots. New mail is never held back.
+  let historyAllowed = true;
+  if (input.history) {
+    const disk = await getDiskUsage();
+    result.diskUsedPercent = disk?.usedPercent ?? null;
+    if (!disk || disk.usedPercent >= HISTORY_MAX_DISK_PERCENT) {
+      result.historyPaused = "disk";
+      historyAllowed = false;
+    }
+  }
+
+  if (mode !== "enrich" && historyAllowed) {
     await ingestMailbox({
       workspaceId: input.workspaceId,
       lookbackDays: input.lookbackDays,
@@ -507,6 +528,9 @@ export async function runGmailSync(input: {
 function trashGuestMessagesEnabled() {
   return process.env.GMAIL_TRASH_GUEST_MESSAGES?.trim().toLowerCase() !== "false";
 }
+
+/** The history run stops at this much volume use. */
+const HISTORY_MAX_DISK_PERCENT = 70;
 
 /** How far back the history run reaches, and how much it takes a run. */
 const HISTORY_LOOKBACK_DAYS = 3650;
@@ -1042,6 +1066,8 @@ export function summarizeGmailSyncResult(result: GmailSyncResult) {
     `reclassified=${result.reclassified}`,
     result.trashed ? `trashed=${result.trashed}` : "",
     result.historyRemaining != null ? `historyRemaining=${result.historyRemaining}` : "",
+    result.diskUsedPercent != null ? `disk=${result.diskUsedPercent}%` : "",
+    result.historyPaused ? `historyPaused=${result.historyPaused}` : "",
     `enrichRemaining=${result.enrichRemaining}`,
     result.enrichErrors.length > 0 ? `enrichErrors=${result.enrichErrors.join("|")}` : "",
   ]

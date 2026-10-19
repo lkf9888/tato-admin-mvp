@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.74.2 - 2026-10-19
+
+### The history import stands down before the volume fills
+
+Each history run now checks the volume first (`getDiskUsage`) and imports nothing at 70% or more, returning `historyPaused: "disk"` and the figure in `diskUsedPercent`. On 2026-10-19 the 500 MB volume filled during the import and deploy snapshots, SQLite could not write, and the site was down about nine hours; the volume is now 5 GB, and this keeps the import from being the thing that fills it again. Regular syncs of new mail are not gated.
+
 ## v1.74.1 - 2026-10-19
 
 ### A deploy's database snapshot can no longer be what fills the volume

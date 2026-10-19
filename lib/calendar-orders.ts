@@ -50,6 +50,9 @@ export type CalendarOrderPayload = {
   depositAmount?: number | null;
   pickupLocation?: string | null;
   returnLocation?: string | null;
+  pickupSpot?: string | null;
+  returnSpot?: string | null;
+  handoverNote?: string | null;
   paymentMethod?: string | null;
   contractNumber?: string | null;
   notes?: string | null;
@@ -80,6 +83,9 @@ export function toCalendarOrderPayload(order: CalendarOrderRow): CalendarOrderPa
     depositAmount: order.depositAmount,
     pickupLocation: order.pickupLocation,
     returnLocation: order.returnLocation,
+    pickupSpot: order.pickupSpot,
+    returnSpot: order.returnSpot,
+    handoverNote: order.handoverNote,
     paymentMethod: order.paymentMethod,
     contractNumber: order.contractNumber,
     notes: getDisplayOrderNote(order.notes, order.source),

@@ -46,6 +46,9 @@ export type StaffShareTask = {
     renterName: string;
     pickupDatetime: string;
     returnDatetime: string;
+    pickupSpot: string | null;
+    returnSpot: string | null;
+    handoverNote: string | null;
   } | null;
   attachments: StaffShareAttachment[];
   complained: boolean;
@@ -72,6 +75,17 @@ function copy(locale: Locale) {
   return locale === "zh"
     ? {
         kicker: "我的任务",
+        handoverTitle: "交接",
+        pickupSpot: "车位",
+        returnSpot: "还车位置",
+        handoverNote: "交接说明",
+        recordSpot: "记录车位",
+        pickupSpotPlaceholder: "例如：YVR P3 · 4 排 · 12 号车位",
+        returnSpotPlaceholder: "车最后停在哪",
+        handoverNotePlaceholder: "锁盒在哪、地标、注意事项（不写密码）",
+        beforeComplete: "完成前记一下车停在哪：客人问「车在哪」时，AI 会照这里回答。",
+        skipSpot: "先不填",
+        notRecorded: "未记录",
         calendarTitle: "加到我的日历",
         calendarGoogle: "添加到谷歌日历",
         calendarCopy: "复制订阅链接",
@@ -129,6 +143,17 @@ function copy(locale: Locale) {
       }
     : {
         kicker: "My tasks",
+        handoverTitle: "Handover",
+        pickupSpot: "Spot",
+        returnSpot: "Return spot",
+        handoverNote: "How to get in",
+        recordSpot: "Record spot",
+        pickupSpotPlaceholder: "e.g. YVR P3 · row 4 · stall 12",
+        returnSpotPlaceholder: "Where the car was left",
+        handoverNotePlaceholder: "Where the lockbox is, landmarks, what to watch for (no code)",
+        beforeComplete: "Before you finish, note where the car is: when the guest asks \"where is the car?\", the AI answers from this.",
+        skipSpot: "Skip for now",
+        notRecorded: "Not recorded",
         calendarTitle: "Add to my calendar",
         calendarGoogle: "Add to Google Calendar",
         calendarCopy: "Copy subscription link",
@@ -312,6 +337,30 @@ export function StaffShareClient({
     return null;
   }
 
+  /** Where the car was left, or found, on the trip this job belongs to.
+   *  Every job of that trip on this page shows the new spot at once. */
+  async function saveHandover(task: StaffShareTask, values: HandoverValues) {
+    const response = await fetch(`/api/staff-share/${token}/tasks/${task.id}/handover`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setNotice(labels.failed);
+      return false;
+    }
+    const { spots } = (await response.json()) as {
+      spots: { pickupSpot: string | null; returnSpot: string | null; handoverNote: string | null };
+    };
+    setTasks((current) =>
+      current.map((item) =>
+        item.order && item.order.id === task.order?.id ? { ...item, order: { ...item.order, ...spots } } : item,
+      ),
+    );
+    setNotice(labels.saved);
+    return true;
+  }
+
   async function toggleComplete(task: StaffShareTask) {
     await patchTask(task, { status: task.status === "done" ? "todo" : "done" });
   }
@@ -462,6 +511,7 @@ export function StaffShareClient({
                 onUnassign={unassignTask}
                 onUploadPhotos={uploadTaskPhotos}
                 onPreviewImage={setPreviewImage}
+                onSaveHandover={saveHandover}
               />
             ))}
           </TaskDateGroup>
@@ -507,6 +557,7 @@ export function StaffShareClient({
                         onUnassign={unassignTask}
                         onUploadPhotos={uploadTaskPhotos}
                         onPreviewImage={setPreviewImage}
+                        onSaveHandover={saveHandover}
                       />
                     ))}
                   </TaskDateGroup>
@@ -595,10 +646,12 @@ function TaskCard({
   onUnassign,
   onUploadPhotos,
   onPreviewImage,
+  onSaveHandover,
 }: {
   labels: ReturnType<typeof copy>;
   locale: Locale;
   task: StaffShareTask;
+  onSaveHandover: (task: StaffShareTask, values: HandoverValues) => Promise<boolean>;
   sameDayPickup?: { time: string; renterName: string };
   subtasks: StaffShareTask[];
   onEdit: (task: StaffShareTask) => void;
@@ -610,6 +663,21 @@ function TaskCard({
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const closed = task.status === "done" || task.status === "cancelled";
   const cancelled = task.status === "cancelled";
+  // Pickup and return jobs carry where the car is handed over. Finishing
+  // a delivery with no spot recorded asks for it first -- the moment the
+  // driver knows it best -- and can be skipped.
+  const handoverKind =
+    task.category === "order_pickup" ? "pickup" : task.category === "order_return" ? "return" : null;
+  const [handoverOpen, setHandoverOpen] = useState(false);
+  const [completeAfterSpot, setCompleteAfterSpot] = useState(false);
+  const complete = () => {
+    if (task.status !== "done" && handoverKind === "pickup" && task.order && !task.order.pickupSpot) {
+      setCompleteAfterSpot(true);
+      setHandoverOpen(true);
+      return;
+    }
+    onComplete(task);
+  };
   return (
     <article className="rounded-md border border-[var(--line)] bg-white p-3">
       <div className="flex items-start justify-between gap-3">
@@ -644,6 +712,34 @@ function TaskCard({
             <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-5 text-[var(--ink-mid)]">
               {task.details}
             </p>
+          ) : null}
+          {handoverKind && task.order ? (
+            <TaskHandover
+              labels={labels}
+              kind={handoverKind}
+              order={task.order}
+              editing={handoverOpen}
+              askBeforeComplete={completeAfterSpot}
+              readOnly={cancelled}
+              onOpen={() => setHandoverOpen(true)}
+              onClose={() => {
+                setHandoverOpen(false);
+                if (completeAfterSpot) {
+                  setCompleteAfterSpot(false);
+                  onComplete(task);
+                }
+              }}
+              onSave={async (values) => {
+                const saved = await onSaveHandover(task, values);
+                if (!saved) return false;
+                setHandoverOpen(false);
+                if (completeAfterSpot) {
+                  setCompleteAfterSpot(false);
+                  onComplete(task);
+                }
+                return true;
+              }}
+            />
           ) : null}
           <AttachmentStrip attachments={task.attachments} labels={labels} onPreview={onPreviewImage} />
           <StaffShareSubtasks
@@ -693,7 +789,7 @@ function TaskCard({
           </>
         ) : null}
         {!cancelled ? (
-          <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-emerald-300 bg-emerald-50 text-emerald-800" onClick={() => onComplete(task)}>
+          <button className="mobile-action min-h-10 flex-col gap-0.5 px-1 py-1 text-[11px] leading-tight border-emerald-300 bg-emerald-50 text-emerald-800" onClick={complete}>
             {task.status === "done" ? <Circle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
             <span className="text-center">{task.status === "done" ? labels.reopen : labels.complete}</span>
           </button>
@@ -1274,6 +1370,120 @@ function CalendarSubscribe({
           </div>
           <p className="text-xs leading-5 text-neutral-300">{labels.calendarHint}</p>
         </div>
+      ) : null}
+    </div>
+  );
+}
+
+type HandoverValues = { pickupSpot?: string; returnSpot?: string; handoverNote?: string };
+
+/**
+ * Where the car is, on a pickup or return job: the spot for this end of
+ * the trip and how to get in, recorded by the person who parks it or
+ * finds it. The lockbox code is not asked for and must not be typed in.
+ */
+function TaskHandover({
+  labels,
+  kind,
+  order,
+  editing,
+  askBeforeComplete,
+  readOnly,
+  onOpen,
+  onClose,
+  onSave,
+}: {
+  labels: ReturnType<typeof copy>;
+  kind: "pickup" | "return";
+  order: NonNullable<StaffShareTask["order"]>;
+  editing: boolean;
+  askBeforeComplete: boolean;
+  readOnly: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onSave: (values: HandoverValues) => Promise<boolean>;
+}) {
+  const spotKey = kind === "pickup" ? "pickupSpot" : "returnSpot";
+  const spot = order[spotKey];
+  const [spotDraft, setSpotDraft] = useState(spot ?? "");
+  const [noteDraft, setNoteDraft] = useState(order.handoverNote ?? "");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (editing) {
+      setSpotDraft(spot ?? "");
+      setNoteDraft(order.handoverNote ?? "");
+    }
+  }, [editing, spot, order.handoverNote]);
+
+  if (editing) {
+    return (
+      <div className="mt-2 space-y-2 rounded-md border border-sky-200 bg-sky-50 p-2.5">
+        {askBeforeComplete ? <p className="text-xs leading-5 text-sky-900">{labels.beforeComplete}</p> : null}
+        <label className="block">
+          <span className="mb-0.5 block text-xs font-semibold text-[var(--ink-mid)]">
+            {kind === "pickup" ? labels.pickupSpot : labels.returnSpot}
+          </span>
+          <input
+            value={spotDraft}
+            onChange={(event) => setSpotDraft(event.target.value)}
+            placeholder={kind === "pickup" ? labels.pickupSpotPlaceholder : labels.returnSpotPlaceholder}
+            maxLength={200}
+            autoFocus
+            className="input w-full"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-0.5 block text-xs font-semibold text-[var(--ink-mid)]">{labels.handoverNote}</span>
+          <textarea
+            value={noteDraft}
+            onChange={(event) => setNoteDraft(event.target.value)}
+            placeholder={labels.handoverNotePlaceholder}
+            maxLength={1000}
+            rows={2}
+            className="input w-full"
+          />
+        </label>
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={onClose} disabled={busy}>
+            {askBeforeComplete ? labels.skipSpot : labels.cancel}
+          </button>
+          <button
+            type="button"
+            className="btn-primary min-h-9 px-3 text-xs"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              await onSave({ [spotKey]: spotDraft, handoverNote: noteDraft });
+              setBusy(false);
+            }}
+          >
+            {labels.save}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex items-start justify-between gap-2 rounded-md bg-[var(--surface-muted)] px-2.5 py-2 text-sm">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-[var(--ink-soft)]">{labels.handoverTitle}</p>
+        <p className={spot ? "text-[var(--ink)]" : "text-[var(--ink-soft)]"}>
+          {kind === "pickup" ? labels.pickupSpot : labels.returnSpot}: {spot || labels.notRecorded}
+        </p>
+        {kind === "return" && order.pickupSpot ? (
+          <p className="text-[var(--ink-soft)]">
+            {labels.pickupSpot}: {order.pickupSpot}
+          </p>
+        ) : null}
+        {order.handoverNote ? (
+          <p className="whitespace-pre-line text-[var(--ink-mid)]">{order.handoverNote}</p>
+        ) : null}
+      </div>
+      {!readOnly ? (
+        <button type="button" className="btn-secondary min-h-8 shrink-0 px-2.5 text-xs" onClick={onOpen}>
+          {labels.recordSpot}
+        </button>
       ) : null}
     </div>
   );

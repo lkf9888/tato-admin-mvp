@@ -5,6 +5,7 @@ import { ArrowRight, Check, ExternalLink, MapPin, Pencil, Phone, Plus, ReceiptTe
 import { useRouter } from "next/navigation";
 
 import { BookingExtraChargePanel } from "@/components/booking-extra-charge-panel";
+import { OrderHandoverPanel } from "@/components/order-handover-panel";
 import { DirectBookingCancelPanel } from "@/components/direct-booking-cancel-panel";
 import { DirectBookingHandoverPanel } from "@/components/direct-booking-handover-panel";
 import { OrderAttachments } from "@/components/order-attachments";
@@ -44,6 +45,10 @@ export type EditableOrder = {
   depositAmount?: number | null;
   pickupLocation?: string | null;
   returnLocation?: string | null;
+  /** Where the car is handed over, exactly (lib/order-handover.ts). */
+  pickupSpot?: string | null;
+  returnSpot?: string | null;
+  handoverNote?: string | null;
   paymentMethod?: string | null;
   contractNumber?: string | null;
   notes?: string | null;
@@ -1733,6 +1738,27 @@ export function OrderDetailModal({
               </div>
             ) : null}
           </section>
+
+          {/* Where exactly the car is handed over. The guest's most
+              common question is "where is the car", and the AI answers
+              it from here. */}
+          {currentOrder.id ? (
+            <OrderHandoverPanel
+              orderId={currentOrder.id}
+              locale={locale}
+              readOnly={readOnly}
+              spots={{
+                pickupSpot: currentOrder.pickupSpot ?? null,
+                returnSpot: currentOrder.returnSpot ?? null,
+                handoverNote: currentOrder.handoverNote ?? null,
+              }}
+              onSaved={(spots) => {
+                const next = { ...currentOrder, ...spots };
+                setCurrentOrder(next);
+                onSaved?.(next);
+              }}
+            />
+          ) : null}
 
           {/* A note is an instruction for the handover ("child seat",
               "late return approved"), so it sits right under the trip

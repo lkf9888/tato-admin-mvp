@@ -92,13 +92,15 @@ export function CalendarOrderSheet({
     {
       label: t.pickup,
       main: when(pickup),
-      sub: [order.pickupLocation, staffLine(handover?.pickup ?? null, "pickup")].filter(Boolean).join(" · ") || null,
+      sub:
+        [order.pickupLocation, order.pickupSpot, staffLine(handover?.pickup ?? null, "pickup")].filter(Boolean).join(" · ") ||
+        null,
     },
     {
       label: t.return,
       main: when(ret),
       sub:
-        [order.returnLocation || order.pickupLocation, staffLine(handover?.return ?? null, "return")]
+        [order.returnLocation || order.pickupLocation, order.returnSpot, staffLine(handover?.return ?? null, "return")]
           .filter(Boolean)
           .join(" · ") || null,
     },
@@ -157,6 +159,11 @@ export function CalendarOrderSheet({
           </div>
         ))}
       </dl>
+      {order.handoverNote ? (
+        <p className="mt-1 whitespace-pre-line rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-[12px] leading-[1.4] text-[var(--ink-mid)]">
+          {order.handoverNote}
+        </p>
+      ) : null}
 
       <div className="mt-2.5 flex gap-2">
         <Link

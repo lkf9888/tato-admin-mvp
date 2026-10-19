@@ -5,7 +5,19 @@ import { prisma } from "@/lib/prisma";
 
 export const staffShareTaskInclude = {
   vehicle: { select: { id: true, plateNumber: true, nickname: true } },
-  order: { select: { id: true, renterName: true, pickupDatetime: true, returnDatetime: true } },
+  order: {
+    select: {
+      id: true,
+      renterName: true,
+      pickupDatetime: true,
+      returnDatetime: true,
+      // Where the car is handed over, which the person doing it reads
+      // and records (lib/order-handover.ts).
+      pickupSpot: true,
+      returnSpot: true,
+      handoverNote: true,
+    },
+  },
   attachments: {
     where: { isArchived: false },
     orderBy: { uploadedAt: "asc" as const },

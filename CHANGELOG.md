@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.76.0 - 2026-10-19
+
+### Each trip records exactly where the car is handed over
+
+A third of guests' messages ask where the car is, where the lockbox is
+or where to return it, and nothing in TATO held this trip's answer.
+
+- Three fields on an order: `pickupSpot` (where the car is, exact enough
+  to walk to), `returnSpot` (the agreed spot until the car is back, then
+  where it was actually left) and `handoverNote` (where the lockbox is,
+  landmarks). Never the lockbox code, which keeps its own field and stays
+  out of anything the AI reads; the forms say so.
+- One save (lib/order-handover.ts) behind two doors: the order panel's
+  new Handover box, and the staff task page, where pickup and return
+  jobs show and record the spot. Finishing a delivery with no spot asks
+  for it first, and can be skipped. Every change is in the activity log.
+- The calendar's phone card and list show the spots; a return job shows
+  where the car was left at pickup.
+- The AI reading these fields comes with the sync session's next release.
+
 ## v1.75.0 - 2026-10-19
 
 ### What guests ask about, measured from the message history

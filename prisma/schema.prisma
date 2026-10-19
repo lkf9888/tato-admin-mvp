@@ -387,6 +387,16 @@ model Order {
   status                 OrderStatus             @default(booked)
   pickupLocation         String?
   returnLocation         String?
+  /// Where the car is for pickup, as exact as a guest needs to walk to
+  /// it: "YVR P3 · row 4 · stall 12". Written by whoever parks it.
+  pickupSpot             String?
+  /// Where the car goes back: the agreed spot until the return, then
+  /// where it was actually left, as the guest or the staff member says.
+  returnSpot             String?
+  /// How to get in: where the lockbox is, landmarks, what to watch for.
+  /// Never the lockbox code -- that has its own field and stays out of
+  /// anything the AI reads.
+  handoverNote           String?
   paymentMethod          String?
   contractNumber         String?
   notes                  String?

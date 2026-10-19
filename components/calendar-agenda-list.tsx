@@ -108,8 +108,11 @@ export function CalendarAgendaList({
   const row = (item: AgendaOrder, kind: "pickup" | "return") => {
     const at = kind === "pickup" ? item.order.pickupDatetime : item.order.returnDatetime;
     const staff = kind === "pickup" ? item.pickupStaff : item.returnStaff;
+    // The exact spot when someone has recorded it, else the place.
     const place =
-      kind === "pickup" ? item.order.pickupLocation : item.order.returnLocation || item.order.pickupLocation;
+      kind === "pickup"
+        ? item.order.pickupSpot || item.order.pickupLocation
+        : item.order.returnSpot || item.order.returnLocation || item.order.pickupLocation;
     const done = new Date(at).getTime() < now;
     const chip =
       kind === "return" && done

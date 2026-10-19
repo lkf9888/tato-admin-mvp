@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.74.3 - 2026-10-19
+
+### The history import looks past mail it cannot import or clear
+
+The second run after the outage imported nothing with 51,200 left: the newest 1,500 matches were all mail the run neither imports nor moves to Trash -- no Message-ID, stored earlier as another kind, or a subject the classifier does not take -- and each run looked only at the newest 1,500. It now reads envelopes a window at a time from the newest end and keeps going to older windows (up to 30,000 envelopes or half its time budget) until it has a full batch. `historySkipped` counts what it passed over and why, and `historyRemaining` counts only mail not yet looked at plus new mail not yet downloaded.
+
+A stored message whose subject is a guest message's now also counts as one when deciding what to clear from the inbox, so rows filed as OTHER while the model was failing no longer keep their emails there.
+
 ## v1.74.2 - 2026-10-19
 
 ### The history import stands down before the volume fills

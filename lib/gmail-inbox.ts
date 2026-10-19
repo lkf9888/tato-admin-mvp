@@ -270,6 +270,8 @@ export type GmailSyncResult = {
   /** History run: old guest messages still to import after this one.
    *  Zero means the history is all in. */
   historyRemaining?: number;
+  /** History run: matching mail it could neither import nor clear. */
+  historySkipped?: { noMessageId: number; storedOtherKind: number; notGuestSubject: number };
   /** History run: how full the volume was when it started. */
   diskUsedPercent?: number | null;
   /** History run: set when it imported nothing because the volume is
@@ -535,6 +537,9 @@ const HISTORY_MAX_DISK_PERCENT = 70;
 /** How far back the history run reaches, and how much it takes a run. */
 const HISTORY_LOOKBACK_DAYS = 3650;
 const HISTORY_MAX_MESSAGES = 1500;
+/** Envelopes the history run reads at most, looking past mail it
+ *  cannot import or clear. */
+const HISTORY_MAX_ENVELOPES = 30_000;
 /** Whole messages are downloaded this many at a time, so the history
  *  run can stop between batches when its time is up. */
 const SOURCE_BATCH = 200;
@@ -611,9 +616,6 @@ async function ingestMailbox(input: {
     // leaves the inbox, so its newest N are always the next batch.
     // (Reading all 55,000 envelopes each run left time for 400 messages.)
     const cap = input.maxMessages ?? (input.history ? HISTORY_MAX_MESSAGES : getMaxMessages());
-    const selected = uids.slice(-cap);
-    const matchedTotal = uids.length;
-    result.scanned = selected.length;
 
     // Pre-load the ids we already have, so the common case -- a poll
     // that finds nothing new -- costs one query rather than one per
@@ -635,39 +637,69 @@ async function ingestMailbox(input: {
     // Two passes: envelopes first, which are small, then whole messages
     // only for what is new. Re-reading every stored message's source
     // to learn it was a duplicate made the history run slow for nothing.
+    //
+    // Envelopes are read a window at a time from the newest end. A
+    // normal run reads one window -- the newest `cap`. The history run
+    // keeps going to older windows until it has `cap` new messages:
+    // mail that matches the search but is neither new nor clearable (no
+    // Message-ID, stored as another kind, a subject the classifier does
+    // not take) stays in the inbox, and one window of it at the top
+    // stopped every later run cold.
     const fresh: number[] = [];
     const toTrash: number[] = [];
-    for await (const message of client.fetch(selected, { uid: true, envelope: true }, { uid: true })) {
-      const messageId = message.envelope?.messageId?.trim();
-      if (!messageId) continue;
-      const kind = storedKind.get(messageId);
-      if (kind) {
-        result.skippedDuplicate += 1;
-        if (kind === InboundEmailKind.GUEST_MESSAGE) toTrash.push(message.uid);
-        continue;
+    let freshTotal = 0;
+    let end = uids.length;
+    let envelopesRead = 0;
+    const skipped = { noMessageId: 0, storedOtherKind: 0, notGuestSubject: 0 };
+    while (end > 0) {
+      const start = Math.max(0, end - cap);
+      const window = uids.slice(start, end);
+      end = start;
+      envelopesRead += window.length;
+      const windowFresh: number[] = [];
+      for await (const message of client.fetch(window, { uid: true, envelope: true }, { uid: true })) {
+        const messageId = message.envelope?.messageId?.trim();
+        if (!messageId) {
+          skipped.noMessageId += 1;
+          continue;
+        }
+        const subjectKind = classifyTuroSubject(message.envelope?.subject ?? "")?.kind;
+        const kind = storedKind.get(messageId);
+        if (kind) {
+          result.skippedDuplicate += 1;
+          // Stored, and a guest message by its row or by its subject (a
+          // row filed as OTHER while the model was failing is still one).
+          if (kind === InboundEmailKind.GUEST_MESSAGE || subjectKind === InboundEmailKind.GUEST_MESSAGE) {
+            toTrash.push(message.uid);
+          } else {
+            skipped.storedOtherKind += 1;
+          }
+          continue;
+        }
+        const fromAddress = message.envelope?.from?.[0]?.address?.trim().toLowerCase() ?? "";
+        if (!senderAllowed(fromAddress, config.allowedSenders)) {
+          result.skippedSender += 1;
+          continue;
+        }
+        // The history run is for conversations. Old booking mail is left
+        // alone: turned into orders now, years-old changes and
+        // cancellations would be replayed onto trips the CSV already got
+        // right.
+        if (input.history && subjectKind !== InboundEmailKind.GUEST_MESSAGE) {
+          skipped.notGuestSubject += 1;
+          continue;
+        }
+        windowFresh.push(message.uid);
       }
-      const fromAddress = message.envelope?.from?.[0]?.address?.trim().toLowerCase() ?? "";
-      if (!senderAllowed(fromAddress, config.allowedSenders)) {
-        result.skippedSender += 1;
-        continue;
-      }
-      // The history run is for conversations. Old booking mail is left
-      // alone: turned into orders now, years-old changes and
-      // cancellations would be replayed onto trips the CSV already got
-      // right.
-      if (
-        input.history &&
-        classifyTuroSubject(message.envelope?.subject ?? "")?.kind !== InboundEmailKind.GUEST_MESSAGE
-      ) {
-        continue;
-      }
-      fresh.push(message.uid);
+      freshTotal += windowFresh.length;
+      // Newest first: within a window the uids ascend, so the newest
+      // are at its end.
+      fresh.push(...windowFresh.slice(-Math.max(0, cap - fresh.length)));
+      if (!input.history || fresh.length >= cap) break;
+      if (envelopesRead >= HISTORY_MAX_ENVELOPES || Date.now() - startedAt > HISTORY_BUDGET_MS / 2) break;
     }
-
-    // Newest first within the cap; the next history run takes the next
-    // older batch, since what this one files is no longer new.
-    const freshTotal = fresh.length;
-    if (fresh.length > cap) fresh.splice(0, fresh.length - cap);
+    result.scanned = envelopesRead;
+    if (input.history) result.historySkipped = skipped;
     let downloaded = 0;
 
     // Anything older than the normal window is history: filed as read,
@@ -756,7 +788,9 @@ async function ingestMailbox(input: {
         if (attribution.kind === InboundEmailKind.GUEST_MESSAGE) toTrash.push(message.uid);
       }
     }
-    if (input.history) result.historyRemaining = matchedTotal - selected.length + (freshTotal - downloaded);
+    // Not yet looked at, plus new ones found but not downloaded this run.
+    // Mail skipped as unclearable is not counted: it never will be.
+    if (input.history) result.historyRemaining = end + (freshTotal - downloaded);
 
     // Only once the rows exist: a message moves out of the inbox after
     // TATO has it, never before. A failure here leaves the mail where

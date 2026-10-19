@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.73.2 - 2026-10-19
+
+### The history import takes a full batch per run
+
+With the subject filter in place the history search returns guest messages only, and each run's filed mail leaves the inbox, so the newest 1,500 matches are always the next batch. Reading all 55,000 matching envelopes first, as v1.73.1 did, used most of the time budget and left room for 400 downloads a run.
+
 ## v1.73.1 - 2026-10-19
 
 ### The history import fits the real mailbox, and booking sync stops reading guest messages

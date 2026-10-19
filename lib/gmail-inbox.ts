@@ -583,11 +583,12 @@ async function ingestMailbox(input: {
 
     // Newest first, capped — a first run against a busy mailbox should
     // not try to ingest years of history in one request. The history
-    // run reads every envelope instead (small, and booking mail that
-    // stays in the inbox would otherwise fill the newest N forever)
-    // and caps only the whole messages it downloads, below.
+    // run's search already holds guest messages only, and what it files
+    // leaves the inbox, so its newest N are always the next batch.
+    // (Reading all 55,000 envelopes each run left time for 400 messages.)
     const cap = input.maxMessages ?? (input.history ? HISTORY_MAX_MESSAGES : getMaxMessages());
-    const selected = input.history ? uids : uids.slice(-cap);
+    const selected = uids.slice(-cap);
+    const matchedTotal = uids.length;
     result.scanned = selected.length;
 
     // Pre-load the ids we already have, so the common case -- a poll
@@ -731,7 +732,7 @@ async function ingestMailbox(input: {
         if (attribution.kind === InboundEmailKind.GUEST_MESSAGE) toTrash.push(message.uid);
       }
     }
-    if (input.history) result.historyRemaining = freshTotal - downloaded;
+    if (input.history) result.historyRemaining = matchedTotal - selected.length + (freshTotal - downloaded);
 
     // Only once the rows exist: a message moves out of the inbox after
     // TATO has it, never before. A failure here leaves the mail where

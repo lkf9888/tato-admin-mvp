@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.78.0 - 2026-10-19
+
+### The dashboard shows yesterday's handovers in a column of their own
+
+- "Yesterday · Pickup & return orders" is the left-hand column, in the
+  same form as today's and tomorrow's: every pickup and return by time,
+  the return or pickup tag, the place, the offline and conflict marks,
+  a click to open the trip. It is for checking that yesterday's cars went
+  out and came back.
+- The three days now read left to right: yesterday; recently viewed and
+  today; tomorrow with the activity log folded under it.
+- Help: the dashboard section mentions the new column and its picture is
+  retaken; the help screenshot script can use the installed Google
+  Chrome (PW_CHANNEL=chrome) where Playwright's own Chromium is missing.
+
 ## v1.77.0 - 2026-10-19
 
 ### The AI answers "where is the car?" from the trip's recorded spot

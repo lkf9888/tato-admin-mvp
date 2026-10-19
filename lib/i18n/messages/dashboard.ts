@@ -24,6 +24,9 @@ export const dashboardMessages = {
       tomorrowKicker: "Tomorrow",
       tomorrowTitle: "Pickup & return orders",
       tomorrowEmpty: "No pickups or returns scheduled for tomorrow.",
+      yesterdayKicker: "Yesterday",
+      yesterdayTitle: "Pickup & return orders",
+      yesterdayEmpty: "No pickups or returns yesterday.",
       event: {
         pickupBadge: "Pickup",
         returnBadge: "Return",
@@ -129,6 +132,9 @@ export const dashboardMessages = {
       tomorrowKicker: "明日",
       tomorrowTitle: "取车/还车订单",
       tomorrowEmpty: "明天没有取车或还车订单。",
+      yesterdayKicker: "昨日",
+      yesterdayTitle: "取车/还车订单",
+      yesterdayEmpty: "昨天没有取车或还车订单。",
       event: {
         pickupBadge: "取车",
         returnBadge: "还车",

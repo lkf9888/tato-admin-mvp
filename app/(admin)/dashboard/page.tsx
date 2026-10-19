@@ -111,6 +111,12 @@ export default async function DashboardPage() {
   startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
   const endOfTomorrow = new Date(endOfDay);
   endOfTomorrow.setDate(endOfTomorrow.getDate() + 1);
+  // Yesterday the same way: what was handed over, for checking a return
+  // came back and a pickup went out.
+  const startOfYesterday = new Date(startOfDay);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+  const endOfYesterday = new Date(endOfDay);
+  endOfYesterday.setDate(endOfYesterday.getDate() - 1);
 
   // Month boundaries for the new "This month" overview. We pull both
   // the current month and last month in a single query (one round
@@ -126,6 +132,7 @@ export default async function DashboardPage() {
     todayOrders,
     todayDayOrders,
     tomorrowDayOrders,
+    yesterdayDayOrders,
     conflictOrders,
     latestImport,
     latestLogs,
@@ -146,6 +153,7 @@ export default async function DashboardPage() {
     }),
     fetchDayOrders(workspace.id, startOfDay, endOfDay),
     fetchDayOrders(workspace.id, startOfTomorrow, endOfTomorrow),
+    fetchDayOrders(workspace.id, startOfYesterday, endOfYesterday),
     prisma.order.findMany({
       where: { workspaceId: workspace.id, isArchived: false, hasConflict: true },
       include: { vehicle: true },
@@ -185,6 +193,7 @@ export default async function DashboardPage() {
 
   const todayEvents = buildDayEvents(todayDayOrders, startOfDay, endOfDay);
   const tomorrowEvents = buildDayEvents(tomorrowDayOrders, startOfTomorrow, endOfTomorrow);
+  const yesterdayEvents = buildDayEvents(yesterdayDayOrders, startOfYesterday, endOfYesterday);
 
   const todaysRentals = todayOrders.length;
   const todaysPickups = todayOrders.filter((order) => order.pickupDatetime >= startOfDay).length;
@@ -509,7 +518,18 @@ export default async function DashboardPage() {
         <CsvQuickImportButton locale={locale} />
       </div>
 
+      {/* Three days left to right, as a calendar reads: yesterday's
+          handovers in a column of their own, today's under what was
+          opened last, tomorrow's with the activity log folded below. */}
       <OrderClickTracker className="grid items-start gap-2.5 lg:grid-cols-3">
+        {renderPanel(
+          `${dashboardMessages.yesterdayKicker} · ${dashboardMessages.yesterdayTitle}`,
+          yesterdayEvents.length,
+          { href: "/orders", label: dashboardMessages.openOrders },
+          yesterdayEvents.length === 0
+            ? emptyRow(dashboardMessages.yesterdayEmpty)
+            : yesterdayEvents.map(renderEvent),
+        )}
         <div className="flex min-w-0 flex-col gap-2.5">
           {renderPanel(
             dashboardMessages.recentTitle,
@@ -524,6 +544,7 @@ export default async function DashboardPage() {
             todayEvents.length === 0 ? emptyRow(dashboardMessages.todayEmpty) : todayEvents.map(renderEvent),
           )}
         </div>
+        <div className="flex min-w-0 flex-col gap-2.5">
         {renderPanel(
           `${dashboardMessages.tomorrowKicker} · ${dashboardMessages.tomorrowTitle}`,
           tomorrowEvents.length,
@@ -574,6 +595,7 @@ export default async function DashboardPage() {
                 ))}
           </div>
         </details>
+        </div>
       </OrderClickTracker>
     </div>
   );

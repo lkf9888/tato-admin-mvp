@@ -26,7 +26,7 @@ export const guides: Guide[] = [
         steps: [
           "The numbers at the top: Today in use, Pickups today, Returns today.",
           "Conflicts counts trips on one car that overlap. A red number comes first; find the red bars on the calendar.",
-          "The pickup & return list shows every handover today by time: a black tag is a return, a white one a pickup, with the place after the car. Click a row to open the trip. The same list for tomorrow sits below, so deliveries and cleaning can be planned a day ahead.",
+          "The pickup & return list shows every handover today by time: a black tag is a return, a white one a pickup, with the place after the car. Click a row to open the trip. Yesterday's list is the column on the left, for checking that yesterday's cars went out and came back; tomorrow's is on the right, so deliveries and cleaning can be planned a day ahead.",
           "Quick CSV import takes a Turo CSV right here; it is the same as the CSV Imports page.",
         ],
       },

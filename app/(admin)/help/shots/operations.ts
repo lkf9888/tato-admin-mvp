@@ -9,7 +9,7 @@ export const operationsShots: Shot[] = [
     marks: [
       { step: 1, target: { text: { zh: "今日在租", en: "Today in use" } } },
       { step: 2, target: { text: { zh: "冲突订单", en: "Conflicts" } } },
-      { step: 3, target: { text: { zh: "取车/还车订单", en: "Pickup & return orders" }, nth: 0 } },
+      { step: 3, target: { text: { zh: "今日 · 取车/还车订单", en: "Today · Pickup & return orders" } } },
       { step: 4, target: { role: "button", name: { zh: "快速导入 CSV", en: "Quick CSV import" } } },
     ],
   },

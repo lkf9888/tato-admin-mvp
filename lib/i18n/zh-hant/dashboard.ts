@@ -22,6 +22,9 @@ export const dashboardMessages = {
       tomorrowKicker: "明日",
       tomorrowTitle: "取車/還車訂單",
       tomorrowEmpty: "明天沒有取車或還車訂單。",
+      yesterdayKicker: "昨日",
+      yesterdayTitle: "取車/還車訂單",
+      yesterdayEmpty: "昨天沒有取車或還車訂單。",
       event: {
         pickupBadge: "取車",
         returnBadge: "還車",

@@ -192,7 +192,9 @@ async function clipFor(page: Page, shot: (typeof SHOTS)[number], locale: Locale)
 }
 
 async function main() {
-  const browser = await chromium.launch();
+  // PW_CHANNEL=chrome uses the installed Google Chrome instead of the
+  // Chromium build Playwright downloads, for a machine without one.
+  const browser = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {});
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
   const page: Page = await context.newPage();
   await page.goto(`${BASE}/login`);

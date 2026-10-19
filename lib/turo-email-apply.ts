@@ -246,7 +246,11 @@ export async function applyTuroEmailsToOrders(input: {
 async function loadObservations(workspaceId: string) {
   const [emails, snapshots] = await Promise.all([
     prisma.inboundEmail.findMany({
-      where: { workspaceId },
+      // Guest messages never state a booking (parseTuroOrderEmail goes
+      // by the subject's intent), and since the history import they are
+      // most of the table: reading every one's body on each five-minute
+      // sync would cost hundreds of megabytes for nothing.
+      where: { workspaceId, kind: { not: "GUEST_MESSAGE" } },
       orderBy: { receivedAt: "asc" },
       select: { subject: true, bodyText: true, receivedAt: true },
     }),
@@ -743,6 +747,7 @@ export async function ingestTuroTripSnapshots(input: {
     ? await prisma.inboundEmail.findMany({
         where: {
           workspaceId: input.workspaceId,
+          kind: { not: "GUEST_MESSAGE" },
           OR: ids.flatMap((id) => [{ bodyText: { contains: id } }, { subject: { contains: id } }]),
         },
         orderBy: { receivedAt: "asc" },

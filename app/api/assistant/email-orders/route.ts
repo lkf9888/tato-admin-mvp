@@ -108,7 +108,9 @@ export async function GET() {
   }
 
   const emails = await prisma.inboundEmail.findMany({
-    where: { workspaceId: context.workspace.id },
+    // Booking mail only; guest messages are most of the table and state
+    // no booking (see loadObservations in lib/turo-email-apply).
+    where: { workspaceId: context.workspace.id, kind: { not: "GUEST_MESSAGE" } },
     orderBy: { receivedAt: "asc" },
     select: { subject: true, bodyText: true, receivedAt: true },
   });

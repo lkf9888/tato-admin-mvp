@@ -510,7 +510,18 @@ function trashGuestMessagesEnabled() {
 
 /** How far back the history run reaches, and how much it takes a run. */
 const HISTORY_LOOKBACK_DAYS = 3650;
-const HISTORY_MAX_MESSAGES = 400;
+const HISTORY_MAX_MESSAGES = 1500;
+/** Whole messages are downloaded this many at a time, so the history
+ *  run can stop between batches when its time is up. */
+const SOURCE_BATCH = 200;
+/** The history run stops starting batches after this long. What it has
+ *  filed by then is cleared from the inbox and the rest waits for the
+ *  next run, well inside Railway's 300s gateway. */
+const HISTORY_BUDGET_MS = 170_000;
+/** Turo's guest-message subject, as IMAP can search for it. The history
+ *  run asks for these only: reading every Turo envelope -- 90,000 of
+ *  them in the first mailbox -- took most of the gateway's time. */
+const GUEST_MESSAGE_SUBJECT = "has sent you a message about your";
 
 /** The mailbox Gmail calls Trash, whatever the account's language. */
 async function findTrashMailbox(client: ImapFlow) {
@@ -529,6 +540,7 @@ async function ingestMailbox(input: {
   result: GmailSyncResult;
 }) {
   const { config, fleet, result } = input;
+  const startedAt = Date.now();
   const client = new ImapFlow({
     host: config.host,
     port: config.port,
@@ -559,8 +571,11 @@ async function ingestMailbox(input: {
     // the newest N of all mail may hold few or no Turo messages. The
     // sender check below still runs; this only narrows the search.
     const senderTerms = config.allowedSenders.map((sender) => ({ from: sender }));
-    const query =
-      senderTerms.length === 1 ? { since, ...senderTerms[0] } : { since, or: senderTerms };
+    const query = {
+      since,
+      ...(senderTerms.length === 1 ? senderTerms[0] : { or: senderTerms }),
+      ...(input.history ? { subject: GUEST_MESSAGE_SUBJECT } : {}),
+    };
     const uids = await client.search(query, { uid: true });
     if (!uids || uids.length === 0) {
       return result;
@@ -626,8 +641,9 @@ async function ingestMailbox(input: {
 
     // Newest first within the cap; the next history run takes the next
     // older batch, since what this one files is no longer new.
-    if (input.history) result.historyRemaining = Math.max(0, fresh.length - cap);
+    const freshTotal = fresh.length;
     if (fresh.length > cap) fresh.splice(0, fresh.length - cap);
+    let downloaded = 0;
 
     // Anything older than the normal window is history: filed as read,
     // or a backfill would put a thousand long-finished conversations
@@ -635,83 +651,87 @@ async function ingestMailbox(input: {
     const historyBefore = new Date();
     historyBefore.setDate(historyBefore.getDate() - getLookbackDays());
 
-    for await (const message of fresh.length > 0
-      ? client.fetch(fresh, { uid: true, envelope: true, source: true }, { uid: true })
-      : []) {
-      const envelope = message.envelope;
-      const messageId = envelope?.messageId?.trim();
-      if (!messageId) continue;
+    for (let start = 0; start < fresh.length; start += SOURCE_BATCH) {
+      if (input.history && Date.now() - startedAt > HISTORY_BUDGET_MS) break;
+      const batch = fresh.slice(start, start + SOURCE_BATCH);
+      downloaded += batch.length;
+      for await (const message of client.fetch(batch, { uid: true, envelope: true, source: true }, { uid: true })) {
+        const envelope = message.envelope;
+        const messageId = envelope?.messageId?.trim();
+        if (!messageId) continue;
 
-      if (storedKind.has(messageId)) {
-        result.skippedDuplicate += 1;
-        continue;
-      }
+        if (storedKind.has(messageId)) {
+          result.skippedDuplicate += 1;
+          continue;
+        }
 
-      const fromAddress = envelope?.from?.[0]?.address?.trim().toLowerCase() ?? "";
+        const fromAddress = envelope?.from?.[0]?.address?.trim().toLowerCase() ?? "";
 
-      // `source` is only present because we asked for it in the fetch
-      // options, but the type is optional — skip rather than assert, so
-      // a server that declines to return it degrades to "no new mail"
-      // instead of throwing mid-loop.
-      if (!message.source) continue;
+        // `source` is only present because we asked for it in the fetch
+        // options, but the type is optional — skip rather than assert, so
+        // a server that declines to return it degrades to "no new mail"
+        // instead of throwing mid-loop.
+        if (!message.source) continue;
 
-      const parsedMail: ParsedMail = await simpleParser(message.source);
-      const bodyText = condenseBody(parsedMail.text ?? "");
-      // The HTML part is read for the avatar and then dropped. Storing
-      // it would multiply this table's size for one URL.
-      const avatarUrl = extractGuestAvatar(
-        typeof parsedMail.html === "string" ? parsedMail.html : "",
-      );
-      const subject = (envelope?.subject ?? parsedMail.subject ?? "").slice(0, 500);
-      const fromName = envelope?.from?.[0]?.name?.trim() || null;
-      const receivedAt = envelope?.date ?? parsedMail.date ?? new Date();
+        const parsedMail: ParsedMail = await simpleParser(message.source);
+        const bodyText = condenseBody(parsedMail.text ?? "");
+        // The HTML part is read for the avatar and then dropped. Storing
+        // it would multiply this table's size for one URL.
+        const avatarUrl = extractGuestAvatar(
+          typeof parsedMail.html === "string" ? parsedMail.html : "",
+        );
+        const subject = (envelope?.subject ?? parsedMail.subject ?? "").slice(0, 500);
+        const fromName = envelope?.from?.[0]?.name?.trim() || null;
+        const receivedAt = envelope?.date ?? parsedMail.date ?? new Date();
 
-      // No model call on this path. Attribution comes from the subject
-      // and the body, which are exact for Turo's templates and cost
-      // nothing; summaries are filled in by the bounded enrichment
-      // pass after the mailbox is drained. Calling the model here is
-      // what made this endpoint exceed the 300s gateway timeout and
-      // fail the whole sync.
-      const attribution = await attributeEmail({
-        workspaceId: input.workspaceId,
-        subject,
-        bodyText,
-        receivedAt,
-        fleet,
-      });
-
-      // Two runs overlapping, or an id that arrived after the pre-load,
-      // both land here as a unique violation. That is a duplicate, not
-      // a failure: count it and keep reading. Throwing would abandon
-      // every message after it in the batch.
-      try {
-        await prisma.inboundEmail.create({
-          data: {
-            workspaceId: input.workspaceId,
-            messageId,
-            fromAddress,
-            fromName,
-            subject,
-            receivedAt,
-            bodyText,
-            avatarUrl,
-            ...attribution,
-            acknowledgedAt:
-              attribution.kind === InboundEmailKind.GUEST_MESSAGE && receivedAt < historyBefore ? new Date() : null,
-            parsedAt: null,
-            parsed: null,
-          },
+        // No model call on this path. Attribution comes from the subject
+        // and the body, which are exact for Turo's templates and cost
+        // nothing; summaries are filled in by the bounded enrichment
+        // pass after the mailbox is drained. Calling the model here is
+        // what made this endpoint exceed the 300s gateway timeout and
+        // fail the whole sync.
+        const attribution = await attributeEmail({
+          workspaceId: input.workspaceId,
+          subject,
+          bodyText,
+          receivedAt,
+          fleet,
         });
-      } catch {
-        result.skippedDuplicate += 1;
-        storedKind.set(messageId, attribution.kind);
-        continue;
-      }
 
-      storedKind.set(messageId, attribution.kind);
-      result.imported += 1;
-      if (attribution.kind === InboundEmailKind.GUEST_MESSAGE) toTrash.push(message.uid);
+        // Two runs overlapping, or an id that arrived after the pre-load,
+        // both land here as a unique violation. That is a duplicate, not
+        // a failure: count it and keep reading. Throwing would abandon
+        // every message after it in the batch.
+        try {
+          await prisma.inboundEmail.create({
+            data: {
+              workspaceId: input.workspaceId,
+              messageId,
+              fromAddress,
+              fromName,
+              subject,
+              receivedAt,
+              bodyText,
+              avatarUrl,
+              ...attribution,
+              acknowledgedAt:
+                attribution.kind === InboundEmailKind.GUEST_MESSAGE && receivedAt < historyBefore ? new Date() : null,
+              parsedAt: null,
+              parsed: null,
+            },
+          });
+        } catch {
+          result.skippedDuplicate += 1;
+          storedKind.set(messageId, attribution.kind);
+          continue;
+        }
+
+        storedKind.set(messageId, attribution.kind);
+        result.imported += 1;
+        if (attribution.kind === InboundEmailKind.GUEST_MESSAGE) toTrash.push(message.uid);
+      }
     }
+    if (input.history) result.historyRemaining = freshTotal - downloaded;
 
     // Only once the rows exist: a message moves out of the inbox after
     // TATO has it, never before. A failure here leaves the mail where

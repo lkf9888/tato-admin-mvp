@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.73.1 - 2026-10-19
+
+### The history import fits the real mailbox, and booking sync stops reading guest messages
+
+The first history run found 92,630 Turo emails and 55,851 guest messages still to import, and took 170 seconds of the 300-second gateway reading every envelope.
+
+- The history run asks IMAP for guest-message subjects only ("has sent you a message about your"), downloads up to 1,500 a run in batches of 200, and stops starting batches after 170 seconds; whatever it filed is cleared from the inbox and the rest waits for the next run.
+- The booking fold (`loadObservations`, run on every five-minute sync and after each CSV import) read every `InboundEmail` body. Guest messages never state a booking and are now most of the table, so it, the reservation re-read and the assistant's email-orders view skip `GUEST_MESSAGE` rows.
+
 ## v1.73.0 - 2026-10-19
 
 ### Guest-message emails leave Gmail once TATO has them, and old conversations come in

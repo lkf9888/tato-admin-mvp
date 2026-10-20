@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { pushStaffActivity } from "@/lib/staff-activity-push";
 import {
   ensureStaffShareToken,
   getBearerToken,
@@ -106,6 +107,14 @@ export async function POST(request: NextRequest, { params }: { params: Params })
       taskId: task.id,
       files: created.map((attachment) => attachment.filename),
     },
+  });
+
+  pushStaffActivity({
+    workspaceId: staff.workspaceId,
+    staffName: staff.name,
+    task,
+    activity: "photos",
+    photoCount: created.length,
   });
 
   revalidatePath("/staff-schedule");

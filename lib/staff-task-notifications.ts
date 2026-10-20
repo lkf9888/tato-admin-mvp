@@ -6,6 +6,7 @@ import {
 } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { sendStaffTaskSms } from "@/lib/sms";
+import { pushStaffActivity } from "@/lib/staff-activity-push";
 import { sendNotification, staffChannelKey } from "@/lib/notify-client";
 import {
   buildStaffTaskTemplateValues,
@@ -194,6 +195,10 @@ export async function notifyAdminsOfStaffTaskAction(input: {
   origin?: string;
 }) {
   if (!input.workspaceId) return;
+
+  // The devices that chose staff tasks, before the email: it needs no
+  // recipient address, and never throws.
+  pushStaffActivity({ workspaceId: input.workspaceId, staffName: input.staffName, task: input.task, activity: input.action });
 
   const users = await prisma.user.findMany({
     where: { workspaceId: input.workspaceId },

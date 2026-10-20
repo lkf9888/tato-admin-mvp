@@ -128,6 +128,22 @@ const RULES: Rule[] = [
     guestGroup: 1,
     vehicleGroup: 2,
   },
+  // "Ann has changed their trip with your Honda Odyssey" -- and a
+  // request to change, which only the host can approve on Turo.
+  {
+    kind: InboundEmailKind.BOOKING_MODIFIED,
+    needsAction: false,
+    test: /^(.+?) has changed their trip with your (.+?)$/i,
+    guestGroup: 1,
+    vehicleGroup: 2,
+  },
+  {
+    kind: InboundEmailKind.BOOKING_MODIFIED,
+    needsAction: true,
+    test: /^(.+?) has requested a change to their trip with your (.+?)$/i,
+    guestGroup: 1,
+    vehicleGroup: 2,
+  },
   {
     kind: InboundEmailKind.BOOKING_MODIFIED,
     needsAction: false,
@@ -165,7 +181,7 @@ const RULES: Rule[] = [
   {
     kind: InboundEmailKind.PAYOUT,
     needsAction: false,
-    test: /(?:your earnings are on the way|has been charged for your reimbursement invoice)/i,
+    test: /(?:your earnings are on the way|reimbursement invoice|invoice approved|incidental charge)/i,
   },
 ];
 

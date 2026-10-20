@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentAdminUser } from "@/lib/auth";
 import {
+  cleanupMailbox,
   GmailInboxError,
   isGmailInboxConfigured,
   runGmailSync,
@@ -104,6 +105,14 @@ export async function POST(request: Request) {
     // `?days=`: it is bounded -- guest messages only, 400 a run, no
     // model -- and is run by hand from the workflow until it is done.
     const requestedMode = new URL(request.url).searchParams.get("mode");
+    // `?mode=cleanup` clears the Turo mail that piled up before the
+    // mail rules existed (see cleanupMailbox): moves only, bounded, run
+    // by hand from the workflow until `remaining` is 0.
+    if (requestedMode === "cleanup") {
+      const cleanup = await cleanupMailbox(context.workspaceId);
+      console.log(`[gmail-sync] cleanup ${JSON.stringify(cleanup)}`);
+      return NextResponse.json(cleanup);
+    }
     const history = requestedMode === "history";
     const mode =
       requestedMode === "ingest" || requestedMode === "enrich" ? requestedMode : history ? "ingest" : undefined;

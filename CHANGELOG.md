@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.84.0 - 2026-10-20
+
+### Every kind of Turo email is notified, filed or cleared
+
+A census of the SpeedX inbox found 29,483 Turo emails besides guest messages: bookings, change requests, reimbursement invoices, payouts, ratings, trip reminders, support threads and claims, security codes. `lib/turo-mail-rules.ts` now says what happens to each kind once TATO has it:
+
+- Bookings, changes and added drivers: cleared (TATO holds them); changes and added drivers push under 预订变动, new and cancelled ones keep coming from the orders they create.
+- Things only the host can do on Turo -- a guest's change request, an unconfirmed licence, an unanswered reimbursement invoice, inspections due: cleared, and pushed under 运营提醒 as 需处理.
+- Earnings and reimbursements, guest ratings: cleared, pushed under the new 收入与报销 and 客人评分 kinds.
+- Support threads, claims, relisting and account notices: pushed under the new Turo 客服与理赔 kind and moved under the "Turo客服" Gmail label rather than deleted -- they are evidence in disputes.
+- Trip reminders, returns, protection-plan updates, surveys: cleared, no push. Security codes: cleared after a day, never pushed. Anything no rule knows stays in the inbox.
+
+Each sync applies this to new mail after storing it, with one notification per kind per run, and to stored mail still in the inbox. `?mode=cleanup` (a `cleanup` choice on the Gmail sync workflow) applies it to the backlog: moves only, nothing imported or pushed, mail under two days old that TATO lacks left for the sync. The subject classifier also learns "has changed their trip", "has requested a change" (needs action) and the reimbursement subjects. Staff task actions and mini-program photo uploads now push under 员工任务.
+
 ## v1.83.0 - 2026-10-20
 
 ### Notifications have their place on the settings page, and staff photos notify you

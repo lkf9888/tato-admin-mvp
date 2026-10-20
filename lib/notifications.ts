@@ -34,6 +34,27 @@ export const NOTIFICATION_CATEGORIES = [
     enHint: "Double bookings, guests left unanswered, overdue tasks, pickups not prepared, failed imports.",
   },
   {
+    key: "turo_support",
+    zh: "Turo 客服与理赔",
+    en: "Turo support & claims",
+    zhHint: "Turo 客服回复、理赔进度、车辆被下架或重新上架。",
+    enHint: "Replies from Turo support, claim updates, a car delisted or relisted.",
+  },
+  {
+    key: "payments",
+    zh: "收入与报销",
+    en: "Earnings & reimbursements",
+    zhHint: "收入到账、报销单开出、客人已付或未付报销。",
+    enHint: "Payouts sent, reimbursement invoices raised, paid or unanswered.",
+  },
+  {
+    key: "reviews",
+    zh: "客人评分",
+    en: "Guest ratings",
+    zhHint: "客人给行程打了分。",
+    enHint: "A guest rated their trip.",
+  },
+  {
     key: "staff_tasks",
     zh: "员工任务",
     en: "Staff tasks",

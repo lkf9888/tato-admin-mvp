@@ -10,6 +10,8 @@ import { kimiExtractJson, isKimiConfigured,
   getExtractionModel,
 } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
+import { NOTIFICATION_CATEGORIES, type NotificationCategory } from "@/lib/notifications";
+import { TURO_ARCHIVE_LABEL, turoMailRule } from "@/lib/turo-mail-rules";
 import { notifyCategory } from "@/lib/web-push";
 import { pushNewGuestMessages } from "@/lib/guest-message-push";
 import { applyTuroEmailsToOrders, type ApplyOutcome } from "@/lib/turo-email-apply";
@@ -266,8 +268,10 @@ export type GmailSyncResult = {
   reclassified: number;
   /** Guest messages pushed to the operator's phone this run. */
   guestMessagesPushed?: number;
-  /** Filed guest-message emails moved to Gmail's Trash this run. */
+  /** Filed emails moved to Gmail's Trash this run. */
   trashed?: number;
+  /** Support and claim emails moved under the "Turo客服" label this run. */
+  archived?: number;
   /** History run: old guest messages still to import after this one.
    *  Zero means the history is all in. */
   historyRemaining?: number;
@@ -540,6 +544,41 @@ function trashGuestMessagesEnabled() {
   return process.env.GMAIL_TRASH_GUEST_MESSAGES?.trim().toLowerCase() !== "false";
 }
 
+/**
+ * Where a stored Turo email goes, per lib/turo-mail-rules: Trash, the
+ * support label, or nowhere yet. Security codes wait a day.
+ */
+function dispositionFor(subject: string, receivedAt: Date | null | undefined): "trash" | "archive" | null {
+  const rule = turoMailRule(subject);
+  if (rule.disposition === "trash") return "trash";
+  if (rule.disposition === "archive") return "archive";
+  if (rule.disposition === "trash_later") {
+    return receivedAt && Date.now() - receivedAt.getTime() > 24 * 3_600_000 ? "trash" : null;
+  }
+  return null;
+}
+
+type MailNotice = { category: NotificationCategory; label: string; subject: string };
+
+/** New Turo mail worth a push, one notification per category per run. */
+async function sendMailNotices(workspaceId: string, notices: MailNotice[]) {
+  const byCategory = new Map<NotificationCategory, MailNotice[]>();
+  for (const notice of notices) byCategory.set(notice.category, [...(byCategory.get(notice.category) ?? []), notice]);
+  for (const [category, list] of byCategory) {
+    const name = NOTIFICATION_CATEGORIES.find((item) => item.key === category)?.zh ?? "Turo";
+    const clean = (subject: string) => subject.replace(/^\([^)]*\)\s*[-–—]\s*/, "").slice(0, 110);
+    await notifyCategory(workspaceId, category, {
+      title: list.length === 1 ? list[0].label : `${list.length} 封${name}`,
+      body: list
+        .slice(0, 4)
+        .map((notice) => (list.length === 1 ? clean(notice.subject) : `· ${clean(notice.subject)}`))
+        .join("\n"),
+      url: "/updates",
+      tag: `mail-${category}`,
+    });
+  }
+}
+
 /** The history run stops at this much volume use. */
 const HISTORY_MAX_DISK_PERCENT = 70;
 
@@ -597,6 +636,7 @@ async function ingestMailbox(input: {
     );
   }
 
+  const notices: MailNotice[] = [];
   const lock = await client.getMailboxLock(config.mailbox);
   try {
     const since = new Date();
@@ -656,6 +696,7 @@ async function ingestMailbox(input: {
     // stopped every later run cold.
     const fresh: number[] = [];
     const toTrash: number[] = [];
+    const toArchive: number[] = [];
     let freshTotal = 0;
     let end = uids.length;
     let envelopesRead = 0;
@@ -680,6 +721,11 @@ async function ingestMailbox(input: {
           // row filed as OTHER while the model was failing is still one).
           if (kind === InboundEmailKind.GUEST_MESSAGE || subjectKind === InboundEmailKind.GUEST_MESSAGE) {
             toTrash.push(message.uid);
+          } else if (!input.history) {
+            // Any other Turo mail TATO already has: cleared by its rule.
+            const where = dispositionFor(message.envelope?.subject ?? "", message.envelope?.date);
+            if (where === "trash") toTrash.push(message.uid);
+            else if (where === "archive") toArchive.push(message.uid);
           } else {
             skipped.storedOtherKind += 1;
           }
@@ -794,7 +840,16 @@ async function ingestMailbox(input: {
 
         storedKind.set(messageId, attribution.kind);
         result.imported += 1;
-        if (attribution.kind === InboundEmailKind.GUEST_MESSAGE) toTrash.push(message.uid);
+        if (attribution.kind === InboundEmailKind.GUEST_MESSAGE) {
+          toTrash.push(message.uid);
+        } else if (!input.history) {
+          // Stored now, so it can go -- and it may be news for the phone.
+          const rule = turoMailRule(subject);
+          if (rule.notify) notices.push({ category: rule.notify, label: rule.label, subject });
+          const where = dispositionFor(subject, receivedAt);
+          if (where === "trash") toTrash.push(message.uid);
+          else if (where === "archive") toArchive.push(message.uid);
+        }
       }
     }
     // Not yet looked at, plus new ones found but not downloaded this run.
@@ -812,7 +867,16 @@ async function ingestMailbox(input: {
           result.trashed = toTrash.length;
         }
       } catch (error) {
-        console.error("[gmail-inbox] moving filed guest messages to Trash failed", error);
+        console.error("[gmail-inbox] moving filed mail to Trash failed", error);
+      }
+    }
+    if (toArchive.length > 0 && trashGuestMessagesEnabled()) {
+      try {
+        await ensureMailbox(client, TURO_ARCHIVE_LABEL);
+        await client.messageMove(toArchive, TURO_ARCHIVE_LABEL, { uid: true });
+        result.archived = toArchive.length;
+      } catch (error) {
+        console.error("[gmail-inbox] filing support mail under its label failed", error);
       }
     }
   } finally {
@@ -820,6 +884,99 @@ async function ingestMailbox(input: {
     await client.logout().catch(() => null);
   }
 
+  if (notices.length > 0) {
+    await sendMailNotices(input.workspaceId, notices).catch((error) =>
+      console.error("[gmail-inbox] mail notifications failed", error),
+    );
+  }
+}
+
+/** A Gmail label to move mail under, created the first time. */
+async function ensureMailbox(client: ImapFlow, path: string) {
+  const boxes = await client.list();
+  if (boxes.some((box) => box.path === path)) return;
+  await client.mailboxCreate(path).catch(() => null);
+}
+
+/** How long one cleanup run keeps going before it reports back. */
+const CLEANUP_BUDGET_MS = 200_000;
+/** Mail younger than this is left for the sync to import first. */
+const CLEANUP_MIN_AGE_MS = 2 * 24 * 3_600_000;
+
+/**
+ * Clear the Turo mail that piled up before the rules existed: the
+ * one-off pass after the census. Moves only -- nothing is imported and
+ * nothing is pushed, so years-old bookings are not replayed onto orders
+ * and the phone does not hear about 2023. Mail TATO has not stored and
+ * that is under two days old is left for the regular sync, which stores
+ * it first. Newest first, a window at a time; run again until
+ * `remaining` is 0.
+ */
+export async function cleanupMailbox(workspaceId: string) {
+  const config = getGmailConfig();
+  if (!config.user || !config.password) throw new GmailInboxError("Gmail is not configured", "GMAIL_NOT_CONFIGURED", 400);
+  const startedAt = Date.now();
+  const client = new ImapFlow({
+    host: config.host,
+    port: config.port,
+    secure: true,
+    auth: { user: config.user, pass: config.password },
+    logger: false,
+  });
+  await client.connect();
+  const stored = new Set(
+    (await prisma.inboundEmail.findMany({ where: { workspaceId }, select: { messageId: true } })).map((row) => row.messageId),
+  );
+  const result = { scanned: 0, trashed: 0, archived: 0, kept: 0, remaining: 0, byGroup: {} as Record<string, number> };
+  const lock = await client.getMailboxLock(config.mailbox);
+  try {
+    const trash = await findTrashMailbox(client);
+    if (!trash) throw new GmailInboxError("No Trash mailbox found", "GMAIL_NO_TRASH", 500);
+    await ensureMailbox(client, TURO_ARCHIVE_LABEL);
+    const since = new Date();
+    since.setDate(since.getDate() - HISTORY_LOOKBACK_DAYS);
+    const senderTerms = config.allowedSenders.map((sender) => ({ from: sender }));
+    const uids =
+      (await client.search({ since, ...(senderTerms.length === 1 ? senderTerms[0] : { or: senderTerms }) }, { uid: true })) || [];
+    let end = uids.length;
+    while (end > 0 && Date.now() - startedAt < CLEANUP_BUDGET_MS) {
+      const start = Math.max(0, end - 2000);
+      const window = uids.slice(start, end);
+      end = start;
+      const toTrash: number[] = [];
+      const toArchive: number[] = [];
+      for await (const message of client.fetch(window, { uid: true, envelope: true }, { uid: true })) {
+        result.scanned += 1;
+        const subject = message.envelope?.subject ?? "";
+        const date = message.envelope?.date ?? null;
+        const isStored = Boolean(message.envelope?.messageId && stored.has(message.envelope.messageId.trim()));
+        const oldEnough = Boolean(date && Date.now() - date.getTime() > CLEANUP_MIN_AGE_MS);
+        const rule = turoMailRule(subject);
+        result.byGroup[rule.group] = (result.byGroup[rule.group] ?? 0) + 1;
+        // A guest message TATO lacks is history still to import, not junk.
+        const where = rule.group === "guest" && !isStored ? null : dispositionFor(subject, date);
+        if (where && (isStored || oldEnough)) {
+          if (where === "trash") toTrash.push(message.uid);
+          else toArchive.push(message.uid);
+        } else {
+          result.kept += 1;
+        }
+      }
+      if (toTrash.length > 0) {
+        await client.messageMove(toTrash, trash, { uid: true });
+        result.trashed += toTrash.length;
+      }
+      if (toArchive.length > 0) {
+        await client.messageMove(toArchive, TURO_ARCHIVE_LABEL, { uid: true });
+        result.archived += toArchive.length;
+      }
+    }
+    result.remaining = end;
+  } finally {
+    lock.release();
+    await client.logout().catch(() => null);
+  }
+  return result;
 }
 
 /** A subject with the guest, car and numbers taken out, for grouping. */
@@ -1237,6 +1394,7 @@ export function summarizeGmailSyncResult(result: GmailSyncResult) {
     `parseFailed=${result.parseFailed}`,
     `reclassified=${result.reclassified}`,
     result.trashed ? `trashed=${result.trashed}` : "",
+    result.archived ? `archived=${result.archived}` : "",
     result.historyRemaining != null ? `historyRemaining=${result.historyRemaining}` : "",
     result.diskUsedPercent != null ? `disk=${result.diskUsedPercent}%` : "",
     result.historyPaused ? `historyPaused=${result.historyPaused}` : "",

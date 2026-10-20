@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.80.0 - 2026-10-20
+
+### The groundwork for push notifications on phones
+
+The first half of web push, for guest messages reaching a phone -- an iPhone included, from TATO added to the home screen (iOS 16.4+). Nothing registers it yet: the "receive on this device" switch on the messages page comes with the sending side.
+
+- `/push-sw.js`, a service worker at scope "/" that only shows pushes and opens what was tapped. It intercepts no request and caches nothing, so it cannot serve stale pages the way the HostHub worker on localhost does. A push it cannot read still shows "TATO 有新通知": iOS withdraws push from a site that receives one and shows nothing. A tap focuses an open TATO window and goes to the push's link (the messages page by default), or opens one. When the browser replaces the subscription, the new one is posted to `/api/messages/push/subscribe`.
+- `/push-badge.png`, the small mark Android shows in the status bar: the brand's T in white on transparent, since Android draws only the shape and the full icon there would be a white square.
+
 ## v1.79.0 - 2026-10-19
 
 ### A Turo account can be given a name to show

@@ -863,8 +863,7 @@ async function ingestMailbox(input: {
       try {
         const trash = await findTrashMailbox(client);
         if (trash && trash !== config.mailbox) {
-          await client.messageMove(toTrash, trash, { uid: true });
-          result.trashed = toTrash.length;
+          result.trashed = await moveInBatches(client, toTrash, trash);
         }
       } catch (error) {
         console.error("[gmail-inbox] moving filed mail to Trash failed", error);
@@ -873,8 +872,7 @@ async function ingestMailbox(input: {
     if (toArchive.length > 0 && trashGuestMessagesEnabled()) {
       try {
         await ensureMailbox(client, TURO_ARCHIVE_LABEL);
-        await client.messageMove(toArchive, TURO_ARCHIVE_LABEL, { uid: true });
-        result.archived = toArchive.length;
+        result.archived = await moveInBatches(client, toArchive, TURO_ARCHIVE_LABEL);
       } catch (error) {
         console.error("[gmail-inbox] filing support mail under its label failed", error);
       }
@@ -889,6 +887,23 @@ async function ingestMailbox(input: {
       console.error("[gmail-inbox] mail notifications failed", error),
     );
   }
+}
+
+/**
+ * Move mail in small batches, counting what Gmail says it moved.
+ *
+ * One MOVE of 1,500 UIDs came back OK with most of them still in the
+ * inbox, so a single command's success says nothing about each message.
+ * Batches of 200, and the count is the server's own map of moved UIDs.
+ */
+async function moveInBatches(client: ImapFlow, uids: number[], destination: string) {
+  let moved = 0;
+  for (let start = 0; start < uids.length; start += 200) {
+    const batch = uids.slice(start, start + 200);
+    const response = await client.messageMove(batch, destination, { uid: true });
+    moved += response && response.uidMap ? response.uidMap.size : 0;
+  }
+  return moved;
 }
 
 /** A Gmail label to move mail under, created the first time. */
@@ -963,12 +978,10 @@ export async function cleanupMailbox(workspaceId: string) {
         }
       }
       if (toTrash.length > 0) {
-        await client.messageMove(toTrash, trash, { uid: true });
-        result.trashed += toTrash.length;
+        result.trashed += await moveInBatches(client, toTrash, trash);
       }
       if (toArchive.length > 0) {
-        await client.messageMove(toArchive, TURO_ARCHIVE_LABEL, { uid: true });
-        result.archived += toArchive.length;
+        result.archived += await moveInBatches(client, toArchive, TURO_ARCHIVE_LABEL);
       }
     }
     result.remaining = end;

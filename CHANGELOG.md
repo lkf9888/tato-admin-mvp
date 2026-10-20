@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.84.2 - 2026-10-20
+
+### Mail moves are batched and counted by what Gmail moved
+
+A cleanup run reported 1,505 emails moved to Trash in one IMAP MOVE, and a census straight after found only 100 gone: the command's OK said nothing about each message. Moves now go 200 UIDs at a time, and `trashed` / `archived` count the server's own map of moved UIDs rather than how many were asked for.
+
 ## v1.84.1 - 2026-10-20
 
 ### The mail rules know the subjects the first cleanup left behind

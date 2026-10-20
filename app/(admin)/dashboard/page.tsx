@@ -23,6 +23,7 @@ import { getOnboardingProgress, ONBOARDING_LINKS, ONBOARDING_STEPS } from "@/lib
 import { correctedNetEarning } from "@/lib/ledger-policy";
 import { loadOrderAdjustments } from "@/lib/owner-ledger";
 import { recentOrderViews } from "@/lib/recent-orders";
+import { DashboardDayTabs, type DashboardDayTab } from "@/components/dashboard-day-tabs";
 import { getActivityActionLabel, getLocaleTag, type Locale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
 
@@ -379,13 +380,25 @@ export default async function DashboardPage() {
   const panelLinkClass =
     "tap-press shrink-0 text-[11px] font-medium text-[var(--ink-soft)] hover:text-[var(--brand)]";
 
+  // On a phone each panel shows only under its own tab (DashboardDayTabs);
+  // spelled out in full so Tailwind sees every class.
+  const DAY_TAB_PANEL: Record<DashboardDayTab, string> = {
+    yesterday: "max-lg:hidden group-data-[active=yesterday]/days:max-lg:flex",
+    today: "max-lg:hidden group-data-[active=today]/days:max-lg:flex",
+    tomorrow: "max-lg:hidden group-data-[active=tomorrow]/days:max-lg:flex",
+    recent: "max-lg:hidden group-data-[active=recent]/days:max-lg:flex",
+  };
+
   const renderPanel = (
+    tab: DashboardDayTab,
     title: string,
     count: number | null,
     link: { href: string; label: string },
     body: React.ReactNode,
   ) => (
-    <section className="flex min-w-0 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)] p-2 sm:p-2.5">
+    <section
+      className={`flex min-w-0 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)] p-2 sm:p-2.5 ${DAY_TAB_PANEL[tab]}`}
+    >
       <header className="flex items-baseline justify-between gap-2 px-1 pb-1">
         <h3 className="truncate text-[13px] font-semibold text-[var(--ink)]">
           {title}
@@ -520,9 +533,20 @@ export default async function DashboardPage() {
 
       {/* Three days left to right, as a calendar reads: yesterday's
           handovers in a column of their own, today's under what was
-          opened last, tomorrow's with the activity log folded below. */}
+          opened last, tomorrow's with the activity log folded below.
+          On a phone the four lists are tabs, one at a time, and the
+          activity log stays folded under whichever is open. */}
+      <DashboardDayTabs
+        tabs={[
+          { key: "yesterday", label: dashboardMessages.yesterdayKicker, count: yesterdayEvents.length },
+          { key: "today", label: dashboardMessages.todayKicker, count: todayEvents.length },
+          { key: "tomorrow", label: dashboardMessages.tomorrowKicker, count: tomorrowEvents.length },
+          { key: "recent", label: dashboardMessages.recentTab },
+        ]}
+      >
       <OrderClickTracker className="grid items-start gap-2.5 lg:grid-cols-3">
         {renderPanel(
+          "yesterday",
           `${dashboardMessages.yesterdayKicker} · ${dashboardMessages.yesterdayTitle}`,
           yesterdayEvents.length,
           { href: "/orders", label: dashboardMessages.openOrders },
@@ -530,22 +554,25 @@ export default async function DashboardPage() {
             ? emptyRow(dashboardMessages.yesterdayEmpty)
             : yesterdayEvents.map(renderEvent),
         )}
-        <div className="flex min-w-0 flex-col gap-2.5">
+        <div className="flex min-w-0 flex-col gap-2.5 max-lg:contents">
           {renderPanel(
+            "recent",
             dashboardMessages.recentTitle,
             null,
             { href: "/orders", label: dashboardMessages.openOrders },
             recentOrders.length === 0 ? emptyRow(dashboardMessages.recentEmpty) : recentOrders.map(renderRecent),
           )}
           {renderPanel(
+            "today",
             `${dashboardMessages.todayKicker} · ${dashboardMessages.todayTitle}`,
             todayEvents.length,
             { href: "/orders", label: dashboardMessages.openOrders },
             todayEvents.length === 0 ? emptyRow(dashboardMessages.todayEmpty) : todayEvents.map(renderEvent),
           )}
         </div>
-        <div className="flex min-w-0 flex-col gap-2.5">
+        <div className="flex min-w-0 flex-col gap-2.5 max-lg:contents">
         {renderPanel(
+          "tomorrow",
           `${dashboardMessages.tomorrowKicker} · ${dashboardMessages.tomorrowTitle}`,
           tomorrowEvents.length,
           { href: "/orders", label: dashboardMessages.openOrders },
@@ -597,6 +624,7 @@ export default async function DashboardPage() {
         </details>
         </div>
       </OrderClickTracker>
+      </DashboardDayTabs>
     </div>
   );
 }

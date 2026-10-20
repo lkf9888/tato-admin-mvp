@@ -49,7 +49,7 @@ export const shellMessages = {
         groupBilling: "帳務",
       },
       bottomNav: {
-        home: "首頁",
+        home: "儀表盤",
         messages: "訊息",
         calendar: "日曆",
         orders: "訂單",

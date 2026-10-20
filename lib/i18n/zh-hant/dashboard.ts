@@ -38,6 +38,7 @@ export const dashboardMessages = {
       activityKicker: "操作記錄",
       activityTitle: "最近動作",
       recentTitle: "最近檢視",
+      recentTab: "最近檢視",
       onboarding: {
         title: "開始使用",
         progress: (done: number, total: number) => `已完成 ${done} / ${total}`,

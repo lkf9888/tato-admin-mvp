@@ -60,7 +60,7 @@ export const shellMessages = {
       // full drawer for the remaining seven entries. Labels are kept
       // short so they fit a ~75px tab cell on a 375px-wide phone.
       bottomNav: {
-        home: "Home",
+        home: "Dashboard",
         messages: "Messages",
         calendar: "Calendar",
         orders: "Orders",
@@ -127,7 +127,7 @@ export const shellMessages = {
         groupBilling: "账务",
       },
       bottomNav: {
-        home: "首页",
+        home: "仪表盘",
         messages: "消息",
         calendar: "日历",
         orders: "订单",

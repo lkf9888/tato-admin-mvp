@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.85.0 - 2026-10-20
+
+### On a phone, the dashboard's days are tabs and the dashboard has a button of its own
+
+- Below `lg`, yesterday's, today's and tomorrow's handovers and the recently viewed trips are four tabs, each with its count, instead of four lists stacked down the page; it opens on Today, and the folded activity log stays under whichever is open. The panels are still rendered by the page; `DashboardDayTabs` only holds which one shows, through `data-active` on a `group/days` wrapper. From `lg` up the three columns are unchanged and the tabs are gone.
+- The bottom bar has six buttons: Dashboard (仪表盘) first, left of Calendar, then Messages, Orders, Schedule and More. The columns follow how many tabs a team member can open.
+- Help: the dashboard chapter says how it reads on a phone.
+
 ## v1.84.2 - 2026-10-20
 
 ### Mail moves are batched and counted by what Gmail moved

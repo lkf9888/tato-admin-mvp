@@ -41,7 +41,10 @@ export const guides: Guide[] = [
         ],
       },
     ],
-    tips: ["Net earnings, Trips, Active vehicles and Avg per trip count this month's imported trips. A Turo trip has an amount only after its CSV is imported."],
+    tips: [
+      "Net earnings, Trips, Active vehicles and Avg per trip count this month's imported trips. A Turo trip has an amount only after its CSV is imported.",
+      "On a phone, Yesterday, Today, Tomorrow and Recent are tabs, opening on Today; Dashboard is the first button in the bottom bar, left of Calendar.",
+    ],
   },
   {
     key: "assistant",

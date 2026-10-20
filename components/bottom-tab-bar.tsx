@@ -5,6 +5,7 @@ import { CountPill, NavBadge, useNavBadges } from "@/components/nav-badges";
 import { NAV_ICONS, type NavIconName } from "@/components/nav-icons";
 import {
   CalendarDays,
+  LayoutGrid,
   ListChecks,
   MessageSquare,
   MoreHorizontal,
@@ -17,8 +18,8 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * iOS-style bottom tab bar for the admin shell on mobile. Five slots —
- * four direct destinations + a "More" button that pops the rest of the
+ * iOS-style bottom tab bar for the admin shell on mobile. Six slots —
+ * five direct destinations + a "More" button that pops the rest of the
  * navigation as a sheet. Hidden on `lg` and above; the desktop sidebar
  * takes over there.
  *
@@ -133,8 +134,14 @@ export function BottomTabBar({
     /** Highlight rule: pathname starts with one of these prefixes. */
     matchPrefixes: string[];
   }> = [
-    // The calendar first and messages second: what a phone is opened
-    // for. The dashboard is a desk page and lives behind More.
+    // The dashboard first, as on the sidebar, then the calendar and
+    // messages: what a phone is opened for.
+    {
+      href: "/dashboard",
+      label: labels.home,
+      Icon: LayoutGrid,
+      matchPrefixes: ["/dashboard"],
+    },
     {
       href: "/calendar",
       label: labels.calendar,
@@ -186,7 +193,10 @@ export function BottomTabBar({
         aria-label="Primary"
         className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[var(--surface)]/95 pb-safe backdrop-blur lg:hidden"
       >
-        <div className="mx-auto grid max-w-2xl grid-cols-5">
+        <div
+          className="mx-auto grid max-w-2xl"
+          style={{ gridTemplateColumns: `repeat(${visibleTabs.length + 1}, minmax(0, 1fr))` }}
+        >
           {visibleTabs.map((tab) => {
             const active = tab.matchPrefixes.some((prefix) =>
               pathname.startsWith(prefix),

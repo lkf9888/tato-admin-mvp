@@ -357,7 +357,17 @@ async function attributeEmail(input: {
   const bySubject = classifyTuroSubject(input.subject);
   const turoLink = extractTuroLink(input.bodyText);
   const guestText = extractGuestMessageText(input.bodyText, input.subject);
-  const account = bySubject?.coHostAccount ?? input.defaultAccount ?? null;
+  // A prefix naming an account no car is filed under is the main
+  // account seen from a co-host's inbox: Kevin's Yahoo gets SpeedX's
+  // mail as "(SPEEDX's vehicle) - ...", and the main account's cars
+  // carry no account at all.
+  const prefixAccount = bySubject?.coHostAccount ?? null;
+  const knownPrefix = prefixAccount && input.fleet.some((vehicle) => vehicle.turoAccount === prefixAccount);
+  const account = prefixAccount
+    ? knownPrefix || !input.defaultAccount
+      ? prefixAccount
+      : null
+    : (input.defaultAccount ?? null);
 
   const matchedVehicles = bySubject?.vehicleText
     ? matchVehiclesForEmail(bySubject.vehicleText, input.fleet, account).matches

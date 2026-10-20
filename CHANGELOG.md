@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.1 - 2026-10-20
+
+### SpeedX's mail in Kevin's inbox is filed to the main account
+
+Kevin co-hosts SpeedX's account, so his Yahoo inbox also receives SpeedX's mail as "(SPEEDX's vehicle) - ...". Read as an account called "speedx", no car matched it. In the second inbox a prefix naming an account no car is filed under now means the main account. Also: "complete your safety inspection" pushes as 需处理 like the other inspection notices.
+
 ## v1.86.0 - 2026-10-20
 
 ### Kevin's Yahoo inbox is read and kept tidy too

@@ -50,7 +50,7 @@ const RULES: Rule[] = [
   { test: /requested a change to their trip/i, group: "action", disposition: "trash", notify: "alerts", label: "客人申请改行程（需处理）" },
   { test: /still need to confirm your guest/i, group: "action", disposition: "trash", notify: "alerts", label: "还没确认客人驾照（需处理）" },
   { test: /has not responded to your reimbursement invoice/i, group: "action", disposition: "trash", notify: "alerts", label: "报销单客人未回应（需处理）" },
-  { test: /inspections? (?:are|is) due|annual (?:vehicle )?inspection|action required|update your vehicle listing|^your vehicle listing|additional usage/i, group: "action", disposition: "trash", notify: "alerts", label: "Turo 要求处理" },
+  { test: /inspections? (?:are|is) due|annual (?:vehicle )?inspection|safety inspection|action required|update your vehicle listing|^your vehicle listing|additional usage/i, group: "action", disposition: "trash", notify: "alerts", label: "Turo 要求处理" },
   { test: /wants to book|requested to book|booking request/i, group: "action", disposition: "trash", notify: "alerts", label: "预订申请（需处理）" },
   { test: /inviting you to be a co-host/i, group: "action", disposition: "trash", notify: "alerts", label: "共管邀请（需处理）" },
   { test: /guest may need to cancel/i, group: "action", disposition: "trash", notify: "alerts", label: "客人可能要取消（需处理）" },

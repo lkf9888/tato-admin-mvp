@@ -30,7 +30,7 @@ export const guestMessagesMessages = {
       searchCount: (count: number) =>
         count === 1 ? "1 conversation" : `${count} conversations`,
       templatesButton: "Templates",
-      alertsButton: "Push to my phone",
+      alertsButton: "Notification settings",
       templatesShort: "Templates",
       carNotesTitle: "Car notes for AI replies",
       carNotesHint: "What a guest may be told about this car: where it parks, how charging works, quirks. AI drafts use it. Leave the pickup code out; it is never given to the AI.",
@@ -232,7 +232,7 @@ export const guestMessagesMessages = {
       searchPlaceholder: "搜索客人、车型、车牌或消息内容",
       searchCount: (count: number) => `${count} 个会话`,
       templatesButton: "消息模板",
-      alertsButton: "推送到手机",
+      alertsButton: "通知设置",
       templatesShort: "模板",
       carNotesTitle: "这台车给 AI 的说明",
       carNotesHint: "可以告诉客人的事：停在哪、怎么充电、要注意什么。AI 起草回复时会用上。别写取车密码，密码从不交给 AI。",

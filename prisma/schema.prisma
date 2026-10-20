@@ -2632,6 +2632,9 @@ model WebPushSubscription {
   auth          String
   /// "iPhone · Safari" and the like, so the device list says which is which.
   label         String?
+  /// JSON array of the notification categories this device wants (see
+  /// lib/notifications). Null: every category, new ones included.
+  categories    String?
   createdAt     DateTime  @default(now())
   lastSuccessAt DateTime?
   lastError     String?

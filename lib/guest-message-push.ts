@@ -173,7 +173,7 @@ async function deliver(
     body: single ? clip(newest.text, 180) : `${clip(names.join("、"), 60)}\n最新 ${newest.guestName}：${clip(newest.text, 120)}`,
     url: "/messages",
     tag: "guest-messages",
-  });
+  }, "guest_messages");
   if (web.sent > 0) return { via: "web" };
 
   const wechat = await sendNotification({
@@ -219,7 +219,14 @@ export type GuestMessageAlertStatus = {
   web: {
     configured: boolean;
     publicKey: string | null;
-    devices: { id: string; endpoint: string; label: string | null; lastSuccessAt: string | null; lastError: string | null }[];
+    devices: {
+      id: string;
+      endpoint: string;
+      label: string | null;
+      categories: string[];
+      lastSuccessAt: string | null;
+      lastError: string | null;
+    }[];
   };
   smsPhone: string | null;
   smsConfigured: boolean;
@@ -244,6 +251,7 @@ export async function getGuestMessageAlertStatus(workspaceId: string): Promise<G
         id: device.id,
         endpoint: device.endpoint,
         label: device.label,
+        categories: device.categories,
         lastSuccessAt: device.lastSuccessAt?.toISOString() ?? null,
         lastError: device.lastError,
       })),

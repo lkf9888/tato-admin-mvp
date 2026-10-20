@@ -31,7 +31,7 @@ export const guestMessagesMessages = {
       searchPlaceholder: "搜尋客人、車型、車牌或訊息內容",
       searchCount: (count: number) => `${count} 個會話`,
       templatesButton: "訊息模板",
-      alertsButton: "推送到手機",
+      alertsButton: "通知設定",
       templatesShort: "模板",
       carNotesTitle: "這台車給 AI 的說明",
       carNotesHint: "可以告訴客人的事：停在哪、怎麼充電、要注意什麼。AI 起草回覆時會用上。別寫取車密碼，密碼從不交給 AI。",

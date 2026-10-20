@@ -9,6 +9,7 @@ import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getAppUrl } from "@/lib/stripe";
 import { resolveTuroSyncWorkspace } from "@/lib/turo-sync";
+import { notifyCategory } from "@/lib/web-push";
 
 export const runtime = "nodejs";
 
@@ -105,6 +106,24 @@ export async function POST(request: Request) {
         where: { workspaceId },
         select: { email: true, name: true },
       });
+
+      // The phone first: the same alerts as one notification to every
+      // device that chose operations alerts. Counted as delivered like an
+      // email would be, so a push that reached someone marks them sent.
+      const top = pending[0];
+      const pushed = await notifyCategory(workspaceId, "alerts", {
+        title: pending.length === 1 ? top.title : `${pending.length} 条运营提醒`,
+        body:
+          pending.length === 1
+            ? top.body.replace(/\s+/g, " ").slice(0, 180)
+            : pending
+                .slice(0, 4)
+                .map((alert) => `· ${alert.title}`)
+                .join("\n"),
+        url: pending.length === 1 && top.href ? top.href : "/assistant",
+        tag: "alerts",
+      });
+      if (pushed.sent > 0) notified += 1;
 
       for (const recipient of recipients) {
         const sent = await sendAlertDigestEmail({

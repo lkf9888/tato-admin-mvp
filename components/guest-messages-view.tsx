@@ -18,7 +18,6 @@ import {
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { GuestMessageAlertPanel } from "@/components/guest-message-alert-panel";
 import { MobileIconButton, MobilePageHeader } from "@/components/mobile-chrome";
 import { MessageRulesPanel } from "@/components/message-rules-panel";
 import {
@@ -433,7 +432,6 @@ export function GuestMessagesView({
     }
   }
   const [templatesOpen, setTemplatesOpen] = useState(false);
-  const [alertsOpen, setAlertsOpen] = useState(false);
   const [tripOpen, setTripOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // Whether the open thread put an entry on the history stack, so "back"
@@ -830,7 +828,6 @@ export function GuestMessagesView({
           />
         ) : null
       ) : null}
-      {alertsOpen ? <GuestMessageAlertPanel locale={locale} onClose={() => setAlertsOpen(false)} /> : null}
       {rulesOpen ? (
         <MessageRulesPanel
           locale={locale}
@@ -943,7 +940,8 @@ export function GuestMessagesView({
             <MobileIconButton label={t.tabLibrary} href="/messages/ai-templates">
               <BookText className="h-[19px] w-[19px]" aria-hidden />
             </MobileIconButton>
-            <MobileIconButton label={t.alertsButton} onClick={() => setAlertsOpen(true)}>
+            {/* Notification settings live on the settings page now. */}
+            <MobileIconButton label={t.alertsButton} href="/account-settings#notifications">
               <Bell className="h-[19px] w-[19px]" aria-hidden />
             </MobileIconButton>
           </>
@@ -974,15 +972,14 @@ export function GuestMessagesView({
                   className="tap-compact h-9 w-full rounded-full border border-[var(--line)] bg-[var(--surface-muted)] pl-9 pr-3 text-[13px] outline-none focus:border-[var(--line-strong)]"
                 />
               </label>
-              <button
-                type="button"
-                onClick={() => setAlertsOpen(true)}
+              <Link
+                href="/account-settings#notifications"
                 title={t.alertsButton}
                 aria-label={t.alertsButton}
                 className="tap-press hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] lg:flex"
               >
                 <Bell className="h-4 w-4" aria-hidden />
-              </button>
+              </Link>
             </div>
 
             <div className="-mx-3 flex items-center gap-1.5 overflow-x-auto px-3 [scrollbar-width:none] lg:mx-0 lg:px-0" role="tablist">

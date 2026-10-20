@@ -1,16 +1,23 @@
 "use client";
 
-import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import type { Locale } from "@/lib/i18n";
+import { NOTIFICATION_CATEGORIES, type NotificationCategory } from "@/lib/notifications";
 
 type Status = {
   enabled: boolean;
   web: {
     configured: boolean;
     publicKey: string | null;
-    devices: { id: string; endpoint: string; label: string | null; lastSuccessAt: string | null; lastError: string | null }[];
+    devices: {
+      id: string;
+      endpoint: string;
+      label: string | null;
+      categories: NotificationCategory[];
+      lastSuccessAt: string | null;
+      lastError: string | null;
+    }[];
   };
   smsPhone: string | null;
   smsConfigured: boolean;
@@ -26,13 +33,18 @@ type Status = {
 function copy(locale: Locale) {
   return locale !== "en"
     ? {
-        title: "新消息推到手机",
+        title: "通知",
         intro:
-          "客人在 Turo 上发来消息时，TATO 同步到后推一条到你手机：客人、车，以及消息的开头。15 分钟内的多条合成一条。打开之前的旧消息不会补推。",
-        enabled: "推送新客人消息",
-        webTitle: "这台手机或电脑（优先）",
+          "在手机或电脑上接收 TATO 的通知，并选择每台设备要收哪些。iPhone 需要 iOS 16.4 以上，并先把 TATO 添加到主屏幕。",
+        enabled: "新客人消息：开启推送",
+        categoriesTitle: "这台设备接收",
+        categoriesHint: "每台设备可以分别选择。",
+        guestFallbackTitle: "新客人消息的备用渠道",
+        guestFallbackHint: "没有设备接收「新客人消息」时，改发微信，再不行发短信。打开总开关之前的旧消息不会补推。",
+        webTitle: "这台手机或电脑",
         webHint: "免费、不限条数，点通知直接打开客人消息。iPhone 需要 iOS 16.4 以上。",
-        webIosInstall: "iPhone 要先把 TATO 加到主屏幕：在 Safari 里点「分享」→「添加到主屏幕」，然后从主屏幕的 TATO 图标打开，再回到这里开启。",
+        webIosInstall:
+          "iPhone 要先把 TATO 加到主屏幕：在 Safari 里点「分享」→「添加到主屏幕」，然后从主屏幕的 TATO 图标打开，再回到这里开启。",
         webUnsupported: "这个浏览器不支持网页推送。iPhone 请用 Safari 并先添加到主屏幕；安卓请用 Chrome。",
         webNotConfigured: "服务器还没配置网页推送密钥，暂时开不了。",
         webEnable: "在这台设备上接收通知",
@@ -47,7 +59,7 @@ function copy(locale: Locale) {
         webLastOk: (when: string) => `上次送达 ${when}`,
         webNever: "还没推送过",
         webError: "上次推送失败",
-        wechatTitle: "微信（网页推送没有设备时）",
+        wechatTitle: "微信",
         wechatBind: (code: string) => `在 TATO 小程序里输入绑定码 ${code} 订阅这个频道。`,
         wechatSubscribers: (count: number) => (count === 0 ? "还没有人绑定。" : `${count} 个微信已绑定。`),
         wechatQuota: (count: number) =>
@@ -77,16 +89,24 @@ function copy(locale: Locale) {
         lastSent: (when: string) => `上次推送：${when}`,
         loadFailed: "读取设置失败。",
         close: "关闭",
+        categoriesFailed: "保存失败，请重试",
       }
     : {
-        title: "Push new messages to my phone",
+        title: "Notifications",
         intro:
-          "When a guest writes on Turo, TATO sends your phone one line after the sync files it: the guest, the car and how the message starts. Messages within 15 minutes go out together. Nothing from before you switch this on is pushed.",
-        enabled: "Push new guest messages",
-        webTitle: "This phone or computer (first)",
+          "Get TATO's notifications on your phone or computer, and choose what each device receives. iPhone needs iOS 16.4+ with TATO added to the home screen.",
+        enabled: "New guest messages: push on",
+        categoriesTitle: "This device receives",
+        categoriesHint: "Each device chooses for itself.",
+        guestFallbackTitle: "Fallback for new guest messages",
+        guestFallbackHint:
+          "When no device takes guest messages, WeChat is tried, then SMS. Nothing from before the switch was turned on is pushed.",
+        webTitle: "This phone or computer",
         webHint: "Free and unlimited; tapping the notification opens guest messages. iPhone needs iOS 16.4 or later.",
-        webIosInstall: "On iPhone, add TATO to your home screen first: in Safari tap Share → Add to Home Screen, open TATO from that icon, then come back here.",
-        webUnsupported: "This browser cannot receive web push. On iPhone use Safari and add TATO to the home screen; on Android use Chrome.",
+        webIosInstall:
+          "On iPhone, add TATO to your home screen first: in Safari tap Share → Add to Home Screen, open TATO from that icon, then come back here.",
+        webUnsupported:
+          "This browser cannot receive web push. On iPhone use Safari and add TATO to the home screen; on Android use Chrome.",
         webNotConfigured: "Web push keys are not set on the server yet.",
         webEnable: "Get notifications on this device",
         webEnabling: "Turning on…",
@@ -100,7 +120,7 @@ function copy(locale: Locale) {
         webLastOk: (when: string) => `Last delivered ${when}`,
         webNever: "Nothing sent yet",
         webError: "Last push failed",
-        wechatTitle: "WeChat (when no device is set up)",
+        wechatTitle: "WeChat",
         wechatBind: (code: string) => `In the TATO mini program, enter bind code ${code} to subscribe.`,
         wechatSubscribers: (count: number) =>
           count === 0 ? "Nobody has bound yet." : `${count} WeChat account(s) bound.`,
@@ -108,8 +128,7 @@ function copy(locale: Locale) {
           count === 0
             ? "No pushes left: the next one goes by SMS. Opening the mini program tops it up."
             : `${count} push(es) left. Opening the mini program tops it up.`,
-        wechatNoTemplate:
-          "The mini program has no alert template yet, so WeChat cannot deliver; pushes go by SMS.",
+        wechatNoTemplate: "The mini program has no alert template yet, so WeChat cannot deliver; pushes go by SMS.",
         wechatUnavailable: "The WeChat hub is not configured here; SMS only.",
         smsTitle: "SMS (when WeChat cannot deliver)",
         smsHint: "Used when nobody is bound on WeChat or the quota has run out. Charged per message.",
@@ -132,6 +151,7 @@ function copy(locale: Locale) {
         lastSent: (when: string) => `Last push: ${when}`,
         loadFailed: "Could not load the setting.",
         close: "Close",
+        categoriesFailed: "Couldn't save. Try again",
       };
 }
 
@@ -156,7 +176,15 @@ function deviceLabel() {
           : /Windows/.test(ua)
             ? "Windows"
             : "Browser";
-  const browser = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "";
+  const browser = /Edg\//.test(ua)
+    ? "Edge"
+    : /Chrome\//.test(ua)
+      ? "Chrome"
+      : /Firefox\//.test(ua)
+        ? "Firefox"
+        : /Safari\//.test(ua)
+          ? "Safari"
+          : "";
   return browser ? `${device} · ${browser}` : device;
 }
 
@@ -173,10 +201,12 @@ function pushSupport(): PushSupport {
 }
 
 /**
- * Where the operator turns guest-message pushes on, binds WeChat and
- * sets the SMS fallback. See lib/guest-message-push.
+ * The notifications section of the settings page: turn this device on,
+ * choose per device which kinds of notification it receives (see
+ * lib/notifications), and the WeChat / SMS fallback for guest messages
+ * (lib/guest-message-push). Mounted by the account settings page.
  */
-export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; onClose: () => void }) {
+export function NotificationSettings({ locale }: { locale: Locale }) {
   const t = useMemo(() => copy(locale), [locale]);
   const [status, setStatus] = useState<Status | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -229,7 +259,10 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
       const response = await fetch("/api/messages/push/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription: subscription.toJSON(), label: deviceLabel() }),
+        body: JSON.stringify({
+          subscription: subscription.toJSON(),
+          label: deviceLabel(),
+        }),
       });
       if (!response.ok) throw new Error(String(response.status));
       setThisEndpoint(subscription.endpoint);
@@ -241,7 +274,10 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
         await fetch("/api/messages/alerts", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ enabled: true, smsPhone: smsPhone.trim() || null }),
+          body: JSON.stringify({
+            enabled: true,
+            smsPhone: smsPhone.trim() || null,
+          }),
         });
       }
       await refreshStatus();
@@ -288,13 +324,39 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
     };
   }, [t]);
 
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+  const [categoriesFailed, setCategoriesFailed] = useState(false);
+  async function toggleCategory(
+    device: { id: string; categories: NotificationCategory[] },
+    category: NotificationCategory,
+  ) {
+    const next = device.categories.includes(category)
+      ? device.categories.filter((value) => value !== category)
+      : [...device.categories, category];
+    // Shown at once; put back if the server says no.
+    setStatus((current) =>
+      current
+        ? {
+            ...current,
+            web: {
+              ...current.web,
+              devices: current.web.devices.map((item) =>
+                item.id === device.id ? { ...item, categories: next } : item,
+              ),
+            },
+          }
+        : current,
+    );
+    setCategoriesFailed(false);
+    const response = await fetch("/api/messages/push/subscribe", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: device.id, categories: next }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setCategoriesFailed(true);
+      await refreshStatus();
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }
 
   async function save() {
     setSaving(true);
@@ -305,7 +367,9 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled, smsPhone: smsPhone.trim() || null }),
       });
-      const data = (await response.json().catch(() => ({}))) as Status & { error?: string };
+      const data = (await response.json().catch(() => ({}))) as Status & {
+        error?: string;
+      };
       if (!response.ok) {
         setError(data.error === "INVALID_PHONE" ? t.invalidPhone : t.loadFailed);
         return;
@@ -323,8 +387,13 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
     setTestMessage(null);
     try {
       const response = await fetch("/api/messages/alerts", { method: "POST" });
-      const data = (await response.json().catch(() => ({}))) as { via?: string; reason?: string };
-      setTestMessage(`${t.testResult(data.via ?? "none")}${data.via === "none" || !data.via ? ` ${data.reason ?? ""}` : ""}`);
+      const data = (await response.json().catch(() => ({}))) as {
+        via?: string;
+        reason?: string;
+      };
+      setTestMessage(
+        `${t.testResult(data.via ?? "none")}${data.via === "none" || !data.via ? ` ${data.reason ?? ""}` : ""}`,
+      );
     } finally {
       setTesting(false);
     }
@@ -332,90 +401,65 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
 
   const wechat = status?.wechat ?? null;
 
+  const thisDevice = status?.web.devices.find((device) => device.endpoint === thisEndpoint) ?? null;
+
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center sm:p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="guest-alert-title"
+    <section
+      id="notifications"
+      className="scroll-mt-20 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4"
     >
-      <div
-        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] shadow-[0_28px_70px_-28px_rgba(17,19,24,0.55)] sm:w-[min(32rem,calc(100vw-2rem))] sm:rounded-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3">
-          <h3 id="guest-alert-title" className="text-[15px] font-bold text-[var(--ink)]">
-            {t.title}
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t.close}
-            className="tap-press flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink-soft)] hover:bg-[var(--surface-muted)]"
-          >
-            <X className="h-5 w-5" aria-hidden />
-          </button>
-        </div>
+      <h2 className="text-[1rem] font-semibold text-[var(--ink)]">{t.title}</h2>
+      <div className="mt-1.5 grid gap-4 text-[13px] leading-5">
+        <p className="text-[var(--ink-mid)]">{t.intro}</p>
 
-        <div className="grid gap-4 px-4 py-4 text-[13px] leading-5">
-          <p className="text-[var(--ink-mid)]">{t.intro}</p>
-
-          <label className="flex items-center justify-between gap-3 rounded-lg border border-[var(--line)] px-3 py-2.5">
-            <span className="font-semibold text-[var(--ink)]">{t.enabled}</span>
-            <input
-              id="guest-alert-enabled"
-              type="checkbox"
-              checked={enabled}
-              onChange={(event) => setEnabled(event.target.checked)}
-              className="h-5 w-5 accent-[var(--brand)]"
-            />
-          </label>
-
-          <section className="grid gap-1.5">
-            <h4 className="text-[12px] font-bold text-[var(--ink)]">{t.webTitle}</h4>
-            <p className="text-[var(--ink-soft)]">{t.webHint}</p>
-            {!status ? null : !status.web.configured ? (
-              <p className="text-amber-800">{t.webNotConfigured}</p>
-            ) : support === "ios-install" ? (
-              <p className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-[var(--ink-mid)]">{t.webIosInstall}</p>
-            ) : support === "unsupported" ? (
-              <p className="text-amber-800">{t.webUnsupported}</p>
-            ) : support === "ok" ? (
-              <div>
-                {thisEndpoint && status.web.devices.some((device) => device.endpoint === thisEndpoint) ? (
-                  <p className="font-semibold text-[var(--ok-fg)]">{t.webOn}</p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void enableThisDevice()}
-                    disabled={webBusy}
-                    className="tap-press h-10 rounded-full bg-[var(--brand)] px-4 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
-                  >
-                    {webBusy ? t.webEnabling : t.webEnable}
-                  </button>
-                )}
-              </div>
-            ) : null}
-            {webMessage && webMessage !== t.webOn ? <p className="text-[var(--ink-mid)]">{webMessage}</p> : null}
-            {status && status.web.devices.length > 0 ? (
-              <ul className="mt-1 grid gap-1">
-                <li className="text-[11.5px] font-semibold text-[var(--ink-soft)]">{t.webDevices}</li>
-                {status.web.devices.map((device) => (
-                  <li
-                    key={device.id}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-[var(--line)] px-3 py-1.5"
-                  >
+        <section className="grid gap-1.5">
+          <h4 className="text-[12px] font-bold text-[var(--ink)]">{t.webTitle}</h4>
+          <p className="text-[var(--ink-soft)]">{t.webHint}</p>
+          {!status ? null : !status.web.configured ? (
+            <p className="text-amber-800">{t.webNotConfigured}</p>
+          ) : support === "ios-install" ? (
+            <p className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-[var(--ink-mid)]">{t.webIosInstall}</p>
+          ) : support === "unsupported" ? (
+            <p className="text-amber-800">{t.webUnsupported}</p>
+          ) : support === "ok" ? (
+            <div>
+              {thisEndpoint && status.web.devices.some((device) => device.endpoint === thisEndpoint) ? (
+                <p className="font-semibold text-[var(--ok-fg)]">{t.webOn}</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void enableThisDevice()}
+                  disabled={webBusy}
+                  className="tap-press h-10 rounded-full bg-[var(--brand)] px-4 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {webBusy ? t.webEnabling : t.webEnable}
+                </button>
+              )}
+            </div>
+          ) : null}
+          {webMessage && webMessage !== t.webOn ? <p className="text-[var(--ink-mid)]">{webMessage}</p> : null}
+          {status && status.web.devices.length > 0 ? (
+            <ul className="mt-1 grid gap-1">
+              <li className="text-[11.5px] font-semibold text-[var(--ink-soft)]">
+                {t.webDevices} · {t.categoriesHint}
+              </li>
+              {status.web.devices.map((device) => (
+                <li key={device.id} className="grid gap-1.5 rounded-lg border border-[var(--line)] px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="min-w-0">
                       <span className="block truncate text-[13px] text-[var(--ink)]">
                         {device.label ?? "Browser"}
                         {device.endpoint === thisEndpoint ? t.webThisDevice : ""}
                       </span>
-                      <span className={`block text-[11px] ${device.lastError ? "text-amber-800" : "text-[var(--ink-soft)]"}`}>
+                      <span
+                        className={`block text-[11px] ${device.lastError ? "text-amber-800" : "text-[var(--ink-soft)]"}`}
+                      >
                         {device.lastError
                           ? t.webError
                           : device.lastSuccessAt
-                            ? t.webLastOk(new Date(device.lastSuccessAt).toLocaleString(locale === "en" ? "en-CA" : "zh-CN"))
+                            ? t.webLastOk(
+                                new Date(device.lastSuccessAt).toLocaleString(locale === "en" ? "en-CA" : "zh-CN"),
+                              )
                             : t.webNever}
                       </span>
                     </span>
@@ -427,11 +471,63 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
                     >
                       {t.webRemove}
                     </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </section>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label={t.categoriesTitle}>
+                    {NOTIFICATION_CATEGORIES.map((category) => {
+                      const on = device.categories.includes(category.key);
+                      return (
+                        <button
+                          key={category.key}
+                          type="button"
+                          role="switch"
+                          aria-checked={on}
+                          title={locale === "en" ? category.enHint : category.zhHint}
+                          onClick={() => void toggleCategory(device, category.key)}
+                          className={`tap-press tap-compact hit-area rounded-full border px-2.5 py-1 text-[12px] font-semibold transition ${
+                            on
+                              ? "border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]"
+                              : "border-[var(--line)] text-[var(--ink-soft)]"
+                          }`}
+                        >
+                          {on ? "✓ " : ""}
+                          {locale === "en" ? category.en : category.zh}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {categoriesFailed ? <p className="text-[var(--bad-fg)]">{t.categoriesFailed}</p> : null}
+          {status && status.web.devices.length > 0 ? (
+            <ul className="grid gap-0.5 text-[11.5px] text-[var(--ink-soft)]">
+              {NOTIFICATION_CATEGORIES.map((category) => (
+                <li key={category.key}>
+                  <span className="font-semibold text-[var(--ink-mid)]">
+                    {locale === "en" ? category.en : category.zh}
+                  </span>
+                  {"："}
+                  {locale === "en" ? category.enHint : category.zhHint}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+
+        <div className="grid gap-3 border-t border-[var(--line)] pt-3">
+          <h3 className="text-[13px] font-bold text-[var(--ink)]">{t.guestFallbackTitle}</h3>
+          <p className="-mt-2 text-[var(--ink-soft)]">{t.guestFallbackHint}</p>
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-[var(--line)] px-3 py-2.5">
+            <span className="font-semibold text-[var(--ink)]">{t.enabled}</span>
+            <input
+              id="guest-alert-enabled"
+              type="checkbox"
+              checked={enabled}
+              onChange={(event) => setEnabled(event.target.checked)}
+              className="h-5 w-5 accent-[var(--brand)]"
+            />
+          </label>
 
           <section className="grid gap-1.5">
             <h4 className="text-[12px] font-bold text-[var(--ink)]">{t.wechatTitle}</h4>
@@ -496,6 +592,6 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

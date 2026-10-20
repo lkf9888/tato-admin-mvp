@@ -2,6 +2,7 @@ import "server-only";
 
 import webpush from "web-push";
 
+import { ALL_CATEGORIES, parseCategories, type NotificationCategory } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -89,11 +90,32 @@ export async function removeSubscription(workspaceId: string, where: { endpoint?
 }
 
 export async function listSubscriptions(workspaceId: string) {
-  return prisma.webPushSubscription.findMany({
+  const rows = await prisma.webPushSubscription.findMany({
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, endpoint: true, label: true, createdAt: true, lastSuccessAt: true, lastError: true },
+    select: { id: true, endpoint: true, label: true, categories: true, createdAt: true, lastSuccessAt: true, lastError: true },
   });
+  return rows.map((row) => ({ ...row, categories: parseCategories(row.categories) }));
+}
+
+/** Which categories one device receives. All of them stores null, so a
+ *  category added later reaches it too. */
+export async function setSubscriptionCategories(workspaceId: string, id: string, categories: NotificationCategory[]) {
+  const unique = [...new Set(categories)];
+  const all = ALL_CATEGORIES.every((category) => unique.includes(category));
+  const { count } = await prisma.webPushSubscription.updateMany({
+    where: { workspaceId, id },
+    data: { categories: all ? null : JSON.stringify(unique) },
+  });
+  return count > 0;
+}
+
+/**
+ * Send one category's notification to every device that wants it.
+ * The entry point for anything new that should reach the phone.
+ */
+export async function notifyCategory(workspaceId: string, category: NotificationCategory, payload: WebPushPayload) {
+  return sendWebPush(workspaceId, payload, category);
 }
 
 /**
@@ -101,9 +123,11 @@ export async function listSubscriptions(workspaceId: string) {
  * `sent` is how many browsers accepted it; a subscription the push
  * service says is gone (404/410) is deleted on the spot.
  */
-export async function sendWebPush(workspaceId: string, payload: WebPushPayload) {
+export async function sendWebPush(workspaceId: string, payload: WebPushPayload, category?: NotificationCategory) {
   if (!configure()) return { sent: 0, failed: 0, reason: "not_configured" as const };
-  const subscriptions = await prisma.webPushSubscription.findMany({ where: { workspaceId } });
+  const subscriptions = (await prisma.webPushSubscription.findMany({ where: { workspaceId } })).filter(
+    (subscription) => !category || parseCategories(subscription.categories).includes(category),
+  );
   if (subscriptions.length === 0) return { sent: 0, failed: 0, reason: "no_subscription" as const };
 
   const body = JSON.stringify(payload);

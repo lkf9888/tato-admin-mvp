@@ -10,6 +10,7 @@ import { kimiExtractJson, isKimiConfigured,
   getExtractionModel,
 } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
+import { notifyCategory } from "@/lib/web-push";
 import { pushNewGuestMessages } from "@/lib/guest-message-push";
 import { applyTuroEmailsToOrders, type ApplyOutcome } from "@/lib/turo-email-apply";
 import {
@@ -488,11 +489,19 @@ export async function runGmailSync(input: {
   // Now it reads: file the new mail, turn booking mail into orders,
   // then heal anything still unattributed. A booking and a message in
   // the same batch resolve in the same run.
+  const applyStartedAt = new Date();
   result.orders = await applyTuroEmailsToOrders({
     workspaceId: input.workspaceId,
     apply: true,
     actor: "turo-email-sync",
   });
+  // A booking that arrived, or a trip cancelled, is news for the phone.
+  // Never throws: a notification is not worth failing the sync for.
+  if (result.orders.created > 0 || result.orders.updated > 0) {
+    await notifyBookingChanges(input.workspaceId, applyStartedAt).catch((error) =>
+      console.error("[gmail-inbox] booking notification failed", error),
+    );
+  }
 
   // Rows imported while the model was failing all landed as OTHER,
   // which made the guest-message alert detector -- it selects on kind
@@ -811,6 +820,135 @@ async function ingestMailbox(input: {
     await client.logout().catch(() => null);
   }
 
+}
+
+/** A subject with the guest, car and numbers taken out, for grouping. */
+function subjectPattern(subject: string) {
+  return subject
+    .replace(/^\([^)]*\)\s*[-–—]\s*/, "")
+    .replace(/^(?:re|fwd?|fw)\s*:\s*/i, "Re: ")
+    .replace(/^(Re: )?.+?(?=['’]s trip| has | is (?:booked|requesting|on)| wants | needs | left you| rated)/i, "$1{name}")
+    .replace(/\byour (?!earnings|vehicle swap|account|trip|listing|car's)[A-Z][^,.!?]*?(?= (?:is|has|was|were|for)\b|[,.!?]|$)/, "your {car}")
+    .replace(/\d[\d,.\-:/]*/g, "#")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 90);
+}
+
+/**
+ * What Turo mail is still sitting in the inbox, grouped by kind and
+ * subject shape: the read-only survey before deciding which of it to
+ * fold into notifications and clear. Envelopes only; nothing is moved.
+ */
+export async function censusMailbox(workspaceId: string) {
+  const config = getGmailConfig();
+  if (!config.user || !config.password) throw new GmailInboxError("Gmail is not configured", "GMAIL_NOT_CONFIGURED", 400);
+  const client = new ImapFlow({
+    host: config.host,
+    port: config.port,
+    secure: true,
+    auth: { user: config.user, pass: config.password },
+    logger: false,
+  });
+  await client.connect();
+  const stored = new Set(
+    (await prisma.inboundEmail.findMany({ where: { workspaceId }, select: { messageId: true } })).map((row) => row.messageId),
+  );
+  const groups = new Map<
+    string,
+    { kind: string; pattern: string; count: number; inTato: number; oldest: string; newest: string; examples: string[]; senders: Set<string> }
+  >();
+  let total = 0;
+  const lock = await client.getMailboxLock(config.mailbox);
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - HISTORY_LOOKBACK_DAYS);
+    const senderTerms = config.allowedSenders.map((sender) => ({ from: sender }));
+    const uids = await client.search(
+      { since, ...(senderTerms.length === 1 ? senderTerms[0] : { or: senderTerms }) },
+      { uid: true },
+    );
+    for (let start = 0; start < (uids || []).length; start += 2000) {
+      const window = (uids || []).slice(start, start + 2000);
+      for await (const message of client.fetch(window, { uid: true, envelope: true }, { uid: true })) {
+        const subject = message.envelope?.subject ?? "";
+        const kind = classifyTuroSubject(subject)?.kind ?? "UNCLASSIFIED";
+        const pattern = subjectPattern(subject);
+        const key = `${kind}|${pattern}`;
+        const date = (message.envelope?.date ?? new Date(0)).toISOString().slice(0, 10);
+        const group =
+          groups.get(key) ??
+          { kind, pattern, count: 0, inTato: 0, oldest: date, newest: date, examples: [], senders: new Set<string>() };
+        group.count += 1;
+        if (message.envelope?.messageId && stored.has(message.envelope.messageId.trim())) group.inTato += 1;
+        if (date < group.oldest) group.oldest = date;
+        if (date > group.newest) group.newest = date;
+        if (group.examples.length < 2 && !group.examples.includes(subject)) group.examples.push(subject.slice(0, 120));
+        const from = message.envelope?.from?.[0]?.address?.toLowerCase();
+        if (from) group.senders.add(from);
+        groups.set(key, group);
+        total += 1;
+      }
+    }
+  } finally {
+    lock.release();
+    await client.logout().catch(() => null);
+  }
+  const list = [...groups.values()]
+    .map((group) => ({ ...group, senders: [...group.senders].slice(0, 3) }))
+    .sort((a, b) => b.count - a.count);
+  const byKind: Record<string, number> = {};
+  for (const group of list) byKind[group.kind] = (byKind[group.kind] ?? 0) + group.count;
+  return { total, byKind, groups: list.slice(0, 80), groupCount: list.length };
+}
+
+/** New and cancelled Turo trips since `since`, as one notification. */
+async function notifyBookingChanges(workspaceId: string, since: Date) {
+  const select = {
+    renterName: true,
+    pickupDatetime: true,
+    vehicle: { select: { brand: true, model: true, plateNumber: true } },
+  } as const;
+  const [created, cancelled] = await Promise.all([
+    prisma.order.findMany({
+      where: { workspaceId, createdAt: { gte: since }, isArchived: false, status: { not: "cancelled" } },
+      select,
+      orderBy: { pickupDatetime: "asc" },
+      take: 10,
+    }),
+    prisma.order.findMany({
+      where: { workspaceId, updatedAt: { gte: since }, createdAt: { lt: since }, status: "cancelled" },
+      select,
+      orderBy: { pickupDatetime: "asc" },
+      take: 10,
+    }),
+  ]);
+  if (created.length === 0 && cancelled.length === 0) return;
+  const when = (date: Date) =>
+    new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "America/Vancouver",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date);
+  const line = (order: (typeof created)[number]) =>
+    `${order.renterName}${order.vehicle ? ` · ${order.vehicle.brand} ${order.vehicle.model} ${order.vehicle.plateNumber}` : ""} · ${when(order.pickupDatetime)}`;
+  const title =
+    created.length > 0 && cancelled.length > 0
+      ? `${created.length} 个新预订，${cancelled.length} 个取消`
+      : created.length > 0
+        ? created.length === 1
+          ? "新预订"
+          : `${created.length} 个新预订`
+        : cancelled.length === 1
+          ? "预订已取消"
+          : `${cancelled.length} 个预订取消`;
+  const body = [...created.map((order) => `新 ${line(order)}`), ...cancelled.map((order) => `取消 ${line(order)}`)]
+    .slice(0, 4)
+    .join("\n");
+  await notifyCategory(workspaceId, "bookings", { title, body, url: "/calendar", tag: "bookings" });
 }
 
 /**

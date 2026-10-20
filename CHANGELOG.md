@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.82.0 - 2026-10-20
+
+### Notifications are set on the settings page, per device and per kind
+
+- The push controls moved from the messages page's bell (now a link) to a 通知 section on the settings page (`components/notification-settings.tsx`, mounted by the settings page): turn this device on, then for each subscribed device choose which kinds it receives -- 新客人消息, 预订变动, 运营提醒, 员工任务 (`lib/notifications.ts`). The choice is per device (`WebPushSubscription.categories`, new, nullable; null means every kind, later ones included), so a phone can take guest messages while the office computer takes everything. The WeChat / SMS fallback for guest messages sits below as before.
+- `notifyCategory(workspaceId, category, payload)` in `lib/web-push` sends to the devices that chose a kind. Wired now: guest messages; new and cancelled Turo bookings found by the Gmail sync (one notification per run, linking to the calendar); and the scheduled alert scan's warning and critical alerts, alongside the email digest. Staff-task events are the operations side's to call.
+- A read-only `/api/gmail-sync/census` (admin) groups the Turo mail still in the inbox by kind and subject shape, with how much of each TATO already has: the survey before deciding which of it to fold into notifications and clear.
+
 ## v1.81.0 - 2026-10-20
 
 ### New guest messages arrive as phone notifications, iPhone included

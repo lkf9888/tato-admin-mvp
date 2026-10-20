@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
-import { removeSubscription, saveSubscription } from "@/lib/web-push";
+import { isNotificationCategory, type NotificationCategory } from "@/lib/notifications";
+import { removeSubscription, saveSubscription, setSubscriptionCategories } from "@/lib/web-push";
 
 export const runtime = "nodejs";
 
@@ -51,5 +52,23 @@ export async function DELETE(request: Request) {
     .safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
   await removeSubscription(context.workspace.id, parsed.data.endpoint ? { endpoint: parsed.data.endpoint } : { id: parsed.data.id });
+  return NextResponse.json({ ok: true });
+}
+
+/** Choose which kinds of notification one device receives. */
+export async function PATCH(request: Request) {
+  let context;
+  try {
+    context = await requireCurrentAdminContext();
+  } catch {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  const parsed = z
+    .object({ id: z.string().min(1).max(60), categories: z.array(z.string().max(40)).max(20) })
+    .safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "VALIDATION_ERROR" }, { status: 400 });
+  const categories = parsed.data.categories.filter((value): value is NotificationCategory => isNotificationCategory(value));
+  const found = await setSubscriptionCategories(context.workspace.id, parsed.data.id, categories);
+  if (!found) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

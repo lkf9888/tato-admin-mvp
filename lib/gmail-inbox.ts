@@ -98,9 +98,50 @@ export function getGmailConfig() {
   };
 }
 
+export type TuroMailbox = ReturnType<typeof getGmailConfig> & {
+  /** "gmail" for the primary inbox, "mailbox2" for the second. */
+  key: string;
+  /** The Turo account this inbox belongs to, for mail that names none.
+   *  Null is the main account (the primary inbox). */
+  turoAccount: string | null;
+  primary: boolean;
+};
+
+/**
+ * Every inbox Turo mail arrives in.
+ *
+ * The primary is the operator's own Gmail (GMAIL_IMAP_*). A second
+ * inbox belongs to a co-hosted account -- Kevin's Yahoo -- whose own
+ * Turo mail (support, claims, invoices, payouts) reaches nobody else:
+ *   MAILBOX2_IMAP_USER, MAILBOX2_IMAP_PASSWORD (an app password),
+ *   MAILBOX2_IMAP_HOST (default imap.mail.yahoo.com), MAILBOX2_IMAP_PORT,
+ *   MAILBOX2_TURO_ACCOUNT (the account key on its cars, e.g. "kevin").
+ */
+export function getMailboxes(): TuroMailbox[] {
+  const boxes: TuroMailbox[] = [];
+  const primary = getGmailConfig();
+  if (primary.user && primary.password) boxes.push({ ...primary, key: "gmail", turoAccount: null, primary: true });
+  const user = process.env.MAILBOX2_IMAP_USER?.trim() || "";
+  const password = (process.env.MAILBOX2_IMAP_PASSWORD ?? "").replace(/\s+/g, "");
+  if (user && password) {
+    const port = Number.parseInt(process.env.MAILBOX2_IMAP_PORT?.trim() || "993", 10);
+    boxes.push({
+      key: "mailbox2",
+      user,
+      password,
+      host: process.env.MAILBOX2_IMAP_HOST?.trim() || "imap.mail.yahoo.com",
+      port: Number.isFinite(port) ? port : 993,
+      mailbox: DEFAULT_MAILBOX,
+      allowedSenders: primary.allowedSenders,
+      turoAccount: process.env.MAILBOX2_TURO_ACCOUNT?.trim().toLowerCase() || null,
+      primary: false,
+    });
+  }
+  return boxes;
+}
+
 export function isGmailInboxConfigured() {
-  const config = getGmailConfig();
-  return Boolean(config.user && config.password);
+  return getMailboxes().length > 0;
 }
 
 function getLookbackDays() {
@@ -272,6 +313,8 @@ export type GmailSyncResult = {
   trashed?: number;
   /** Support and claim emails moved under the "Turo客服" label this run. */
   archived?: number;
+  /** A secondary inbox that could not be read this run, and why. */
+  mailboxErrors?: string[];
   /** History run: old guest messages still to import after this one.
    *  Zero means the history is all in. */
   historyRemaining?: number;
@@ -307,14 +350,17 @@ async function attributeEmail(input: {
   bodyText: string;
   receivedAt: Date;
   fleet: VehicleForMatch[];
+  /** The account of the inbox it came from, for a subject that names
+   *  none: Kevin's own mail carries no "(kevin's vehicles)" prefix. */
+  defaultAccount?: string | null;
 }) {
   const bySubject = classifyTuroSubject(input.subject);
   const turoLink = extractTuroLink(input.bodyText);
   const guestText = extractGuestMessageText(input.bodyText, input.subject);
+  const account = bySubject?.coHostAccount ?? input.defaultAccount ?? null;
 
   const matchedVehicles = bySubject?.vehicleText
-    ? matchVehiclesForEmail(bySubject.vehicleText, input.fleet, bySubject.coHostAccount ?? null)
-        .matches
+    ? matchVehiclesForEmail(bySubject.vehicleText, input.fleet, account).matches
     : [];
 
   // One vehicle is an identification; several is only a narrowing, and
@@ -360,7 +406,7 @@ async function attributeEmail(input: {
     kind: bySubject?.kind ?? InboundEmailKind.OTHER,
     guestName: bySubject?.guestName ?? null,
     guestText,
-    turoAccount: bySubject?.coHostAccount ?? null,
+    turoAccount: account,
     vehicleId,
     turoLink,
     orderId,
@@ -408,8 +454,8 @@ export async function runGmailSync(input: {
   history?: boolean;
 }): Promise<GmailSyncResult> {
   const mode = input.mode ?? "full";
-  const config = getGmailConfig();
-  if (!config.user || !config.password) {
+  const mailboxes = getMailboxes();
+  if (mailboxes.length === 0) {
     throw new GmailInboxError(
       "Set GMAIL_IMAP_USER and GMAIL_IMAP_PASSWORD (a Gmail App Password) before syncing the Turo inbox.",
       "GMAIL_NOT_CONFIGURED",
@@ -465,15 +511,27 @@ export async function runGmailSync(input: {
   }
 
   if (mode !== "enrich" && historyAllowed) {
-    await ingestMailbox({
-      workspaceId: input.workspaceId,
-      lookbackDays: input.lookbackDays,
-      maxMessages: input.maxMessages,
-      history: input.history,
-      config,
-      fleet,
-      result,
-    });
+    // One inbox failing (a revoked app password) must not stop the
+    // others: the primary is where guests write.
+    for (const config of mailboxes) {
+      try {
+        await ingestMailbox({
+          workspaceId: input.workspaceId,
+          lookbackDays: input.lookbackDays,
+          maxMessages: input.maxMessages,
+          history: input.history,
+          config,
+          fleet,
+          result,
+        });
+      } catch (error) {
+        if (config.primary) throw error;
+        result.mailboxErrors = [
+          ...(result.mailboxErrors ?? []),
+          `${config.key}: ${error instanceof Error ? error.message : String(error)}`.slice(0, 200),
+        ];
+      }
+    }
   }
 
   // Order of these three is the whole point, and it used to be wrong.
@@ -612,7 +670,7 @@ async function ingestMailbox(input: {
   maxMessages?: number;
   /** The history run: see `runGmailSync`. */
   history?: boolean;
-  config: ReturnType<typeof getGmailConfig>;
+  config: TuroMailbox;
   fleet: VehicleForMatch[];
   result: GmailSyncResult;
 }) {
@@ -808,7 +866,47 @@ async function ingestMailbox(input: {
           bodyText,
           receivedAt,
           fleet,
+          defaultAccount: config.turoAccount,
         });
+
+        // A co-hosted account's own inbox repeats what the primary
+        // already gets as the co-host's copy -- "(kevin's vehicles) - ..."
+        // -- for bookings and guest messages. Bookings from here are not
+        // stored: the booking fold places a trip by the subject's account,
+        // and this inbox's subjects name none. Guest messages are stored
+        // only when the primary's copy is not already there.
+        if (!config.primary) {
+          const bookingKind =
+            attribution.kind === InboundEmailKind.BOOKING_CREATED ||
+            attribution.kind === InboundEmailKind.BOOKING_MODIFIED ||
+            attribution.kind === InboundEmailKind.BOOKING_CANCELLED ||
+            attribution.kind === InboundEmailKind.TRIP_STARTED ||
+            attribution.kind === InboundEmailKind.TRIP_ENDED;
+          let copyExists = false;
+          if (attribution.kind === InboundEmailKind.GUEST_MESSAGE && attribution.guestName) {
+            copyExists = Boolean(
+              await prisma.inboundEmail.findFirst({
+                where: {
+                  workspaceId: input.workspaceId,
+                  kind: InboundEmailKind.GUEST_MESSAGE,
+                  guestName: attribution.guestName,
+                  receivedAt: {
+                    gte: new Date(receivedAt.getTime() - 15 * 60_000),
+                    lte: new Date(receivedAt.getTime() + 15 * 60_000),
+                  },
+                  ...(attribution.guestText ? { guestText: attribution.guestText } : {}),
+                },
+                select: { id: true },
+              }),
+            );
+          }
+          if (bookingKind || copyExists) {
+            result.skippedDuplicate += 1;
+            // Cleared once the primary has had time to store its copy.
+            if (Date.now() - receivedAt.getTime() > CLEANUP_MIN_AGE_MS) toTrash.push(message.uid);
+            continue;
+          }
+        }
 
         // Two runs overlapping, or an id that arrived after the pre-load,
         // both land here as a unique violation. That is a duplicate, not
@@ -928,9 +1026,29 @@ const CLEANUP_MIN_AGE_MS = 2 * 24 * 3_600_000;
  * `remaining` is 0.
  */
 export async function cleanupMailbox(workspaceId: string) {
-  const config = getGmailConfig();
-  if (!config.user || !config.password) throw new GmailInboxError("Gmail is not configured", "GMAIL_NOT_CONFIGURED", 400);
   const startedAt = Date.now();
+  const results: Record<string, Awaited<ReturnType<typeof cleanupOneMailbox>>> = {};
+  for (const config of getMailboxes()) {
+    if (Date.now() - startedAt > CLEANUP_BUDGET_MS) break;
+    try {
+      results[config.key] = await cleanupOneMailbox(workspaceId, config, startedAt);
+    } catch (error) {
+      if (config.primary) throw error;
+      results[config.key] = { error: error instanceof Error ? error.message : String(error) } as never;
+    }
+  }
+  const all = Object.values(results).filter((item) => item && "scanned" in item);
+  return {
+    scanned: all.reduce((sum, item) => sum + item.scanned, 0),
+    trashed: all.reduce((sum, item) => sum + item.trashed, 0),
+    archived: all.reduce((sum, item) => sum + item.archived, 0),
+    kept: all.reduce((sum, item) => sum + item.kept, 0),
+    remaining: all.reduce((sum, item) => sum + item.remaining, 0),
+    mailboxes: results,
+  };
+}
+
+async function cleanupOneMailbox(workspaceId: string, config: TuroMailbox, startedAt: number) {
   const client = new ImapFlow({
     host: config.host,
     port: config.port,
@@ -1010,9 +1128,9 @@ function subjectPattern(subject: string) {
  * subject shape: the read-only survey before deciding which of it to
  * fold into notifications and clear. Envelopes only; nothing is moved.
  */
-export async function censusMailbox(workspaceId: string) {
-  const config = getGmailConfig();
-  if (!config.user || !config.password) throw new GmailInboxError("Gmail is not configured", "GMAIL_NOT_CONFIGURED", 400);
+export async function censusMailbox(workspaceId: string, mailboxKey = "gmail") {
+  const config = getMailboxes().find((box) => box.key === mailboxKey);
+  if (!config) throw new GmailInboxError(`Mailbox ${mailboxKey} is not configured`, "GMAIL_NOT_CONFIGURED", 400);
   const client = new ImapFlow({
     host: config.host,
     port: config.port,
@@ -1358,6 +1476,7 @@ async function reclassifyBySubject(workspaceId: string, fleet: VehicleForMatch[]
       bodyText: email.bodyText ?? "",
       receivedAt: email.receivedAt,
       fleet,
+      defaultAccount: email.turoAccount,
     });
 
     const data: {

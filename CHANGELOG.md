@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.0 - 2026-10-20
+
+### Kevin's Yahoo inbox is read and kept tidy too
+
+A second inbox can now be synced alongside the primary Gmail: `MAILBOX2_IMAP_USER`, `MAILBOX2_IMAP_PASSWORD` (an app password), `MAILBOX2_IMAP_HOST` (default imap.mail.yahoo.com) and `MAILBOX2_TURO_ACCOUNT` -- set for tungstenrental@yahoo.com, Kevin's own Turo account. His support, claim, invoice, payout and to-do mail reaches nobody else, so it is stored, attributed to his cars (a subject with no "(kevin's vehicles)" prefix now takes the inbox's account, here and when stored rows are re-attributed), pushed by kind and cleared or filed under the inbox's own "Turo客服" folder by the same rules. What the primary already gets as the co-host's copy is not doubled: bookings and trip mail from his inbox are not stored (the booking fold places trips by the subject's account, and these name none) and are cleared after two days; a guest message is stored only when the primary has no message from that guest with the same words within fifteen minutes. A failing second inbox is reported in the sync result and never stops the primary. The census takes `?mailbox=mailbox2`, and cleanup goes through every inbox.
+
 ## v1.85.1 - 2026-10-20
 
 ### The reply box fits a phone, and the last Turo mail kinds have rules

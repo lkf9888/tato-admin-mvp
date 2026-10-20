@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import { AccountLoginSecurity } from "@/components/account-login-security";
 import { AppInstallGuide } from "@/components/app-install-guide";
+import { NotificationSettings } from "@/components/notification-settings";
+import { ScrollToHash } from "@/components/scroll-to-hash";
 import {
   updateAccountProfileAction,
   updateStripePayoutBindingAction,
@@ -209,6 +211,9 @@ export default async function AccountSettingsPage({
         </SettingsCard>
         ) : null}
       </div>
+
+      <NotificationSettings locale={locale} />
+      <ScrollToHash />
 
       {team ? (
         <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3 sm:px-4">

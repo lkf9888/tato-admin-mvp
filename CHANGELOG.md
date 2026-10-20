@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.83.0 - 2026-10-20
+
+### Notifications have their place on the settings page, and staff photos notify you
+
+Follows v1.82.0, which moved the notification settings out of the messages page's bell and let each device choose what it receives.
+
+- Settings shows the Notifications section above Team members. The bell on the messages page links to `/account-settings#notifications` and now lands on that section: on a client-side navigation Next writes the hash only after the page's effects, so a small `ScrollToHash` reads it a frame later.
+- Staff tasks notify: when staff upload photos to a task from their staff link or the iOS staff app, devices that take "Staff tasks" get "<name> 上传了 N 张照片 · <task>", with the plate and renter, opening the staff schedule. The wording lives once in `lib/staff-activity-push.ts` (`pushStaffActivity`), which also takes completed, updated, handed back and cancelled for the task routes to call through the admin notifier. Notifications for one task replace each other; two tasks stay two. Nothing an admin does in TATO is announced.
+- Help: Account Settings has a Notifications section -- turning a device on, iPhone's home-screen requirement, choosing kinds per device, the WeChat and SMS fallback.
+
 ## v1.82.0 - 2026-10-20
 
 ### Notifications are set on the settings page, per device and per kind

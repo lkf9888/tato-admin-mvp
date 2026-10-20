@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 
 import { logActivity } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { pushStaffActivity } from "@/lib/staff-activity-push";
 import { findSharedStaffTask, staffShareTaskAttachmentUrl } from "@/lib/staff-share";
 import { checkUploadLimits, isImageAttachment, makeStaffTaskAttachmentPath, resolveUploadPath, sanitizeFilename } from "@/lib/uploads";
 
@@ -76,6 +77,14 @@ export async function POST(request: NextRequest, { params }: { params: Params })
       taskId: context.task.id,
       files: created.map((attachment) => attachment.filename),
     },
+  });
+
+  pushStaffActivity({
+    workspaceId: context.staff.workspaceId,
+    staffName: context.staff.name,
+    task: context.task,
+    activity: "photos",
+    photoCount: created.length,
   });
 
   revalidatePath(`/staff-share/${token}`);

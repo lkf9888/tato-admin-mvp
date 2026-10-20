@@ -771,7 +771,7 @@ export const guides: Guide[] = [
   {
     key: "account-settings",
     title: "Account Settings",
-    summary: "Company profile, sign-in and security, team members, the activity log and trash, API tokens, and TATO on your phone.",
+    summary: "Company profile, sign-in and security, notifications, team members, the activity log and trash, API tokens, and TATO on your phone.",
     sections: [
       {
         heading: "Company profile, sign-in and security",
@@ -780,6 +780,15 @@ export const guides: Guide[] = [
           "Change the company name and login display name; Save profile.",
           "To change the login email, press Change email, enter the new address and your current password, and Send code; then type the 6-digit code that arrives at the new address and press Change email. The code lasts 10 minutes.",
           "To change the password, enter the current one and the new one twice (8 characters or more); Update password.",
+        ],
+      },
+      {
+        heading: "Notifications",
+        steps: [
+          "Open this page on the phone or computer that should be notified, press Get notifications on this device, and allow it when the browser asks. An iPhone needs iOS 16.4 or later, with TATO added to the home screen and opened from there (see installing the app below).",
+          "Under Devices, tick for each device what it receives: new guest messages, booking changes, operations alerts, staff tasks. A phone can take guest messages only while the office computer takes everything.",
+          "Staff tasks notify you when staff finish, change or hand back a task, or upload photos, from their task page or app; what you do yourself in TATO does not.",
+          "When no device takes new guest messages, they go by WeChat, then text, set under Fallback for new guest messages in the same section; the test button sends one now.",
         ],
       },
       {

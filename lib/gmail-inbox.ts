@@ -904,7 +904,10 @@ async function ingestMailbox(input: {
                     gte: new Date(receivedAt.getTime() - 15 * 60_000),
                     lte: new Date(receivedAt.getTime() + 15 * 60_000),
                   },
-                  ...(attribution.guestText ? { guestText: attribution.guestText } : {}),
+                  // Not the text: the copy's prefixed subject changes what
+                  // the extractor reads, so the same message never compared
+                  // equal and 8,284 copies were stored twice (2026-10-20).
+                  // One guest, fifteen minutes, is the same message.
                 },
                 select: { id: true },
               }),

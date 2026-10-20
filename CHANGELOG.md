@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.2 - 2026-10-20
+
+### A guest message from Kevin's inbox is recognised as SpeedX's copy by guest and time
+
+The second inbox stored a guest message only when the primary had none from that guest with the same words within fifteen minutes. The words never matched: the copy's "(SPEEDX's vehicle) - ..." subject changes what the extractor reads, so the history import stored 8,284 messages SpeedX already had. The check is now one guest within fifteen minutes, whatever the text. The duplicates were removed from the database by hand.
+
 ## v1.86.1 - 2026-10-20
 
 ### SpeedX's mail in Kevin's inbox is filed to the main account

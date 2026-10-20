@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.84.1 - 2026-10-20
+
+### The mail rules know the subjects the first cleanup left behind
+
+The backlog cleanup cleared 24,674 Turo emails and filed 2,739, leaving 2,578 no rule matched. Most were spellings the rules missed: a co-host account's "has returned Kevin's …", "You've confirmed …'s change request", "Reminder: … starts soon", "You've cancelled / Turo has canceled …'s trip", reimbursement status and cleaning or smoking reports, earnings-plan and demand-surge mail, new-device and confirmation codes. Added, along with two kinds that need the host -- "wants to book" (a booking request) and "your guest may need to cancel" -- and compliance and follow-up notices, filed with support.
+
 ## v1.84.0 - 2026-10-20
 
 ### Every kind of Turo email is notified, filed or cleared

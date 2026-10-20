@@ -31,12 +31,12 @@ type Rule = { test: RegExp } & TuroMailRule;
 
 const RULES: Rule[] = [
   { test: /has sent you a message about your/i, group: "guest", disposition: "trash", notify: null, label: "客人消息" },
-  { test: /\b(?:security|verification) code\b/i, group: "security", disposition: "trash_later", notify: null, label: "验证码" },
+  { test: /\b(?:security|verification|confirmation) code\b|new device log/i, group: "security", disposition: "trash_later", notify: null, label: "验证码" },
 
   // Support threads and claims: kept, out of the inbox. Mail-client
   // prefixes only appear on threads a person answered.
   {
-    test: /^(?:\([^)]*\)\s*[-–—]\s*)?(?:re|fwd?|fw)\s*:|\bclaim\b|relisted|ineligible vehicle|notice of|issue with your account|review (?:removal|policy)|vehicle swap|action required for your vehicle|support call|verification agent|damage reporting/i,
+    test: /^(?:\([^)]*\)\s*[-–—]\s*)?(?:re|fwd?|fw)\s*:|\bclaim\b|relisted|ineligible vehicle|notice of|issue with your account|review (?:removal|policy)|vehicle swap|action required for your vehicle|support call|verification agent|damage reporting|following up on your|about your reported|didn.t comply|escalated reimbursement/i,
     group: "support",
     disposition: "archive",
     notify: "turo_support",
@@ -47,18 +47,21 @@ const RULES: Rule[] = [
   { test: /requested a change to their trip/i, group: "action", disposition: "trash", notify: "alerts", label: "客人申请改行程（需处理）" },
   { test: /still need to confirm your guest/i, group: "action", disposition: "trash", notify: "alerts", label: "还没确认客人驾照（需处理）" },
   { test: /has not responded to your reimbursement invoice/i, group: "action", disposition: "trash", notify: "alerts", label: "报销单客人未回应（需处理）" },
-  { test: /inspections? (?:are|is) due|action required/i, group: "action", disposition: "trash", notify: "alerts", label: "Turo 要求处理" },
+  { test: /inspections? (?:are|is) due|annual inspection|action required/i, group: "action", disposition: "trash", notify: "alerts", label: "Turo 要求处理" },
+  { test: /wants to book|requested to book|booking request/i, group: "action", disposition: "trash", notify: "alerts", label: "预订申请（需处理）" },
+  { test: /guest may need to cancel/i, group: "action", disposition: "trash", notify: "alerts", label: "客人可能要取消（需处理）" },
 
   // Bookings. New and cancelled ones are announced from the orders they
   // create (richer: car and dates); the mail itself only for changes.
   { test: /trip with your .+ is booked/i, group: "booking", disposition: "trash", notify: null, label: "新预订" },
-  { test: /cancell?ed (?:their|the) trip|trip with your .+ (?:has been |was )?cancell?ed/i, group: "booking", disposition: "trash", notify: null, label: "预订取消" },
+  { test: /cancell?ed (?:their|the) trip|cancell?ed .+[’']s trip|trip with your .+ (?:has been |was )?cancell?ed/i, group: "booking", disposition: "trash", notify: null, label: "预订取消" },
+  { test: /confirmed .+ change request/i, group: "booking", disposition: "trash", notify: null, label: "已确认改行程" },
   { test: /has changed their trip|has been (?:changed|modified|extended)|trip (?:change|extension)/i, group: "booking", disposition: "trash", notify: "bookings", label: "行程已变更" },
   { test: /added another driver/i, group: "booking", disposition: "trash", notify: "bookings", label: "加了驾驶员" },
 
   // Money.
   {
-    test: /reimbursement invoice|reimbursement approved|earnings are on the way|invoice approved|incidental charge|payout/i,
+    test: /reimbursement|earnings are on the way|invoice approved|incidental charge|payout|payment information|(?:cleaning|smoking) report|cleaning\/smoking|refund/i,
     group: "money",
     disposition: "trash",
     notify: "payments",
@@ -69,7 +72,7 @@ const RULES: Rule[] = [
 
   // Already on TATO's calendar, or nothing to act on.
   {
-    test: /upcoming trip|has returned your|has picked up your|protection plan|congratulations|how would you rate|host event|post visit summary|tell us what you thought|newsletter|tips for|welcome to turo/i,
+    test: /upcoming trip|has (?:returned|picked up) (?:your|.+[’']s )|starts soon|^reminder|protection plan|earnings plan|congratulations|how would you rate|host event|post visit summary|tell us what you thought|newsletter|tips for|welcome to turo|demand surge|long weekend|recent turo experience|snooze ends/i,
     group: "routine",
     disposition: "trash",
     notify: null,

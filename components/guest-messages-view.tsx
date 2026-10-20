@@ -1440,10 +1440,19 @@ export function GuestMessagesView({
                     onClick={copyAndOpen}
                     disabled={!composerText.trim() || aiBusy !== null}
                     title={turoUrl ? t.replyOnTuroHint : t.noTuroLink}
-                    className="tap-press tap-compact hit-area flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--brand)] px-3 text-[12.5px] font-bold text-white transition hover:opacity-90 disabled:opacity-40 lg:h-9 lg:px-3.5 lg:text-[13px]"
+                    // Small on a phone, so the four tools beside it fit on one
+                    // row at 375px; the full wording on a desktop.
+                    className="tap-press tap-compact hit-area flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[var(--brand)] px-2.5 text-[11.5px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40 lg:h-9 lg:gap-1.5 lg:px-3.5 lg:text-[13px] lg:font-bold"
                   >
-                    {turoUrl ? t.copyAndOpen : t.copyOnly}
-                    {turoUrl ? <ExternalLink className="h-3.5 w-3.5" aria-hidden /> : null}
+                    {turoUrl ? (
+                      <>
+                        <span className="lg:hidden">{t.copyAndOpenShort}</span>
+                        <span className="hidden lg:inline">{t.copyAndOpen}</span>
+                      </>
+                    ) : (
+                      t.copyOnly
+                    )}
+                    {turoUrl ? <ExternalLink className="h-3 w-3 lg:h-3.5 lg:w-3.5" aria-hidden /> : null}
                   </button>
                 </div>
               </div>
@@ -1671,10 +1680,10 @@ function ComposerTool({
       disabled={disabled}
       title={title}
       aria-label={title}
-      className="tap-press tap-compact hit-area flex h-8 shrink-0 items-center gap-1 rounded-lg px-1.5 text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)] disabled:opacity-40 lg:px-2"
+      className="tap-press tap-compact hit-area flex h-8 shrink-0 items-center gap-0.5 rounded-lg px-1 text-[var(--ink-mid)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--ink)] disabled:opacity-40 lg:gap-1 lg:px-2"
     >
       {busy ? <InlineSpinner /> : children}
-      <span className="text-[12px] font-semibold leading-none">{label}</span>
+      <span className="text-[11.5px] font-semibold leading-none lg:text-[12px]">{label}</span>
     </button>
   );
 }

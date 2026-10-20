@@ -111,6 +111,7 @@ export const guestMessagesMessages = {
       toolTranslateHint: "把你寫的內容翻譯成客人用的語言",
       composing: "AI 正在寫…",
       copyAndOpen: "複製並去 Turo 傳送",
+      copyAndOpenShort: "複製去 Turo",
       copyOnly: "複製",
       copiedOpening: "已複製，到 Turo 裡貼上傳送",
       copiedNoLink: "已複製。這個會話沒有 Turo 連結。",

@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.85.1 - 2026-10-20
+
+### The reply box fits a phone, and the last Turo mail kinds have rules
+
+- On a phone the copy button is smaller (28px, 11.5px type, "复制去 Turo" / "Copy") and the four tools tighter, so 模板 起草 改写 翻译 and the button fit one row at 375px in Chinese; the desktop keeps the full wording.
+- The 451 Turo emails no rule knew get rules: escalated or disputed invoices, "Regarding your vehicle / current trip", additional info needed, relisting evidence, roadside and cleaning issues are filed with support and pushed; insurance documents are filed without a push; annual inspections, listing updates, additional-usage charges and co-host invitations push as 需处理; phone, password, email and team-permission notices clear after a day like codes; community, survey and marketing mail clears; a withdrawn change request clears with bookings.
+
 ## v1.85.0 - 2026-10-20
 
 ### On a phone, the dashboard's days are tabs and the dashboard has a button of its own

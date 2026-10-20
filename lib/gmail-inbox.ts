@@ -894,23 +894,32 @@ async function ingestMailbox(input: {
             attribution.kind === InboundEmailKind.TRIP_ENDED;
           let copyExists = false;
           if (attribution.kind === InboundEmailKind.GUEST_MESSAGE && attribution.guestName) {
-            copyExists = Boolean(
-              await prisma.inboundEmail.findFirst({
-                where: {
-                  workspaceId: input.workspaceId,
-                  kind: InboundEmailKind.GUEST_MESSAGE,
-                  guestName: attribution.guestName,
-                  receivedAt: {
-                    gte: new Date(receivedAt.getTime() - 15 * 60_000),
-                    lte: new Date(receivedAt.getTime() + 15 * 60_000),
-                  },
-                  // Not the text: the copy's prefixed subject changes what
-                  // the extractor reads, so the same message never compared
-                  // equal and 8,284 copies were stored twice (2026-10-20).
-                  // One guest, fifteen minutes, is the same message.
+            // The other inbox's copy of the same message: same guest, sent
+            // within two minutes, and the same subject once the co-host
+            // prefix is taken off -- but not the same raw subject, because
+            // one of the two carries the prefix ("(SPEEDX's vehicle) - ..."
+            // here, "(kevin's vehicles) - ..." in the primary). Not the
+            // text: the prefix changes what the extractor reads, and that
+            // stored 8,284 copies twice (2026-10-20). Not a wider window
+            // either: a guest's second message a few minutes later, with
+            // the identical subject, is a real message.
+            const bare = subject.replace(/^\([^)]*\)\s*[-–—]\s*/, "");
+            const candidates = await prisma.inboundEmail.findMany({
+              where: {
+                workspaceId: input.workspaceId,
+                kind: InboundEmailKind.GUEST_MESSAGE,
+                guestName: attribution.guestName,
+                receivedAt: {
+                  gte: new Date(receivedAt.getTime() - 2 * 60_000),
+                  lte: new Date(receivedAt.getTime() + 2 * 60_000),
                 },
-                select: { id: true },
-              }),
+                NOT: { subject },
+              },
+              select: { subject: true },
+              take: 10,
+            });
+            copyExists = candidates.some(
+              (candidate) => candidate.subject.replace(/^\([^)]*\)\s*[-–—]\s*/, "") === bare,
             );
           }
           if (bookingKind || copyExists) {

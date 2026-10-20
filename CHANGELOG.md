@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.3 - 2026-10-20
+
+### Copies across inboxes are told apart from a guest's next message
+
+v1.86.2 treated any message from the same guest within fifteen minutes as the primary's copy, which would also drop a guest's real second message in Kevin's inbox. A copy is now: same guest, within two minutes, the same subject once the co-host prefix is removed, and a different raw subject -- one copy carries "(SPEEDX's vehicle) - ..." or "(kevin's vehicles) - ...", the other not. A guest's next message has the identical subject and is kept.
+
 ## v1.86.2 - 2026-10-20
 
 ### A guest message from Kevin's inbox is recognised as SpeedX's copy by guest and time

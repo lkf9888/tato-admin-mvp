@@ -2618,6 +2618,27 @@ model GuestMessageAlertSetting {
   updatedAt   DateTime  @updatedAt
 }
 
+/// A browser that asked to receive TATO's notifications (Web Push):
+/// the operator's phone added to its home screen, a desktop browser.
+/// One row per subscription endpoint; a push the browser vendor
+/// answers 404/410 for removes its row.
+model WebPushSubscription {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  /// Who turned it on, for the device list.
+  userId        String?
+  endpoint      String    @unique
+  p256dh        String
+  auth          String
+  /// "iPhone · Safari" and the like, so the device list says which is which.
+  label         String?
+  createdAt     DateTime  @default(now())
+  lastSuccessAt DateTime?
+  lastError     String?
+
+  @@index([workspaceId])
+}
+
 /// Standing instructions the operator gives the AI once ("replies short",
 /// "pickup is in lot B2"). Added to every assistant answer and every
 /// guest-reply draft.

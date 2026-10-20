@@ -7,6 +7,11 @@ import type { Locale } from "@/lib/i18n";
 
 type Status = {
   enabled: boolean;
+  web: {
+    configured: boolean;
+    publicKey: string | null;
+    devices: { id: string; endpoint: string; label: string | null; lastSuccessAt: string | null; lastError: string | null }[];
+  };
   smsPhone: string | null;
   smsConfigured: boolean;
   lastSentAt: string | null;
@@ -25,7 +30,24 @@ function copy(locale: Locale) {
         intro:
           "客人在 Turo 上发来消息时，TATO 同步到后推一条到你手机：客人、车，以及消息的开头。15 分钟内的多条合成一条。打开之前的旧消息不会补推。",
         enabled: "推送新客人消息",
-        wechatTitle: "微信（优先）",
+        webTitle: "这台手机或电脑（优先）",
+        webHint: "免费、不限条数，点通知直接打开客人消息。iPhone 需要 iOS 16.4 以上。",
+        webIosInstall: "iPhone 要先把 TATO 加到主屏幕：在 Safari 里点「分享」→「添加到主屏幕」，然后从主屏幕的 TATO 图标打开，再回到这里开启。",
+        webUnsupported: "这个浏览器不支持网页推送。iPhone 请用 Safari 并先添加到主屏幕；安卓请用 Chrome。",
+        webNotConfigured: "服务器还没配置网页推送密钥，暂时开不了。",
+        webEnable: "在这台设备上接收通知",
+        webEnabling: "开启中…",
+        webDisable: "这台设备停止接收",
+        webOn: "这台设备已开启。",
+        webDenied: "通知权限被拒绝了。请到系统设置里允许 TATO 发通知，再回来开启。",
+        webFailed: "开启失败：",
+        webDevices: "已开启的设备",
+        webRemove: "移除",
+        webThisDevice: "（这台）",
+        webLastOk: (when: string) => `上次送达 ${when}`,
+        webNever: "还没推送过",
+        webError: "上次推送失败",
+        wechatTitle: "微信（网页推送没有设备时）",
         wechatBind: (code: string) => `在 TATO 小程序里输入绑定码 ${code} 订阅这个频道。`,
         wechatSubscribers: (count: number) => (count === 0 ? "还没有人绑定。" : `${count} 个微信已绑定。`),
         wechatQuota: (count: number) =>
@@ -44,7 +66,13 @@ function copy(locale: Locale) {
         test: "发一条测试",
         testing: "发送中…",
         testResult: (via: string) =>
-          via === "wechat" ? "已通过微信发出。" : via === "sms" ? "已通过短信发出。" : "没有发出去：",
+          via === "web"
+            ? "已推送到你开启的设备。"
+            : via === "wechat"
+              ? "已通过微信发出。"
+              : via === "sms"
+                ? "已通过短信发出。"
+                : "没有发出去：",
         invalidPhone: "这个号码认不出来，请带区号。",
         lastSent: (when: string) => `上次推送：${when}`,
         loadFailed: "读取设置失败。",
@@ -55,7 +83,24 @@ function copy(locale: Locale) {
         intro:
           "When a guest writes on Turo, TATO sends your phone one line after the sync files it: the guest, the car and how the message starts. Messages within 15 minutes go out together. Nothing from before you switch this on is pushed.",
         enabled: "Push new guest messages",
-        wechatTitle: "WeChat (first)",
+        webTitle: "This phone or computer (first)",
+        webHint: "Free and unlimited; tapping the notification opens guest messages. iPhone needs iOS 16.4 or later.",
+        webIosInstall: "On iPhone, add TATO to your home screen first: in Safari tap Share → Add to Home Screen, open TATO from that icon, then come back here.",
+        webUnsupported: "This browser cannot receive web push. On iPhone use Safari and add TATO to the home screen; on Android use Chrome.",
+        webNotConfigured: "Web push keys are not set on the server yet.",
+        webEnable: "Get notifications on this device",
+        webEnabling: "Turning on…",
+        webDisable: "Stop on this device",
+        webOn: "On for this device.",
+        webDenied: "Notifications are blocked. Allow them for TATO in your settings, then try again.",
+        webFailed: "Could not turn on: ",
+        webDevices: "Devices",
+        webRemove: "Remove",
+        webThisDevice: " (this one)",
+        webLastOk: (when: string) => `Last delivered ${when}`,
+        webNever: "Nothing sent yet",
+        webError: "Last push failed",
+        wechatTitle: "WeChat (when no device is set up)",
         wechatBind: (code: string) => `In the TATO mini program, enter bind code ${code} to subscribe.`,
         wechatSubscribers: (count: number) =>
           count === 0 ? "Nobody has bound yet." : `${count} WeChat account(s) bound.`,
@@ -76,12 +121,55 @@ function copy(locale: Locale) {
         test: "Send a test",
         testing: "Sending…",
         testResult: (via: string) =>
-          via === "wechat" ? "Sent over WeChat." : via === "sms" ? "Sent by SMS." : "Not delivered: ",
+          via === "web"
+            ? "Pushed to your devices."
+            : via === "wechat"
+              ? "Sent over WeChat."
+              : via === "sms"
+                ? "Sent by SMS."
+                : "Not delivered: ",
         invalidPhone: "That number is not recognised; include the area code.",
         lastSent: (when: string) => `Last push: ${when}`,
         loadFailed: "Could not load the setting.",
         close: "Close",
       };
+}
+
+/** The VAPID key as the Push API wants it. */
+function keyBytes(base64: string) {
+  const padded = `${base64}${"=".repeat((4 - (base64.length % 4)) % 4)}`.replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(padded);
+  return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+}
+
+/** "iPhone · Safari" -- enough to tell devices apart in the list. */
+function deviceLabel() {
+  const ua = navigator.userAgent;
+  const device = /iPhone/.test(ua)
+    ? "iPhone"
+    : /iPad/.test(ua)
+      ? "iPad"
+      : /Android/.test(ua)
+        ? "Android"
+        : /Mac/.test(ua)
+          ? "Mac"
+          : /Windows/.test(ua)
+            ? "Windows"
+            : "Browser";
+  const browser = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "";
+  return browser ? `${device} · ${browser}` : device;
+}
+
+type PushSupport = "ok" | "ios-install" | "unsupported";
+
+function pushSupport(): PushSupport {
+  const ios = /iPhone|iPad/.test(navigator.userAgent);
+  const standalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  if ("serviceWorker" in navigator && "PushManager" in window && "Notification" in window) return "ok";
+  // iOS only exposes the Push API to a site opened from the home screen.
+  return ios && !standalone ? "ios-install" : "unsupported";
 }
 
 /**
@@ -98,6 +186,91 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [testing, setTesting] = useState(false);
   const [testMessage, setTestMessage] = useState<string | null>(null);
+  const [support, setSupport] = useState<PushSupport | null>(null);
+  // This browser's push endpoint, when it has one.
+  const [thisEndpoint, setThisEndpoint] = useState<string | null>(null);
+  const [webBusy, setWebBusy] = useState(false);
+  const [webMessage, setWebMessage] = useState<string | null>(null);
+
+  async function refreshStatus() {
+    const response = await fetch("/api/messages/alerts");
+    if (response.ok) setStatus((await response.json()) as Status);
+  }
+
+  useEffect(() => {
+    const found = pushSupport();
+    setSupport(found);
+    if (found !== "ok") return;
+    void navigator.serviceWorker
+      .getRegistration("/")
+      .then((registration) => registration?.pushManager.getSubscription())
+      .then((subscription) => setThisEndpoint(subscription?.endpoint ?? null))
+      .catch(() => null);
+  }, []);
+
+  async function enableThisDevice() {
+    if (!status?.web.publicKey) return;
+    setWebBusy(true);
+    setWebMessage(null);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setWebMessage(t.webDenied);
+        return;
+      }
+      const registration = await navigator.serviceWorker.register("/push-sw.js", { scope: "/" });
+      await navigator.serviceWorker.ready;
+      const subscription =
+        (await registration.pushManager.getSubscription()) ??
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: keyBytes(status.web.publicKey),
+        }));
+      const response = await fetch("/api/messages/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: subscription.toJSON(), label: deviceLabel() }),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      setThisEndpoint(subscription.endpoint);
+      setWebMessage(t.webOn);
+      // A device turned on is a request to be told: switch the push on
+      // too, rather than leave a subscribed phone that never hears.
+      if (!enabled) {
+        setEnabled(true);
+        await fetch("/api/messages/alerts", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled: true, smsPhone: smsPhone.trim() || null }),
+        });
+      }
+      await refreshStatus();
+    } catch (failure) {
+      setWebMessage(`${t.webFailed}${failure instanceof Error ? failure.message : String(failure)}`);
+    } finally {
+      setWebBusy(false);
+    }
+  }
+
+  async function removeDevice(device: { id: string; endpoint: string }) {
+    setWebBusy(true);
+    try {
+      if (device.endpoint === thisEndpoint) {
+        const registration = await navigator.serviceWorker.getRegistration("/");
+        await (await registration?.pushManager.getSubscription())?.unsubscribe().catch(() => null);
+        setThisEndpoint(null);
+      }
+      await fetch("/api/messages/push/subscribe", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: device.id }),
+      });
+      setWebMessage(null);
+      await refreshStatus();
+    } finally {
+      setWebBusy(false);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -198,6 +371,67 @@ export function GuestMessageAlertPanel({ locale, onClose }: { locale: Locale; on
               className="h-5 w-5 accent-[var(--brand)]"
             />
           </label>
+
+          <section className="grid gap-1.5">
+            <h4 className="text-[12px] font-bold text-[var(--ink)]">{t.webTitle}</h4>
+            <p className="text-[var(--ink-soft)]">{t.webHint}</p>
+            {!status ? null : !status.web.configured ? (
+              <p className="text-amber-800">{t.webNotConfigured}</p>
+            ) : support === "ios-install" ? (
+              <p className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-[var(--ink-mid)]">{t.webIosInstall}</p>
+            ) : support === "unsupported" ? (
+              <p className="text-amber-800">{t.webUnsupported}</p>
+            ) : support === "ok" ? (
+              <div>
+                {thisEndpoint && status.web.devices.some((device) => device.endpoint === thisEndpoint) ? (
+                  <p className="font-semibold text-[var(--ok-fg)]">{t.webOn}</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void enableThisDevice()}
+                    disabled={webBusy}
+                    className="tap-press h-10 rounded-full bg-[var(--brand)] px-4 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    {webBusy ? t.webEnabling : t.webEnable}
+                  </button>
+                )}
+              </div>
+            ) : null}
+            {webMessage && webMessage !== t.webOn ? <p className="text-[var(--ink-mid)]">{webMessage}</p> : null}
+            {status && status.web.devices.length > 0 ? (
+              <ul className="mt-1 grid gap-1">
+                <li className="text-[11.5px] font-semibold text-[var(--ink-soft)]">{t.webDevices}</li>
+                {status.web.devices.map((device) => (
+                  <li
+                    key={device.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-[var(--line)] px-3 py-1.5"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13px] text-[var(--ink)]">
+                        {device.label ?? "Browser"}
+                        {device.endpoint === thisEndpoint ? t.webThisDevice : ""}
+                      </span>
+                      <span className={`block text-[11px] ${device.lastError ? "text-amber-800" : "text-[var(--ink-soft)]"}`}>
+                        {device.lastError
+                          ? t.webError
+                          : device.lastSuccessAt
+                            ? t.webLastOk(new Date(device.lastSuccessAt).toLocaleString(locale === "en" ? "en-CA" : "zh-CN"))
+                            : t.webNever}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void removeDevice(device)}
+                      disabled={webBusy}
+                      className="tap-press shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold text-[var(--ink-soft)] hover:text-[var(--bad-fg)] disabled:opacity-50"
+                    >
+                      {t.webRemove}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
 
           <section className="grid gap-1.5">
             <h4 className="text-[12px] font-bold text-[var(--ink)]">{t.wechatTitle}</h4>

@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.81.0 - 2026-10-20
+
+### New guest messages arrive as phone notifications, iPhone included
+
+Builds on v1.80.0's service worker (`public/push-sw.js`). In the guest-message push panel (the bell on the messages page), "在这台设备上接收通知" asks for permission, subscribes this browser and switches pushing on; the panel lists every subscribed device with when it last received a push, each removable. On iPhone it needs iOS 16.4+ and TATO opened from the home screen, and the panel says how when it is not.
+
+- `WebPushSubscription` (new table, one row per endpoint) and `lib/web-push.ts` (the `web-push` library, VAPID keys from `WEB_PUSH_PUBLIC_KEY` / `WEB_PUSH_PRIVATE_KEY` / `WEB_PUSH_SUBJECT`). A subscription the push service answers 404/410 for is deleted on the spot. POST/DELETE `/api/messages/push/subscribe`.
+- Guest-message pushes go to subscribed browsers first: free, no quota, and a tap opens guest messages. Only when no browser takes it does the push fall back to WeChat, then SMS, as before. The panel's test send follows the same order.
+
 ## v1.80.0 - 2026-10-20
 
 ### The groundwork for push notifications on phones

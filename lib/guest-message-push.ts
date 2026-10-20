@@ -4,6 +4,7 @@ import { getAlertChannelStatus, guestMessageChannelKey, sendNotification } from 
 import { prisma } from "@/lib/prisma";
 import { isSmsConfigured, normalizeSmsPhone, sendSms } from "@/lib/sms";
 import { getAppUrl } from "@/lib/stripe";
+import { getWebPushPublicKey, isWebPushConfigured, listSubscriptions, sendWebPush } from "@/lib/web-push";
 
 /**
  * New guest messages, pushed to the operator's phone.
@@ -33,7 +34,7 @@ const CHANNEL_NAME = "TATO 客人消息";
 
 export type GuestMessagePushResult =
   | { pushed: 0; reason: "disabled" | "nothing_new" | "batching" }
-  | { pushed: number; via: "wechat" | "sms" | "none"; reason?: string };
+  | { pushed: number; via: "web" | "wechat" | "sms" | "none"; reason?: string };
 
 type PendingMessage = {
   id: string;
@@ -151,7 +152,7 @@ async function deliver(
   workspaceId: string,
   smsPhone: string | null,
   messages: PendingMessage[],
-): Promise<{ via: "wechat" | "sms" | "none"; reason?: string }> {
+): Promise<{ via: "web" | "wechat" | "sms" | "none"; reason?: string }> {
   const newest = messages[messages.length - 1];
   const names = [...new Set(messages.map((message) => message.guestName))];
   const single = messages.length === 1;
@@ -163,6 +164,17 @@ async function deliver(
     ? `${newest.guestName}：${clip(newest.text, 60)}`
     : `${messages.length} 条新客人消息：${clip(names.join("、"), 40)}`;
   const details = single ? newest.text : `最新 ${newest.guestName}：${newest.text}`;
+
+  // The operator's own browsers first: free, no quota, and a tap lands
+  // on the conversation. With one, WeChat's authorisations and SMS money
+  // are kept for when no browser is subscribed.
+  const web = await sendWebPush(workspaceId, {
+    title: single ? `${newest.guestName}${newest.car ? ` · ${newest.car}` : ""}` : `${messages.length} 条新客人消息`,
+    body: single ? clip(newest.text, 180) : `${clip(names.join("、"), 60)}\n最新 ${newest.guestName}：${clip(newest.text, 120)}`,
+    url: "/messages",
+    tag: "guest-messages",
+  });
+  if (web.sent > 0) return { via: "web" };
 
   const wechat = await sendNotification({
     channel: guestMessageChannelKey(workspaceId),
@@ -204,6 +216,11 @@ async function deliver(
 
 export type GuestMessageAlertStatus = {
   enabled: boolean;
+  web: {
+    configured: boolean;
+    publicKey: string | null;
+    devices: { id: string; endpoint: string; label: string | null; lastSuccessAt: string | null; lastError: string | null }[];
+  };
   smsPhone: string | null;
   smsConfigured: boolean;
   lastSentAt: string | null;
@@ -211,14 +228,26 @@ export type GuestMessageAlertStatus = {
 };
 
 export async function getGuestMessageAlertStatus(workspaceId: string): Promise<GuestMessageAlertStatus> {
-  const [setting, wechat] = await Promise.all([
+  const [setting, wechat, devices] = await Promise.all([
     prisma.guestMessageAlertSetting.findUnique({ where: { workspaceId } }),
     getAlertChannelStatus({ key: guestMessageChannelKey(workspaceId), name: CHANNEL_NAME }).catch(
       () => null,
     ),
+    listSubscriptions(workspaceId),
   ]);
   return {
     enabled: Boolean(setting?.enabled),
+    web: {
+      configured: isWebPushConfigured(),
+      publicKey: getWebPushPublicKey(),
+      devices: devices.map((device) => ({
+        id: device.id,
+        endpoint: device.endpoint,
+        label: device.label,
+        lastSuccessAt: device.lastSuccessAt?.toISOString() ?? null,
+        lastError: device.lastError,
+      })),
+    },
     smsPhone: setting?.smsPhone ?? null,
     smsConfigured: isSmsConfigured(),
     lastSentAt: setting?.lastSentAt?.toISOString() ?? null,

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.6 - 2026-10-20
+
+### Copies in Kevin's inbox are recognised from the envelope, without downloading them
+
+A guest message in Kevin's Yahoo inbox that SpeedX's inbox already stored was only recognised as a copy after its whole source was downloaded, so the history run fetched a thousand full messages each time just to leave them unstored, and Yahoo began failing commands under the load. The copy test (same subject without the co-host prefix, different raw subject, within two minutes) now runs on the envelope against the stored guest messages, before any download. The cleanup and purge runs apply the same test, so they clear these copies too instead of keeping them as "not yet imported".
+
 ## v1.86.5 - 2026-10-20
 
 ### Kevin's Yahoo inbox clears several thousand messages a run, not five hundred

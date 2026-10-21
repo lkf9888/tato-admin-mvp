@@ -680,6 +680,44 @@ const GUEST_MESSAGE_SUBJECT = "has sent you a message about your";
 /** The most matches Yahoo returns for one IMAP search (Gmail has no cap). */
 const SEARCH_RESULT_CAP = 1000;
 
+/** A subject without the co-host prefix, "(kevin's vehicles) - ". */
+function bareSubject(subject: string) {
+  return subject.replace(/^\([^)]*\)\s*[-–—]\s*/, "");
+}
+
+/** How far apart the two inboxes' copies of one message can arrive. */
+const COPY_WINDOW_MS = 2 * 60_000;
+
+type GuestRowsBySubject = Map<string, { subject: string; at: number }[]>;
+
+async function loadGuestRowsBySubject(workspaceId: string): Promise<GuestRowsBySubject> {
+  const rows = await prisma.inboundEmail.findMany({
+    where: { workspaceId, kind: InboundEmailKind.GUEST_MESSAGE },
+    select: { subject: true, receivedAt: true },
+  });
+  const bySubject: GuestRowsBySubject = new Map();
+  for (const row of rows) {
+    const key = bareSubject(row.subject);
+    const list = bySubject.get(key) ?? [];
+    list.push({ subject: row.subject, at: row.receivedAt.getTime() });
+    bySubject.set(key, list);
+  }
+  return bySubject;
+}
+
+/**
+ * The other inbox's copy of a stored guest message: the same subject
+ * once the co-host prefix is off (which names the guest), a different
+ * raw subject (one of the two carries the prefix), arriving within two
+ * minutes. The same rule the source-stage check applies by guest name.
+ */
+function isCrossInboxCopy(subject: string, date: Date, rows: GuestRowsBySubject) {
+  const list = rows.get(bareSubject(subject));
+  if (!list) return false;
+  const at = date.getTime();
+  return list.some((row) => row.subject !== subject && Math.abs(row.at - at) <= COPY_WINDOW_MS);
+}
+
 /** The mailbox Gmail calls Trash, whatever the account's language. */
 async function findTrashMailbox(client: ImapFlow) {
   const boxes = await client.list();
@@ -767,6 +805,9 @@ async function ingestMailbox(input: {
       select: { messageId: true, kind: true },
     });
     const storedKind = new Map(existing.map((row) => [row.messageId, row.kind]));
+    // The other inbox's guest messages by bare subject, for telling a
+    // copy from its envelope (see `isCrossInboxCopy`).
+    const primaryGuestRows = config.primary ? null : await loadGuestRowsBySubject(input.workspaceId);
 
     // Two passes: envelopes first, which are small, then whole messages
     // only for what is new. Re-reading every stored message's source
@@ -827,6 +868,20 @@ async function ingestMailbox(input: {
         // right.
         if (input.history && subjectKind !== InboundEmailKind.GUEST_MESSAGE) {
           skipped.notGuestSubject += 1;
+          continue;
+        }
+        // The primary's copy, told from the envelope alone. Waiting for
+        // the source to say so downloaded every copy in Kevin's inbox
+        // whole, a thousand a run, only to leave it unstored.
+        const envelopeDate = message.envelope?.date;
+        if (
+          primaryGuestRows &&
+          subjectKind === InboundEmailKind.GUEST_MESSAGE &&
+          envelopeDate &&
+          isCrossInboxCopy(message.envelope?.subject ?? "", envelopeDate, primaryGuestRows)
+        ) {
+          result.skippedDuplicate += 1;
+          if (Date.now() - envelopeDate.getTime() > CLEANUP_MIN_AGE_MS) toTrash.push(message.uid);
           continue;
         }
         windowFresh.push(message.uid);
@@ -920,24 +975,22 @@ async function ingestMailbox(input: {
             // stored 8,284 copies twice (2026-10-20). Not a wider window
             // either: a guest's second message a few minutes later, with
             // the identical subject, is a real message.
-            const bare = subject.replace(/^\([^)]*\)\s*[-–—]\s*/, "");
+            const bare = bareSubject(subject);
             const candidates = await prisma.inboundEmail.findMany({
               where: {
                 workspaceId: input.workspaceId,
                 kind: InboundEmailKind.GUEST_MESSAGE,
                 guestName: attribution.guestName,
                 receivedAt: {
-                  gte: new Date(receivedAt.getTime() - 2 * 60_000),
-                  lte: new Date(receivedAt.getTime() + 2 * 60_000),
+                  gte: new Date(receivedAt.getTime() - COPY_WINDOW_MS),
+                  lte: new Date(receivedAt.getTime() + COPY_WINDOW_MS),
                 },
                 NOT: { subject },
               },
               select: { subject: true },
               take: 10,
             });
-            copyExists = candidates.some(
-              (candidate) => candidate.subject.replace(/^\([^)]*\)\s*[-–—]\s*/, "") === bare,
-            );
+            copyExists = candidates.some((candidate) => bareSubject(candidate.subject) === bare);
           }
           if (bookingKind || copyExists) {
             result.skippedDuplicate += 1;
@@ -1108,6 +1161,7 @@ async function cleanupOneMailbox(workspaceId: string, config: TuroMailbox, start
   const stored = new Set(
     (await prisma.inboundEmail.findMany({ where: { workspaceId }, select: { messageId: true } })).map((row) => row.messageId),
   );
+  const primaryGuestRows = config.primary ? null : await loadGuestRowsBySubject(workspaceId);
   const result = { scanned: 0, trashed: 0, archived: 0, kept: 0, remaining: 0, byGroup: {} as Record<string, number> };
   const lock = await client.getMailboxLock(config.mailbox);
   try {
@@ -1135,7 +1189,10 @@ async function cleanupOneMailbox(workspaceId: string, config: TuroMailbox, start
           result.scanned += 1;
           const subject = message.envelope?.subject ?? "";
           const date = message.envelope?.date ?? null;
-          const isStored = Boolean(message.envelope?.messageId && stored.has(message.envelope.messageId.trim()));
+          // A copy of a guest message the other inbox stored counts as stored.
+          const isStored =
+            Boolean(message.envelope?.messageId && stored.has(message.envelope.messageId.trim())) ||
+            Boolean(primaryGuestRows && date && isCrossInboxCopy(subject, date, primaryGuestRows));
           const oldEnough = Boolean(date && Date.now() - date.getTime() > CLEANUP_MIN_AGE_MS);
           const rule = turoMailRule(subject);
           result.byGroup[rule.group] = (result.byGroup[rule.group] ?? 0) + 1;

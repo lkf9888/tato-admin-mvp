@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  Copy as CopyIcon,
   ExternalLink,
   Languages,
   LayoutTemplate,
@@ -178,6 +179,29 @@ function mergePages(pages: Page[]) {
 }
 
 type Copy = ReturnType<typeof getMessages>["guestMessagesPage"];
+
+/**
+ * Put text on the clipboard. The Clipboard API is refused in some
+ * places a phone opens TATO from (an embedded browser, a page not yet
+ * trusted), so a hidden field and the old copy command stand in.
+ */
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const field = document.createElement("textarea");
+    field.value = text;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.appendChild(field);
+    field.select();
+    const ok = document.execCommand("copy");
+    field.remove();
+    return ok;
+  }
+}
 
 type DueMessage = {
   ruleId: string;
@@ -434,6 +458,7 @@ export function GuestMessagesView({
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [tripOpen, setTripOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [turoLinkCopied, setTuroLinkCopied] = useState(false);
   // Whether the open thread put an entry on the history stack, so "back"
   // can pop it rather than stack another.
   const pushedHistory = useRef(false);
@@ -1158,6 +1183,32 @@ export function GuestMessagesView({
                     {selected.vehiclePlate ? ` · ${selected.vehiclePlate}` : ""}
                   </p>
                 </div>
+                {/* For when the Turo link will not open where it should --
+                    signed out in this browser, or the app grabbing it --
+                    so it can be pasted into the browser that is signed
+                    in. An icon on a phone, where the header is full. */}
+                {turoUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void copyText(turoUrl).then((ok) => {
+                        if (!ok) return;
+                        setTuroLinkCopied(true);
+                        setTimeout(() => setTuroLinkCopied(false), 1500);
+                      });
+                    }}
+                    title={t.copyTuroLinkHint}
+                    aria-label={turoLinkCopied ? t.turoLinkCopied : t.copyTuroLink}
+                    className="tap-press tap-compact hit-area flex h-8 w-8 shrink-0 items-center justify-center gap-1 rounded-full border border-[var(--line-strong)] text-[12px] font-bold text-[var(--ink)] transition hover:bg-[var(--surface-muted)] lg:w-auto lg:px-3"
+                  >
+                    {turoLinkCopied ? (
+                      <Check className="h-3.5 w-3.5 text-[var(--success,#1f8a4c)]" aria-hidden />
+                    ) : (
+                      <CopyIcon className="h-3.5 w-3.5" aria-hidden />
+                    )}
+                    <span className="hidden lg:inline">{turoLinkCopied ? t.turoLinkCopied : t.copyTuroLink}</span>
+                  </button>
+                ) : null}
                 {turoUrl ? (
                   <a
                     href={turoUrl}

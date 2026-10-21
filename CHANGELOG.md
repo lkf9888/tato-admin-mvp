@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.9 - 2026-10-21
+
+### A conversation's Turo link can be copied, for the browser signed in to Turo
+
+When "Turo reply" will not land on the chat -- this browser signed out of Turo, or the Turo app taking the link -- the operator had no way to carry the link elsewhere. A copy button now sits left of it in the conversation header: "Copy Turo link" on a wide screen, an icon on a phone where the header is full, turning to a tick for a moment once copied. It copies the same link "Turo reply" opens. Where the Clipboard API is refused, a hidden field and the copy command stand in.
+
 ## v1.86.8 - 2026-10-21
 
 ### Updates reads like a mailbox, sorted by what each Turo email needs

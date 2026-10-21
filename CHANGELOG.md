@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.7 - 2026-10-21
+
+### Kevin's inbox is read message by message, because Yahoo's search misses mail
+
+After the bulk clear-out, Yahoo's IMAP search for turo.com found 116 messages in Kevin's inbox while its web search showed over a thousand from the past two weeks -- bookings, changes, invoices, guest messages -- that the sync and cleanup had never seen. An inbox other than the primary is now read envelope by envelope from the newest end and filtered by sender in TATO: the newest 2,000 for a normal sync, the whole inbox for the history, cleanup and purge runs. Gmail keeps its search. The re-search loop added in v1.86.5 to page past Yahoo's 1,000-result cap is gone, as reading the inbox directly has no cap. `/api/gmail-sync/census?mailbox=mailbox2&folders=1` counts Turo mail in every folder the same way, read-only, for checking nothing is left elsewhere.
+
 ## v1.86.6 - 2026-10-20
 
 ### Copies in Kevin's inbox are recognised from the envelope, without downloading them

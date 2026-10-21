@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
-import { censusMailbox, GmailInboxError } from "@/lib/gmail-inbox";
+import { censusMailbox, folderCensus, GmailInboxError } from "@/lib/gmail-inbox";
 
 export const runtime = "nodejs";
 
@@ -18,7 +18,13 @@ export async function GET(request: Request) {
   }
   try {
     // `?mailbox=mailbox2` surveys the second inbox (Kevin's).
-    const mailbox = new URL(request.url).searchParams.get("mailbox")?.trim() || "gmail";
+    const params = new URL(request.url).searchParams;
+    const mailbox = params.get("mailbox")?.trim() || "gmail";
+    // `?folders=1` reads every folder envelope by envelope instead of
+    // trusting the inbox search (see folderCensus).
+    if (params.get("folders")) {
+      return NextResponse.json(await folderCensus(mailbox), { headers: { "Cache-Control": "no-store" } });
+    }
     return NextResponse.json(await censusMailbox(context.workspace.id, mailbox), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof GmailInboxError) return NextResponse.json({ error: error.code }, { status: error.status });

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.4 - 2026-10-20
+
+### A final sweep clears unread Turo mail no rule places
+
+`?mode=purge` (a `purge` choice on the Gmail sync workflow) runs the cleanup across both inboxes and also moves to Trash the unread Turo mail no rule places, as the operator asked for a mailbox with nothing left over. Read mail stays, as does a guest message TATO has not stored and anything under two days old that TATO does not have yet. Trash keeps it thirty days.
+
 ## v1.86.3 - 2026-10-20
 
 ### Copies across inboxes are told apart from a guest's next message

@@ -108,8 +108,10 @@ export async function POST(request: Request) {
     // `?mode=cleanup` clears the Turo mail that piled up before the
     // mail rules existed (see cleanupMailbox): moves only, bounded, run
     // by hand from the workflow until `remaining` is 0.
-    if (requestedMode === "cleanup") {
-      const cleanup = await cleanupMailbox(context.workspaceId);
+    // `?mode=purge` is cleanup plus the final sweep: unread Turo mail no
+    // rule places goes to Trash too.
+    if (requestedMode === "cleanup" || requestedMode === "purge") {
+      const cleanup = await cleanupMailbox(context.workspaceId, { purgeUnread: requestedMode === "purge" });
       console.log(`[gmail-sync] cleanup ${JSON.stringify(cleanup)}`);
       return NextResponse.json(cleanup);
     }

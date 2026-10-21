@@ -20,11 +20,11 @@ on:
     # 一直跑到 imported=0 为止。
     inputs:
       mode:
-        description: "ingest(默认)、history(导入历史客人消息)或 cleanup(按规则清理旧的 Turo 邮件)"
+        description: "ingest(默认)、history(导入历史客人消息)、cleanup(按规则清理旧的 Turo 邮件)或 purge(清理并删除剩余未读 Turo 邮件)"
         required: false
         default: ingest
         type: choice
-        options: [ingest, history, cleanup]
+        options: [ingest, history, cleanup, purge]
 
 # 重叠的运行做不了有用的事:同步内部按 Message-ID 去重并且单飞,
 # 第二个只会重读第一个正在处理的东西。

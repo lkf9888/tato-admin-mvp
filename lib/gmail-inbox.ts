@@ -1047,13 +1047,13 @@ const CLEANUP_MIN_AGE_MS = 2 * 24 * 3_600_000;
  * it first. Newest first, a window at a time; run again until
  * `remaining` is 0.
  */
-export async function cleanupMailbox(workspaceId: string) {
+export async function cleanupMailbox(workspaceId: string, options: { purgeUnread?: boolean } = {}) {
   const startedAt = Date.now();
   const results: Record<string, Awaited<ReturnType<typeof cleanupOneMailbox>>> = {};
   for (const config of getMailboxes()) {
     if (Date.now() - startedAt > CLEANUP_BUDGET_MS) break;
     try {
-      results[config.key] = await cleanupOneMailbox(workspaceId, config, startedAt);
+      results[config.key] = await cleanupOneMailbox(workspaceId, config, startedAt, options.purgeUnread ?? false);
     } catch (error) {
       if (config.primary) throw error;
       results[config.key] = { error: error instanceof Error ? error.message : String(error) } as never;
@@ -1070,7 +1070,7 @@ export async function cleanupMailbox(workspaceId: string) {
   };
 }
 
-async function cleanupOneMailbox(workspaceId: string, config: TuroMailbox, startedAt: number) {
+async function cleanupOneMailbox(workspaceId: string, config: TuroMailbox, startedAt: number, purgeUnread: boolean) {
   const client = new ImapFlow({
     host: config.host,
     port: config.port,
@@ -1100,7 +1100,7 @@ async function cleanupOneMailbox(workspaceId: string, config: TuroMailbox, start
       end = start;
       const toTrash: number[] = [];
       const toArchive: number[] = [];
-      for await (const message of client.fetch(window, { uid: true, envelope: true }, { uid: true })) {
+      for await (const message of client.fetch(window, { uid: true, envelope: true, flags: true }, { uid: true })) {
         result.scanned += 1;
         const subject = message.envelope?.subject ?? "";
         const date = message.envelope?.date ?? null;
@@ -1109,7 +1109,14 @@ async function cleanupOneMailbox(workspaceId: string, config: TuroMailbox, start
         const rule = turoMailRule(subject);
         result.byGroup[rule.group] = (result.byGroup[rule.group] ?? 0) + 1;
         // A guest message TATO lacks is history still to import, not junk.
-        const where = rule.group === "guest" && !isStored ? null : dispositionFor(subject, date);
+        let where = rule.group === "guest" && !isStored ? null : dispositionFor(subject, date);
+        // The final sweep the operator asked for: whatever Turo mail no
+        // rule placed and nobody has opened goes to Trash too. Read mail
+        // stays (someone looked at it for a reason), and so does a guest
+        // message TATO has not stored yet.
+        if (!where && purgeUnread && !message.flags?.has("\\Seen") && !(rule.group === "guest" && !isStored)) {
+          where = "trash";
+        }
         if (where && (isStored || oldEnough)) {
           if (where === "trash") toTrash.push(message.uid);
           else toArchive.push(message.uid);

@@ -917,7 +917,10 @@ async function ingestMailbox(input: {
           isCrossInboxCopy(message.envelope?.subject ?? "", envelopeDate, primaryGuestRows)
         ) {
           result.skippedDuplicate += 1;
-          if (Date.now() - envelopeDate.getTime() > CLEANUP_MIN_AGE_MS) toTrash.push(message.uid);
+          // The primary's row is already there, so there is nothing to
+          // wait for: clear it now rather than leave it unread for two
+          // days looking like mail TATO missed.
+          toTrash.push(message.uid);
           continue;
         }
         windowFresh.push(message.uid);
@@ -1030,8 +1033,10 @@ async function ingestMailbox(input: {
           }
           if (bookingKind || copyExists) {
             result.skippedDuplicate += 1;
-            // Cleared once the primary has had time to store its copy.
-            if (Date.now() - receivedAt.getTime() > CLEANUP_MIN_AGE_MS) toTrash.push(message.uid);
+            // A guest message's copy is cleared now: the primary's row was
+            // just found. Booking mail waits until the primary has had time
+            // to store its own copy.
+            if (copyExists || Date.now() - receivedAt.getTime() > CLEANUP_MIN_AGE_MS) toTrash.push(message.uid);
             continue;
           }
         }

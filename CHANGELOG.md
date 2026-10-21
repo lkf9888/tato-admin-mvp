@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.10 - 2026-10-21
+
+### Kevin's copy of a guest message leaves his inbox as soon as SpeedX's is stored
+
+Kevin's cars are co-hosted under SpeedX, so every guest message reaches both inboxes and TATO stores SpeedX's. Kevin's copy waited two days before going to Trash, so his inbox was always full of unread guest mail that looked like messages TATO had missed. A copy is now cleared as soon as it is recognised, which only happens once SpeedX's row exists; Trash still keeps it thirty days. Booking mail from Kevin's inbox still waits two days, since SpeedX's copy may not be stored yet.
+
 ## v1.86.9 - 2026-10-21
 
 ### A conversation's Turo link can be copied, for the browser signed in to Turo

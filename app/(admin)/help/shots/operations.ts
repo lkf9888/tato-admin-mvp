@@ -88,11 +88,13 @@ export const operationsShots: Shot[] = [
   {
     id: "updates-main",
     path: "/updates",
+    setup: [{ click: { css: "main ul li button", nth: 0 } }, { wait: 1200 }],
     marks: [
-      { step: 1, target: { role: "button", name: { zh: "新订单", en: "New booking" } } },
-      { step: 2, target: { css: 'main a:text-is("订单"), main a:text-is("Order")' } },
-      { step: 3, target: { css: 'main a:text-is("会话"), main a:text-is("Conversation")' } },
-      { step: 4, target: { role: "link", name: { zh: "去 Turo 查看", en: "Open on Turo" } } },
+      { step: 1, target: { role: "button", name: { zh: "需处理", en: "Needs action" } } },
+      { step: 2, target: { placeholder: { zh: "客人 / 车牌 / 行程号", en: "Guest, plate or reservation #" } } },
+      { step: 3, target: { css: "main ul li button", nth: 0 } },
+      { step: 4, target: { role: "link", name: { zh: "去 Turo 处理", en: "Handle on Turo" } } },
+      { step: 5, target: { role: "button", name: { zh: "标记已处理", en: "Mark handled" } } },
     ],
   },
   {

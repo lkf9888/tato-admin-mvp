@@ -122,16 +122,17 @@ export const guides: Guide[] = [
   {
     key: "updates",
     title: "Updates",
-    summary: "Everything that happens on Turo as one timeline: new bookings, changes, cancellations, pickups, returns, payouts and guest messages.",
+    summary: "Every Turo email except guest messages, read like a mailbox: a list on the left, the open one in full on the right, sorted by what each needs from you.",
     sections: [
       {
-        heading: "Filter, then jump to the details",
+        heading: "Pick a category, open one to read it in full",
         shot: "updates-main",
         steps: [
-          "Press a chip at the top to see one kind, such as New booking, Cancelled or Payout; tick Needs a reply for guest messages still waiting.",
-          "Order opens the trip in TATO.",
-          "Conversation opens the guest's message thread.",
-          "Open on Turo ↗ opens the original page on Turo.",
+          "The tabs sort mail by what it needs: Needs action, Bookings, Earnings, Support & claims, Ratings, Trips & reminders. Needs action opens first when anything is waiting, with the count still open. Guest messages are on the Guest messages page.",
+          "Search for a guest, a plate or a reservation number across all updates.",
+          "Pick one to see it in full: the car, reservation, trip times (a change shows before and after), earnings and what the guest wrote, then the rest of that trip's mail and the original email. On a phone it opens full screen.",
+          "Handle on Turo ↗ opens the page on Turo. Accepting or declining a change happens there.",
+          "Once it's dealt with on Turo, Mark handled takes it off Needs action.",
         ],
       },
     ],

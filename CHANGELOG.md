@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.8 - 2026-10-21
+
+### Updates reads like a mailbox, sorted by what each Turo email needs
+
+The updates page was every inbound email in one stream: guest messages crowding out the rest, the model's coarse kinds, two lines of English per row, no way to read the mail itself, and only the newest 300. It now leaves guest messages to their own page and sorts the rest by the mail rules' groups -- needs action, bookings, earnings, support and claims, ratings, trips and reminders -- the same groups the phone notifications are chosen by; needs action opens first when anything is waiting. Each row is one Chinese line naming the guest and what happened, the car and plate, the summary, and for a request the reply-by time; two mails about one trip and event within fifteen minutes fold into one row. Opening one shows the facts read off the mail (`lib/turo-email-facts`: reservation, trip start and end with before and after for a change, earnings, location, guest phone, distance, the guest's note on a change), the buttons to act on Turo, view the order or mark it handled, the rest of that trip's mail as a timeline, and the original text. Search covers guest, plate, reservation number and the body; older pages load on request. On a phone the open update takes the screen. Reimbursement, payout, pickup, return and upcoming-trip mail have their own rule names now, which the phone notifications use too.
+
 ## v1.86.7 - 2026-10-21
 
 ### Kevin's inbox is read message by message, because Yahoo's search misses mail

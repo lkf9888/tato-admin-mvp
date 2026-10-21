@@ -64,7 +64,12 @@ const RULES: Rule[] = [
   { test: /has changed their trip|has been (?:changed|modified|extended)|trip (?:change|extension)/i, group: "booking", disposition: "trash", notify: "bookings", label: "行程已变更" },
   { test: /added another driver/i, group: "booking", disposition: "trash", notify: "bookings", label: "加了驾驶员" },
 
-  // Money.
+  // Money. The specific ones first, for what the updates page calls them.
+  { test: /has been charged for your reimbursement|accepted the reimbursement/i, group: "money", disposition: "trash", notify: "payments", label: "客人已付报销" },
+  { test: /credited your account/i, group: "money", disposition: "trash", notify: "payments", label: "报销款已入账" },
+  { test: /disputed (?:your |the )?(?:reimbursement )?invoice/i, group: "money", disposition: "trash", notify: "payments", label: "客人对报销单有异议" },
+  { test: /^(?:\([^)]*\)\s*[-–—]\s*)?reimbursement invoice$/i, group: "money", disposition: "trash", notify: "payments", label: "已开报销单" },
+  { test: /earnings are on the way|payout/i, group: "money", disposition: "trash", notify: "payments", label: "收入到账" },
   {
     test: /reimbursement|earnings are on the way|invoice approved|incidental charge|payout|payment information|(?:cleaning|smoking) report|cleaning\/smoking|refund/i,
     group: "money",
@@ -75,7 +80,11 @@ const RULES: Rule[] = [
 
   { test: /rated their trip|left you a review/i, group: "review", disposition: "trash", notify: "reviews", label: "客人评分" },
 
-  // Already on TATO's calendar, or nothing to act on.
+  // Already on TATO's calendar, or nothing to act on. Pickups, returns
+  // and trip reminders by name first, for the updates page.
+  { test: /has returned (?:your|.+[’']s )/i, group: "routine", disposition: "trash", notify: null, label: "已还车" },
+  { test: /has picked up (?:your|.+[’']s )/i, group: "routine", disposition: "trash", notify: null, label: "已取车" },
+  { test: /upcoming trip|starts soon/i, group: "routine", disposition: "trash", notify: null, label: "行程即将开始" },
   {
     test: /upcoming trip|has (?:returned|picked up) (?:your|.+[’']s )|starts soon|^reminder|protection plan|earnings plan|congratulations|how would you rate|host event|post visit summary|tell us what you thought|newsletter|tips for|welcome to turo|demand surge|long weekend|recent turo experience|snooze ends|shape the future|roundtable|community event|host release|take a stand|boost your listing|delivery setting|success manager|how did we do|love your feedback|you.re invited/i,
     group: "routine",

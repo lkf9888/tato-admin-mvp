@@ -521,19 +521,29 @@ export async function runGmailSync(input: {
   }
 
   if (mode !== "enrich" && historyAllowed) {
+    const ingestStartedAt = Date.now();
     // One inbox failing (a revoked app password) must not stop the
     // others: the primary is where guests write.
     for (const config of mailboxes) {
       try {
-        await ingestMailbox({
-          workspaceId: input.workspaceId,
-          lookbackDays: input.lookbackDays,
-          maxMessages: input.maxMessages,
-          history: input.history,
-          config,
-          fleet,
-          result,
-        });
+        // Yahoo answers a search with its newest 1,000 matches and no
+        // more, so one pass of the history run could clear 1,000 copies
+        // at most. While a pass cleared something out of a full answer,
+        // search again: the next thousand are underneath.
+        for (;;) {
+          const pass = await ingestMailbox({
+            workspaceId: input.workspaceId,
+            lookbackDays: input.lookbackDays,
+            maxMessages: input.maxMessages,
+            history: input.history,
+            startedAt: ingestStartedAt,
+            config,
+            fleet,
+            result,
+          });
+          if (!input.history || pass.searched < SEARCH_RESULT_CAP || pass.moved === 0) break;
+          if (Date.now() - ingestStartedAt > HISTORY_BUDGET_MS) break;
+        }
       } catch (error) {
         if (config.primary) throw error;
         result.mailboxErrors = [
@@ -667,6 +677,8 @@ const HISTORY_BUDGET_MS = 170_000;
  *  run asks for these only: reading every Turo envelope -- 90,000 of
  *  them in the first mailbox -- took most of the gateway's time. */
 const GUEST_MESSAGE_SUBJECT = "has sent you a message about your";
+/** The most matches Yahoo returns for one IMAP search (Gmail has no cap). */
+const SEARCH_RESULT_CAP = 1000;
 
 /** The mailbox Gmail calls Trash, whatever the account's language. */
 async function findTrashMailbox(client: ImapFlow) {
@@ -680,12 +692,16 @@ async function ingestMailbox(input: {
   maxMessages?: number;
   /** The history run: see `runGmailSync`. */
   history?: boolean;
+  /** When the run began; the history budget counts from here across passes. */
+  startedAt?: number;
   config: TuroMailbox;
   fleet: VehicleForMatch[];
   result: GmailSyncResult;
-}) {
+}): Promise<{ searched: number; moved: number }> {
   const { config, fleet, result } = input;
-  const startedAt = Date.now();
+  const startedAt = input.startedAt ?? Date.now();
+  let searched = 0;
+  let moved = 0;
   const client = new ImapFlow({
     host: config.host,
     port: config.port,
@@ -724,8 +740,9 @@ async function ingestMailbox(input: {
     };
     const uids = await client.search(query, { uid: true });
     if (!uids || uids.length === 0) {
-      return result;
+      return { searched: 0, moved: 0 };
     }
+    searched = uids.length;
 
     // Newest first, capped — a first run against a busy mailbox should
     // not try to ingest years of history in one request. The history
@@ -821,7 +838,7 @@ async function ingestMailbox(input: {
       if (!input.history || fresh.length >= cap) break;
       if (envelopesRead >= HISTORY_MAX_ENVELOPES || Date.now() - startedAt > HISTORY_BUDGET_MS / 2) break;
     }
-    result.scanned = envelopesRead;
+    result.scanned += envelopesRead;
     if (input.history) result.historySkipped = skipped;
     let downloaded = 0;
 
@@ -983,7 +1000,9 @@ async function ingestMailbox(input: {
       try {
         const trash = await findTrashMailbox(client);
         if (trash && trash !== config.mailbox) {
-          result.trashed = await moveInBatches(client, toTrash, trash);
+          const count = await moveInBatches(client, toTrash, trash);
+          result.trashed = (result.trashed ?? 0) + count;
+          moved += count;
         }
       } catch (error) {
         console.error("[gmail-inbox] moving filed mail to Trash failed", error);
@@ -992,7 +1011,9 @@ async function ingestMailbox(input: {
     if (toArchive.length > 0 && trashGuestMessagesEnabled()) {
       try {
         await ensureMailbox(client, TURO_ARCHIVE_LABEL);
-        result.archived = await moveInBatches(client, toArchive, TURO_ARCHIVE_LABEL);
+        const count = await moveInBatches(client, toArchive, TURO_ARCHIVE_LABEL);
+        result.archived = (result.archived ?? 0) + count;
+        moved += count;
       } catch (error) {
         console.error("[gmail-inbox] filing support mail under its label failed", error);
       }
@@ -1007,6 +1028,7 @@ async function ingestMailbox(input: {
       console.error("[gmail-inbox] mail notifications failed", error),
     );
   }
+  return { searched, moved };
 }
 
 /**
@@ -1014,17 +1036,21 @@ async function ingestMailbox(input: {
  *
  * One MOVE of 1,500 UIDs came back OK with most of them still in the
  * inbox, so a single command's success says nothing about each message.
- * Batches of 200, and the count is the server's own map of moved UIDs.
+ * Batches of 100, and the count is the server's own map of moved UIDs.
+ * (Yahoo acted on 100 of every 200 sent: each run's counts came out in
+ * round hundreds, half of what it was asked to move.)
  */
 async function moveInBatches(client: ImapFlow, uids: number[], destination: string) {
   let moved = 0;
-  for (let start = 0; start < uids.length; start += 200) {
-    const batch = uids.slice(start, start + 200);
+  for (let start = 0; start < uids.length; start += MOVE_BATCH) {
+    const batch = uids.slice(start, start + MOVE_BATCH);
     const response = await client.messageMove(batch, destination, { uid: true });
     moved += response && response.uidMap ? response.uidMap.size : 0;
   }
   return moved;
 }
+
+const MOVE_BATCH = 100;
 
 /** A Gmail label to move mail under, created the first time. */
 async function ensureMailbox(client: ImapFlow, path: string) {
@@ -1091,45 +1117,53 @@ async function cleanupOneMailbox(workspaceId: string, config: TuroMailbox, start
     const since = new Date();
     since.setDate(since.getDate() - HISTORY_LOOKBACK_DAYS);
     const senderTerms = config.allowedSenders.map((sender) => ({ from: sender }));
-    const uids =
-      (await client.search({ since, ...(senderTerms.length === 1 ? senderTerms[0] : { or: senderTerms }) }, { uid: true })) || [];
-    let end = uids.length;
-    while (end > 0 && Date.now() - startedAt < CLEANUP_BUDGET_MS) {
-      const start = Math.max(0, end - 2000);
-      const window = uids.slice(start, end);
-      end = start;
-      const toTrash: number[] = [];
-      const toArchive: number[] = [];
-      for await (const message of client.fetch(window, { uid: true, envelope: true, flags: true }, { uid: true })) {
-        result.scanned += 1;
-        const subject = message.envelope?.subject ?? "";
-        const date = message.envelope?.date ?? null;
-        const isStored = Boolean(message.envelope?.messageId && stored.has(message.envelope.messageId.trim()));
-        const oldEnough = Boolean(date && Date.now() - date.getTime() > CLEANUP_MIN_AGE_MS);
-        const rule = turoMailRule(subject);
-        result.byGroup[rule.group] = (result.byGroup[rule.group] ?? 0) + 1;
-        // A guest message TATO lacks is history still to import, not junk.
-        let where = rule.group === "guest" && !isStored ? null : dispositionFor(subject, date);
-        // The final sweep the operator asked for: whatever Turo mail no
-        // rule placed and nobody has opened goes to Trash too. Read mail
-        // stays (someone looked at it for a reason), and so does a guest
-        // message TATO has not stored yet.
-        if (!where && purgeUnread && !message.flags?.has("\\Seen") && !(rule.group === "guest" && !isStored)) {
-          where = "trash";
+    // Search again after a pass that moved mail out of a full answer:
+    // Yahoo returns the newest 1,000 matches only.
+    let end = 0;
+    for (;;) {
+      const uids =
+        (await client.search({ since, ...(senderTerms.length === 1 ? senderTerms[0] : { or: senderTerms }) }, { uid: true })) || [];
+      const movedBefore = result.trashed + result.archived;
+      end = uids.length;
+      while (end > 0 && Date.now() - startedAt < CLEANUP_BUDGET_MS) {
+        const start = Math.max(0, end - 2000);
+        const window = uids.slice(start, end);
+        end = start;
+        const toTrash: number[] = [];
+        const toArchive: number[] = [];
+        for await (const message of client.fetch(window, { uid: true, envelope: true, flags: true }, { uid: true })) {
+          result.scanned += 1;
+          const subject = message.envelope?.subject ?? "";
+          const date = message.envelope?.date ?? null;
+          const isStored = Boolean(message.envelope?.messageId && stored.has(message.envelope.messageId.trim()));
+          const oldEnough = Boolean(date && Date.now() - date.getTime() > CLEANUP_MIN_AGE_MS);
+          const rule = turoMailRule(subject);
+          result.byGroup[rule.group] = (result.byGroup[rule.group] ?? 0) + 1;
+          // A guest message TATO lacks is history still to import, not junk.
+          let where = rule.group === "guest" && !isStored ? null : dispositionFor(subject, date);
+          // The final sweep the operator asked for: whatever Turo mail no
+          // rule placed and nobody has opened goes to Trash too. Read mail
+          // stays (someone looked at it for a reason), and so does a guest
+          // message TATO has not stored yet.
+          if (!where && purgeUnread && !message.flags?.has("\\Seen") && !(rule.group === "guest" && !isStored)) {
+            where = "trash";
+          }
+          if (where && (isStored || oldEnough)) {
+            if (where === "trash") toTrash.push(message.uid);
+            else toArchive.push(message.uid);
+          } else {
+            result.kept += 1;
+          }
         }
-        if (where && (isStored || oldEnough)) {
-          if (where === "trash") toTrash.push(message.uid);
-          else toArchive.push(message.uid);
-        } else {
-          result.kept += 1;
+        if (toTrash.length > 0) {
+          result.trashed += await moveInBatches(client, toTrash, trash);
+        }
+        if (toArchive.length > 0) {
+          result.archived += await moveInBatches(client, toArchive, TURO_ARCHIVE_LABEL);
         }
       }
-      if (toTrash.length > 0) {
-        result.trashed += await moveInBatches(client, toTrash, trash);
-      }
-      if (toArchive.length > 0) {
-        result.archived += await moveInBatches(client, toArchive, TURO_ARCHIVE_LABEL);
-      }
+      const movedThisPass = result.trashed + result.archived - movedBefore;
+      if (uids.length < SEARCH_RESULT_CAP || movedThisPass === 0 || Date.now() - startedAt >= CLEANUP_BUDGET_MS) break;
     }
     result.remaining = end;
   } finally {

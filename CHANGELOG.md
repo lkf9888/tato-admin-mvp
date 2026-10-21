@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.5 - 2026-10-20
+
+### Kevin's Yahoo inbox clears several thousand messages a run, not five hundred
+
+Yahoo answers an IMAP search with its newest 1,000 matches only, and acted on 100 of every 200 messages in a MOVE: each history or cleanup run cleared about 500. Moves now go 100 at a time, and the history and cleanup runs search again after a pass that cleared mail out of a full answer, within the same time budget, so one run works down through the next thousands. Gmail, which has neither limit, behaves as before. The history run's `trashed` and `scanned` now add up across inboxes instead of showing the last one's.
+
 ## v1.86.4 - 2026-10-20
 
 ### A final sweep clears unread Turo mail no rule places

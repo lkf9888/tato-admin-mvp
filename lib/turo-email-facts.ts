@@ -103,7 +103,7 @@ export function readTuroEmailFacts(body: string): TuroEmailFacts {
     const willEarn = text.match(new RegExp(`You(?:’|')ll earn\\s+(${MONEY})`, "i"));
     if (willEarn) facts.earnings = willEarn[1];
   }
-  const paid = text.match(new RegExp(`Total paid\\s+(${MONEY})`, "i")) ?? text.match(new RegExp(`(?:invoice|charged|credited)[^$]{0,80}(${MONEY})`, "i"));
+  const paid = text.match(new RegExp(`Total (?:paid|charge|amount)\\s*[-–:]?\\s*(${MONEY})`, "i")) ?? text.match(new RegExp(`(?:invoice|charged|credited)[^$]{0,80}(${MONEY})`, "i"));
   if (paid) facts.amount = paid[1];
 
   const location =

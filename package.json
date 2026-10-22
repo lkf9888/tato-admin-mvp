@@ -1,6 +1,6 @@
 {
   "name": "turo-admin-mvp",
-  "version": "1.86.10",
+  "version": "1.86.11",
   "private": true,
   "scripts": {
     "test": "tsx --conditions=react-server --test tests/*.test.ts",

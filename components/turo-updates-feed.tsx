@@ -125,7 +125,7 @@ export function TuroUpdatesFeed({
       if (!response?.ok) return;
       setItems((current) => current.map((row) => (row.id === item.id ? { ...row, needsAction: false } : row)));
       setDetails((current) =>
-        current[item.id] ? { ...current, [item.id]: { ...current[item.id], handled: true } } : current,
+        current[item.id] ? { ...current, [item.id]: { ...current[item.id], handled: true, open: false } } : current,
       );
       setCounts((current) => (current ? { ...current, action: Math.max(0, current.action - 1) } : current));
     },
@@ -359,7 +359,7 @@ function itemFromDetail(detail: TuroUpdateDetail, guestLabel: string): TuroUpdat
     vehicleLabel: detail.vehicleLabel,
     plate: detail.plate,
     reservationId: detail.reservationId,
-    needsAction: detail.category === "action" && !detail.handled,
+    needsAction: detail.open,
     respondBy: detail.facts.respondBy ?? null,
     respondByAt: detail.facts.respondByAt ?? null,
   };
@@ -406,7 +406,9 @@ function UpdateDetail({
   ];
   const shown = rows.filter(([, value]) => value);
   const isAction = item.category === "action";
-  const handled = detail?.handled ?? !item.needsAction;
+  // Pending: an open request. An old one nobody marked is just history.
+  const pending = detail ? detail.open : item.needsAction;
+  const handled = detail?.handled ?? false;
 
   return (
     <article className="space-y-3">
@@ -414,7 +416,7 @@ function UpdateDetail({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={`chip ${CATEGORY_TONE[item.category]}`}>{t.categories[item.category]}</span>
           {isAction && handled ? <span className="chip chip-neutral">{t.handled}</span> : null}
-          {isAction && !handled ? deadlineChip(item) : null}
+          {pending ? deadlineChip(item) : null}
         </div>
         <h2 className="mt-1.5 text-[15px] font-bold leading-6 text-[var(--ink)]">
           {locale === "en" ? item.titleEn : item.title}
@@ -455,7 +457,7 @@ function UpdateDetail({
             target="_blank"
             rel="noopener noreferrer"
             className={`tap-press inline-flex h-8 items-center rounded-md px-3 text-[12px] font-bold ${
-              isAction && !handled ? "bg-[var(--ink)] text-white" : "border border-[var(--line)] text-[var(--ink)]"
+              pending ? "bg-[var(--ink)] text-white" : "border border-[var(--line)] text-[var(--ink)]"
             }`}
           >
             {isAction ? t.actOnTuro : t.openOnTuro} ↗
@@ -469,7 +471,7 @@ function UpdateDetail({
             {t.viewOrder}
           </Link>
         ) : null}
-        {isAction && !handled ? (
+        {pending ? (
           <button
             type="button"
             onClick={onMarkHandled}

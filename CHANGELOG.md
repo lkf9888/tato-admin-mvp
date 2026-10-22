@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.11 - 2026-10-21
+
+### Needs action counts what is still waiting, and updates name their guest
+
+On real data the new updates page said 323 things needed action: every change request, licence reminder and unanswered invoice ever imported, none of them marked. An action mail is open for three days unless marked handled; older ones stay under All without the red dot or the mark-handled button. Mail the model never read now takes its guest's name from the subject ("Jader has not responded…"), so titles name them and the SpeedX and Kevin copies of one event fold into one row. The guest-message text extractor is no longer shown on other mail, where it picked up an invoice's line items, and an invoice's amount is read from its total rather than the first figure after "invoice".
+
 ## v1.86.10 - 2026-10-21
 
 ### Kevin's copy of a guest message leaves his inbox as soon as SpeedX's is stored

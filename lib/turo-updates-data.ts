@@ -54,6 +54,29 @@ function readParsed(raw: string | null) {
   }
 }
 
+/**
+ * How long an action mail stays open without being marked handled.
+ * Turo's requests lapse within a day or two, and the years of history
+ * imported before this page existed are not waiting on anyone: counting
+ * them made "needs action" read 323 on its first day.
+ */
+const OPEN_WINDOW_MS = 3 * 24 * 3_600_000;
+
+function isOpen(category: UpdateCategory, acknowledgedAt: Date | null, receivedAt: Date) {
+  return category === "action" && !acknowledgedAt && Date.now() - receivedAt.getTime() < OPEN_WINDOW_MS;
+}
+
+/** The guest a subject names, for mail the model never read: "Jader has
+ *  not responded…", "(SPEEDX's vehicle) - Victor's trip…". */
+function subjectGuestName(subject: string) {
+  const match = bareSubject(subject).match(
+    /^(?:re:\s*)?(.+?)(?:(?:’|')s trip| has | is | wants | needs | rated | left you | added | disputed )/i,
+  );
+  const name = match?.[1]?.trim();
+  if (!name || name.length > 40 || /^(?:turo|you|your|we)\b/i.test(name)) return null;
+  return name;
+}
+
 /** Light rows scanned to sort mail into tabs: subjects only. */
 const SCAN_ROWS = 3000;
 const PAGE_ITEMS = 50;
@@ -89,7 +112,7 @@ export async function loadTuroUpdates(
     where,
     orderBy: { receivedAt: "desc" },
     take: SCAN_ROWS,
-    select: { id: true, subject: true, kind: true, acknowledgedAt: true },
+    select: { id: true, subject: true, kind: true, acknowledgedAt: true, receivedAt: true },
   });
 
   const sorted = scanned
@@ -103,7 +126,7 @@ export async function loadTuroUpdates(
     : UPDATE_CATEGORIES.reduce(
         (all, key) => {
           all[key] = sorted.filter((row) =>
-            key === "action" ? row.category === "action" && !row.acknowledgedAt : row.category === key,
+            key === "action" ? isOpen(row.category, row.acknowledgedAt, row.receivedAt) : row.category === key,
           ).length;
           return all;
         },
@@ -112,7 +135,11 @@ export async function loadTuroUpdates(
 
   // "Needs action" lists only what is still open.
   const matching = sorted.filter((row) =>
-    category === "all" ? true : category === "action" ? row.category === "action" && !row.acknowledgedAt : row.category === category,
+    category === "all"
+      ? true
+      : category === "action"
+        ? isOpen(row.category, row.acknowledgedAt, row.receivedAt)
+        : row.category === category,
   );
   // One extra to know whether a further page exists; merged pairs are
   // read whole, so take a little more than a page.
@@ -145,7 +172,7 @@ export async function loadTuroUpdates(
     const facts = readTuroEmailFacts(row.bodyText);
     const parsed = readParsed(row.parsed);
     const reservationId = facts.reservationId ?? parsed?.reservationId ?? row.order?.externalOrderId ?? null;
-    const guestName = row.guestName ?? parsed?.guestName ?? null;
+    const guestName = row.guestName ?? parsed?.guestName ?? subjectGuestName(row.subject);
     const previous = items[items.length - 1];
     if (
       previous &&
@@ -174,7 +201,7 @@ export async function loadTuroUpdates(
       vehicleLabel: vehicle ? `${vehicle.brand} ${vehicle.model}` : null,
       plate: vehicle?.plateNumber ?? null,
       reservationId,
-      needsAction: rowCategory === "action" && !row.acknowledgedAt,
+      needsAction: isOpen(rowCategory, row.acknowledgedAt, row.receivedAt),
       respondBy: facts.respondBy ?? null,
       respondByAt: facts.respondByAt ?? null,
     });
@@ -285,12 +312,16 @@ export async function loadTuroUpdateDetail(workspaceId: string, id: string) {
     fromAddress: row.fromAddress,
     receivedAt: row.receivedAt.toISOString(),
     handled: row.acknowledgedAt != null,
-    guestName: row.guestName ?? parsed?.guestName ?? null,
+    /** Still waiting on the operator: see `isOpen`. */
+    open: category ? isOpen(category, row.acknowledgedAt, row.receivedAt) : false,
+    guestName: row.guestName ?? parsed?.guestName ?? subjectGuestName(row.subject),
     account: row.turoAccount,
     summary: row.summaryZh ?? parsed?.summaryZh ?? null,
     summaryEn: parsed?.summary ?? null,
-    guestText: row.guestText,
-    guestTextZh: row.guestTextZh,
+    // Lifted by the guest-message extractor, which on other mail picks up
+    // whatever paragraph comes first -- an invoice's line items.
+    guestText: row.kind === "GUEST_MESSAGE" ? row.guestText : null,
+    guestTextZh: row.kind === "GUEST_MESSAGE" ? row.guestTextZh : null,
     body: row.bodyText,
     turoLink: row.turoLink,
     order: row.order

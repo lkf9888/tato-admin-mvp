@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.12 - 2026-10-22
+
+### Invoice mail whose subject names nobody gets its guest from the body
+
+"Reimbursement invoice" and similar subjects name no guest, so on the updates page those rows had a bare title and SpeedX's and Kevin's copies of one invoice stayed two rows. The guest is now read from the body when the subject does not say ("…has been sent to Bogdan, who has until…", "Your guest, Zhengze, has accepted…", "…from Jader's trip with your…"), which names the row and lets the two copies fold into one.
+
 ## v1.86.11 - 2026-10-21
 
 ### Needs action counts what is still waiting, and updates name their guest

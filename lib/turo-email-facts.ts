@@ -30,6 +30,9 @@ export type TuroEmailFacts = {
   location?: string;
   guestPhone?: string;
   distance?: string;
+  /** The guest, where only the body names them ("The reimbursement
+   *  invoice has been sent to Bogdan, who has until…"). */
+  guestName?: string;
   /** What the guest wrote with a trip change ("we might be early to go
    *  to the airport"), which Turo appends to the last listed change. */
   guestNote?: string;
@@ -126,6 +129,12 @@ export function readTuroEmailFacts(body: string): TuroEmailFacts {
     for (let match = last.match(known); match; match = last.match(known)) last = last.slice(match[0].length);
     if (last && !/^(?:Return to|Pickup at|Delivery)/i.test(last)) facts.guestNote = last.slice(0, 500);
   }
+
+  const named =
+    text.match(/invoice has been sent to (.+?), who has until/i) ??
+    text.match(/Your guest, (.+?), has (?:accepted|disputed|paid|declined)/i) ??
+    text.match(/from (.+?)(?:’|')s trip with your/i);
+  if (named && named[1].length <= 40) facts.guestName = named[1].trim();
 
   const respond = text.match(/You have until (.+?) to (?:respond|accept|reply)/i);
   if (respond) {

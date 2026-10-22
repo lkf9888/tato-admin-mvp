@@ -172,7 +172,7 @@ export async function loadTuroUpdates(
     const facts = readTuroEmailFacts(row.bodyText);
     const parsed = readParsed(row.parsed);
     const reservationId = facts.reservationId ?? parsed?.reservationId ?? row.order?.externalOrderId ?? null;
-    const guestName = row.guestName ?? parsed?.guestName ?? subjectGuestName(row.subject);
+    const guestName = row.guestName ?? parsed?.guestName ?? subjectGuestName(row.subject) ?? facts.guestName ?? null;
     const previous = items[items.length - 1];
     if (
       previous &&
@@ -314,7 +314,7 @@ export async function loadTuroUpdateDetail(workspaceId: string, id: string) {
     handled: row.acknowledgedAt != null,
     /** Still waiting on the operator: see `isOpen`. */
     open: category ? isOpen(category, row.acknowledgedAt, row.receivedAt) : false,
-    guestName: row.guestName ?? parsed?.guestName ?? subjectGuestName(row.subject),
+    guestName: row.guestName ?? parsed?.guestName ?? subjectGuestName(row.subject) ?? facts.guestName ?? null,
     account: row.turoAccount,
     summary: row.summaryZh ?? parsed?.summaryZh ?? null,
     summaryEn: parsed?.summary ?? null,

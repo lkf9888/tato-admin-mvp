@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.87.1 - 2026-10-22
+
+### The nav can show how many updates need action
+
+`/api/messages/counts` also returns `updatesOpen`: Turo mail that needs action, the same number as the updates page's "Needs action" tab and from the same rule (action mail, not marked handled, under three days old), for the bottom bar's Updates button. (Shipped in d9aeccb, whose subject says v1.86.14; it landed after v1.87.0, so the version is this one.)
+
 ## v1.87.0 - 2026-10-22
 
 ### Updates has its own button in the phone's bottom bar

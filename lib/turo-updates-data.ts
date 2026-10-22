@@ -92,6 +92,26 @@ const MERGE_WINDOW_MS = 15 * 60_000;
 
 const vehicleSelect = { select: { brand: true, model: true, year: true, plateNumber: true } } as const;
 
+/**
+ * How many updates need action, for the nav badge: the same count the
+ * "Needs action" tab shows, read from the same rule (`isOpen`).
+ */
+export async function countOpenUpdates(workspaceId: string) {
+  const rows = await prisma.inboundEmail.findMany({
+    where: {
+      workspaceId,
+      kind: { not: "GUEST_MESSAGE" },
+      acknowledgedAt: null,
+      receivedAt: { gte: new Date(Date.now() - OPEN_WINDOW_MS) },
+    },
+    select: { subject: true, kind: true, acknowledgedAt: true, receivedAt: true },
+  });
+  return rows.filter((row) => {
+    const category = updateCategory(row.subject, row.kind);
+    return category ? isOpen(category, row.acknowledgedAt, row.receivedAt) : false;
+  }).length;
+}
+
 export async function loadTuroUpdates(
   workspaceId: string,
   options: { category?: UpdateCategory | "all"; q?: string; before?: string | null } = {},

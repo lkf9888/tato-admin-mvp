@@ -4,6 +4,7 @@ import { requireCurrentAdminContext } from "@/lib/auth";
 import { countUnreadThreads } from "@/lib/guest-thread-state";
 import { listDueMessages } from "@/lib/message-rules";
 import { prisma } from "@/lib/prisma";
+import { countOpenUpdates } from "@/lib/turo-updates-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,17 +19,20 @@ export const dynamic = "force-dynamic";
  *   stuck; "Needs reply" on the page still counts those;
  * - pendingOrders: Turo bookings not yet on a car (the orders page's
  *   unassigned basket);
- * - scheduledDue: scheduled guest messages due now and not yet sent.
+ * - scheduledDue: scheduled guest messages due now and not yet sent;
+ * - updatesOpen: Turo mail that needs action -- the updates page's
+ *   "Needs action" count, from the same function.
  */
 export async function GET() {
   const { workspace } = await requireCurrentAdminContext();
-  const [needsReply, pendingOrders, scheduledDue] = await Promise.all([
+  const [needsReply, pendingOrders, scheduledDue, updatesOpen] = await Promise.all([
     countUnreadThreads(workspace.id),
     prisma.pendingOrder.count({ where: { workspaceId: workspace.id } }),
     listDueMessages(workspace.id).then((due) => due.length),
+    countOpenUpdates(workspace.id),
   ]);
   return NextResponse.json(
-    { needsReply, pendingOrders, scheduledDue },
+    { needsReply, pendingOrders, scheduledDue, updatesOpen },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

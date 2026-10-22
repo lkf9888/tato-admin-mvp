@@ -62,6 +62,12 @@ function readParsed(raw: string | null) {
  */
 const OPEN_WINDOW_MS = 3 * 24 * 3_600_000;
 
+/** New to the operator: not opened, not handled, and recent -- the
+ *  years of imported history were never opened and are not news. */
+function isUnread(readAt: Date | null, acknowledgedAt: Date | null, receivedAt: Date) {
+  return !readAt && !acknowledgedAt && Date.now() - receivedAt.getTime() < OPEN_WINDOW_MS;
+}
+
 function isOpen(category: UpdateCategory, acknowledgedAt: Date | null, receivedAt: Date) {
   return category === "action" && !acknowledgedAt && Date.now() - receivedAt.getTime() < OPEN_WINDOW_MS;
 }
@@ -154,6 +160,7 @@ export async function loadTuroUpdates(
           subject: true,
           receivedAt: true,
           acknowledgedAt: true,
+          readAt: true,
           guestName: true,
           summaryZh: true,
           parsed: true,
@@ -181,6 +188,7 @@ export async function loadTuroUpdates(
       new Date(previous.receivedAt).getTime() - row.receivedAt.getTime() < MERGE_WINDOW_MS
     ) {
       previous.ids.push(row.id);
+      if (isUnread(row.readAt, row.acknowledgedAt, row.receivedAt)) previous.unread = true;
       continue;
     }
     const vehicle = row.vehicle ?? row.order?.vehicle ?? null;
@@ -202,6 +210,7 @@ export async function loadTuroUpdates(
       plate: vehicle?.plateNumber ?? null,
       reservationId,
       needsAction: isOpen(rowCategory, row.acknowledgedAt, row.receivedAt),
+      unread: isUnread(row.readAt, row.acknowledgedAt, row.receivedAt),
       respondBy: facts.respondBy ?? null,
       respondByAt: facts.respondByAt ?? null,
     });
@@ -234,6 +243,8 @@ export type TuroUpdateItem = {
   plate: string | null;
   reservationId: string | null;
   needsAction: boolean;
+  /** Not opened yet; see `isUnread`. */
+  unread: boolean;
   respondBy: string | null;
   respondByAt: string | null;
 };

@@ -25,6 +25,10 @@ export type ThreadEmail = {
   avatarUrl: string | null;
   receivedAt: Date;
   acknowledgedAt: Date | null;
+  /** When the operator opened the conversation; see `unreadCount`.
+   *  Optional so callers that never show it (the agent API) need not
+   *  select it; absent reads as unread. */
+  readAt?: Date | null;
   turoLink: string | null;
   orderId: string | null;
   /** What the guest actually wrote, when the template carried it. */
@@ -53,8 +57,12 @@ export type GuestThread = {
   /** Newest first — the reason someone opens this page is the last message. */
   messages: ThreadEmail[];
   latestAt: Date;
-  /** Messages not yet marked handled. Drives the badge and the sort. */
+  /** Messages not yet marked handled: "needs reply", and the sort. */
   openCount: number;
+  /** Messages nobody has opened yet -- neither read nor handled. Drives
+   *  the red badge, which used to show `openCount` and so stayed lit
+   *  after the operator had looked. */
+  unreadCount: number;
   /** The order these messages are about, if any message matched one. */
   orderId: string | null;
   /** Newest link Turo gave us for this guest — where "reply on Turo" goes. */
@@ -99,6 +107,7 @@ export function groupIntoThreads(emails: ThreadEmail[]): GuestThread[] {
       messages,
       latestAt: newest.receivedAt,
       openCount: messages.filter((m) => !m.acknowledgedAt).length,
+      unreadCount: messages.filter((m) => !m.acknowledgedAt && !m.readAt).length,
       orderId: messages.find((m) => m.orderId)?.orderId ?? null,
       turoLink: messages.find((m) => m.turoLink)?.turoLink ?? null,
     };

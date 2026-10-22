@@ -17,7 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { MobileIconButton, MobilePageHeader } from "@/components/mobile-chrome";
 import { MessageRulesPanel } from "@/components/message-rules-panel";
@@ -41,6 +41,7 @@ type ThreadMessage = {
   guestText: string | null;
   receivedAt: string;
   acknowledgedAt: string | null;
+  readAt?: string | null;
   summary: string | null;
   summaryZh: string | null;
   summaryZhBrief: string | null;
@@ -61,6 +62,7 @@ type Thread = {
   messages: ThreadMessage[];
   latestAt: string;
   openCount: number;
+  unreadCount: number;
   orderId: string | null;
   /** Present only when there is no trip: what specifically stopped the
    *  match, so the operator knows which fix applies. */
@@ -148,6 +150,7 @@ function mergePages(pages: Page[]) {
         ...have,
         messages: [...have.messages, ...extra].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)),
         openCount: have.openCount + extra.filter((message) => !message.acknowledgedAt).length,
+        unreadCount: have.unreadCount + extra.filter((message) => !message.acknowledgedAt && !message.readAt).length,
         vehicleLabel: have.vehicleLabel ?? thread.vehicleLabel,
         vehiclePlate: have.vehiclePlate ?? thread.vehiclePlate,
         avatarUrl: have.avatarUrl ?? thread.avatarUrl,
@@ -424,6 +427,15 @@ export function GuestMessagesView({
   }
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // Messages opened since the page loaded, so the badge clears at once
+  // instead of on the next refresh.
+  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
+  const unreadIn = useCallback(
+    (thread: Thread) =>
+      thread.messages.filter((message) => !message.acknowledgedAt && !message.readAt && !readIds.has(message.id))
+        .length,
+    [readIds],
+  );
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "open" | "today" | "scheduled">("all");
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -585,6 +597,24 @@ export function GuestMessagesView({
   }
 
   const selected = threads.find((thread) => thread.key === selectedKey) ?? null;
+
+  // Opening a conversation reads it, and so does a new message arriving
+  // while it is open. Read is not handled: "needs reply" stays until
+  // marked or answered.
+  const selectedUnreadIds = selected
+    ? selected.messages.filter((message) => !message.acknowledgedAt && !message.readAt && !readIds.has(message.id)).map((message) => message.id)
+    : [];
+  const selectedUnreadKey = selectedUnreadIds.join(",");
+  useEffect(() => {
+    if (!selectedUnreadKey) return;
+    const ids = selectedUnreadKey.split(",");
+    setReadIds((current) => new Set([...current, ...ids]));
+    void fetch("/api/messages/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emailIds: ids }),
+    }).catch(() => null);
+  }, [selectedUnreadKey]);
   const order = selected?.orderId ? (ordersById.get(selected.orderId) ?? null) : null;
   function conversationFor(thread: Thread) {
     const trip = thread.orderId ? ordersById.get(thread.orderId) : null;
@@ -1067,6 +1097,7 @@ export function GuestMessagesView({
             <ul className="min-h-0 flex-1 lg:overflow-y-auto">
               {visibleThreads.map((thread) => {
                 const open = thread.openCount > 0;
+                const unread = unreadIn(thread);
                 const trip = thread.orderId ? ordersById.get(thread.orderId) : null;
                 const rowStage = tripStage(trip, t);
                 const preview =
@@ -1086,29 +1117,34 @@ export function GuestMessagesView({
                       <span className="grid min-w-0 flex-1 gap-0.5">
                         <span className="flex items-baseline justify-between gap-2">
                           <span
-                            className={`truncate text-[14px] text-[var(--ink)] ${open ? "font-bold" : "font-semibold"}`}
+                            className={`truncate text-[14px] text-[var(--ink)] ${unread > 0 ? "font-bold" : "font-semibold"}`}
                           >
                             {highlight(thread.guestName, normalizedSearch)}
                           </span>
                           <span
-                            className={`shrink-0 text-[11px] tabular-nums ${open ? "font-semibold text-[var(--brand)]" : "text-[var(--ink-soft)]"}`}
+                            className={`shrink-0 text-[11px] tabular-nums ${unread > 0 ? "font-semibold text-[var(--brand)]" : "text-[var(--ink-soft)]"}`}
                           >
                             {formatListTime(thread.latestAt, locale, t)}
                           </span>
                         </span>
                         <span className="flex items-center gap-2">
                           <span
-                            className={`line-clamp-1 min-w-0 flex-1 text-[13px] leading-[1.35] ${open ? "font-medium text-[var(--ink)]" : "text-[var(--ink-mid)]"}`}
+                            className={`line-clamp-1 min-w-0 flex-1 text-[13px] leading-[1.35] ${unread > 0 ? "font-medium text-[var(--ink)]" : "text-[var(--ink-mid)]"}`}
                           >
                             {highlight(preview, normalizedSearch)}
                           </span>
-                          {open ? (
+                          {/* Red is for what nobody has looked at yet. Read but
+                              unanswered keeps a quiet label, which the
+                              "needs reply" filter still finds. */}
+                          {unread > 0 ? (
                             <span
-                              aria-label={`${t.openBadge} ${thread.openCount}`}
+                              aria-label={`${t.unreadBadge} ${unread}`}
                               className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[10.5px] font-bold tabular-nums text-white"
                             >
-                              {thread.openCount}
+                              {unread}
                             </span>
+                          ) : open ? (
+                            <span className="shrink-0 text-[10.5px] font-semibold text-[var(--ink-soft)]">{t.openBadge}</span>
                           ) : null}
                         </span>
                         <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--ink-soft)]">

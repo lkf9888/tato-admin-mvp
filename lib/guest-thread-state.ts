@@ -44,6 +44,7 @@ export async function loadGuestThreads(
       vehicleId: true,
       receivedAt: true,
       acknowledgedAt: true,
+      readAt: true,
       turoLink: true,
       orderId: true,
       parsed: true,
@@ -131,6 +132,7 @@ export async function loadGuestThreads(
         avatarUrl: email.avatarUrl,
         receivedAt: email.receivedAt,
         acknowledgedAt: email.acknowledgedAt,
+        readAt: email.readAt,
         turoLink: email.turoLink,
         orderId: email.orderId,
         guestText: email.guestText,
@@ -172,4 +174,14 @@ export async function loadGuestThreads(
 export async function countThreadsNeedingReply(workspaceId: string) {
   const { threads, answeredKeys } = await loadGuestThreads(workspaceId);
   return threads.filter((thread) => thread.openCount > 0 && !answeredKeys.has(thread.key)).length;
+}
+
+/**
+ * Conversations with a message the operator has not opened, for the nav
+ * badge: a badge that stays lit after they have looked reads as broken.
+ * Answered and handled ones never count.
+ */
+export async function countUnreadThreads(workspaceId: string) {
+  const { threads, answeredKeys } = await loadGuestThreads(workspaceId);
+  return threads.filter((thread) => thread.unreadCount > 0 && !answeredKeys.has(thread.key)).length;
 }

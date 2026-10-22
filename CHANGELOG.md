@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.86.13 - 2026-10-22
+
+### Opening a conversation or an update marks it read
+
+Neither page had a read state: the red count on a conversation and the red dot on an update meant "not marked handled", so opening one changed nothing and they looked stuck. Inbound mail has a `readAt` now, set when the operator opens it (`POST /api/messages/read`). On the messages page the red count is unread messages and clears on opening; a conversation read but not answered shows a quiet "needs reply", which the filter still finds, and "mark handled" works as before. The nav badge counts conversations with unread messages. On the updates page the dot and bold mean unopened and clear on opening, every folded mail included; needs action and its deadline still wait for "mark handled". Only mail from the last three days can show unread there, so the imported history does not light up.
+
 ## v1.86.12 - 2026-10-22
 
 ### Invoice mail whose subject names nobody gets its guest from the body

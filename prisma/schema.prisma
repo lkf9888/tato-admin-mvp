@@ -1463,6 +1463,11 @@ model InboundEmail {
   parsed         String?
   // Set once the assistant has surfaced this to the operator.
   acknowledgedAt DateTime?
+  /// When the operator opened it on the messages or updates page. Not
+  /// the same as handled: a conversation can be read and still need a
+  /// reply. Null on everything before this existed; a handled message
+  /// counts as read.
+  readAt         DateTime?
   /// When this message was pushed to the operator's phone (WeChat or
   /// SMS). Per row rather than a time cursor, because a message only
   /// becomes a guest message once it is classified, which can be after

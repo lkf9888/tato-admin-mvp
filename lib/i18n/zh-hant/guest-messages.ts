@@ -26,6 +26,7 @@ export const guestMessagesMessages = {
       today: "今天",
       yesterday: "昨天",
       openBadge: "待回覆",
+      unreadBadge: "未讀",
       messageCount: (count: number) => `${count} 條訊息`,
       noVehicle: "未識別車輛",
       searchPlaceholder: "搜尋客人、車型、車牌或訊息內容",

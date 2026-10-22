@@ -179,6 +179,7 @@ export async function loadGuestMessagesPage(
         ...message,
         receivedAt: message.receivedAt.toISOString(),
         acknowledgedAt: message.acknowledgedAt?.toISOString() ?? null,
+        readAt: message.readAt?.toISOString() ?? null,
       })),
     })),
     orders: orders.map((order) => {

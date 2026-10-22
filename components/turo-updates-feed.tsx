@@ -101,6 +101,18 @@ export function TuroUpdatesFeed({
   const selected =
     items.find((item) => item.id === selectedId) ?? (detail ? itemFromDetail(detail, t.categories.guest) : null);
 
+  // Opening an update reads it, every mail folded into it included.
+  useEffect(() => {
+    const item = items.find((row) => row.id === selectedId);
+    if (!item?.unread) return;
+    setItems((current) => current.map((row) => (row.id === item.id ? { ...row, unread: false } : row)));
+    void fetch("/api/messages/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emailIds: item.ids }),
+    }).catch(() => null);
+  }, [selectedId, items]);
+
   useEffect(() => {
     if (!selectedId || details[selectedId]) return;
     let cancelled = false;
@@ -253,11 +265,11 @@ export function TuroUpdatesFeed({
                       <div className="flex items-center gap-1.5">
                         <span
                           aria-hidden
-                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.needsAction ? "bg-[#d64545]" : "bg-transparent"}`}
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.unread ? "bg-[#d64545]" : "bg-transparent"}`}
                         />
                         <span
                           className={`min-w-0 flex-1 truncate text-[12.5px] leading-5 text-[var(--ink)] ${
-                            item.needsAction ? "font-bold" : "font-semibold"
+                            item.unread ? "font-bold" : "font-semibold"
                           }`}
                         >
                           {locale === "en" ? item.titleEn : item.title}
@@ -360,6 +372,7 @@ function itemFromDetail(detail: TuroUpdateDetail, guestLabel: string): TuroUpdat
     plate: detail.plate,
     reservationId: detail.reservationId,
     needsAction: detail.open,
+    unread: false,
     respondBy: detail.facts.respondBy ?? null,
     respondByAt: detail.facts.respondByAt ?? null,
   };

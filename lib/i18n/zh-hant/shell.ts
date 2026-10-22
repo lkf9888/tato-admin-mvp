@@ -51,6 +51,7 @@ export const shellMessages = {
       bottomNav: {
         home: "儀表盤",
         messages: "訊息",
+        updates: "動態",
         calendar: "日曆",
         orders: "訂單",
         schedule: "排班",

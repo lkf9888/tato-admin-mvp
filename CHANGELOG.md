@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.87.0 - 2026-10-22
+
+### Updates has its own button in the phone's bottom bar
+
+- The bottom bar puts Updates (动态, /updates) between Messages and Orders: what Turo sent besides guest messages, a tap away on a phone. Seven slots now -- Dashboard, Calendar, Messages, Updates, Orders, Schedule, More -- and a team member without the Updates page does not get the button.
+- The button carries the page's unread count once the navigation badges report one for /updates.
+- In English the dashboard's bottom-bar label is "Home": "Dashboard" filled its whole 54px slot at 375px. Chinese stays 仪表盘; the help tip says which button it is.
+
 ## v1.86.13 - 2026-10-22
 
 ### Opening a conversation or an update marks it read

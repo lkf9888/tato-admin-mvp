@@ -9,6 +9,7 @@ import {
   ListChecks,
   MessageSquare,
   MoreHorizontal,
+  Radio,
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -18,8 +19,8 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * iOS-style bottom tab bar for the admin shell on mobile. Six slots —
- * five direct destinations + a "More" button that pops the rest of the
+ * iOS-style bottom tab bar for the admin shell on mobile. Seven slots —
+ * six direct destinations + a "More" button that pops the rest of the
  * navigation as a sheet. Hidden on `lg` and above; the desktop sidebar
  * takes over there.
  *
@@ -47,6 +48,7 @@ export function BottomTabBar({
   labels: {
     home: string;
     messages: string;
+    updates: string;
     calendar: string;
     orders: string;
     schedule: string;
@@ -153,6 +155,13 @@ export function BottomTabBar({
       label: labels.messages,
       Icon: MessageSquare,
       matchPrefixes: ["/messages"],
+    },
+    // What Turo sent besides guest messages, read beside them.
+    {
+      href: "/updates",
+      label: labels.updates,
+      Icon: Radio,
+      matchPrefixes: ["/updates"],
     },
     {
       href: "/orders",

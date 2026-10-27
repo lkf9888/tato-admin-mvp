@@ -34,7 +34,7 @@ type Section = {
 
 export const ACCESS_SECTIONS: Section[] = [
   { key: "/dashboard", prefixes: [] },
-  { key: "/assistant", prefixes: ["/api/assistant"] },
+  { key: "/assistant", prefixes: ["/api/assistant", "/turo-tasks"] },
   { key: "/messages", prefixes: ["/api/messages", "/agent", "/api/gmail-sync"] },
   { key: "/updates", prefixes: [] },
   { key: "/calendar", prefixes: ["/api/calendar"] },

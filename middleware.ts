@@ -12,6 +12,7 @@ import { getSiteHreflang, getSiteLocaleFromPath } from "@/lib/site-locale";
 
 const protectedPrefixes = [
   "/dashboard",
+  "/turo-tasks",
   "/vehicles",
   "/vehicle-roi",
   "/rental-estimate",

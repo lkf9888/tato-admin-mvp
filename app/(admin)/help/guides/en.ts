@@ -67,6 +67,28 @@ export const guides: Guide[] = [
     tips: ["Turo cannot be written to: when a car is booked on your own website, someone has to block those dates on Turo, or the car can be booked twice. The assistant reminds you."],
   },
   {
+    key: "turo-tasks",
+    title: "Turo to-dos",
+    summary: "What the phone assistant found still undone in the Turo app: licences and check-ins before pickup, check-outs, claims and fees within 24 hours of a return, late returns, tight turnovers.",
+    sections: [
+      {
+        heading: "See what is still undone",
+        shot: "turo-tasks-main",
+        steps: [
+          "The top line says when the phone assistant last synced and how many items are open. If it has not synced for over an hour the box turns yellow: the phone may be offline, so check the Turo app rather than rely on the list.",
+          "Anything past its deadline sits on top, in red, with how long it is overdue. The rest is grouped: before pickup, pickup, on trip, after return, closing, tickets, fleet.",
+          "Each item starts with its short code (e.g. F23), the same one the WeChat reminders use, then the job, how urgent it is, the deadline and one line of detail.",
+          "View order opens the trip in TATO; Open on Turo ↗, when shown, goes straight to Turo.",
+          "When it is done, reply \"完成 F23\" in the WeChat group (or \"无费用 F23\" when a fee check finds nothing). After the assistant's next sync, about 15 minutes, the item leaves this list.",
+        ],
+      },
+    ],
+    tips: [
+      "Every item here is the phone assistant's reading of the Turo app; TATO itself cannot see Turo's check-ins, photos or invoices. The reminder rules are set on the assistant's console.",
+      "Double bookings, trips not placed on a car and unanswered guests are alerts on the Assistant page and do not appear here again.",
+    ],
+  },
+  {
     key: "messages",
     title: "Messages",
     summary: "Every Turo guest message, grouped by conversation, with a translation beside it; write the reply here (AI can draft, rewrite and translate) and copy it to Turo.",

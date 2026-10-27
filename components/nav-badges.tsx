@@ -17,7 +17,13 @@ import { cn } from "@/lib/utils";
  * and wasteful on every click.
  */
 
-type Counts = { needsReply: number; pendingOrders: number; scheduledDue: number };
+type Counts = {
+  needsReply: number;
+  pendingOrders: number;
+  scheduledDue: number;
+  updatesOpen: number;
+  turoTasksOpen: number;
+};
 
 const POLL_INTERVAL_MS = 60_000;
 /** Coming back to the app refreshes, but not twice in quick succession. */
@@ -33,6 +39,10 @@ function badgesFrom(counts: Counts | null): Record<string, number> {
     // both are a person's job on the messages page.
     "/messages": counts.needsReply + counts.scheduledDue,
     "/orders": counts.pendingOrders,
+    // Turo mail that needs action: the updates page's "Needs action" tab.
+    "/updates": counts.updatesOpen,
+    // What the phone assistant found undone on Turo trips.
+    "/turo-tasks": counts.turoTasksOpen,
   };
 }
 
@@ -59,6 +69,8 @@ export function NavBadgeProvider({ children }: { children: React.ReactNode }) {
         needsReply: toCount(data?.needsReply),
         pendingOrders: toCount(data?.pendingOrders),
         scheduledDue: toCount(data?.scheduledDue),
+        updatesOpen: toCount(data?.updatesOpen),
+        turoTasksOpen: toCount(data?.turoTasksOpen),
       });
     } catch {
       // Offline or signed out: keep the last numbers rather than flash zero.

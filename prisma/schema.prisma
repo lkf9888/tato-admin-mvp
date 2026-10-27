@@ -190,6 +190,8 @@ model Workspace {
   billing                       WorkspaceBilling?
   inboundEmails                 InboundEmail[]
   agentTokens                   AgentToken[]
+  turoTasks                     TuroTask[]
+  turoTaskFeed                  TuroTaskFeed?
   turoConversationMessages      TuroConversationMessage[]
   assistantThreads              AssistantThread[]
   assistantAlerts               AssistantAlert[]
@@ -1652,6 +1654,71 @@ model AgentToken {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
+}
+
+/// What is still undone on a Turo trip -- check-in, the guest's licence,
+/// photos, checkout, fees to invoice within 24 hours, a late return --
+/// as the phone assistant reads it off the Turo app. TATO cannot see any
+/// of it (Turo has no API; the emails do not say), so it keeps no rules
+/// of its own here: the assistant pushes its whole open list every sync
+/// (POST /api/agent/turo-tasks) and anything missing from a push is
+/// closed. `code` is the assistant's short id (F23), the one staff
+/// answer in WeChat with "完成 F23".
+model TuroTask {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  code          String
+  /// The assistant's kind: checkin, license, photos, checkout, fees, ...
+  kind          String
+  /// Where in the trip it falls: before_pickup, pickup, on_trip,
+  /// after_return, closing, tickets, fleet. Null when the assistant
+  /// does not say.
+  stage         String?
+  /// Short name of the job, e.g. 费用核查, as the assistant words it.
+  title         String
+  /// One line: car, guest, what is missing. No phone, email or codes.
+  brief         String
+  reservationId String?
+  /// The TATO order the reservation matched, when one did. Not a
+  /// relation: a task outlives a merge or archive of its order.
+  orderId       String?
+  plate         String?
+  /// When it must be done by; past it the task is overdue.
+  dueAt         DateTime?
+  /// info | warning | critical, as the assistant ranks it.
+  severity      String    @default("warning")
+  turoUrl       String?
+  /// When the assistant first found it open.
+  openedAt      DateTime
+  /// How many times the assistant has reminded WeChat about it.
+  remindCount   Int       @default(0)
+  lastSeenAt    DateTime  @default(now())
+  /// Set when a push no longer carries it: done, waived or expired.
+  resolvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, code])
+  @@index([workspaceId, resolvedAt])
+}
+
+/// When the phone assistant last pushed its task list, so the page can
+/// say how fresh it is -- a phone off its charger stops the pushes, and
+/// a list that quietly stopped updating reads as "nothing to do".
+model TuroTaskFeed {
+  id           String   @id @default(cuid())
+  workspaceId  String   @unique
+  lastPushAt   DateTime
+  /// The assistant's own clock for the list it pushed.
+  generatedAt  DateTime?
+  openCount    Int      @default(0)
+  /// Which token pushed it (AgentToken.name), for the page footer.
+  source       String?
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 enum TuroMessageDirection {

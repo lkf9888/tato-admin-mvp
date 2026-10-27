@@ -108,6 +108,12 @@ export async function GET(request: Request) {
         summary: "Bookings Turo told us about that could not be placed on a car, with the candidates for each. These are the ones waiting on a human decision.",
       },
       {
+        path: "/api/agent/turo-tasks",
+        method: "GET",
+        summary:
+          "Open Turo tasks as last pushed by the phone assistant (check-in, licence, photos, checkout, fees, late return...), most pressing first, with feed.lastPushAt and feed.stale (no push for an hour).",
+      },
+      {
         path: "/api/agent/message-templates",
         method: "GET",
         summary:
@@ -152,6 +158,36 @@ export async function GET(request: Request) {
  * that already does it, and a rule changed there changes here.
  */
 const WRITE_ENDPOINTS: Array<{ scope: AgentScope } & Record<string, unknown>> = [
+  {
+    scope: "orders:write",
+    path: "/api/agent/turo-tasks",
+    method: "POST",
+    summary:
+      "Replace the list of open Turo tasks -- what only the Turo app shows: not checked in, licence missing, too few photos, no checkout, fees to invoice within 24 hours, a late return. Send every open task each time: a code missing from the push is closed, and an empty list closes everything. Push only after a sync that actually read the app.",
+    body: {
+      generatedAt: "optional ISO 8601. When the list was read",
+      tasks: [
+        {
+          code: "required. Your short id, unique among open tasks, e.g. \"F23\"",
+          kind: "required. e.g. checkin | license | photos | checkout | claim | fees | late | turnover | urgent",
+          stage: "optional. before_pickup | pickup | on_trip | after_return | closing | tickets | fleet",
+          title: "required. Short name of the job, e.g. \"费用核查\"",
+          brief: "required. One line: car, guest, what is missing. Never a phone, email, licence number or lockbox code",
+          reservationId: "optional. Turo reservation id; matched to the TATO trip",
+          plate: "optional",
+          dueAt: "optional ISO 8601. Past it the task shows as overdue",
+          severity: "info | warning (default) | critical",
+          turoUrl: "optional. https link on turo.com to the trip",
+          openedAt: "required ISO 8601. When you first found it open",
+          remindCount: "optional. How many reminders you have sent about it",
+        },
+      ],
+    },
+    notes: [
+      `At most 500 tasks per push.`,
+      "Returns { received, open, opened, updated, resolved }.",
+    ],
+  },
   {
     scope: "orders:write",
     path: "/api/agent/imports",

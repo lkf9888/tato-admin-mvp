@@ -61,6 +61,9 @@ export function AppShell({
       items: [
         { href: "/dashboard", label: messages.shell.nav.dashboard, icon: "dashboard" },
         { href: "/assistant", label: messages.shell.nav.assistant, icon: "assistant" },
+        // What the phone assistant found undone on Turo trips, under the
+        // assistant: both are "what needs doing", read before the rest.
+        { href: "/turo-tasks", label: messages.shell.nav.turoTasks, icon: "turoTasks" },
         { href: "/messages", label: messages.shell.nav.guestMessages, icon: "messages" },
         { href: "/updates", label: messages.shell.nav.turoUpdates, icon: "turoUpdates" },
         { href: "/calendar", label: messages.shell.nav.calendar, icon: "calendar" },

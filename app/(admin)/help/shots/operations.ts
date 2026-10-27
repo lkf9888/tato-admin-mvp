@@ -86,6 +86,16 @@ export const operationsShots: Shot[] = [
     ],
   },
   {
+    id: "turo-tasks-main",
+    path: "/turo-tasks",
+    marks: [
+      { step: 1, target: { text: { zh: "手机助理", en: "Phone assistant synced" } } },
+      { step: 2, target: { text: { zh: "已逾期", en: "Overdue" }, nth: 0 } },
+      { step: 3, target: { css: "main ul li span.font-mono", nth: 0 } },
+      { step: 4, target: { role: "link", name: { zh: "查看订单", en: "View order" } } },
+    ],
+  },
+  {
     id: "updates-main",
     path: "/updates",
     setup: [{ click: { css: "main ul li button", nth: 0 } }, { wait: 1200 }],

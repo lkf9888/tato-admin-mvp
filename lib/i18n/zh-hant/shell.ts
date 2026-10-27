@@ -37,6 +37,7 @@ export const shellMessages = {
         accountSettings: "帳戶設定",
         shareLinks: "共享連結",
         assistant: "助理",
+        turoTasks: "Turo 待辦",
         guestMessages: "客人訊息",
         turoUpdates: "動態更新",
         agent: "API 令牌",

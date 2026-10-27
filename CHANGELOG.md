@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.88.0 - 2026-10-26
+
+### What the phone assistant finds undone on Turo has a place in TATO
+
+The phone assistant (the WeChat assistant project) reads the Turo app every 15 minutes and keeps a list of what is still undone on each trip: the guest's licence and the check-in before pickup, check-in photos, a late return, a car whose last trip has not come back, check-out, and within 24 hours of a return the claim decision and the fees to invoice. Staff close items in WeChat with "完成 F23". TATO cannot see any of it -- Turo has no API and the emails do not say -- so it now keeps the assistant's list rather than rules of its own.
+
+- `POST /api/agent/turo-tasks` (orders:write) takes the whole open list each sync: new codes open, known ones update, codes missing from the push close, and an empty list closes everything. Reservations are matched to TATO trips. `GET` reads it back. Listed in the agent catalogue.
+- New tables `TuroTask` (one row per assistant code) and `TuroTaskFeed` (when the list was last pushed). A list not pushed for an hour is marked stale, since a phone off its charger would otherwise read as "nothing to do".
+- "Turo to-dos" (Turo 待办) sits in the sidebar under Assistant with its count; members who can open the Assistant can open it. The page itself is the sync session's, released alongside.
+- The navigation badges also show how many updates need action (`updatesOpen`, served since v1.87.1).
+- Help: a Turo to-dos chapter with its picture.
+
 ## v1.87.2 - 2026-10-30
 
 ### The rental site can be a page of the operator's own company site

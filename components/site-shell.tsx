@@ -8,6 +8,7 @@ import type { Messages } from "@/lib/i18n";
 import { getSiteBasePath } from "@/lib/rental-site";
 import type { LocalizedSite } from "@/lib/rental-site-content";
 import { parseAdsSendTo, parseMeasurementId } from "@/lib/site-conversion";
+import { SITE_EMBED_HIDE_CLASS, SITE_EMBED_SCRIPT } from "@/lib/site-embed";
 import { SITE_LOCALES, SITE_LOCALE_LABELS, type SiteLocale } from "@/lib/site-locale";
 
 /**
@@ -86,6 +87,8 @@ export function SiteShell({
       className="site-theme min-h-screen"
       style={accent ? ({ "--brand": accent, "--accent": accent } as React.CSSProperties) : undefined}
     >
+      {/* Framed by the operator's own site: hide the header before paint. */}
+      <script dangerouslySetInnerHTML={{ __html: SITE_EMBED_SCRIPT }} />
       {/* Inside the theme so the bar takes the site's own colour. */}
       <Suspense fallback={null}>
         <SiteRouteProgress />
@@ -113,7 +116,7 @@ export function SiteShell({
         </>
       ) : null}
 
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-white/85 backdrop-blur-md">
+      <header className={`${SITE_EMBED_HIDE_CLASS} sticky top-0 z-30 border-b border-[var(--line)] bg-white/85 backdrop-blur-md`}>
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link href={home} className="flex min-w-0 items-center gap-2.5">
             {site.logoPathname ? (

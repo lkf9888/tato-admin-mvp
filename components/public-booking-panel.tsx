@@ -35,6 +35,7 @@ import {
 import { DEFAULT_CANCELLATION_POLICY, type CancellationPolicyKey } from "@/lib/booking-changes";
 import { BusyLabel } from "@/components/booking-spinner";
 import { getLocaleTag, getMessages, type Locale } from "@/lib/i18n";
+import { openWholePage } from "@/lib/site-embed";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type CheckoutState = "idle" | "success" | "cancelled" | "error";
@@ -798,7 +799,9 @@ export function PublicBookingPanel({
       }
 
       setRedirecting(true);
-      window.location.href = payload.url;
+      // Stripe Checkout will not load in a frame; when the operator's
+      // company site frames this one, payment takes the whole window.
+      openWholePage(payload.url);
     });
   }
 

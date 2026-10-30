@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.87.2 - 2026-10-30
+
+### The rental site can be a page of the operator's own company site
+
+speedxrental.com now has a "Rent a Car" page (`/en/rent`, `/zh-CN/rent`, `/zh-TW/rent`) that frames rent.speedxrental.com, so a guest books without leaving the company site. Two things change when a site page is framed:
+
+- Its own header is hidden. The company site's nav sits right above it, and two SPEEDX headers read as a broken page. `SiteShell` runs a small inline script before paint that adds a style hiding `.site-embed-hide` only when `window.self !== window.top`; opened directly, the site is unchanged.
+- Stripe Checkout refuses to load in a frame, so the checkout redirect goes through `openWholePage` (`lib/site-embed.ts`): framed, it asks the parent page by `postMessage` to navigate the whole window -- sent only to a parent on the same domain family, never `*`, since the message carries a checkout address -- and also tries `window.top` itself as a fallback. The company site accepts the message only from the rental site's origin and only toward the rental site or checkout.stripe.com.
+
 ## v1.87.1 - 2026-10-22
 
 ### The nav can show how many updates need action

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.88.1 - 2026-10-31
+
+### The Turo to-do page shows the phone assistant's open list
+
+`/turo-tasks` reads what the phone assistant last pushed (v1.88.0): overdue tasks first in red whatever their stage, then the rest by where they fall in the trip -- before pickup, pickup, on trip, the 24 hours after return, closing, tickets, fleet, other. Each shows its short code, title, urgency, time left or overdue (refreshed each minute), the assistant's one line, plate, how often it reminded, and links to the TATO order and to Turo. The top line says when the assistant last synced; past an hour it turns amber and says the phone may be offline, and before the first push it explains what will appear. `/api/messages/counts` returns `turoTasksOpen` for the nav badge.
+
 ## v1.88.0 - 2026-10-26
 
 ### What the phone assistant finds undone on Turo has a place in TATO

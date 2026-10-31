@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { countOpenTuroTasks } from "@/lib/agent-turo-tasks";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { countUnreadThreads } from "@/lib/guest-thread-state";
 import { listDueMessages } from "@/lib/message-rules";
@@ -21,18 +22,20 @@ export const dynamic = "force-dynamic";
  *   unassigned basket);
  * - scheduledDue: scheduled guest messages due now and not yet sent;
  * - updatesOpen: Turo mail that needs action -- the updates page's
- *   "Needs action" count, from the same function.
+ *   "Needs action" count, from the same function;
+ * - turoTasksOpen: the phone assistant's open Turo to-dos (/turo-tasks).
  */
 export async function GET() {
   const { workspace } = await requireCurrentAdminContext();
-  const [needsReply, pendingOrders, scheduledDue, updatesOpen] = await Promise.all([
+  const [needsReply, pendingOrders, scheduledDue, updatesOpen, turoTasksOpen] = await Promise.all([
     countUnreadThreads(workspace.id),
     prisma.pendingOrder.count({ where: { workspaceId: workspace.id } }),
     listDueMessages(workspace.id).then((due) => due.length),
     countOpenUpdates(workspace.id),
+    countOpenTuroTasks(workspace.id),
   ]);
   return NextResponse.json(
-    { needsReply, pendingOrders, scheduledDue, updatesOpen },
+    { needsReply, pendingOrders, scheduledDue, updatesOpen, turoTasksOpen },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

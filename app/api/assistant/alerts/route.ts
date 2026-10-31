@@ -9,6 +9,7 @@ import { getI18n } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getAppUrl } from "@/lib/stripe";
 import { resolveTuroSyncWorkspace } from "@/lib/turo-sync";
+import { flushPushPlus } from "@/lib/pushplus";
 import { notifyCategory } from "@/lib/web-push";
 
 export const runtime = "nodejs";
@@ -79,6 +80,9 @@ export async function POST(request: Request) {
   }
 
   const result = await runAlertScan(workspaceId);
+  // The scheduled scan is also what retries WeChat notifications that
+  // PushPlus refused or could not take (lib/pushplus).
+  if (isScheduled) void flushPushPlus(workspaceId);
 
   // Email only from scheduled runs by default. A person clicking
   // "refresh" is already looking at the list; emailing them what they

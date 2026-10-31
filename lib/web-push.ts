@@ -4,6 +4,7 @@ import webpush from "web-push";
 
 import { ALL_CATEGORIES, parseCategories, type NotificationCategory } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { queuePushPlus } from "@/lib/pushplus";
 
 /**
  * Notifications to the operator's own browsers (Web Push).
@@ -124,6 +125,10 @@ export async function notifyCategory(workspaceId: string, category: Notification
  * service says is gone (404/410) is deleted on the spot.
  */
 export async function sendWebPush(workspaceId: string, payload: WebPushPayload, category?: NotificationCategory) {
+  // WeChat (PushPlus) is its own channel, not a fallback: the group
+  // reaches staff who have no TATO device at all. Queued, never awaited
+  // for delivery, and unable to fail this call.
+  if (category) await queuePushPlus(workspaceId, category, payload);
   if (!configure()) return { sent: 0, failed: 0, reason: "not_configured" as const };
   const subscriptions = (await prisma.webPushSubscription.findMany({ where: { workspaceId } })).filter(
     (subscription) => !category || parseCategories(subscription.categories).includes(category),

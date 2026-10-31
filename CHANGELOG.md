@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.88.2 - 2026-10-31
+
+### Notifications reach WeChat through PushPlus
+
+Every category notification -- guest messages, bookings, alerts, Turo support, earnings, ratings, staff tasks -- can now also go to WeChat through PushPlus, to the operator and to staff who scanned into the PushPlus group, without an account of their own. Mini-program subscribe messages cost one authorisation per send; PushPlus does not. Settings → Notifications has a WeChat (PushPlus) section: one switch and one set of categories for the workspace, a test button, and when it last delivered.
+
+Notifications are written to an outbox and sent in the background, spaced under PushPlus's five-per-ten-seconds limit; a failure is retried by the scheduled alert scan at 2, 4, 8, 16 and 32 minutes and dropped after six tries or a day, and nothing here can fail the step that raised the notification. The same text twice within an hour is dropped (PushPlus refuses repeats and counts them). Only the summaries already in the notifications go out, with phone numbers and email addresses stripped, since messages pass through PushPlus's servers in mainland China. Environment: `PUSHPLUS_TOKEN` (a message token made for TATO) and `PUSHPLUS_TOPIC` (the group code; without it only the token's owner receives).
+
 ## v1.88.1 - 2026-10-31
 
 ### The Turo to-do page shows the phone assistant's open list

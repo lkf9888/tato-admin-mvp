@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { PushPlusSettings } from "@/components/pushplus-settings";
 import type { Locale } from "@/lib/i18n";
 import { NOTIFICATION_CATEGORIES, type NotificationCategory } from "@/lib/notifications";
 
@@ -514,6 +515,8 @@ export function NotificationSettings({ locale }: { locale: Locale }) {
             </ul>
           ) : null}
         </section>
+
+        <PushPlusSettings locale={locale} />
 
         <div className="grid gap-3 border-t border-[var(--line)] pt-3">
           <h3 className="text-[13px] font-bold text-[var(--ink)]">{t.guestFallbackTitle}</h3>

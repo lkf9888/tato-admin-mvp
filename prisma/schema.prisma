@@ -2694,6 +2694,42 @@ model GuestMessageAlertSetting {
 /// the operator's phone added to its home screen, a desktop browser.
 /// One row per subscription endpoint; a push the browser vendor
 /// answers 404/410 for removes its row.
+/// WeChat notifications through PushPlus (pushplus.plus): one switch and
+/// one choice of categories per workspace. The token and the group code
+/// are environment variables, never stored here.
+model PushPlusSetting {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  enabled     Boolean   @default(false)
+  /// JSON array of notification categories; null means all of them.
+  categories  String?
+  lastSentAt  DateTime?
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+/// Outbox for PushPlus. A notification is written here first and sent
+/// after, so a PushPlus outage or a rate limit delays it instead of
+/// losing it; the scheduled alert scan retries what is still pending.
+model PushPlusMessage {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  category      String
+  title         String
+  content       String
+  /// pending | sent | failed (gave up after retries or too old)
+  status        String    @default("pending")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([workspaceId, status, nextAttemptAt])
+  @@index([workspaceId, createdAt])
+}
+
 model WebPushSubscription {
   id            String    @id @default(cuid())
   workspaceId   String

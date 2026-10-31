@@ -2694,13 +2694,20 @@ model GuestMessageAlertSetting {
 /// the operator's phone added to its home screen, a desktop browser.
 /// One row per subscription endpoint; a push the browser vendor
 /// answers 404/410 for removes its row.
-/// WeChat notifications through PushPlus (pushplus.plus): one switch and
-/// one choice of categories per workspace. The token and the group code
-/// are environment variables, never stored here.
+/// WeChat notifications through PushPlus (pushplus.plus): one switch,
+/// one choice of categories, and the workspace's own PushPlus account.
+/// Each workspace brings its own token, so one operator's quota and
+/// group never carry another's notifications.
 model PushPlusSetting {
   id          String    @id @default(cuid())
   workspaceId String    @unique
   enabled     Boolean   @default(false)
+  /// The workspace's PushPlus message token. Never sent back to the
+  /// browser whole -- the settings page sees only its last four.
+  token       String?
+  /// The PushPlus group code (一对多消息); without it only the token's
+  /// owner receives.
+  topic       String?
   /// JSON array of notification categories; null means all of them.
   categories  String?
   lastSentAt  DateTime?

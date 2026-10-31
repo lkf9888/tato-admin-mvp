@@ -24,9 +24,9 @@ import { getAppUrl } from "@/lib/stripe";
  * phone numbers and email addresses are stripped from the text, and
  * nothing that carries a licence or ID is ever passed in.
  *
- * Environment:
- *   PUSHPLUS_TOKEN  a message token made for TATO in the PushPlus console
- *   PUSHPLUS_TOPIC  the group code; without it only the token's owner gets it
+ * Each workspace brings its own PushPlus account: the message token and
+ * the group code are entered on its settings page and stored with it,
+ * so one operator's quota and group never carry another's messages.
  */
 
 const ENDPOINT = "https://www.pushplus.plus/send";
@@ -42,17 +42,13 @@ const MAX_AGE_MS = 24 * 3_600_000;
  *  refusal against the daily quota. */
 const DEDUPE_WINDOW_MS = 60 * 60_000;
 
-export function getPushPlusConfig() {
-  const token = process.env.PUSHPLUS_TOKEN?.trim() || null;
-  const topic = process.env.PUSHPLUS_TOPIC?.trim() || null;
-  return { token, topic, configured: Boolean(token) };
-}
-
 export async function getPushPlusSetting(workspaceId: string) {
   const row = await prisma.pushPlusSetting.findUnique({ where: { workspaceId } });
   return {
     enabled: row?.enabled ?? false,
     categories: parseCategories(row?.categories),
+    token: row?.token ?? null,
+    topic: row?.topic ?? null,
     lastSentAt: row?.lastSentAt ?? null,
     lastError: row?.lastError ?? null,
   };
@@ -60,7 +56,7 @@ export async function getPushPlusSetting(workspaceId: string) {
 
 export async function savePushPlusSetting(
   workspaceId: string,
-  input: { enabled?: boolean; categories?: NotificationCategory[] },
+  input: { enabled?: boolean; categories?: NotificationCategory[]; token?: string; topic?: string },
 ) {
   const categories = input.categories
     ? (() => {
@@ -70,10 +66,19 @@ export async function savePushPlusSetting(
     : undefined;
   await prisma.pushPlusSetting.upsert({
     where: { workspaceId },
-    create: { workspaceId, enabled: input.enabled ?? false, categories: categories ?? null },
+    create: {
+      workspaceId,
+      enabled: input.enabled ?? false,
+      categories: categories ?? null,
+      token: input.token?.trim() || null,
+      topic: input.topic?.trim() || null,
+    },
     update: {
       ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
       ...(categories === undefined ? {} : { categories }),
+      // An empty string clears it; absent leaves it as it was.
+      ...(input.token === undefined ? {} : { token: input.token.trim() || null }),
+      ...(input.topic === undefined ? {} : { topic: input.topic.trim() || null }),
     },
   });
 }
@@ -103,9 +108,8 @@ export async function queuePushPlus(
   payload: { title: string; body: string; url: string },
 ) {
   try {
-    if (!getPushPlusConfig().configured) return;
     const setting = await getPushPlusSetting(workspaceId);
-    if (!setting.enabled || !setting.categories.includes(category)) return;
+    if (!setting.token || !setting.enabled || !setting.categories.includes(category)) return;
 
     const title = scrub(payload.title).slice(0, 100);
     const body = scrub(payload.body).slice(0, 1_500);
@@ -137,7 +141,7 @@ export async function flushPushPlus(workspaceId: string) {
   let sent = 0;
   let failed = 0;
   try {
-    const { token, topic } = getPushPlusConfig();
+    const { token, topic } = await getPushPlusSetting(workspaceId);
     if (!token) return { sent, failed, skipped: "not_configured" as const };
 
     // Too old to be worth sending: give up on them quietly.
@@ -208,7 +212,7 @@ async function sendOne(token: string, topic: string | null, title: string, conte
 
 /** The settings panel's test: straight to PushPlus, bypassing the outbox. */
 export async function sendPushPlusTest(workspaceId: string) {
-  const { token, topic } = getPushPlusConfig();
+  const { token, topic } = await getPushPlusSetting(workspaceId);
   if (!token) return { ok: false as const, error: "not_configured" };
   const result = await sendOne(
     token,

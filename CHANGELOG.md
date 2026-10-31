@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.88.3 - 2026-10-31
+
+### Each account brings its own PushPlus token, set in Settings
+
+The PushPlus token and group code are no longer environment variables: each workspace enters its own in Settings → Notifications → WeChat (PushPlus), so another operator who wants WeChat notifications registers their own PushPlus account instead of sending through the first operator's quota and group. The token is stored with the workspace and never returned to the browser whole -- the page shows its last four characters, and it can be replaced or removed. The section only appears when the interface is in Simplified Chinese, since PushPlus is a mainland-China service. `PushPlusSetting` gains two nullable columns, `token` and `topic`.
+
 ## v1.88.2 - 2026-10-31
 
 ### Notifications reach WeChat through PushPlus

@@ -4,7 +4,6 @@ import { z } from "zod";
 import { requireCurrentAdminContext } from "@/lib/auth";
 import { isNotificationCategory } from "@/lib/notifications";
 import {
-  getPushPlusConfig,
   getPushPlusQueueStats,
   getPushPlusSetting,
   savePushPlusSetting,
@@ -15,8 +14,8 @@ export const runtime = "nodejs";
 
 /**
  * WeChat notifications through PushPlus, for the settings page: GET the
- * state, PATCH the switch and categories, POST a test message. The token
- * and group code live in the environment and are never returned.
+ * state, PATCH the switch, categories, token and group code, POST a test
+ * message. The token is never returned whole -- only its last four.
  */
 async function context() {
   try {
@@ -27,11 +26,12 @@ async function context() {
 }
 
 async function status(workspaceId: string) {
-  const config = getPushPlusConfig();
   const [setting, queue] = await Promise.all([getPushPlusSetting(workspaceId), getPushPlusQueueStats(workspaceId)]);
   return {
-    configured: config.configured,
-    group: Boolean(config.topic),
+    configured: Boolean(setting.token),
+    tokenTail: setting.token ? setting.token.slice(-4) : null,
+    topic: setting.topic,
+    group: Boolean(setting.topic),
     enabled: setting.enabled,
     categories: setting.categories,
     lastSentAt: setting.lastSentAt?.toISOString() ?? null,
@@ -49,6 +49,8 @@ export async function GET() {
 const patchSchema = z.object({
   enabled: z.boolean().optional(),
   categories: z.array(z.string()).max(20).optional(),
+  token: z.string().max(100).optional(),
+  topic: z.string().max(100).optional(),
 });
 
 export async function PATCH(request: Request) {
@@ -59,6 +61,8 @@ export async function PATCH(request: Request) {
   await savePushPlusSetting(ctx.workspace.id, {
     enabled: parsed.data.enabled,
     categories: parsed.data.categories?.filter(isNotificationCategory),
+    token: parsed.data.token,
+    topic: parsed.data.topic,
   });
   return NextResponse.json(await status(ctx.workspace.id));
 }

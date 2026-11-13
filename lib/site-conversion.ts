@@ -92,40 +92,19 @@ export function sendConversionEvents(
   }
 }
 
-/** How long a framed landing without ad parameters holds its page_view. */
-export const FRAMED_PAGE_VIEW_DELAY_MS = 3000;
-
 /**
  * The inline script that loads the site's Google tags.
  *
- * Two corrections to what gtag would record on its own:
- *
- * - Back from paying, the referrer is Stripe. Told to ignore it, GA4
- *   keeps the source the visit already had instead of crediting the
- *   booking to checkout.stripe.com; a source carried back on the
- *   address (lib/site-attribution.ts) still wins over both.
- * - The company site renders its frame without the ad parameters and
- *   swaps them in once its page is ready, so the booking site loads
- *   twice and the first load would record a sourceless page_view and
- *   start the visit as "direct". So the first page of a framed visit
- *   that arrives without ad parameters holds its `config` -- which is
- *   what sends the page_view -- until the visitor does something or a
- *   few seconds pass. A frame that is swapped in the meantime never
- *   sends it; a visitor who really came without parameters is counted
- *   a moment late.
+ * Back from paying, the referrer is Stripe. Told to ignore it, GA4 keeps
+ * the source the visit already had instead of crediting the booking to
+ * checkout.stripe.com; a source carried back on the address
+ * (lib/site-attribution.ts) still wins over both.
  */
-export function buildSiteAnalyticsScript(tagIds: string[], delayMs = FRAMED_PAGE_VIEW_DELAY_MS) {
+export function buildSiteAnalyticsScript(tagIds: string[]) {
   const configs = tagIds.map((id) => `gtag('config',${JSON.stringify(id)},o);`).join("");
   return [
     "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());",
     `var o=/(^|\\.)stripe\\.com$/.test((function(){try{return new URL(document.referrer).hostname}catch(e){return""}})())?{ignore_referrer:true}:{};`,
-    `var done=false;function go(){if(done)return;done=true;${configs}}`,
-    "var framed;try{framed=window.self!==window.top}catch(e){framed=true}",
-    "var tagged=/[?&](gclid|gbraid|wbraid|utm_[a-z]+)=/.test(location.search);",
-    // Marked on the frame's own window.name: it survives the company
-    // site swapping the address, and a new frame (a later visit) starts
-    // without it, where sessionStorage would outlive the frame.
-    'var first=window.name!=="tato-frame-seen";if(framed)window.name="tato-frame-seen";',
-    `if(framed&&!tagged&&first){setTimeout(go,${Math.max(0, Math.round(delayMs))});["pointerdown","keydown","touchstart","scroll"].forEach(function(t){addEventListener(t,go,{once:true,passive:true,capture:true})})}else{go()}`,
+    configs,
   ].join("");
 }

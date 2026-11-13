@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.88.5 - 2026-11-13
+
+### A framed visit reports its page_view at once again
+
+v1.88.4 held the page_view of a framed first load without ad parameters for up to 3 seconds, because the company site loaded the booking site twice (first without the parameters, then with them). The company site now sets the frame's final address once (speedx_auto 44bbc37), so the hold only had a cost: a visitor without parameters who left within 3 seconds went uncounted, and bounce rate read low. `buildSiteAnalyticsScript` drops the hold and its `window.name` marker; ignoring stripe.com as the referrer and carrying the ad source to the thank-you page are unchanged.
+
 ## v1.88.4 - 2026-11-13
 
 ### A booking from an ad is credited to the ad, not to Stripe

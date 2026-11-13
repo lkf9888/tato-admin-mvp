@@ -35,6 +35,7 @@ import {
 import { DEFAULT_CANCELLATION_POLICY, type CancellationPolicyKey } from "@/lib/booking-changes";
 import { BusyLabel } from "@/components/booking-spinner";
 import { getLocaleTag, getMessages, type Locale } from "@/lib/i18n";
+import { recallAttribution } from "@/lib/site-attribution";
 import { openWholePage } from "@/lib/site-embed";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -784,6 +785,8 @@ export function PublicBookingPanel({
       if (appliedCoupon) formData.set("couponCode", appliedCoupon.code);
       for (const addOn of selectedAddOns) formData.append("addOnId", addOn.id);
       formData.set("signature", signature);
+      // The ad that brought them, back onto the thank-you page's address.
+      formData.set("attribution", JSON.stringify(recallAttribution()));
       formData.set("licenseFront", licenseFront);
       formData.set("licenseBack", licenseBack);
 

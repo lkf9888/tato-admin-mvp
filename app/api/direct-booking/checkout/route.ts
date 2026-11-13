@@ -33,6 +33,7 @@ import {
 import { listBookingAddOns } from "@/lib/booking-add-ons-server";
 import { prisma } from "@/lib/prisma";
 import { getBookingReturnUrls } from "@/lib/rental-site";
+import { appendAttribution, parseAttribution } from "@/lib/site-attribution";
 import { DEFAULT_BOOKING_TIME, zonedDateTimeToUtc } from "@/lib/booking-time";
 import type { CouponDiscount } from "@/lib/booking-coupons";
 import {
@@ -211,7 +212,14 @@ async function readCheckoutRequest(request: Request) {
   const rawLocale = formData.get("locale");
   const siteLocale = isSiteLocale(rawLocale) ? rawLocale : "en";
 
-  return { parsed, licenseFront, licenseBack, siteLocale, signature };
+  return {
+    parsed,
+    licenseFront,
+    licenseBack,
+    siteLocale,
+    signature,
+    attribution: parseAttribution(formData.get("attribution")),
+  };
 }
 
 export async function POST(request: Request) {
@@ -220,7 +228,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Stripe is not configured." }, { status: 400 });
     }
 
-    const { parsed, licenseFront, licenseBack, siteLocale, signature } =
+    const { parsed, licenseFront, licenseBack, siteLocale, signature, attribution } =
       await readCheckoutRequest(request);
     // When and from where the renter signed, for the agreement's audit
     // trail; the webhook applies the signature after payment.
@@ -624,7 +632,10 @@ export async function POST(request: Request) {
         ? { expires_at: Math.floor(Date.now() / 1000) + COUPON_HOLD_MINUTES * 60 }
         : {}),
       locale: getStripeCheckoutLocale(siteLocale),
-      success_url: successUrl,
+      // The ad that brought the renter rides back on the thank-you
+      // page's address, where gtag credits the purchase to it rather
+      // than to checkout.stripe.com (lib/site-attribution.ts).
+      success_url: appendAttribution(successUrl, attribution),
       cancel_url: cancelUrl,
       customer_email: parsed.renterEmail,
       // A customer holding the card, so a late return or an early

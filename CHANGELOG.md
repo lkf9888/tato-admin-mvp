@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.88.4 - 2026-11-13
+
+### A booking from an ad is credited to the ad, not to Stripe
+
+The rental site reports a paid booking to GA4 (`purchase`) and Google Ads (`conversion`) from the thank-you page, but which ad brought the renter was lost on the way: `gclid` and `utm_*` are only on the landing address (speedxrental.com/en/rent now passes them into the framed site's `src`), every click after that drops them, and the renter comes back from checkout.stripe.com with Stripe as the referrer.
+
+- The landing page keeps `gclid`, `gbraid`, `wbraid` and `utm_*` in localStorage (`lib/site-attribution.ts`), one store per site so sites sharing the platform host stay apart, for 30 days, a newer click replacing the whole set. Pages Stripe sends renters back to (`?checkout=`) are not taken for a new click. With storage blocked, an in-memory copy still reaches the same visit's checkout.
+- Checkout posts them with the booking, and the server appends them to Stripe's `success_url` (string work, so `{CHECKOUT_SESSION_ID}` survives). The thank-you page then has the source in its own address, where gtag reads it before the purchase is reported. Values are whitelisted, length-limited, and lone surrogates dropped so a malformed value cannot fail checkout after a coupon is reserved.
+- Back from Stripe, the site's gtag config sets `ignore_referrer`, so a booking without carried parameters keeps the visit's own source instead of becoming a stripe.com referral.
+- The company site renders its frame without the parameters and swaps them in once hydrated, so the booking site loads twice. The first page of a framed visit that arrives without ad parameters holds its `config` (which sends the page_view) until the visitor acts or 3 seconds pass, so the swapped-out load does not record a sourceless page_view or start the visit as direct. The frame marks itself on `window.name`, which survives the swap and is fresh in a new frame. A parent slower than 3 seconds still records one.
+- The analytics bootstrap moved into `buildSiteAnalyticsScript` (`lib/site-conversion.ts`). The conversion value is unchanged: contract total less deposit and tax.
+
 ## v1.88.3 - 2026-10-31
 
 ### Each account brings its own PushPlus token, set in Settings

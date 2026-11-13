@@ -2,12 +2,13 @@ import Link from "next/link";
 import Script from "next/script";
 import { Suspense } from "react";
 
+import { SiteAttributionCapture } from "@/components/site-attribution";
 import { SiteRouteProgress } from "@/components/site-route-progress";
 
 import type { Messages } from "@/lib/i18n";
 import { getSiteBasePath } from "@/lib/rental-site";
 import type { LocalizedSite } from "@/lib/rental-site-content";
-import { parseAdsSendTo, parseMeasurementId } from "@/lib/site-conversion";
+import { buildSiteAnalyticsScript, parseAdsSendTo, parseMeasurementId } from "@/lib/site-conversion";
 import { SITE_EMBED_HIDE_CLASS, SITE_EMBED_SCRIPT } from "@/lib/site-embed";
 import { SITE_LOCALES, SITE_LOCALE_LABELS, type SiteLocale } from "@/lib/site-locale";
 
@@ -93,6 +94,7 @@ export function SiteShell({
       <Suspense fallback={null}>
         <SiteRouteProgress />
       </Suspense>
+      <SiteAttributionCapture />
       {/* Inter, as on the operator's company site. Latin only: the CJK
           text falls through to PingFang / Noto, which read better than
           any web font at these sizes and cost nothing to load. */}
@@ -110,8 +112,9 @@ export function SiteShell({
             src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`}
             strategy="afterInteractive"
           />
+          {/* lib/site-conversion.ts says what this corrects. */}
           <Script id="site-analytics" strategy="afterInteractive">
-            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());${tagIds.map((id) => `gtag('config',${JSON.stringify(id)});`).join("")}`}
+            {buildSiteAnalyticsScript(tagIds)}
           </Script>
         </>
       ) : null}

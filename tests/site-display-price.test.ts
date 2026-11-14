@@ -25,8 +25,8 @@ function days(from: string, count: number) {
 }
 
 /** A season at `flat` everywhere, with the given days priced differently. */
-function season(flat: number, special: Record<string, number> = {}) {
-  return { ...Object.fromEntries(days('2027-06-01', 400).map((day) => [day, flat])), ...special };
+function season(flat: number, special: Record<string, number> = {}, from = '2027-06-01') {
+  return { ...Object.fromEntries(days(from, 400).map((day) => [day, flat])), ...special };
 }
 
 function input(overrides: Partial<FromPriceInput> = {}): FromPriceInput {
@@ -220,28 +220,32 @@ test('the licence surcharge comes from the two fees, never a fixed $10', () => {
   assert.equal(getLicenceSurcharge(29, null), 0);
 });
 
+// Clock changes are tested on 2025's: BC moved to permanent daylight time
+// from November 2026 (tzdata 2026e, which production's Node 24 ships), so
+// Vancouver has no clock change after that. The code reads the zone
+// through Intl and follows whichever rule the runtime knows.
 test('"today" is Vancouver\'s, across midnight UTC and a clock change', () => {
-  // 23:30 on 13 March in Vancouver is already 14 March in UTC, and the
-  // clocks go forward that night.
-  const lateNight = new Date('2027-03-14T07:30:00Z');
+  // 23:30 on 8 March 2025 in Vancouver is already 9 March in UTC, and the
+  // clocks went forward that night.
+  const lateNight = new Date('2025-03-09T07:30:00Z');
   const from = getFromDailyPrice(
-    input({ seasonalRates: season(70, { '2027-03-13': 20, '2027-03-14': 90 }) }),
+    input({ seasonalRates: season(70, { '2025-03-08': 20, '2025-03-09': 90 }, '2025-02-01') }),
     lateNight,
   );
-  assert.equal(from?.pickupDate, '2027-03-13');
+  assert.equal(from?.pickupDate, '2025-03-08');
   assert.equal(from?.pickupTime, '23:30');
   assert.equal(from?.dailyPrice, 49);
 });
 
 test('a "from" price is exactly what checkout charges for its own trip, clock change included', () => {
-  // The clocks go back on 7 November 2027. With no grace and a two-day
+  // The clocks went back on 2 November 2025. With no grace and a two-day
   // minimum, the trip found must be charged exactly two days.
   const policy = input({
     returnGraceMinutes: 0,
     minimumRentalDays: 2,
-    seasonalRates: season(70, { '2027-11-06': 20, '2027-11-07': 60 }),
+    seasonalRates: season(70, { '2025-11-01': 20, '2025-11-02': 60 }, '2025-10-01'),
   });
-  const now = new Date('2027-10-20T17:00:00Z');
+  const now = new Date('2025-10-20T17:00:00Z');
   const from = getFromDailyPrice(policy, now)!;
   const quote = getDirectBookingQuote({
     pickupDate: from.pickupDate,
@@ -254,7 +258,7 @@ test('a "from" price is exactly what checkout charges for its own trip, clock ch
     weeklyDiscountPercent: policy.weeklyDiscountPercent,
     seasonalRates: policy.seasonalRates,
   });
-  assert.equal(from.pickupDate, '2027-11-06');
+  assert.equal(from.pickupDate, '2025-11-01');
   assert.equal(quote.days, 2);
   assert.equal(from.dailyPrice, getTripDailyPrice(quote));
   assert.equal(from.dailyPrice, 69);
@@ -279,9 +283,9 @@ test('a long grace never lets a shorter trip pass for the minimum', () => {
 });
 
 test('chosen dates across the autumn clock change are averaged over the days charged', () => {
-  // 6 to 7 November at 10:00 is 25 hours: two charged days with no grace.
-  const policy = { ...input({ returnGraceMinutes: 0 }), seasonalRates: season(70, { '2027-11-06': 20, '2027-11-07': 100 }) };
-  assert.equal(getRangeDailyPrice(policy, '2027-11-06', '2027-11-07'), 89);
+  // 1 to 2 November 2025 at 10:00 was 25 hours: two charged days with no grace.
+  const policy = { ...input({ returnGraceMinutes: 0 }), seasonalRates: season(70, { '2025-11-01': 20, '2025-11-02': 100 }, '2025-10-01') };
+  assert.equal(getRangeDailyPrice(policy, '2025-11-01', '2025-11-02'), 89);
 });
 
 test('charging is unchanged: the quote and the Stripe amounts for a fixed booking', () => {

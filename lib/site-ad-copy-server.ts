@@ -3,7 +3,7 @@ import "server-only";
 import { OrderAttachmentKind } from "@prisma/client";
 
 import { listBookingLocations } from "@/lib/booking-locations";
-import { renterDailyPrice, resolveBookingPolicy } from "@/lib/booking-policy";
+import { resolveBookingPolicy } from "@/lib/booking-policy";
 import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
 import { kimiChat } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +12,13 @@ import { verifyAdRewrite, type AdDraft, type AdFacts } from "@/lib/site-ad-copy"
 import { isImageAttachment } from "@/lib/uploads";
 import { parseVehicleFeatures } from "@/lib/vehicle-features";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
+import {
+  buildSeasonalRateMap,
+  getBookingWindowDayKeys,
+  getRateSeasonality,
+} from "@/lib/rental-estimate/rate-seasonality-server";
+import { loadPriceOverridesForBooking } from "@/lib/vehicle-price-overrides";
+import { fromPriceInputFor, getFromDailyPrice, getLicenceSurcharge } from "@/lib/site-display-price";
 
 /**
  * One car's ad facts, read from the same places the booking page reads
@@ -26,6 +33,16 @@ export async function loadAdFacts(workspaceId: string, vehicleId: string): Promi
           where: { isArchived: false, kind: OrderAttachmentKind.photo },
           select: { contentType: true, filename: true },
         },
+        // What can still block a booking: upcoming trips, and ones back
+        // within the longest turnaround buffer (48 h).
+        orders: {
+          where: {
+            isArchived: false,
+            status: { not: "cancelled" },
+            returnDatetime: { gte: new Date(Date.now() - 3 * 86_400_000) },
+          },
+          select: { pickupDatetime: true, returnDatetime: true, status: true, isArchived: true },
+        },
       },
     }),
     getWorkspaceBookingPolicy(workspaceId),
@@ -36,6 +53,27 @@ export async function loadAdFacts(workspaceId: string, vehicleId: string): Promi
   const terms = resolveBookingPolicy(fleetPolicy, vehicle);
   const rate = resolveVehicleDailyRate(vehicle, fleetPolicy);
   const location = locations.find((each) => each.isDefault) ?? locations[0] ?? null;
+  // The car page's own "from" price (TT-20): the cheapest trip bookable
+  // in the next 90 days, priced as checkout prices it. Not the flat rate.
+  const dailyRate = rate.dailyRate ?? 0;
+  const [dailyRateOverrides, seasonality] = isVehicleBookable(rate)
+    ? await Promise.all([loadPriceOverridesForBooking(vehicle.id), getRateSeasonality(workspaceId)])
+    : [{}, null];
+  const fromPrice =
+    isVehicleBookable(rate) && seasonality
+      ? getFromDailyPrice(
+          fromPriceInputFor({
+            dailyRate,
+            policy: terms,
+            dailyRateOverrides,
+            seasonalRates:
+              rate.source === "suggested"
+                ? buildSeasonalRateMap(dailyRate, getBookingWindowDayKeys(), seasonality)
+                : {},
+            orders: vehicle.orders,
+          }),
+        )
+      : null;
   // Only a car the site actually shows has a page to send people to.
   const listed = Boolean(site?.isPublished && vehicle.directBookingEnabled && !vehicle.isArchived);
   return {
@@ -44,7 +82,9 @@ export async function loadAdFacts(workspaceId: string, vehicleId: string): Promi
     year: vehicle.year,
     features: parseVehicleFeatures(vehicle.bookingFeatures),
     intro: vehicle.bookingIntro?.trim() || null,
-    dailyFrom: isVehicleBookable(rate) ? renterDailyPrice(rate.dailyRate ?? 0, terms.insuranceFee) : null,
+    dailyFrom: fromPrice?.dailyPrice ?? null,
+    licenceSurcharge: getLicenceSurcharge(terms.insuranceFee, terms.insuranceFeeNonLocal),
+    isPriced: isVehicleBookable(rate),
     weeklyDiscountPercent: terms.weeklyDiscountPercent,
     minimumRentalDays: terms.minimumRentalDays,
     dailyKmAllowance: terms.dailyKmAllowance,

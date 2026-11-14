@@ -17,7 +17,8 @@ import {
   getSiteUrl,
 } from "@/lib/rental-site";
 import { prisma } from "@/lib/prisma";
-import { renterDailyPrice } from "@/lib/booking-policy";
+import { TripPriceProvider, VehicleDailyPrice } from "@/components/site-vehicle-price";
+import { fromPriceInputFor, getFromDailyPrice, getLicenceSurcharge } from "@/lib/site-display-price";
 import { getBookingPolicyForVehicle } from "@/lib/booking-policy-server";
 import { getWorkspaceAgreementClauses } from "@/lib/rental-agreement-clauses";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
@@ -217,6 +218,13 @@ export default async function ReserveVehiclePage({
   const hostPayoutsReady = Boolean(
     connectSnapshot?.accountId && connectSnapshot.chargesEnabled,
   );
+  // As on a site's car page (TT-20): before dates are chosen, the
+  // cheapest trip bookable in the next 90 days, not the flat rate.
+  const fromDailyPrice =
+    getFromDailyPrice(
+      fromPriceInputFor({ dailyRate, policy, dailyRateOverrides, seasonalRates, orders: vehicle.orders }),
+    )?.dailyPrice ?? null;
+  const licenceSurcharge = getLicenceSurcharge(policy.insuranceFee, policy.insuranceFeeNonLocal);
   const today = new Date();
   const defaultPickupDate = toDateInputValue(addDays(today, 1));
   const defaultReturnDate = toDateInputValue(addDays(today, 4));
@@ -226,6 +234,7 @@ export default async function ReserveVehiclePage({
       : "idle";
 
   return (
+    <TripPriceProvider>
     <main className="min-h-screen bg-[var(--page)] px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[92rem] space-y-5">
         <header className="flex flex-col gap-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -268,10 +277,13 @@ export default async function ReserveVehiclePage({
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
                     {reserveMessages.rateLabel}
                   </p>
-                  <p className="mt-3 text-2xl font-semibold text-[var(--ink)]">
-                    {/* Insurance included: one price, no extras. */}
-                    {formatCurrency(renterDailyPrice(dailyRate, policy.insuranceFee), locale)}
-                  </p>
+                  {/* Insurance included: one price, no extras. */}
+                  <VehicleDailyPrice
+                    locale={locale}
+                    fromDailyPrice={fromDailyPrice}
+                    licenceSurcharge={licenceSurcharge}
+                    className="mt-3 text-2xl font-semibold text-[var(--ink)]"
+                  />
                 </div>
                 <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]">
@@ -322,5 +334,6 @@ export default async function ReserveVehiclePage({
         </section>
       </div>
     </main>
+    </TripPriceProvider>
   );
 }

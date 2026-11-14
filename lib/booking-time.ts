@@ -33,18 +33,34 @@ export function isBookingTime(value: string | null | undefined): value is string
   return typeof value === "string" && TIME_PATTERN.test(value);
 }
 
+/**
+ * One formatter per zone and shape, kept. Building an
+ * `Intl.DateTimeFormat` costs far more than using one, and a listing
+ * that prices a fleet converts thousands of times per request.
+ */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+function zoneFormatter(kind: "offset" | "parts", timeZone: string) {
+  const key = `${kind}|${timeZone}`;
+  let formatter = formatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(kind === "offset" ? "en-US" : "en-CA", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      ...(kind === "offset" ? { second: "2-digit" as const } : {}),
+    });
+    formatters.set(key, formatter);
+  }
+  return formatter;
+}
+
 /** Minutes the zone is ahead of UTC at this instant (negative in Vancouver). */
 function zoneOffsetMinutes(instant: number, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(new Date(instant));
+  const parts = zoneFormatter("offset", timeZone).formatToParts(new Date(instant));
   const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
   const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
   return Math.round((asUtc - instant) / 60_000);
@@ -78,15 +94,7 @@ export function zonedDateTimeToUtc(
 }
 
 function zonedParts(value: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).formatToParts(value);
+  const parts = zoneFormatter("parts", timeZone).formatToParts(value);
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
   return {
     date: `${get("year")}-${get("month")}-${get("day")}`,

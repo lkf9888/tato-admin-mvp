@@ -21,7 +21,9 @@ import {
   type BusyWindow,
   type DateOnlyBookingWindow,
 } from "@/lib/direct-booking";
-import { renterDailyPrice, type TaxLine } from "@/lib/booking-policy";
+import type { TaxLine } from "@/lib/booking-policy";
+import { getLicenceSurcharge, getTripDailyPrice } from "@/lib/site-display-price";
+import { useReportTripPrice } from "@/components/site-vehicle-price";
 import { normalizeCouponCode, type CouponDiscount } from "@/lib/booking-coupons";
 import { SignaturePad } from "@/components/signature-pad";
 import type { BookingAddOnOption } from "@/lib/booking-add-ons";
@@ -42,6 +44,8 @@ import { cn, formatCurrency } from "@/lib/utils";
 type CheckoutState = "idle" | "success" | "cancelled" | "error";
 
 type StoredBookingState = {
+  /** The renter picked dates, times or a licence themselves. */
+  datesChosen?: boolean;
   hasLocalLicence?: "yes" | "no" | "";
   pickupTime?: string;
   returnTime?: string;
@@ -325,6 +329,7 @@ export function PublicBookingPanel({
   hostPayoutsReady,
   defaultPickupDate,
   defaultReturnDate,
+  datesChosen: initialDatesChosen = false,
   checkoutState,
 }: {
   locale: Locale;
@@ -368,6 +373,8 @@ export function PublicBookingPanel({
   hostPayoutsReady: boolean;
   defaultPickupDate: string;
   defaultReturnDate: string;
+  /** The defaults came from the renter (a fleet search), not the page. */
+  datesChosen?: boolean;
   checkoutState: CheckoutState;
 }) {
   const messages = getMessages(locale);
@@ -387,6 +394,10 @@ export function PublicBookingPanel({
   const [pickupDate, setPickupDate] = useState(defaultPickupDate);
   const [returnDate, setReturnDate] = useState(defaultReturnDate);
   const [pickupTime, setPickupTime] = useState(DEFAULT_BOOKING_TIME);
+  // Whether the trip on screen is one the renter chose. The page's
+  // starting dates are a suggestion: until they are changed, the price
+  // at the top of the page stays the car's "from" price (TT-20).
+  const [datesChosen, setDatesChosen] = useState(initialDatesChosen);
   const [returnTime, setReturnTime] = useState(DEFAULT_BOOKING_TIME);
   const [renterFirstName, setRenterFirstName] = useState("");
   const [renterLastName, setRenterLastName] = useState("");
@@ -491,6 +502,23 @@ export function PublicBookingPanel({
       const parsed = JSON.parse(stored) as StoredBookingState;
       setPickupDate(parsed.pickupDate || defaultPickupDate);
       setReturnDate(parsed.returnDate || defaultReturnDate);
+      // Saved before the flag existed: a licence answer, or a trip other
+      // than the page's own starting one, was the renter's choice. Either
+      // way the top of the page then shows the trip the panel prices.
+      // An explicit `false` stands: yesterday's untouched defaults differ
+      // from today's and must not read as a choice.
+      if (
+        parsed.datesChosen === true ||
+        (parsed.datesChosen === undefined &&
+          (parsed.hasLocalLicence === "yes" ||
+            parsed.hasLocalLicence === "no" ||
+            (parsed.pickupDate && parsed.pickupDate !== defaultPickupDate) ||
+            (parsed.returnDate && parsed.returnDate !== defaultReturnDate) ||
+            (isBookingTime(parsed.pickupTime) && parsed.pickupTime !== DEFAULT_BOOKING_TIME) ||
+            (isBookingTime(parsed.returnTime) && parsed.returnTime !== DEFAULT_BOOKING_TIME)))
+      ) {
+        setDatesChosen(true);
+      }
       if (isBookingTime(parsed.pickupTime)) setPickupTime(parsed.pickupTime);
       if (isBookingTime(parsed.returnTime)) setReturnTime(parsed.returnTime);
       if (parsed.hasLocalLicence === "yes" || parsed.hasLocalLicence === "no") {
@@ -536,6 +564,7 @@ export function PublicBookingPanel({
 
   useEffect(() => {
     const payload: StoredBookingState = {
+      datesChosen,
       pickupDate,
       returnDate,
       pickupTime,
@@ -553,6 +582,7 @@ export function PublicBookingPanel({
   }, [
     addOnIds,
     agreementAccepted,
+    datesChosen,
     hasLocalLicence,
     pickupTime,
     returnTime,
@@ -660,6 +690,17 @@ export function PublicBookingPanel({
     ],
   );
 
+  // The trip's vehicle price per charged day -- rent after the weekly
+  // rate, plus insurance -- the figure the quote's first line and the
+  // top of the page show for the chosen dates.
+  const tripDailyPrice = getTripDailyPrice(quote);
+  const licenceSurcharge = getLicenceSurcharge(localInsuranceFee, bookingInsuranceFeeNonLocal);
+  useReportTripPrice(
+    datesChosen && tripDailyPrice != null
+      ? { dailyPrice: tripDailyPrice, nonLocal: asksLicenceRegion && hasLocalLicence === "no" }
+      : null,
+  );
+
   // The chosen moments, checked against when the car is actually out.
   // The date pickers only know whole days; this is what catches a
   // pickup at nine on the morning another renter returns at noon.
@@ -681,6 +722,7 @@ export function PublicBookingPanel({
 
   function handlePickupDateChange(nextValue: string) {
     setError("");
+    setDatesChosen(true);
     setPickupDate(nextValue);
 
     // Keep the return if it still makes a trip; otherwise offer the
@@ -701,6 +743,7 @@ export function PublicBookingPanel({
 
   function handleReturnDateChange(nextValue: string) {
     setError("");
+    setDatesChosen(true);
     setReturnDate(nextValue);
   }
 
@@ -849,6 +892,7 @@ export function PublicBookingPanel({
           value={pickupTime}
           onChange={(value) => {
             setError("");
+            setDatesChosen(true);
             setPickupTime(value);
           }}
         />
@@ -869,6 +913,7 @@ export function PublicBookingPanel({
           value={returnTime}
           onChange={(value) => {
             setError("");
+            setDatesChosen(true);
             setReturnTime(value);
           }}
         />
@@ -957,6 +1002,7 @@ export function PublicBookingPanel({
                     checked={hasLocalLicence === option.value}
                     onChange={() => {
                       setError("");
+                      setDatesChosen(true);
                       setHasLocalLicence(option.value);
                     }}
                     className="mt-0.5 shrink-0"
@@ -1150,8 +1196,19 @@ export function PublicBookingPanel({
       <div className="mt-3 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3 sm:mt-5 sm:p-4">
         <div className="flex items-center justify-between text-sm text-[var(--ink-mid)]">
           <span>{reserveMessages.quoteDays(quote.days)}</span>
-          <span>{formatCurrency(renterDailyPrice(bookingDailyRate, bookingInsuranceFee), locale)}</span>
+          {/* These dates' average, not the car's flat rate: the days are
+              priced one by one below, and the two used to disagree. */}
+          {tripDailyPrice != null ? (
+            <span>
+              {formatCurrency(tripDailyPrice, locale)} {messages.sitePublic.perDay}
+            </span>
+          ) : null}
         </div>
+        {asksLicenceRegion && hasLocalLicence !== "no" && licenceSurcharge > 0 ? (
+          <p className="mt-1 text-[11px] leading-4 text-[var(--ink-soft)] sm:text-xs">
+            {messages.sitePublic.licenceNote(formatCurrency(licenceSurcharge, locale))}
+          </p>
+        ) : null}
         <div className="mt-2 space-y-1 text-[13px] text-[var(--ink-mid)] sm:mt-4 sm:space-y-3 sm:text-sm">
           <div className="flex items-center justify-between">
             <span>{reserveMessages.quoteBase}</span>

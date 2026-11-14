@@ -8,6 +8,18 @@ import { getWorkspaceBookingPolicy } from "@/lib/booking-policy-server";
 import { resolveBookingPolicy } from "@/lib/booking-policy";
 import { prisma } from "@/lib/prisma";
 import { isVehicleBookable, resolveVehicleDailyRate } from "@/lib/vehicle-pricing";
+import {
+  buildSeasonalRateMap,
+  getBookingWindowDayKeys,
+  getRateSeasonality,
+} from "@/lib/rental-estimate/rate-seasonality-server";
+import { loadPriceOverridesForVehicles } from "@/lib/vehicle-price-overrides";
+import {
+  fromPriceInputFor,
+  getFromDailyPrice,
+  getLicenceSurcharge,
+  getRangeDailyPrice,
+} from "@/lib/site-display-price";
 import { getAppUrl } from "@/lib/stripe";
 import { isImageAttachment } from "@/lib/uploads";
 import { getSiteLocalePrefix, type SiteLocale } from "@/lib/site-locale";
@@ -222,6 +234,16 @@ export type SiteFleetVehicle = {
   rateSource: "manual" | "suggested";
   insuranceFee: number | null;
   depositAmount: number | null;
+  /**
+   * What the card shows with no dates: the cheapest trip bookable in the
+   * next 90 days, per day, local licence (`lib/site-display-price.ts`).
+   * Null when none is.
+   */
+  fromDailyPrice: number | null;
+  /** The asked-for dates' own average per day; null without a range. */
+  rangeDailyPrice: number | null;
+  /** What another licence adds per day; 0 when it adds nothing. */
+  licenceSurcharge: number;
   intro: string | null;
   photoUrl: string | null;
   /** Null when no date range was asked for. */
@@ -242,9 +264,14 @@ export async function getSiteFleet(input: {
   workspaceId: string;
   pickupDate?: string | null;
   returnDate?: string | null;
+  /** False skips the display prices -- for the sitemap, which shows none. */
+  withPrices?: boolean;
 }): Promise<SiteFleetVehicle[]> {
+  const withPrices = input.withPrices ?? true;
+  // Three days back: a trip already returned can still block by its
+  // turnaround buffer (up to 48 h), which checkout respects.
   const bookableFrom = new Date();
-  bookableFrom.setDate(bookableFrom.getDate() - 1);
+  bookableFrom.setDate(bookableFrom.getDate() - 3);
 
   const vehicles = await prisma.vehicle.findMany({
     where: {
@@ -277,19 +304,39 @@ export async function getSiteFleet(input: {
   });
 
   const wantsRange = Boolean(input.pickupDate && input.returnDate);
-  const policy = await getWorkspaceBookingPolicy(input.workspaceId);
+  const [policy, seasonality, overridesByVehicle] = await Promise.all([
+    getWorkspaceBookingPolicy(input.workspaceId),
+    withPrices ? getRateSeasonality(input.workspaceId) : null,
+    withPrices
+      ? loadPriceOverridesForVehicles(vehicles.map((vehicle) => vehicle.id))
+      : new Map<string, Record<string, number>>(),
+  ]);
+  const dayKeys = getBookingWindowDayKeys();
 
   return vehicles
     .map((vehicle) => ({ vehicle, rate: resolveVehicleDailyRate(vehicle, policy) }))
     // A car with no typed price and no catalogue match has no price at
     // all. Listing it would be a card a renter can click and not book.
     .filter(({ rate }) => isVehicleBookable(rate))
-    .sort((left, right) => (left.rate.dailyRate ?? 0) - (right.rate.dailyRate ?? 0))
     .map(({ vehicle, rate }) => {
     const blockedWindows = getDateOnlyBookingWindows(vehicle.orders);
     // What this car is actually rented on: its own figures where it has
     // them, the fleet's otherwise.
     const terms = resolveBookingPolicy(policy, vehicle);
+    // Priced from the inputs its own page and checkout use, so the card
+    // and the quote cannot disagree. Season only for a model-priced car,
+    // as on the page.
+    const dailyRate = rate.dailyRate ?? 0;
+    const priceInput = fromPriceInputFor({
+      dailyRate,
+      policy: terms,
+      dailyRateOverrides: overridesByVehicle.get(vehicle.id) ?? {},
+      seasonalRates:
+        rate.source === "suggested" && seasonality
+          ? buildSeasonalRateMap(dailyRate, dayKeys, seasonality)
+          : {},
+      orders: vehicle.orders,
+    });
     const photo = vehicle.attachments.find((attachment) =>
       isImageAttachment(attachment.contentType, attachment.filename),
     );
@@ -301,10 +348,15 @@ export async function getSiteFleet(input: {
       brand: vehicle.brand,
       model: vehicle.model,
       year: vehicle.year,
-      dailyRate: rate.dailyRate ?? 0,
+      dailyRate,
       rateSource: rate.source ?? "suggested",
       insuranceFee: terms.insuranceFee,
       depositAmount: terms.depositAmount,
+      fromDailyPrice: withPrices ? (getFromDailyPrice(priceInput)?.dailyPrice ?? null) : null,
+      rangeDailyPrice: withPrices && wantsRange
+        ? getRangeDailyPrice(priceInput, input.pickupDate!, input.returnDate!)
+        : null,
+      licenceSurcharge: getLicenceSurcharge(terms.insuranceFee, terms.insuranceFeeNonLocal),
       intro: vehicle.bookingIntro,
       photoUrl: photo
         ? `/api/direct-booking/vehicles/${vehicle.id}/attachments/file?attachmentId=${photo.id}`
@@ -314,7 +366,14 @@ export async function getSiteFleet(input: {
         : null,
       blockedWindows,
     };
-  });
+  })
+    // Cheapest first by the price the card shows; a car with nothing
+    // bookable in the window goes last.
+    .sort(
+      (left, right) =>
+        (left.fromDailyPrice ?? Infinity) - (right.fromDailyPrice ?? Infinity) ||
+        left.dailyRate - right.dailyRate,
+    );
 }
 
 /**
@@ -335,8 +394,10 @@ export async function loadSiteVehicle(site: RentalSite, vehicleSlug: string) {
   const vehicleId = parseVehicleIdFromSlug(vehicleSlug);
   if (!vehicleId) return null;
 
+  // Three days back: a trip already returned can still block by its
+  // turnaround buffer (up to 48 h), which checkout respects.
   const bookableFrom = new Date();
-  bookableFrom.setDate(bookableFrom.getDate() - 1);
+  bookableFrom.setDate(bookableFrom.getDate() - 3);
 
   return prisma.vehicle.findFirst({
     where: {

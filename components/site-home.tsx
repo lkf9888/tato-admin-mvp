@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { siteHref, telHref } from "@/components/site-shell";
-import { renterDailyPrice } from "@/lib/booking-policy";
+import { FROM_PRICE_WINDOW_DAYS } from "@/lib/site-display-price";
 import { getSiteOrigin, getSiteUrl, type SiteFleetVehicle } from "@/lib/rental-site";
 import type { LocalizedSite } from "@/lib/rental-site-content";
 import type { Messages } from "@/lib/i18n";
@@ -25,6 +25,10 @@ function CheckIcon() {
       <path d="M3 8.5l3 3 7-7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
+}
+
+function structuredMoney(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
 export function SiteHome({
@@ -64,9 +68,11 @@ export function SiteHome({
   // The business itself, for the local results a "car rental near me"
   // search draws from. Each car page already describes its car; this
   // is the one place that says who rents them and where to find them.
+  // The same "from" prices the cards show with no dates (TT-20), so the
+  // range a search engine reads is one a renter can actually book.
   const rates = fleet
-    .map((vehicle) => (vehicle.dailyRate > 0 ? renterDailyPrice(vehicle.dailyRate, vehicle.insuranceFee) : 0))
-    .filter((rate) => rate > 0);
+    .map((vehicle) => vehicle.fromDailyPrice)
+    .filter((rate): rate is number => rate != null && rate > 0);
   const businessData = {
     "@context": "https://schema.org",
     "@type": "AutoRental",
@@ -85,7 +91,9 @@ export function SiteHome({
     ...(site.contactAddress?.trim() ? { address: site.contactAddress.trim() } : {}),
     ...(rates.length > 0
       ? {
-          priceRange: `CA$${Math.round(Math.min(...rates))}–CA$${Math.round(Math.max(...rates))} / day`,
+          // To the cent, as the cards show them: rounding could quote a
+          // dollar less than any car is offered at.
+          priceRange: `CA$${structuredMoney(Math.min(...rates))}–CA$${structuredMoney(Math.max(...rates))} / day`,
         }
       : {}),
   };
@@ -284,17 +292,48 @@ export function SiteHome({
                     </div>
 
                     <div className="mt-5 flex items-end justify-between gap-2 border-t border-[var(--line)] pt-4">
-                      <p className="text-[var(--ink)]">
-                        <span className="text-[1.5rem] font-bold tracking-[-0.02em]">
-                          {/* Insurance included: one price, no extras. */}
-                          {formatCurrency(renterDailyPrice(vehicle.dailyRate, vehicle.insuranceFee), locale)}
-                        </span>
-                        <span className="text-[13px] text-[var(--ink-soft)]"> {copy.perDay}</span>
-                      </p>
-                      <span className="text-[14px] font-semibold text-[var(--brand)]">
+                      {/* Insurance included: one price, no extras. With
+                          dates, what those dates average per day; without,
+                          the cheapest trip bookable in the next 90 days --
+                          never the car's flat rate, which the season can
+                          sit well above (TT-20). */}
+                      {hasRange && !unavailable && vehicle.rangeDailyPrice != null ? (
+                        <p className="text-[var(--ink)]">
+                          <span className="text-[1.5rem] font-bold tracking-[-0.02em]">
+                            {formatCurrency(vehicle.rangeDailyPrice, locale)}
+                          </span>
+                          <span className="text-[13px] text-[var(--ink-soft)]"> {copy.perDay}</span>
+                        </p>
+                      ) : vehicle.fromDailyPrice != null ? (
+                        <p className="text-[var(--ink)]">
+                          <span className="text-[13px] text-[var(--ink-soft)]">{copy.priceFromLead} </span>
+                          <span className="text-[1.5rem] font-bold tracking-[-0.02em]">
+                            {formatCurrency(vehicle.fromDailyPrice, locale)}
+                          </span>
+                          <span className="text-[13px] text-[var(--ink-soft)]"> {copy.priceFromTail}</span>
+                        </p>
+                      ) : (
+                        <p className="text-[14px] font-medium text-[var(--ink-soft)]">
+                          {copy.priceNoDates(FROM_PRICE_WINDOW_DAYS)}
+                        </p>
+                      )}
+                      <span className="shrink-0 text-[14px] font-semibold text-[var(--brand)]">
                         {copy.viewDetails} <span aria-hidden>→</span>
                       </span>
                     </div>
+                    {hasRange && !unavailable && vehicle.rangeDailyPrice != null ? (
+                      <p className="mt-1 text-[12px] text-[var(--ink-soft)]">{copy.priceTripNote}</p>
+                    ) : vehicle.fromDailyPrice != null ? (
+                      <p className="mt-1 text-[12px] text-[var(--ink-soft)]">
+                        {copy.priceFromNote(FROM_PRICE_WINDOW_DAYS)}
+                      </p>
+                    ) : null}
+                    {vehicle.licenceSurcharge > 0 &&
+                    (vehicle.fromDailyPrice != null || vehicle.rangeDailyPrice != null) ? (
+                      <p className="mt-1 text-[12px] text-[var(--ink-soft)]">
+                        {copy.licenceNote(formatCurrency(vehicle.licenceSurcharge, locale))}
+                      </p>
+                    ) : null}
 
                     {vehicle.depositAmount ? (
                       <p className="mt-2 text-[13px] text-[var(--ink-soft)]">

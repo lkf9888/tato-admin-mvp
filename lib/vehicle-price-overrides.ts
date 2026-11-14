@@ -51,3 +51,29 @@ export async function loadPriceOverridesForBooking(vehicleId: string) {
     toDate: dateToDateOnly(to),
   });
 }
+
+/**
+ * The same window for several cars in one query, keyed by car -- what a
+ * listing of the whole fleet needs to price each card as its page will.
+ */
+export async function loadPriceOverridesForVehicles(vehicleIds: string[]) {
+  const byVehicle = new Map<string, Record<string, number>>();
+  if (vehicleIds.length === 0) return byVehicle;
+  const today = new Date();
+  const rows = await prisma.vehiclePriceOverride.findMany({
+    where: {
+      vehicleId: { in: vehicleIds },
+      date: {
+        gte: dateOnlyToUtcMidday(dateToDateOnly(new Date(today.getTime() - 7 * 86_400_000))),
+        lte: dateOnlyToUtcMidday(dateToDateOnly(new Date(today.getTime() + 500 * 86_400_000))),
+      },
+    },
+    select: { vehicleId: true, date: true, price: true },
+  });
+  for (const row of rows) {
+    const prices = byVehicle.get(row.vehicleId) ?? {};
+    prices[dateToDateOnly(row.date)] = row.price;
+    byVehicle.set(row.vehicleId, prices);
+  }
+  return byVehicle;
+}

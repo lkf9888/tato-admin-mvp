@@ -116,10 +116,9 @@ export async function renderSiteVehicle(
 
   const messages = getMessages(locale);
   const localized = getLocalizedSite(site, locale);
-  const { defaultPickupDate, defaultReturnDate } = getBookingDateDefaults(
-    readDateParam(searchParams.from),
-    readDateParam(searchParams.to),
-  );
+  const askedPickup = readDateParam(searchParams.from);
+  const askedReturn = readDateParam(searchParams.to);
+  const { defaultPickupDate, defaultReturnDate } = getBookingDateDefaults(askedPickup, askedReturn);
   const [connectSnapshot, policy] = await Promise.all([
     getWorkspaceConnectSnapshot(site.workspaceId),
     getBookingPolicyForVehicle(vehicle),
@@ -168,6 +167,9 @@ export async function renderSiteVehicle(
         hostPayoutsReady={Boolean(connectSnapshot.accountId && connectSnapshot.chargesEnabled)}
         defaultPickupDate={defaultPickupDate}
         defaultReturnDate={defaultReturnDate}
+        // Dates from the fleet search are the renter's own; the defaults
+        // are not, and leave the "from" price on the page.
+        datesChosen={Boolean(askedPickup && askedReturn && askedReturn > askedPickup)}
         checkoutState={checkoutState}
         agreementClauses={agreement.isCustom ? agreement.clauses : null}
       />

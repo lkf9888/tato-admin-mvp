@@ -8,7 +8,9 @@ import {
   getBookingBusyWindows,
   getDateOnlyBookingWindows,
 } from "@/lib/direct-booking";
-import { renterDailyPrice, type BookingPolicy } from "@/lib/booking-policy";
+import type { BookingPolicy } from "@/lib/booking-policy";
+import { TripPriceProvider, VehicleDailyPrice } from "@/components/site-vehicle-price";
+import { fromPriceInputFor, getFromDailyPrice, getLicenceSurcharge } from "@/lib/site-display-price";
 import type { BookingAddOnOption } from "@/lib/booking-add-ons";
 import { siteHref } from "@/components/site-shell";
 import { buildVehicleSlug, getSiteOrigin, getSiteUrl } from "@/lib/rental-site";
@@ -46,6 +48,7 @@ export function SiteVehicleView({
   hostPayoutsReady,
   defaultPickupDate,
   defaultReturnDate,
+  datesChosen = false,
   agreementClauses = null,
   checkoutState,
 }: {
@@ -64,13 +67,21 @@ export function SiteVehicleView({
   hostPayoutsReady: boolean;
   defaultPickupDate: string;
   defaultReturnDate: string;
+  /** The visitor arrived with dates of their own (from the fleet search). */
+  datesChosen?: boolean;
   /** The operator's own clauses, when they have edited them. */
   agreementClauses?: Array<{ heading: string; body: string }> | null;
   checkoutState: "idle" | "success" | "cancelled" | "error";
 }) {
   const reserveMessages = messages.reservePage;
-  // What a renter is shown: rent with insurance folded in (BC rate).
-  const shownDailyRate = renterDailyPrice(dailyRate, policy.insuranceFee);
+  // What a renter is shown before choosing dates: the cheapest trip
+  // bookable in the next 90 days, rent and BC-licence insurance per day,
+  // priced day by day as checkout will (TT-20). Null: nothing bookable.
+  const fromDailyPrice =
+    getFromDailyPrice(
+      fromPriceInputFor({ dailyRate, policy, dailyRateOverrides, seasonalRates, orders: vehicle.orders }),
+    )?.dailyPrice ?? null;
+  const licenceSurcharge = getLicenceSurcharge(policy.insuranceFee, policy.insuranceFeeNonLocal);
   const copy = messages.sitePublic;
   const blockedDateWindows = getDateOnlyBookingWindows(vehicle.orders);
   const photos = vehicle.attachments
@@ -93,25 +104,32 @@ export function SiteVehicleView({
     ...(photos.length > 0
       ? { image: photos.slice(0, 5).map((photo) => `${getSiteOrigin(site)}${photo.src}`) }
       : {}),
-    offers: {
-      "@type": "Offer",
-      url: canonical,
-      priceCurrency: "CAD",
-      price: shownDailyRate,
-      availability: "https://schema.org/InStock",
-      priceSpecification: {
-        "@type": "UnitPriceSpecification",
-        price: shownDailyRate,
-        priceCurrency: "CAD",
-        // UN/CEFACT code for "day" — what tells Google the price is a
-        // daily rate and not the cost of the car.
-        unitCode: "DAY",
-      },
-      seller: { "@type": "Organization", name: site.brandName },
-    },
+    // The page's own "from" price, so what a search result quotes is a
+    // trip a renter can book. No offer at all when none is.
+    ...(fromDailyPrice != null
+      ? {
+          offers: {
+            "@type": "Offer",
+            url: canonical,
+            priceCurrency: "CAD",
+            price: fromDailyPrice,
+            availability: "https://schema.org/InStock",
+            priceSpecification: {
+              "@type": "UnitPriceSpecification",
+              price: fromDailyPrice,
+              priceCurrency: "CAD",
+              // UN/CEFACT code for "day" — what tells Google the price is
+              // a daily rate and not the cost of the car.
+              unitCode: "DAY",
+            },
+            seller: { "@type": "Organization", name: site.brandName },
+          },
+        }
+      : {}),
   };
 
   return (
+    <TripPriceProvider>
     <main className="mx-auto max-w-6xl px-3 py-3 sm:px-6 sm:py-10">
       <script
         type="application/ld+json"
@@ -162,9 +180,12 @@ export function SiteVehicleView({
                 <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--brand-deep)] sm:text-[12px] sm:tracking-[0.08em]">
                   {reserveMessages.rateLabel}
                 </p>
-                <p className="mt-1 text-[1rem] font-bold tracking-[-0.02em] text-[var(--ink)] sm:mt-2 sm:text-[1.6rem]">
-                  {formatCurrency(shownDailyRate, locale)}
-                </p>
+                <VehicleDailyPrice
+                  locale={locale}
+                  fromDailyPrice={fromDailyPrice}
+                  licenceSurcharge={licenceSurcharge}
+                  className="mt-1 text-[1rem] font-bold tracking-[-0.02em] text-[var(--ink)] sm:mt-2 sm:text-[1.6rem]"
+                />
               </div>
               <div className="rounded-xl bg-[var(--brand-tint)] p-2.5 sm:rounded-[18px] sm:p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--brand-deep)] sm:text-[12px] sm:tracking-[0.08em]">
@@ -213,11 +234,13 @@ export function SiteVehicleView({
             hostPayoutsReady={hostPayoutsReady}
             defaultPickupDate={defaultPickupDate}
             defaultReturnDate={defaultReturnDate}
+            datesChosen={datesChosen}
             agreementClauses={agreementClauses}
             checkoutState={checkoutState}
           />
         </div>
       </div>
     </main>
+    </TripPriceProvider>
   );
 }

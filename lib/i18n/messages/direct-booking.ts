@@ -120,6 +120,7 @@ export const directBookingMessages = {
       formFields: "On the posting form",
       warnings: {
         no_price: "This car has no price, so the ad has none either. Set a daily rate first.",
+        no_dates: "This car has no bookable trip in the next 90 days, so the ad has no price to quote.",
         no_link: "The car is not on your published site, so the ad has no booking link.",
         no_photos: "The car has no photos. Every one of these sites needs at least one.",
         title_cut: "The title was shortened to fit this site's limit.",
@@ -731,6 +732,7 @@ export const directBookingMessages = {
       formFields: "发帖表单里填",
       warnings: {
         no_price: "这辆车没有价格，广告里也没有。请先设置日租金。",
+        no_dates: "这辆车未来 90 天没有可订的行程，广告里没有可以报的价格。",
         no_link: "这辆车不在已发布的网站上，广告没有预订链接。",
         no_photos: "这辆车没有照片，这几个平台都至少需要一张。",
         title_cut: "标题按这个平台的字数上限截短了。",

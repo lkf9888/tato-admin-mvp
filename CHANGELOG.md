@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.89.0 - 2026-11-13
+
+### The rental site's daily price is one a renter can actually pay (TT-20)
+
+The fleet cards, a car's page, the booking panel's first line, the structured data and the ad drafts all showed the car's flat rate plus BC-licence insurance. Checkout charges each day at its calendar price (hand-set day, then season, then the flat rate), so a Fiesta listed at $71 cost up to $100 a day in July, and a renter with an out-of-province licence only learned of their extra $10 a day inside the form. Canada's Competition Bureau treats a headline price that the real one sits above as drip pricing.
+
+- **No dates chosen:** "From $X / day", where X is the cheapest trip a renter could book that starts within the next 90 days (Vancouver days): a trip charged exactly the car's minimum stay (any half-hour pick-up, the shortest return that is charged that many days), clear of existing trips by the turnaround buffer (including a trip already back whose buffer has not run out), respecting the notice, priced day by day exactly as the quote prices it. The weekly rate counts only when the minimum stay is itself a week. "Lowest price, next 90 days" sits beside it; with nothing bookable in that window the card says so and shows no price. Pages are rendered per request, so the figure moves day by day.
+- **Dates chosen** (on the fleet search, or by changing dates, times or licence on a car's page): the trip's own average, the panel's vehicle price (rent after the weekly rate, plus insurance; no coupon, extras, tax or deposit) over its charged days. The page's starting dates are a suggestion and leave the "from" price in place. The panel's first line now shows the same average instead of the flat rate.
+- **Licence:** where another licence costs more, "BC licence · other licences +$Y/day" sits next to the price, Y worked out from the two insurance fees. Choosing "not a BC licence" switches the price to that licence's and drops the note.
+- **Structured data:** a car's `Offer.price` and the home page's `AutoRental.priceRange` use the same "from" prices (to the cent); a car with nothing bookable has no `Offer`.
+- **Ads:** `dailyFrom` is the same "from" price; the drafts read "insurance included (BC licence)", "lowest price in the next 90 days" and what other licences add. A car with a price but no bookable trip gets its own warning (`no_dates`). **Ads already copied and posted elsewhere are not updated:** repost them from the ad page to carry the new wording and price.
+- **Charging is unchanged.** `lib/site-display-price.ts` only calls `getDirectBookingQuote`; checkout, Stripe line items, instalments, contracts and emails are untouched, and a regression test pins the quote and Stripe amounts of a fixed booking. The owner share page, confirmation emails and contracts still show the order's own amounts.
+
 ## v1.88.5 - 2026-11-13
 
 ### A framed visit reports its page_view at once again

@@ -1,4 +1,5 @@
 import { VEHICLE_FEATURE_LABELS, type VehicleFeature } from "@/lib/vehicle-features";
+import { FROM_PRICE_WINDOW_DAYS } from "@/lib/site-display-price";
 
 /**
  * Classified-ad drafts for one car, for VanPeople, Facebook and
@@ -22,8 +23,16 @@ export type AdFacts = {
   features: VehicleFeature[];
   /** The operator's own description of the car, as written. */
   intro: string | null;
-  /** Per day with insurance folded in, as the site shows it. Null: no price. */
+  /**
+   * The car page's "from" price: the cheapest trip bookable in the next
+   * 90 days, per day, with local (BC) licence insurance folded in. Null:
+   * no price, or nothing bookable in that window.
+   */
   dailyFrom: number | null;
+  /** What another licence adds per day; 0 when it adds nothing. */
+  licenceSurcharge: number;
+  /** The car has a rate at all; `dailyFrom` can still be null if it is fully booked. */
+  isPriced: boolean;
   weeklyDiscountPercent: number;
   minimumRentalDays: number;
   dailyKmAllowance: number;
@@ -41,7 +50,7 @@ export type AdFacts = {
 export type AdWarning = {
   /** `blocker`: the ad cannot be posted correctly yet. `lossy`: something was cut to fit. */
   severity: "blocker" | "lossy";
-  code: "no_price" | "no_link" | "no_photos" | "title_cut" | "intro_language";
+  code: "no_price" | "no_dates" | "no_link" | "no_photos" | "title_cut" | "intro_language";
 };
 
 export type AdDraft = {
@@ -80,7 +89,11 @@ function fitTitle(tokens: string[], limit: number, separator: string) {
 
 function blockers(facts: AdFacts): AdWarning[] {
   return [
-    ...(facts.dailyFrom == null ? [{ severity: "blocker" as const, code: "no_price" as const }] : []),
+    ...(!facts.isPriced
+      ? [{ severity: "blocker" as const, code: "no_price" as const }]
+      : facts.dailyFrom == null
+        ? [{ severity: "blocker" as const, code: "no_dates" as const }]
+        : []),
     ...(facts.carUrl ? [] : [{ severity: "blocker" as const, code: "no_link" as const }]),
     ...(facts.photoCount === 0 ? [{ severity: "blocker" as const, code: "no_photos" as const }] : []),
   ];
@@ -101,7 +114,14 @@ function zhBody(facts: AdFacts) {
   const features = facts.features.map((feature) => VEHICLE_FEATURE_LABELS.zh[feature]);
   return [
     `${facts.year} ${facts.brand} ${facts.model} 出租`,
-    facts.dailyFrom != null ? `每天 ${money(facts.dailyFrom)} 起，已含保险。` : null,
+    // Says which licence the price is for and how far ahead it looks,
+    // so the figure is one a reader can actually book (TT-20).
+    facts.dailyFrom != null
+      ? `每天 ${money(facts.dailyFrom)} 起（未来 ${FROM_PRICE_WINDOW_DAYS} 天起价），含保险（BC 驾照）。`
+      : null,
+    facts.dailyFrom != null && facts.licenceSurcharge > 0
+      ? `其他驾照每天 +${money(facts.licenceSurcharge)}。`
+      : null,
     facts.weeklyDiscountPercent > 0 ? `租满 7 天打 ${(100 - facts.weeklyDiscountPercent) / 10} 折（减 ${facts.weeklyDiscountPercent}%）。` : null,
     "",
     features.length ? `· ${features.join("、")}` : null,
@@ -124,7 +144,12 @@ function enBody(facts: AdFacts) {
   const features = facts.features.map((feature) => VEHICLE_FEATURE_LABELS.en[feature]);
   return [
     `${facts.year} ${facts.brand} ${facts.model} for rent`,
-    facts.dailyFrom != null ? `From ${money(facts.dailyFrom)}/day, insurance included.` : null,
+    facts.dailyFrom != null
+      ? `From ${money(facts.dailyFrom)}/day (lowest price in the next ${FROM_PRICE_WINDOW_DAYS} days), insurance included (BC licence).`
+      : null,
+    facts.dailyFrom != null && facts.licenceSurcharge > 0
+      ? `Other licences +${money(facts.licenceSurcharge)}/day.`
+      : null,
     facts.weeklyDiscountPercent > 0 ? `${facts.weeklyDiscountPercent}% off for 7 days or more.` : null,
     "",
     features.length ? `• ${features.join(", ")}` : null,
@@ -159,7 +184,7 @@ export function buildAdDraft(platform: AdPlatform, facts: AdFacts): AdDraft {
         price ? `${price}/天起` : "",
         facts.features.includes("seats7") ? "7座" : "",
         facts.features.includes("awd") ? "四驱" : "",
-        "含保险",
+        "含保险（BC驾照）",
       ],
       limit,
       " ",
@@ -172,7 +197,7 @@ export function buildAdDraft(platform: AdPlatform, facts: AdFacts): AdDraft {
       titleLimit: limit,
       body: zhBody(facts),
       fields: [
-        ...(price ? [{ label: "价格", value: `${price}/天` }] : []),
+        ...(price ? [{ label: "价格", value: `${price}/天起` }] : []),
         ...(facts.location ? [{ label: "地区", value: facts.location }] : []),
         ...(facts.phone ? [{ label: "电话", value: facts.phone }] : []),
         ...(facts.wechat ? [{ label: "微信", value: facts.wechat }] : []),
@@ -185,7 +210,7 @@ export function buildAdDraft(platform: AdPlatform, facts: AdFacts): AdDraft {
     [
       `${car} for rent`,
       price ? `from ${price}/day` : "",
-      "insurance included",
+      "insurance included (BC licence)",
       facts.features.includes("seats7") ? "7 seats" : "",
       facts.features.includes("awd") ? "AWD" : "",
     ],

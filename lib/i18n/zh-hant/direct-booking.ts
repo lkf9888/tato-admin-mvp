@@ -116,6 +116,7 @@ export const directBookingMessages = {
       formFields: "發帖表單裡填",
       warnings: {
         no_price: "這輛車沒有價格，廣告裡也沒有。請先設定日租金。",
+        no_dates: "這輛車未來 90 天沒有可訂的行程，廣告裡沒有可以報的價格。",
         no_link: "這輛車不在已釋出的網站上，廣告沒有預訂連結。",
         no_photos: "這輛車沒有照片，這幾個平台都至少需要一張。",
         title_cut: "標題按這個平台的字數上限截短了。",

@@ -19,7 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const site = await getSiteForCurrentRequest();
   if (!site) return [];
 
-  const fleet = await getSiteFleet({ workspaceId: site.workspaceId });
+  const fleet = await getSiteFleet({ workspaceId: site.workspaceId, withPrices: false });
   const now = new Date();
 
   const pages: Array<{ path: string; lastModified: Date; priority: number }> = [

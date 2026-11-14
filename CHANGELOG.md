@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.89.1 - 2026-11-14
+
+### An ad title always names the car and its price
+
+A title took its parts in order and skipped any that did not fit. On VanPeople's 30 characters a long name such as "2014 Chrysler Town & Country 出租" did not fit at all, so the title came out as "$66/天起 含保险（BC驾照）" with no car in it (3 of the 45 cars on the SPEEDX site), and six more, Equinox and Outlander among them, kept the name but lost the price.
+
+- The car's name is now the longest of "year make model", "make model" and "model" that leaves room for the price after it (or that fits on its own, for a car with no price), so "2017 Chevrolet Equinox" becomes "Chevrolet Equinox 出租 $73/天起" and Town & Country becomes "Town & Country 出租 $66/天起". Year and make are still in the body. A shortened name raises the existing "title cut" note.
+- The same rule applies to Facebook and Craigslist; none of today's cars needed it there.
+- Titles only: bodies, prices and form fields are unchanged.
+
 ## v1.89.0 - 2026-11-13
 
 ### The rental site's daily price is one a renter can actually pay (TT-20)

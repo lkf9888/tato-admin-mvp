@@ -12,7 +12,7 @@ import {
   getTripDailyPrice,
   type FromPriceInput,
 } from '../lib/site-display-price';
-import { buildAdDraft, type AdFacts } from '../lib/site-ad-copy';
+import { AD_PLATFORMS, AD_TITLE_LIMITS, buildAdDraft, type AdFacts } from '../lib/site-ad-copy';
 
 // 10:00 in Vancouver (PDT) on 1 July 2027.
 const NOW = new Date('2027-07-01T17:00:00Z');
@@ -370,4 +370,41 @@ test('ads quote the "from" price for a BC licence, say how far ahead it looks, a
     buildAdDraft('facebook', { ...facts, dailyFrom: null, isPriced: false }).warnings.map((warning) => warning.code),
     ['no_price'],
   );
+});
+
+test('an ad title always names the car and gives the price, shortening the name first', () => {
+  const base: AdFacts = {
+    brand: 'Ford', model: 'Fiesta', year: 2019, features: [], intro: null, dailyFrom: 59, licenceSurcharge: 10,
+    isPriced: true, weeklyDiscountPercent: 30, minimumRentalDays: 1, dailyKmAllowance: 100, extraKmRate: 0.12,
+    depositAmount: 1000, location: null, carUrl: 'https://rent.example.com/cars/x', photoCount: 3,
+    brandName: 'Example', phone: null, wechat: null,
+  };
+  const car = (year: number, brand: string, model: string, dailyFrom: number) => ({ ...base, year, brand, model, dailyFrom });
+  // Short names keep the year.
+  assert.equal(buildAdDraft('vanpeople', base).title, '2019 Ford Fiesta 出租 $59/天起');
+  // Too long with the year: the year goes, the price stays.
+  assert.equal(buildAdDraft('vanpeople', car(2017, 'Chevrolet', 'Equinox', 73)).title, 'Chevrolet Equinox 出租 $73/天起');
+  // Too long even without the year: the model alone, never the price alone.
+  assert.equal(buildAdDraft('vanpeople', car(2014, 'Chrysler', 'Town & Country', 66)).title, 'Town & Country 出租 $66/天起');
+  assert.equal(buildAdDraft('vanpeople', car(2024, 'Land Rover', 'Range Rover Sport', 135)).title, 'Range Rover Sport 出租 $135/天起');
+  assert.ok(buildAdDraft('vanpeople', car(2014, 'Chrysler', 'Town & Country', 66)).warnings.some((w) => w.code === 'title_cut'));
+  // No price to make room for: the name still has to fit on its own.
+  assert.match(buildAdDraft('vanpeople', { ...car(2014, 'Chrysler', 'Town & Country', 66), dailyFrom: null }).title, /Town & Country 出租/);
+
+  // Cars the SPEEDX site listed on 2026-11-13, the long names among them:
+  // every title, on every platform, has the model and the price and fits.
+  const fleet: Array<[number, string, string, number]> = [
+    [2018, 'BMW', '5 Series', 84], [2017, 'Chevrolet', 'Equinox', 73], [2014, 'Chrysler', 'Town & Country', 66],
+    [2024, 'Land Rover', 'Range Rover Sport', 135], [2015, 'Mitsubishi', 'Mirage', 61], [2024, 'Mitsubishi', 'Outlander', 89],
+    [2015, 'Nissan', 'Versa Note', 61], [2021, 'Ram', '1500 Classic', 103], [2019, 'Ram', 'ProMaster City Cargo', 81],
+    [2019, 'Volkswagen', 'Atlas', 82], [2025, 'Honda', 'Odyssey', 100], [2023, 'Toyota', 'bZ4X', 96],
+  ];
+  for (const [year, brand, model, price] of fleet) {
+    for (const platform of AD_PLATFORMS) {
+      const draft = buildAdDraft(platform, car(year, brand, model, price));
+      assert.ok(draft.title.includes(model), `${platform}: ${draft.title}`);
+      assert.ok(draft.title.includes(`$${price}`), `${platform}: ${draft.title}`);
+      assert.ok([...draft.title].length <= AD_TITLE_LIMITS[platform], `${platform}: ${draft.title}`);
+    }
+  }
 });

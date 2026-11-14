@@ -87,6 +87,26 @@ function fitTitle(tokens: string[], limit: number, separator: string) {
   return { title, cut };
 }
 
+/**
+ * The car's name for a title, in the longest form that still leaves room
+ * for the price after it: year, make and model, then make and model, then
+ * the model alone. A title that names no car, or gives no price, is the
+ * one thing a classified title must not be -- the year and the make are
+ * in the body anyway.
+ */
+function carTitle(facts: AdFacts, suffix: string, price: string, limit: number, separator: string) {
+  const fits = (text: string) => [...text].length <= limit;
+  const names = [`${facts.year} ${facts.brand} ${facts.model}`, `${facts.brand} ${facts.model}`, facts.model]
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => `${name} ${suffix}`);
+  const name =
+    names.find((candidate) => fits(price ? `${candidate}${separator}${price}` : candidate)) ??
+    names.find(fits) ??
+    [...names[names.length - 1]].slice(0, limit).join("");
+  return { name, shortened: name !== names[0] };
+}
+
 function blockers(facts: AdFacts): AdWarning[] {
   return [
     ...(!facts.isPriced
@@ -174,14 +194,15 @@ export function buildAdDraft(platform: AdPlatform, facts: AdFacts): AdDraft {
   if (facts.intro && !introFor(facts, platform === "vanpeople" ? "zh" : "en")) {
     warnings.push({ severity: "lossy", code: "intro_language" });
   }
-  const car = `${facts.year} ${facts.brand} ${facts.model}`;
   const price = facts.dailyFrom != null ? money(facts.dailyFrom) : null;
 
   if (platform === "vanpeople") {
+    const pricePart = price ? `${price}/天起` : "";
+    const name = carTitle(facts, "出租", pricePart, limit, " ");
     const { title, cut } = fitTitle(
       [
-        `${car} 出租`,
-        price ? `${price}/天起` : "",
+        name.name,
+        pricePart,
         facts.features.includes("seats7") ? "7座" : "",
         facts.features.includes("awd") ? "四驱" : "",
         "含保险（BC驾照）",
@@ -189,7 +210,7 @@ export function buildAdDraft(platform: AdPlatform, facts: AdFacts): AdDraft {
       limit,
       " ",
     );
-    if (cut) warnings.push({ severity: "lossy", code: "title_cut" });
+    if (cut || name.shortened) warnings.push({ severity: "lossy", code: "title_cut" });
     return {
       platform,
       locale: "zh",
@@ -206,18 +227,21 @@ export function buildAdDraft(platform: AdPlatform, facts: AdFacts): AdDraft {
     };
   }
 
+  const separator = platform === "craigslist" ? " - " : " · ";
+  const pricePart = price ? `from ${price}/day` : "";
+  const name = carTitle(facts, "for rent", pricePart, limit, separator);
   const { title, cut } = fitTitle(
     [
-      `${car} for rent`,
-      price ? `from ${price}/day` : "",
+      name.name,
+      pricePart,
       "insurance included (BC licence)",
       facts.features.includes("seats7") ? "7 seats" : "",
       facts.features.includes("awd") ? "AWD" : "",
     ],
     limit,
-    platform === "craigslist" ? " - " : " · ",
+    separator,
   );
-  if (cut) warnings.push({ severity: "lossy", code: "title_cut" });
+  if (cut || name.shortened) warnings.push({ severity: "lossy", code: "title_cut" });
   return {
     platform,
     locale: "en",

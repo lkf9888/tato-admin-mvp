@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { BookingExtraChargePanel } from "@/components/booking-extra-charge-panel";
 import { OrderHandoverPanel } from "@/components/order-handover-panel";
+import { OrderPickupInfoCard } from "@/components/order-pickup-info-card";
 import { DirectBookingCancelPanel } from "@/components/direct-booking-cancel-panel";
 import { DirectBookingHandoverPanel } from "@/components/direct-booking-handover-panel";
 import { OrderAttachments } from "@/components/order-attachments";
@@ -1757,6 +1758,33 @@ export function OrderDetailModal({
                 setCurrentOrder(next);
                 onSaved?.(next);
               }}
+            />
+          ) : null}
+
+          {/* The message a guest collects the car with when nobody is
+              there; the phone assistant sends it from Turo, so a Turo
+              trip only. Rebuilt when the handover above changes. */}
+          {currentOrder.id && currentOrder.source === "turo" && currentOrder.externalOrderId ? (
+            <OrderPickupInfoCard
+              // A fresh card per trip: nothing typed on one trip carries
+              // over to the next.
+              key={currentOrder.id}
+              orderId={currentOrder.id}
+              locale={locale}
+              readOnly={readOnly}
+              refreshKey={[
+                // Everything the text can be filled from.
+                currentOrder.pickupSpot,
+                currentOrder.returnSpot,
+                currentOrder.handoverNote,
+                currentOrder.pickupDatetime,
+                currentOrder.returnDatetime,
+                currentOrder.pickupLocation,
+                currentOrder.returnLocation,
+                currentOrder.renterName,
+                currentOrder.vehicleId,
+                currentOrder.externalOrderId,
+              ].join("|")}
             />
           ) : null}
 

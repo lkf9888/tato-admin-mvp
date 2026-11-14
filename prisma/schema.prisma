@@ -192,6 +192,7 @@ model Workspace {
   agentTokens                   AgentToken[]
   turoTasks                     TuroTask[]
   turoTaskFeed                  TuroTaskFeed?
+  orderPickupInfos              OrderPickupInfo[]
   turoConversationMessages      TuroConversationMessage[]
   assistantThreads              AssistantThread[]
   assistantAlerts               AssistantAlert[]
@@ -444,6 +445,7 @@ model Order {
   vehicle                Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   ownerLedgerItems       OwnerLedgerItem[]
   attachments            OrderAttachment[]
+  pickupInfo             OrderPickupInfo?
   staffTasks             StaffTask[]
   directBookingDocuments DirectBookingDocument[]
   contractEnvelopes      ContractEnvelope[]
@@ -1719,6 +1721,48 @@ model TuroTaskFeed {
   updatedAt    DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+/// The message a guest is sent to collect the car on their own -- where
+/// it is parked, where the lockbox is, its code -- prepared by staff on
+/// the trip and sent by the phone assistant once the guest has uploaded
+/// their licence, so a 5 a.m. pickup does not wait for someone to wake.
+///
+/// The text is a message template filled from the trip: the spot and the
+/// way in come from the order's handover fields, the code from here,
+/// because it changes every trip and must stay out of anything the AI
+/// reads. Only staff make it ready, and ready means "this exact text":
+/// `readyHash` is the hash of the text they approved, and any change to
+/// what would be sent -- the time, the spot, the template, the code --
+/// makes it a draft again until someone looks.
+model OrderPickupInfo {
+  id          String    @id @default(cuid())
+  workspaceId String
+  orderId     String    @unique
+  /// MessageTemplate the text is filled from.
+  templateId  String?
+  /// This trip's lockbox code. Never logged, never in a notification.
+  lockboxCode String?
+  /// sha256 of the text staff marked ready; null while a draft.
+  readyHash   String?
+  readyAt     DateTime?
+  readyBy     String?
+  /// When the phone assistant reports it sent the message.
+  sentAt      DateTime?
+  /// "confirmed": staff had checked the licence; "uploaded": the guest
+  /// had uploaded it and nobody had checked it yet.
+  sentLicense String?
+  sentChannel String?
+  /// sha256 of the text that went out, to tell staff when the trip's text
+  /// has changed since.
+  sentHash    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
 
 enum TuroMessageDirection {

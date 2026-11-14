@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.90.0 - 2026-11-14
+
+### A trip's pickup information can be prepared for a guest to collect the car alone
+
+Early pickups had nobody awake to send the guest where the car is and the lockbox code. Now staff prepare that message on the trip and the phone assistant (the WeChat assistant project) sends it from Turo once the guest has uploaded their licence; staff check the licence later, a risk Kevin accepted.
+
+- The order panel of a Turo trip has a Pickup information card under Handover: choose a reply template, enter this trip's lockbox code (it changes every trip), check the preview, mark it ready. The spot and the way in are the handover fields (`{{pickup_spot}}`, `{{handover_note}}`); `{{pickup_code}}` is this trip's code.
+- Ready means one exact text. The click carries the hash of the preview on screen and the server refuses if the text it would send now is different -- another template, a code not yet previewed, someone else's edit. Afterwards any change to what would be sent (time, spot, place, guest, template, code) makes it a draft again until someone looks. Text still holding `{{...}}` -- an unknown placeholder, or braces typed into a field -- is never ready.
+- `GET /api/agent/pickup-info?reservationIds=` (orders:write, since the text holds the code) gives each live trip's text and its `hash` only when ready; cancelled and deleted trips never answer. `POST /api/agent/pickup-info/sent` records the send once per trip even when reports race, with the license state and the hash of what went out; the card says when it was sent, flags a licence nobody had checked, and warns when what went out differs from the trip's text now.
+- New table `OrderPickupInfo`. The code is never written to the activity log or a notification.
+- Reviewed by Codex before release; its seven findings (unpreviewed text could be marked ready, a stale version could be reported sent, cancelled and archived trips still answered, leftover braces passed, racing reports, refresh gaps, lost input on refresh) are fixed.
+
+Also in this release: `CLAUDE.md` and `docs/看板.md` set up TATO's sessions as a coordinator plus the five domain sessions.
+
 ## v1.89.1 - 2026-11-14
 
 ### An ad title always names the car and its price

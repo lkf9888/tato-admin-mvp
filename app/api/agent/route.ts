@@ -160,6 +160,30 @@ export async function GET(request: Request) {
 const WRITE_ENDPOINTS: Array<{ scope: AgentScope } & Record<string, unknown>> = [
   {
     scope: "orders:write",
+    path: "/api/agent/pickup-info",
+    method: "GET",
+    summary:
+      "The pickup message staff prepared for each reservation -- where the car is, where the lockbox is, this trip's code -- for sending to the guest once their licence is uploaded. Only reservations with pickup info come back. status=ready carries `message`, the full text exactly as staff approved it; a draft has message=null and must not be sent. Behind orders:write because the text holds the lockbox code.",
+    query: { reservationIds: "required. Comma-separated Turo reservation ids, at most 50" },
+    returns:
+      "{ data: [{ reservationId, status: ready | draft, message, hash, updatedAt, sentAt }] }. Cancelled and deleted trips never come back. Read it again right before sending: an edit after it was marked ready makes it a draft.",
+  },
+  {
+    scope: "orders:write",
+    path: "/api/agent/pickup-info/sent",
+    method: "POST",
+    summary:
+      "Record that a reservation's pickup message was sent to the guest. Idempotent: the first report stands, a repeat returns alreadySent=true.",
+    body: {
+      reservationId: "required",
+      sentAt: "required ISO 8601",
+      license: "confirmed (staff had checked the licence) | uploaded (uploaded, not yet checked by a person)",
+      channel: "optional, default \"turo\"",
+      messageHash: "recommended: the `hash` the GET gave with the text you sent. Without it TATO records that something was sent but cannot tell staff whether the trip's text has changed since",
+    },
+  },
+  {
+    scope: "orders:write",
     path: "/api/agent/turo-tasks",
     method: "POST",
     summary:

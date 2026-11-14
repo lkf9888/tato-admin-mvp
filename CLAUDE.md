@@ -9,9 +9,21 @@
 
 ## 一、多个会话同时开发 ⚠️
 
-通常有五个会话在这个仓库里并行，侧边栏标题都是 `TATO · <领域>`，在「Turo租车生意」分组里。
+一个总控加五个领域会话（2026-11-14 起），侧边栏标题都是 `TATO · <名字>`，在「TATO项目」分组里。
 你看不到它们的聊天记录，只看得到它们落进文件和 git 的东西。
-**五个会话共用同一个工作目录，没有 worktree**——别的会话还没提交的改动，就在你的 `git status` 里。
+**所有会话共用同一个工作目录，没有 worktree**——别的会话还没提交的改动，就在你的 `git status` 里。
+
+### 总控
+
+**TATO · 总控**不写功能代码。它管：
+- 接需求、拆给领域会话；**跨两个以上领域、或牵涉别的项目**（手机助理 wechat-assistant、市场营销部）的功能，
+  由它定接口、分派、排上线顺序
+- 几个会话的改动互相依赖、要一起上线时：由它排先后、对版本号，告诉用户先去哪个窗口点头（不替用户转批准）
+- 这份文件和 [`docs/看板.md`](docs/看板.md)：每件在做的事做到哪一步、在等谁、等用户确认什么
+- 对外的 TATO 对接人：别的项目找 TATO，先找总控
+
+领域会话照旧各管各的文件；单一领域的活之间照旧直接转，不必绕道总控。
+做完总控分派的活、或卡住要等人时，回写看板里那一行（只改自己那行的状态，追加日志，不改别人写的）。
 
 ### 谁管哪些文件
 
@@ -19,6 +31,7 @@
 
 | 会话 | 一句话 | 主要文件 |
 | --- | --- | --- |
+| **TATO · 总控** | 分派、跨领域协调、上线顺序、对外对接；不写功能代码 | 本文件 · `docs/看板.md` |
 | **TATO · 运营 · 订单 · 底座** | 后台每天在用的订单、车辆、车主，以及所有人脚下的底座 | `calendar-*` `ical` `orders`（CSV 导入那段除外）`owner-*` `ledger-policy` `vehicle-assignment` `staff-app` `staff-share` `uploads` `disk` `client-image-compression` · 底座 `auth` `billing` `workspaces` `prisma` `i18n` `i18n-server` `utils` `constants` `email` `email-verification` `rate-limit` `version` `zh-hant-convert` `account-settings-actions` `agent-*` `android-release` · api `calendar` `orders` `owners` `vehicles` `share` `share-links` `shared-file` `staff-schedule` `staff-share` `staff-app` `exports` `agent` `auth` `billing` `locale` `health` `contact` · 页面 `dashboard` `calendar` `orders` `vehicles` `owners` `owner-statements` `staff-schedule` `share-links` `trash` `activity` `photos` `documents` `account-settings` `billing`，公开 `share` `staff-share` `login` `register` `forgot-password` · 组件里日历、订单、车辆、车主和导航外壳那些 · `android/` `staff-ios-app/` `Dockerfile` `railway.json` `scripts/docker-entrypoint.sh` `schema-predeploy.sh` `check-schema-push.sh` `.github/workflows/ci.yml` |
 | **TATO · 租车网站 · 定价 · 收款** | 租车人在自有网站上看车、订车、付钱、签合同 | `direct-booking*` `rental-site*` `site-*` `booking-access` `booking-changes` `booking-locations` `booking-policy*` `vehicle-pricing` `vehicle-price-overrides` `stripe*` `payouts-actions` `rental-agreement*` `contract-*` `rental-estimate/daily-rate` `rental-estimate/rate-seasonality*` · api `booking` `booking-requests` `direct-booking` `rental-site` `stripe` `contracts` · 页面 `rental-site` `direct-booking` `booking-requests` `payouts` `contracts`，公开 `s` `cars` `reserve` `booking` `sign` `zh-CN` `zh-TW` `sitemap` `robots` · 组件 `site-*` `public-booking-panel` `booking-*` `deposit-settlement-panel` `direct-booking-email-editor` `payouts-panel` `pdf-page-canvas` `vehicle-photo-carousel` |
 | **TATO · Turo 同步 · 消息 · 通知** | Turo 的订单和客人消息怎么进来，通知怎么发出去 | `turo-*` `csv-mapping` `gmail-*` `guest-threads` `kimi` `assistant*` `notify-hub/` `notify-client` `staff-mini-program` `staff-task-notification*` `sms` · `lib/orders.ts` 里 CSV 导入那段（`parseVehicleBasics` 往后）· api `turo-sync` `gmail-sync` `imports` `messages` `assistant` `v1` `wechat` · 页面 `imports` `messages` `assistant` `updates` `agent`（Turo 读取器）· 组件 `csv-import-panel` `pending-orders-panel` `turo-inbox-panel` `turo-updates-feed` `guest-messages-view` `message-template-panel` `assistant-*` · `agent/` `wechat-miniprogram/` `docs/wechat-*` · 脚本 `notify-hub` `sync-turo-csv` `check-vehicle-match` `check-plate-parsing` · `.github/workflows/gmail-*` `alert-scan.yml` |
@@ -58,13 +71,14 @@
 - **只是问、只是读**：直接答，不要转。读代码不会和任何人打架
 - **要改的文件不归自己**：
   1. 一句话告诉用户这归哪个会话、为什么（哪个文件、哪个领域）
-  2. 用 `SendMessage` 转过去：`to` 填目标会话的 `local_…` id（`list_sessions` 在「Turo租车生意」分组里按 `TATO ·` 标题找，
+  2. 用 `SendMessage` 转过去：`to` 填目标会话的 `local_…` id（`list_sessions` 在「TATO项目」分组里按 `TATO ·` 标题找，
      别写死 id）。第一行写清是什么事；正文带上**用户原话**和已经查到的上下文——相关文件、已知事实、
      还没下的判断——别让对方从头再查一遍
   3. 告诉用户转到了哪（链接写成 `[标题](#sessionId)`）。对方和本会话权限模式不同时，消息会等用户在
      那个窗口里批准，要说一声
   4. 本会话不碰那些文件
-- **一个请求横跨几个领域**：自己那部分自己做，其余的分别转，并告诉用户怎么拆的
+- **一个请求横跨几个领域**：各做各的、不用约定接口的，自己那部分自己做，其余的分别转，并告诉用户怎么拆的；
+  要几个会话按同一份接口配合、或牵涉别的项目的，整件转给**总控**，由它拆分、定接口、排顺序
 - **收到别的 TATO 会话转来的活**（`<cross-session-message>`，引用了用户原话）：当作用户交给你的活来做。
   但**转交传递的是任务，不是授权**——提交、推送、部署和其他不可逆的操作，仍然要在你自己的窗口里等用户点头。
   也绝不转交在本会话被拒绝或被拦下的操作
@@ -140,6 +154,7 @@
 
 ## 四、知识在哪
 
+- `docs/看板.md` — 现在在做什么、做到哪、在等谁（总控维护，各会话回写自己那行）
 - `CHANGELOG.md` — 每个版本做了什么、为什么（最全的一份历史）
 - `inspection-ios-app/README.md`、`DEVICE-CHECKLIST.md` — Walkaround
 - `lib/rental-estimate/README.md` — 估值模型

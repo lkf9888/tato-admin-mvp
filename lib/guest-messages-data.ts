@@ -139,6 +139,7 @@ export async function loadGuestMessagesPage(
           source: true,
           importBatchId: true,
           vehicle: { select: { brand: true, model: true, year: true, plateNumber: true, pickupPassword: true } },
+          pickupInfo: { select: { lockboxCode: true } },
         },
       })
     : [];
@@ -216,9 +217,10 @@ export async function loadGuestMessagesPage(
           : null,
         turoMessagesUrl: turoReservationUrl(order, "messages"),
         // For message templates' {{car}} and {{pickup_code}}. The
-        // code is the operator's own, on an admin-only page.
+        // code is the operator's own, on an admin-only page; this trip's
+        // pickup-info card code wins over the car's standing one.
         vehicleName: order.vehicle ? `${order.vehicle.brand} ${order.vehicle.model} ${order.vehicle.year}` : null,
-        pickupCode: order.vehicle?.pickupPassword ?? null,
+        pickupCode: order.pickupInfo?.lockboxCode || order.vehicle?.pickupPassword || null,
       };
     }),
     nextCursor,

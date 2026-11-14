@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
+import { createCodeMask } from "@/lib/guest-reply-prompt";
 import { isKimiConfigured, kimiChat } from "@/lib/kimi";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -40,7 +41,7 @@ const translateSchema = z.object({
 const SYSTEM_PROMPT = [
   "你是翻译。把每条 Turo 客人消息翻译成简体中文。",
   "只输出译文，不要解释、不要引号、不要编号以外的任何前后缀。",
-  "保留 emoji、数字、日期、金额、车牌和人名。语气贴近原文，客人怎么说就怎么译，不要润色成客服腔。",
+  "保留 emoji、数字、日期、金额、车牌和人名，{{code_1}} 这样的占位符原样保留。语气贴近原文，客人怎么说就怎么译，不要润色成客服腔。",
   "输入是带编号的多行，每行形如 `3. <原文>`。输出必须是同样数量、同样编号的行，每条译文只占一行，不要换行。",
 ].join("\n");
 
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
         },
         orderBy: { sentAt: "desc" },
         take: BATCH,
-        select: { id: true, body: true },
+        select: { id: true, body: true, reservationId: true },
       })
     : [];
 
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
     },
         orderBy: { receivedAt: "desc" },
         take: BATCH,
-        select: { id: true, guestText: true, guestTextZh: true, parsed: true },
+        select: { id: true, guestText: true, guestTextZh: true, parsed: true, orderId: true },
       })
     : [];
 
@@ -169,12 +170,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ translated: 0, translations: {} });
   }
 
+  // Host messages in the thread can carry a lockbox code. Codes never
+  // reach the model: swapped for placeholders here, back in each line.
+  const orderIds = pending.map((email) => email.orderId).filter((id): id is string => Boolean(id));
+  const reservationIds = [...new Set(conversationRows.map((row) => row.reservationId))];
+  const codeOrders =
+    orderIds.length || reservationIds.length
+      ? await prisma.order.findMany({
+          where: {
+            workspaceId: context.workspace.id,
+            OR: [{ id: { in: orderIds } }, { externalOrderId: { in: reservationIds } }],
+          },
+          select: { vehicle: { select: { pickupPassword: true } }, pickupInfo: { select: { lockboxCode: true } } },
+        })
+      : [];
+  const codes = createCodeMask(
+    codeOrders
+      .flatMap((order) => [order.pickupInfo?.lockboxCode, order.vehicle?.pickupPassword])
+      .filter((code): code is string => Boolean(code?.trim())),
+  );
+
   const result = await kimiChat({
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
-        content: allItems.map((item, index) => `${index + 1}. ${item.text}`).join("\n"),
+        content: allItems.map((item, index) => `${index + 1}. ${codes.mask(item.text)}`).join("\n"),
       },
     ],
     maxTokens: 3000,
@@ -199,8 +220,9 @@ export async function POST(request: Request) {
 
   const translations: Record<string, string> = {};
   for (const [index, item] of allItems.entries()) {
-    const text = byIndex.get(index + 1);
-    if (!text) continue;
+    const translated = byIndex.get(index + 1);
+    if (!translated) continue;
+    const text = codes.restore(translated);
     translations[item.id] = text;
 
     if (item.kind === "conversation") {

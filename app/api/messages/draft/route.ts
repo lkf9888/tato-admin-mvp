@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
-import { loadReplyContext, replyContextText, REPLY_RULES } from "@/lib/guest-reply-prompt";
+import { createCodeMask, loadReplyContext, replyContextText, REPLY_RULES } from "@/lib/guest-reply-prompt";
 import { isKimiConfigured, kimiChat } from "@/lib/kimi";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -85,10 +85,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "THREAD_NOT_FOUND" }, { status: 404 });
   }
 
-  const steer = parsed.data.instruction ? `\n\nThe host wants you to convey: ${parsed.data.instruction}` : "";
+  // Codes never reach the model: swapped out here, back in the result.
+  const codes = createCodeMask(reply.codes);
+  const steer = parsed.data.instruction
+    ? `\n\nThe host wants you to convey: ${codes.mask(parsed.data.instruction)}`
+    : "";
   const result = await kimiChat({
     messages: [
-      { role: "system", content: reply.memory ? `${SYSTEM_PROMPT}\n\n${reply.memory}` : SYSTEM_PROMPT },
+      { role: "system", content: reply.memory ? `${SYSTEM_PROMPT}\n\n${codes.mask(reply.memory)}` : SYSTEM_PROMPT },
       { role: "user", content: `${replyContextText(reply)}${steer}` },
     ],
     maxTokens: 3000,
@@ -100,5 +104,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "DRAFT_FAILED", reason: result.reason }, { status: 502 });
   }
 
-  return NextResponse.json({ draft: result.content, libraryUsed: reply.libraryUsed });
+  return NextResponse.json({ draft: codes.restore(result.content), libraryUsed: reply.libraryUsed });
 }

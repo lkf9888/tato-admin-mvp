@@ -17,7 +17,7 @@ export const REPLY_RULES = [
   "Write in the language the guest writes in (look at their latest message). If you cannot tell, write English.",
   "Plain, warm, everyday wording -- like a quick text between two people, not a formal letter. No greeting, no sign-off, no restating their question.",
   "Never invent details: pickup addresses, codes, prices, times, policies. If something is not in the trip facts or the host's library, say you will check and get back to them.",
-  "The latest relevant host reply in this same conversation may confirm facts for this trip only. Never generalize it to another trip, and never reuse a historical access code. Keep {{pickup_code}} for the host to fill.",
+  "The latest relevant host reply in this same conversation may confirm facts for this trip only. Never generalize it to another trip, and never reuse a historical access code. Keep {{pickup_code}} for the host to fill, and keep every other {{placeholder}} (such as {{code_1}}) exactly as written.",
   "Read the latest guest message together with the preceding guest messages. Resolve words such as it, there and again from that exchange, not from an unrelated template or older topic. If the referent is unclear, ask what they mean.",
   "A confirmed option is not an exclusive policy: if the host said a guest can pay a parking ticket online, say that option without claiming tickets never go through Turo. Do not add always, never, must, or cannot unless the evidence explicitly supports it.",
   "Pickup and return are separate. Use only the confirmed address and instructions for the direction asked about; never borrow the other direction when an address is missing. A requested change is not confirmed until the trip is updated.",
@@ -45,7 +45,12 @@ export async function loadReplyContext(input: {
       guestText: true,
       receivedAt: true,
       parsed: true,
-      order: { include: { vehicle: { select: { plateNumber: true, brand: true, model: true, year: true } } } },
+      order: {
+        include: {
+          vehicle: { select: { plateNumber: true, brand: true, model: true, year: true, pickupPassword: true } },
+          pickupInfo: { select: { lockboxCode: true } },
+        },
+      },
     },
   });
   if (emails.length === 0) return null;
@@ -60,7 +65,7 @@ export async function loadReplyContext(input: {
     (vehicleId
       ? await prisma.vehicle.findFirst({
           where: { id: vehicleId, workspaceId: input.workspaceId },
-          select: { plateNumber: true, brand: true, model: true, year: true },
+          select: { plateNumber: true, brand: true, model: true, year: true, pickupPassword: true },
         })
       : null);
   // Reader imports may contain only the host's side. They complement the
@@ -123,6 +128,8 @@ export async function loadReplyContext(input: {
     .join("\n");
 
   return {
+    /** This trip's and this car's access codes: never shown to the model. */
+    codes: [order?.pickupInfo?.lockboxCode, vehicle?.pickupPassword].filter((code): code is string => Boolean(code?.trim())),
     memory,
     facts,
     library: library.text,
@@ -146,5 +153,51 @@ export function replyContextText(context: NonNullable<Awaited<ReturnType<typeof 
     .join("\n\n")
     // Current-trip imports can carry access codes too. Only the browser may
     // fill a code from the matched order; never teach it to the model.
-    .replace(/((?:\bpin|\b(?:lockbox|key|access|door|pickup|pick-up|security)\s*code|密码)\s*(?:(?:is|为|是)\s*)?[:：]?\s*)(?=[a-z0-9]*\d)[a-z0-9]{3,12}\b/gi, "$1{{pickup_code}}");
+    // Known codes first, whole, so a code with a dash or space is not
+    // half-caught by the pattern below.
+    .replace(knownCodesPattern(context.codes) ?? /$^/, "{{pickup_code}}")
+    .replace(ACCESS_CODE, "$1{{pickup_code}}");
+}
+
+const ACCESS_CODE =
+  /((?:\bpin|\b(?:lockbox|key|access|door|pickup|pick-up|security)\s*code|密码)\s*(?:(?:is|为|是)\s*)?[:：]?\s*)(?=[a-z0-9]*\d)[a-z0-9]{3,12}\b/gi;
+
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** The given codes as whole words, longest first; null when there are none
+ *  long enough to be told apart from ordinary numbers. */
+function knownCodesPattern(codes: string[]) {
+  const usable = [...new Set(codes.map((code) => code.trim()).filter((code) => code.length >= 3))].sort(
+    (a, b) => b.length - a.length,
+  );
+  if (usable.length === 0) return null;
+  return new RegExp(`(?<![A-Za-z0-9])(?:${usable.map(escapeRegExp).join("|")})(?![A-Za-z0-9])`, "g");
+}
+
+/**
+ * Text on its way to the model with access codes swapped for numbered
+ * placeholders, and back again on the way out. Catches the trip's known
+ * codes wherever they stand and anything typed after "lockbox code" or
+ * 密码. Each distinct value gets its own {{code_N}}, so a code the host
+ * typed by hand comes back as that code, not as the trip's.
+ */
+export function createCodeMask(known: string[] = []) {
+  const values: string[] = [];
+  const token = (value: string) => {
+    let index = values.indexOf(value);
+    if (index < 0) index = values.push(value) - 1;
+    return `{{code_${index + 1}}}`;
+  };
+  const knownPattern = knownCodesPattern(known);
+  return {
+    mask(text: string) {
+      const masked = knownPattern ? text.replace(knownPattern, (code) => token(code)) : text;
+      return masked.replace(ACCESS_CODE, (match: string, label: string) => label + token(match.slice(label.length)));
+    },
+    restore(text: string) {
+      return text.replace(/\{\{\s*code_(\d+)\s*\}\}/g, (match, n: string) => values[Number(n) - 1] ?? match);
+    },
+  };
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireCurrentAdminContext } from "@/lib/auth";
-import { loadReplyContext, replyContextText, REPLY_RULES } from "@/lib/guest-reply-prompt";
+import { createCodeMask, loadReplyContext, replyContextText, REPLY_RULES } from "@/lib/guest-reply-prompt";
 import { isKimiConfigured, kimiChat } from "@/lib/kimi";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -71,20 +71,23 @@ export async function POST(request: Request) {
   });
   if (!reply) return NextResponse.json({ error: "THREAD_NOT_FOUND" }, { status: 404 });
 
+  // Codes never reach the model: swapped out here, back in the result.
+  const codes = createCodeMask(reply.codes);
+  const text = codes.mask(parsed.data.text);
   const messages =
     parsed.data.mode === "rewrite"
       ? [
-          { role: "system" as const, content: reply.memory ? `${REWRITE_PROMPT}\n\n${reply.memory}` : REWRITE_PROMPT },
+          { role: "system" as const, content: reply.memory ? `${REWRITE_PROMPT}\n\n${codes.mask(reply.memory)}` : REWRITE_PROMPT },
           {
             role: "user" as const,
-            content: `${replyContextText(reply)}\n\nWhat the host wants to say:\n${parsed.data.text}`,
+            content: `${replyContextText(reply)}\n\nWhat the host wants to say:\n${text}`,
           },
         ]
       : [
           { role: "system" as const, content: TRANSLATE_PROMPT },
           {
             role: "user" as const,
-            content: `The guest's latest message (for the language only):\n${reply.lastGuestText}\n\nThe host's message to translate:\n${parsed.data.text}`,
+            content: `The guest's latest message (for the language only):\n${codes.mask(reply.lastGuestText)}\n\nThe host's message to translate:\n${text}`,
           },
         ];
 
@@ -92,7 +95,7 @@ export async function POST(request: Request) {
   if (!result.ok) return NextResponse.json({ error: "COMPOSE_FAILED", reason: result.reason }, { status: 502 });
 
   return NextResponse.json({
-    text: result.content,
+    text: codes.restore(result.content),
     libraryUsed: parsed.data.mode === "rewrite" ? reply.libraryUsed : [],
   });
 }

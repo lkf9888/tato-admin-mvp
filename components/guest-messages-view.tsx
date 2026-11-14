@@ -741,10 +741,22 @@ export function GuestMessagesView({
     return templateContext ? renderTemplate(text, templateContext.values).text : text;
   }
 
+  /**
+   * The composer's text on its way to the AI, with this trip's pickup code
+   * turned back into {{pickup_code}} -- a template filled in here put it
+   * there. fillIn restores it in the result.
+   */
+  function maskCode(text: string) {
+    const code = templateContext?.values.pickupCode?.trim();
+    if (!code) return text;
+    const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return text.replace(new RegExp(`(?<![A-Za-z0-9])${escaped}(?![A-Za-z0-9])`, "g"), "{{pickup_code}}");
+  }
+
   /** Draft, rewrite or translate, through the one AI path. */
   async function runAi(mode: "draft" | "rewrite" | "translate") {
     if (!selected || aiBusy) return;
-    const text = (composerTexts[selected.key] ?? "").trim();
+    const text = maskCode((composerTexts[selected.key] ?? "").trim());
     if (mode !== "draft" && !text) return;
     setAiBusy(mode);
     setAiStartedAt(Date.now());

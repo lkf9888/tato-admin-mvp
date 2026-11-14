@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.90.1 - 2026-11-14
+
+### A trip's own lockbox code fills {{pickup_code}}, and no code reaches the AI
+
+`{{pickup_code}}` in message templates now takes the trip's own lockbox code from its pickup-info card (v1.90.0) before the car's standing one, since the code changes every trip. Scheduled message rules, which can send by themselves, use the card's code only while the card is ready -- the text staff confirmed, unchanged since; a draft or since-edited code falls back to the car's.
+
+Access codes are kept from Kimi on every path that sends it guest-conversation text: drafting, 改写, 翻译 and thread translation. The page turns the trip's code back into `{{pickup_code}}` before asking, and the server swaps the trip's and the car's known codes, plus anything typed after "lockbox code", "PIN" or 密码, for numbered placeholders and puts each original back in the result -- so a code the host typed by hand comes back as that code, not the trip's. Codes in a shape the pattern cannot recognise (letters only, symbols) are still caught when they are the trip's or car's own.
+
 ## v1.90.0 - 2026-11-14
 
 ### A trip's pickup information can be prepared for a guest to collect the car alone

@@ -3,6 +3,7 @@ import "server-only";
 import { OrderStatus } from "@prisma/client";
 
 import { renderTemplate } from "@/lib/message-placeholders";
+import { getOrderPickupInfo } from "@/lib/order-pickup-info";
 import { prisma } from "@/lib/prisma";
 import { turoReservationUrl } from "@/lib/utils";
 
@@ -199,6 +200,7 @@ export async function listDueMessages(workspaceId: string, now = new Date()): Pr
       returnLocation: true,
       vehicleId: true,
       vehicle: { select: { brand: true, model: true, year: true, plateNumber: true, pickupPassword: true } },
+      pickupInfo: { select: { lockboxCode: true } },
     },
   });
   if (orders.length === 0) return [];
@@ -208,6 +210,16 @@ export async function listDueMessages(workspaceId: string, now = new Date()): Pr
     select: { ruleId: true, orderId: true },
   });
   const handled = new Set(done.map((row) => `${row.ruleId}:${row.orderId}`));
+
+  // A trip's own lockbox code counts only while its pickup-info card is
+  // ready -- the text staff confirmed, unchanged since. A rule can send by
+  // itself, so a draft or since-edited code must not go out.
+  const readyCodes = new Map<string, string>();
+  for (const order of orders) {
+    if (!order.pickupInfo?.lockboxCode) continue;
+    const info = await getOrderPickupInfo(workspaceId, order.id);
+    if (info?.state.status === "ready" && info.state.lockboxCode) readyCodes.set(order.id, info.state.lockboxCode);
+  }
 
   const due: DueMessage[] = [];
   for (const rule of rules) {
@@ -234,7 +246,9 @@ export async function listDueMessages(workspaceId: string, now = new Date()): Pr
         pickupLocation: order.pickupLocation,
         returnLocation: order.returnLocation,
         reservation: order.externalOrderId,
-        pickupCode: order.vehicle.pickupPassword,
+        // This trip's own lockbox code wins over the car's standing one:
+        // the code changes every trip.
+        pickupCode: readyCodes.get(order.id) || order.vehicle.pickupPassword,
       });
       due.push({
         ruleId: rule.id,

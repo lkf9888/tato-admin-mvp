@@ -64,8 +64,8 @@ TATO 已经有其中大半：车主、车辆、电子合同、Stripe 收款和�
 设想：月租自己的代码放进新文件（`lib/monthly-*`、`app/(admin)/monthly/`、`app/api/monthly/`），
 需要给 `Vehicle`、`Owner` 加列或改别人的文件时，先在对应会话里说一声。
 
-月租登记在 [`docs/看板.md`](../看板.md) 的 T3。它是单独的领域会话还是挂在现有会话下，由「TATO · 总控」和用户决定，
-写进根目录 `CLAUDE.md` 的分工表。**定下来之前不写代码。**
+月租登记在 [`docs/看板.md`](../看板.md) 的 T3。2026-11-14 定为单独的领域会话「TATO · SpeedX 月租」（Kevin：「新文件归月租」），
+归它的有 `docs/speedx-monthly/`、`lib/monthly-*`、api `monthly`、页面 `monthly`；动已有文件按根目录 `CLAUDE.md` 的交界规则先说一声。
 
 ## 进度
 
@@ -75,3 +75,4 @@ TATO 已经有其中大半：车主、车辆、电子合同、Stripe 收款和�
 | 2026-10-30 至 11-10 | 讨论业务模式：车主上线流程、lessee 的法律依据、事故和拒赔、收车、公司架构、Fleetplan 取舍 |
 | 2026-11-11 | 按 BC 财政部公告核对 broker 的两条说法：出租车辆一般要注册 PST；GST 一般不用注册、ICBC 不收 GST |
 | 2026-11-14 | 讨论结论写成 business-model.md，待确认清单补上要问各方的问题。Codex 复核后核实原文并更正：私人车主的车很可能进不了 Fleetplan；车主可能因只做免税租赁而不用注册 PST；Kevin 的租约很可能不用 PPR 登记；2 月单月合同要收 PVRT；出事必须通知 ICBC |
+| 2026-11-14 | 第 1 步：`lib/monthly-rules.ts` 纯函数 + `tests/monthly-rules.test.ts`（15 项）。整月租期（计费锚点同 Stripe，月底起租按月底计费，续租沿用原锚点）、期限折扣、押金倍数、PST 分档（PST 116 表 1 只作参考常量）、超里程费、每期账单、逾期分级。金额用分，税率和倍数用基点。Kevin 未定的数全部走配置，测试里是示例值。核实 PST 116 第 20 页：PVRT 不收 PST、要收 GST。Codex 审两轮 |

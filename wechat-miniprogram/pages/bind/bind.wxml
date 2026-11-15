@@ -1,6 +1,6 @@
 <view class="page bind-page safe-bottom">
   <view class="brand-block">
-    <view class="brand-mark">T</view>
+    <image class="brand-mark" src="/images/brand-mark.png" mode="aspectFit" aria-label="TATO" />
     <view>
       <view class="eyebrow">TATO</view>
       <view class="title">添加频道</view>

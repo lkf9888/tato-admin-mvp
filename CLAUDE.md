@@ -9,7 +9,7 @@
 
 ## 一、多个会话同时开发 ⚠️
 
-一个总控加五个领域会话（2026-11-14 起），侧边栏标题都是 `TATO · <名字>`，在「TATO项目」分组里。
+一个总控加六个领域会话（2026-11-14 起，领域会话都是总控的子对话），侧边栏标题都是 `TATO · <名字>`，在「TATO项目」分组里。
 你看不到它们的聊天记录，只看得到它们落进文件和 git 的东西。
 **所有会话共用同一个工作目录，没有 worktree**——别的会话还没提交的改动，就在你的 `git status` 里。
 
@@ -37,6 +37,7 @@
 | **TATO · Turo 同步 · 消息 · 通知** | Turo 的订单和客人消息怎么进来，通知怎么发出去 | `turo-*` `csv-mapping` `gmail-*` `guest-threads` `kimi` `assistant*` `notify-hub/` `notify-client` `staff-mini-program` `staff-task-notification*` `sms` · `lib/orders.ts` 里 CSV 导入那段（`parseVehicleBasics` 往后）· api `turo-sync` `gmail-sync` `imports` `messages` `assistant` `v1` `wechat` · 页面 `imports` `messages` `assistant` `updates` `agent`（Turo 读取器）· 组件 `csv-import-panel` `pending-orders-panel` `turo-inbox-panel` `turo-updates-feed` `guest-messages-view` `message-template-panel` `assistant-*` · `agent/` `wechat-miniprogram/` `docs/wechat-*` · 脚本 `notify-hub` `sync-turo-csv` `check-vehicle-match` `check-plate-parsing` · `.github/workflows/gmail-*` `alert-scan.yml` |
 | **TATO · Walkaround · 车况照片** | 手机绕车拍照，留下经得起 Turo 理赔的车况证据 | `inspection-ios-app/` · `inspection*` · api `inspection` · 页面 `inspections` · `scripts/check-inspection-evidence.ts` |
 | **TATO · 估值 · 投资分析** | 一台车在这里能赚多少、该买哪台 | `lib/rental-estimate/`（`daily-rate` `rate-seasonality*` 除外）· 页面 `vehicle-roi`（含子页 `estimate` `ranking`；旧路径 `rental-estimate` `investment-ranking` 是跳转页）· 组件 `vehicle-roi-*` `rental-estimate-tool` `investment-ranking-tool` · `scripts/build-rental-estimate-model.ts` |
+| **TATO · SpeedX 月租** | 1–12 个月整月转租（新移民、留学生）：车主承租、租客申请、月租合同、每期账单、月检 | `docs/speedx-monthly/` · `lib/monthly-*` · api `monthly` · 页面 `monthly`（新文件都归它；要动车辆、合同、收款、验车等已有文件，按下面交界规则先在对应会话说一声，由总控排顺序） |
 
 **交界——动之前在对话里说一声：**
 
@@ -59,7 +60,7 @@
 - 到处被调用的工具（`utils` `uploads` `email` `rate-limit`，`lib/orders.ts` 的 `logActivity` `reconcileVehicleConflicts`）：改签名之前说一声
 
 用户报 bug 多半只说得出症状：Turo 订单没进来、没匹配上车、客人消息、消息模板、AI 助理、微信和短信没收到 → 同步·消息·通知；
-网站、直订、价格、押金、退款、Stripe、保险税费、电子合同 → 租车网站；拍照 app、车况照片 → Walkaround；
+网站、直订、价格、押金、退款、Stripe、保险税费、电子合同 → 租车网站；拍照 app、车况照片 → Walkaround；月租、整月转租 → SpeedX 月租；
 租金预估、买哪台车 → 估值；其余日常操作（日历、订单、车辆、车主分成、排班）和登录、权限、账单、API、APK、部署 → 运营·底座。
 **拿不准就当不是自己的**——问一句比回滚便宜。
 

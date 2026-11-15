@@ -13,8 +13,10 @@ import type { MetadataRoute } from "next";
  *   on something useful, and an unauthenticated user gets bounced to
  *   /login by middleware automatically.
  *
- * Icons are generated dynamically via `app/icon.tsx` and
- * `app/apple-icon.tsx`, so no static asset is needed.
+ * Icons are drawn on request from `components/brand-mark.tsx`:
+ * `app/app-icon.png` (the whole "tato") for installs, `app/apple-icon.tsx`
+ * for iOS. `app/icon.tsx` is the one-letter favicon and is left out of
+ * the manifest on purpose -- a launcher would show a lone "t".
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -27,25 +29,21 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     orientation: "portrait",
     background_color: "#ffffff",
-    theme_color: "#111318",
+    theme_color: "#15171C",
     categories: ["business", "productivity"],
     lang: "en",
     icons: [
+      // The whole "tato": installs and launchers show it large. One
+      // 512 PNG serves every size; launchers scale it down.
       {
-        src: "/icon",
-        sizes: "192x192",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
-        src: "/icon",
+        src: "/app-icon.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon",
-        sizes: "192x192",
+        src: "/app-icon.png",
+        sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
       },

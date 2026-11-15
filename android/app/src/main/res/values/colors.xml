@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ink">#111318</color>
+    <color name="ink">#15171C</color>
     <color name="ink_soft">#6B6F76</color>
     <color name="surface">#FFFFFF</color>
-    <color name="accent">#593CFB</color>
+    <color name="accent">#FF5A3C</color>
 </resources>

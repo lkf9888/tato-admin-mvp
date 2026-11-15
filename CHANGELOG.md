@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.91.0 - 2026-11-14
+
+### TATO has a new logo: a lowercase "tato"
+
+The purple "T" is replaced by a lowercase "tato" whose two t's share one crossbar, with the final "o" in signal orange (#FF5A3C) on ink (#15171C). Kevin picked it from three original designs. Turo's own logo was not copied: TATO is a tool for Turo hosts, and a mark that reads as Turo's invites being taken for Turo. The old purple (#593CFB) was all but Turo's, so the mark no longer uses it.
+
+- Two forms by size. App icons -- iOS home screen, the PWA install, the Android launcher, the staff app -- show the whole word. At 32px and below -- the sidebar, the browser tab, the push-notification badge -- the word blurs, so those show one lowercase t with an orange crossbar.
+- One drawing: `lib/brand-mark.ts` returns the mark as SVG markup, which the sidebar renders, `ImageResponse` draws (as an `<img>` data URI that resvg renders whole, replacing the div-built T) and `scripts/generate-brand-icons.ts` turns into the committed PNGs.
+- The manifest now points installs at a new `/app-icon.png` (the word, 512px, any + maskable); `/icon` stays the one-letter favicon. Theme colour #15171C.
+- The sign-in, sign-up and password-reset pages show the wordmark where they used to set "TATO" in type.
+- Android: launcher icons and `colors.xml` redrawn. Installed phones get the new icon only with a new APK (`scripts/build-android-apk.sh`), which is not part of this release.
+- Staff app (Expo): its assets were still Expo's default template icons; now the mark, adaptive background ink.
+
+The app's own purple (`--brand`, links, active nav, focus rings) is unchanged in this release.
+
 ## v1.90.1 - 2026-11-14
 
 ### A trip's own lockbox code fills {{pickup_code}}, and no code reaches the AI

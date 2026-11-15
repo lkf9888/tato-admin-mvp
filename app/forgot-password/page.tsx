@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { BrandWordmark } from "@/components/brand-mark";
 import { CompactLanguageSwitcher } from "@/components/language-switcher";
 import { ForgotPasswordForm } from "@/components/forgot-password-form";
 import { isAdminAuthenticated } from "@/lib/auth";
@@ -23,8 +24,8 @@ export default async function ForgotPasswordPage() {
               <p className="text-[11px] uppercase tracking-[0.42em] text-white/60">
                 {loginMessages.heroKicker}
               </p>
-              <h1 className="mt-4 font-serif text-[5rem] leading-none tracking-[-0.08em] xl:text-[5.4rem]">
-                {loginMessages.brandName}
+              <h1 className="mt-4 text-white">
+                <BrandWordmark label={loginMessages.brandName} className="h-16 w-auto xl:h-[4.5rem]" />
               </h1>
               <p className="mt-4 max-w-sm text-[13px] leading-6 text-white/70">
                 {loginMessages.brandIntro}
@@ -41,8 +42,8 @@ export default async function ForgotPasswordPage() {
 
         <section className="relative flex flex-1 items-start justify-center bg-white px-4 pb-10 pt-6 sm:px-8 sm:pt-10 lg:items-center lg:px-12 lg:py-10">
           <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 pt-5 sm:px-8 lg:left-auto lg:right-6 lg:top-6 lg:justify-end">
-            <p className="font-serif text-2xl font-semibold tracking-tight text-black lg:hidden">
-              {loginMessages.brandName}
+            <p className="text-black lg:hidden">
+              <BrandWordmark label={loginMessages.brandName} className="h-7 w-auto" />
             </p>
             <CompactLanguageSwitcher locale={locale} />
           </div>

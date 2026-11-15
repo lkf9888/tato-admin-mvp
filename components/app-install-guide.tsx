@@ -197,7 +197,7 @@ function AddHomeMock({ t }: { t: MockCopy }) {
         </Tap>
       </div>
       <div className="mt-3 flex items-center gap-2 rounded-lg bg-white p-2">
-        <BrandMark size={30} className="shrink-0 rounded-[7px]" />
+        <BrandMark size={30} variant="word" className="shrink-0 rounded-[7px]" />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="border-b border-[#e5e5ea] pb-0.5 text-[9px] font-medium">TATO</div>
           <div className="truncate text-[7.5px] text-[#8e8e93]">tatocar.co</div>

@@ -1,69 +1,49 @@
 /**
  * The TATO mark.
  *
- * A "T" whose crossbar is a timeline row: one booking, then the next,
- * meeting flush the way bars do on the calendar. That is literally
- * what the product is -- cars down the side, bookings across the days
- * -- and it is a shape no other rental tool's logo arrives at, because
- * most of them draw a car.
+ * A lowercase "tato" drawn from round-capped strokes rather than set in
+ * a font, so it looks the same in a sidebar, a launcher and a PNG made
+ * on a server with no fonts installed. The two t's share one crossbar
+ * -- a road, or a run of bookings on the calendar -- and the final "o"
+ * carries the accent, like a wheel.
  *
- * The colour changes at x=282, which is exactly the stem's right edge,
- * so the split is a consequence of the letter rather than a decision
- * about where to put some purple. An earlier version floated the
- * accent as a separate pill with a gap before it; at 32px that reads
- * as a notification dot, which is worse than no accent at all.
+ * It replaced a purple "T" in v1.91.0. That purple was all but Turo's
+ * own, and TATO is a tool for Turo hosts: a mark that reads as Turo's
+ * invites being taken for Turo, so neither the shape nor the colour is
+ * theirs any more.
  *
- * The bars carry the same pill radius as the calendar's own booking
- * bars, so the icon on a home screen and the thing it opens are
- * recognisably the same object.
+ * Two forms, chosen by size:
+ *  - "word": the whole "tato" on its dark tile. App icons -- home
+ *    screen, launcher, PWA, the install guide's home-screen preview.
+ *  - "t": one lowercase t, accent crossbar. Everywhere at 32px or less
+ *    (sidebar, browser tab, push badge), where four letters blur.
+ *
+ * The drawing is plain SVG markup from one function, because the same
+ * geometry has to reach React, `ImageResponse` (as an <img> data URI,
+ * which Satori hands to resvg whole) and `sharp` for the Android and
+ * Expo PNGs (`scripts/generate-brand-icons.ts`) -- it lives in
+ * `lib/brand-mark.ts`. One source is what
+ * keeps the sidebar, the browser tab and the launcher one logo.
  */
 
-/**
- * One set of numbers, two renderers.
- *
- * The app draws this as SVG; `app/icon.tsx` has to draw it as divs,
- * because Satori -- what `ImageResponse` renders with -- supports the
- * box model far more completely than it supports SVG paths. Sharing
- * the geometry is what keeps the launcher icon and the sidebar from
- * drifting into two different logos.
- *
- * Everything sits inside a centred circle of ~410px, the safe area
- * Android crops adaptive icons to: a launcher may shave the corners of
- * this tile without touching the mark.
- */
-export const BRAND_MARK = {
-  box: 512,
-  ink: "#111318",
-  accent: "#593CFB",
-  tileRadius: 112,
-  /** Crossbar, full span. Split by colour, not by a gap. */
-  bar: { x: 106, y: 132, width: 300, height: 52, radius: 26 },
-  /** Where white gives way to accent — the stem's right edge. */
-  split: 282,
-  stem: { x: 230, y: 132, width: 52, height: 248, radius: 26 },
-} as const;
+import {
+  BRAND,
+  BRAND_WORDMARK_VIEWBOX,
+  brandMarkInner,
+  brandWordmarkInner,
+  type BrandMarkVariant,
+} from "@/lib/brand-mark";
 
 export function BrandMark({
   size = 32,
-  rounded = true,
+  variant = "t",
   className,
 }: {
   size?: number;
-  /** The tile's own corner radius. Android masks adaptive icons
-   *  itself, so the launcher icon passes `rounded={false}` and lets
-   *  the system decide circle, squircle or square. */
-  rounded?: boolean;
+  variant?: BrandMarkVariant;
   className?: string;
 }) {
-  const { box, ink, accent, tileRadius, bar, split, stem } = BRAND_MARK;
-  const barEnd = bar.x + bar.width;
-  // The accent tail: straight where it meets the white, capped round
-  // at the far end so the crossbar keeps one continuous silhouette.
-  const capCentre = barEnd - bar.radius;
-  const tail = `M ${split} ${bar.y} H ${capCentre} A ${bar.radius} ${bar.radius} 0 0 1 ${capCentre} ${
-    bar.y + bar.height
-  } H ${split} Z`;
-
+  const { box, tileRadius } = BRAND;
   return (
     <svg
       width={size}
@@ -74,25 +54,23 @@ export function BrandMark({
       className={className}
       role="img"
       aria-label="TATO"
-    >
-      <rect width={box} height={box} rx={rounded ? tileRadius : 0} fill={ink} />
-      <rect
-        x={bar.x}
-        y={bar.y}
-        width={bar.width}
-        height={bar.height}
-        rx={bar.radius}
-        fill="#FFFFFF"
-      />
-      <path d={tail} fill={accent} />
-      <rect
-        x={stem.x}
-        y={stem.y}
-        width={stem.width}
-        height={stem.height}
-        rx={stem.radius}
-        fill="#FFFFFF"
-      />
-    </svg>
+      dangerouslySetInnerHTML={{ __html: brandMarkInner({ variant, radius: tileRadius }) }}
+    />
+  );
+}
+
+/** The word on its own, for headers and sign-in pages. The letters take
+ *  the text colour; the o keeps the accent. */
+export function BrandWordmark({ className, label = "TATO" }: { className?: string; label?: string }) {
+  return (
+    <svg
+      viewBox={BRAND_WORDMARK_VIEWBOX}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      role="img"
+      aria-label={label}
+      dangerouslySetInnerHTML={{ __html: brandWordmarkInner("currentColor") }}
+    />
   );
 }

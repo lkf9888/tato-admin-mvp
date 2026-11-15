@@ -1,48 +1,26 @@
 import { ImageResponse } from "next/og";
 
-import { BRAND_MARK } from "@/components/brand-mark";
+import { brandMarkDataUri } from "@/lib/brand-mark";
 
 /**
  * The small mark Android shows in the status bar for a push
  * notification (public/push-sw.js). Android draws only its alpha, in
- * white, so it is the brand's T alone, white on transparent -- the full
- * app icon there would be a white square.
- *
- * The same geometry as app/icon.tsx, scaled to 96px, without the tile.
+ * white, so it is the brand's lowercase t alone, white on transparent
+ * -- the full app icon there would be a white square.
  */
 export const dynamic = "force-static";
 
 const SIZE = 96;
 
 export function GET() {
-  const { box, bar, stem } = BRAND_MARK;
-  const k = SIZE / box;
   return new ImageResponse(
     (
-      <div style={{ width: SIZE, height: SIZE, display: "flex", position: "relative" }}>
-        <div
-          style={{
-            position: "absolute",
-            left: bar.x * k,
-            top: bar.y * k,
-            width: bar.width * k,
-            height: bar.height * k,
-            borderRadius: bar.radius * k,
-            background: "#ffffff",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            left: stem.x * k,
-            top: stem.y * k,
-            width: stem.width * k,
-            height: stem.height * k,
-            borderRadius: stem.radius * k,
-            background: "#ffffff",
-          }}
-        />
-      </div>
+      // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+      <img
+        src={brandMarkDataUri({ variant: "t", tile: false, mono: "#ffffff", scale: 1.25, size: SIZE })}
+        width={SIZE}
+        height={SIZE}
+      />
     ),
     { width: SIZE, height: SIZE },
   );

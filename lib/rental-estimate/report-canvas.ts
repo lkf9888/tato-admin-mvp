@@ -18,6 +18,7 @@
  * `SCALE` times that, so the caller can drop the bitmap straight onto a
  * page with no coordinate conversion.
  */
+import { BRAND as MARK, brandMarkSvg } from "@/lib/brand-mark";
 import type { Locale } from "@/lib/i18n";
 
 import type { VehicleEstimate } from "./index";
@@ -32,13 +33,19 @@ const CONTENT = PAGE_WIDTH - MARGIN * 2;
 // Literal rather than read off CSS custom properties: the report should
 // look the same whoever exports it, and a canvas has no cascade to
 // inherit from anyway.
-const INK = "#121214";
-const INK_MID = "#414143";
-const INK_SOFT = "#6e6e73";
-const LINE = "#e7e7e8";
-const BRAND = "#593cfb";
-const BRAND_SOFT = "#efecff";
-const BAR_TRACK = "#e9e5ff";
+//
+// The colours are the logo's (`lib/brand-mark.ts`): ink, and the
+// orange-red of its "o". That orange is 3.1:1 on white, too faint for
+// small text, so it fills the bars and the share box, and a darker
+// step of it (4.6:1) carries any text set in the accent.
+const INK = MARK.ink;
+const INK_MID = "#41444c";
+const INK_SOFT = "#6c6f77";
+const LINE = "#e8e8ea";
+const ACCENT = MARK.accent;
+const ACCENT_TEXT = "#d93a1c";
+const ACCENT_SOFT = "#fff1ec";
+const BAR_TRACK = "#ffd9cf";
 
 const SANS =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, sans-serif';
@@ -125,16 +132,28 @@ function roundRect(
   ctx.closePath();
 }
 
-export function drawReport(options: {
+/** The logo's "t" tile, rasterised by the browser from the same SVG the
+ *  app draws, so the report cannot drift from the sidebar's mark. */
+async function loadMark() {
+  const image = new Image();
+  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+    brandMarkSvg({ variant: "t", radius: MARK.tileRadius, size: 128 }),
+  )}`;
+  await image.decode();
+  return image;
+}
+
+export async function drawReport(options: {
   estimate: VehicleEstimate;
   copy: ReportCopy;
   locale: Locale;
   commission: number;
   monthLabel: (month: number, year: number) => string;
   currency: (value: number) => string;
-}): HTMLCanvasElement {
+}): Promise<HTMLCanvasElement> {
   const { estimate, copy, commission, monthLabel, currency } = options;
   const ownerShare = 1 - commission / 100;
+  const mark = await loadMark();
 
   const canvas = document.createElement("canvas");
   canvas.width = PAGE_WIDTH * SCALE;
@@ -148,9 +167,10 @@ export function drawReport(options: {
   ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
 
   // ---- header -------------------------------------------------------
-  ctx.fillStyle = BRAND;
+  ctx.drawImage(mark, MARGIN, 44, 18, 18);
+  ctx.fillStyle = INK;
   ctx.font = font(13, 700);
-  ctx.fillText("TATO", MARGIN, 58);
+  ctx.fillText("TATO", MARGIN + 24, 58);
 
   ctx.fillStyle = INK_SOFT;
   ctx.font = font(8);
@@ -194,13 +214,16 @@ export function drawReport(options: {
   // owner's share, boxed
   const boxW = 176;
   const boxX = PAGE_WIDTH - MARGIN - boxW;
-  ctx.fillStyle = BRAND_SOFT;
+  ctx.fillStyle = ACCENT_SOFT;
   roundRect(ctx, boxX, 155, boxW, 66, 6);
   ctx.fill();
 
-  ctx.fillStyle = BRAND;
+  // The label in ink: the darker orange is only 4.2:1 on the tint,
+  // fine for the 24pt figure below and not for 8pt caps.
+  ctx.fillStyle = INK_MID;
   ctx.font = font(8, 600);
   ctx.fillText(copy.netLabel.toUpperCase(), boxX + 14, 176);
+  ctx.fillStyle = ACCENT_TEXT;
   ctx.font = font(24, 700);
   ctx.fillText(currency(estimate.annualGross * ownerShare), boxX + 14, 203);
   ctx.fillStyle = INK_SOFT;
@@ -218,7 +241,7 @@ export function drawReport(options: {
   let legendX = MARGIN;
   const legendY = 278;
   for (const [label, colour] of [
-    [copy.netLabel, BRAND],
+    [copy.netLabel, ACCENT],
     [copy.grossLabel, BAR_TRACK],
   ] as const) {
     ctx.fillStyle = colour;
@@ -246,7 +269,7 @@ export function drawReport(options: {
     roundRect(ctx, x, chartBottom - total, barWidth, total, 2);
     ctx.fill();
 
-    ctx.fillStyle = BRAND;
+    ctx.fillStyle = ACCENT;
     roundRect(ctx, x, chartBottom - net, barWidth, net, 2);
     ctx.fill();
 
@@ -287,7 +310,7 @@ export function drawReport(options: {
     ctx.fillStyle = INK_SOFT;
     ctx.font = font(8, 600);
     ctx.fillText(label.toUpperCase(), x, 476);
-    ctx.fillStyle = index === 0 ? BRAND : INK;
+    ctx.fillStyle = index === 0 ? ACCENT_TEXT : INK;
     ctx.font = font(17, 700);
     ctx.fillText(value, x, 498);
     ctx.fillStyle = INK_SOFT;

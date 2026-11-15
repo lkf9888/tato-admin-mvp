@@ -124,7 +124,7 @@ export function RentalEstimateTool({
         import("pdf-lib"),
       ]);
 
-      const canvas = drawReport({
+      const canvas = await drawReport({
         estimate,
         locale,
         commission,

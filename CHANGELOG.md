@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.91.1 - 2026-11-14
+
+### The estimate report carries the new logo's colours
+
+The one-page PDF from 租金预估 was drawn in the old purple (#593CFB), the colour v1.91.0 dropped from the logo because it was all but Turo's. The report goes to owners, so it now uses the logo's own colours, read from `lib/brand-mark.ts` rather than copied: ink #15171C for type, orange #FF5A3C for the owner's-share bars and box. Orange is only 3.1:1 on white, so the figures set in the accent (the owner's share, the peak month) use a darker step, #D93A1C (4.6:1), and the small label on the tinted box is set in ink.
+
+- The header shows the logo's one-letter "t" tile beside "TATO", drawn by the browser from the same `brandMarkSvg` the sidebar uses. Loading that image made `drawReport` async; its one caller awaits it.
+
 ## v1.91.0 - 2026-11-14
 
 ### TATO has a new logo: a lowercase "tato"
